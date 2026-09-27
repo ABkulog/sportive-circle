@@ -2133,3 +2133,25 @@ def test_followers_see_one_unfollow_button(accounts, client, app):
     assert client.get(f"/clubs/{club}").data.decode().count(">Unfollow<") == 1
     client.post(f"/clubs/{club}/leave")
     assert ">Follow<" in client.get(f"/clubs/{club}").data.decode()
+
+
+def test_reminder_task_needs_the_secret_token(client, app):
+    assert client.post("/tasks/send-reminders").status_code == 404            # no token configured: no page
+    app.config["TASK_TOKEN"] = "s3cret"
+    assert client.post("/tasks/send-reminders", headers={"X-Task-Token": "wrong"}).status_code == 404
+    response = client.post("/tasks/send-reminders", headers={"X-Task-Token": "s3cret"})
+    assert response.status_code == 200 and response.get_json() == {"sent": 0}
+
+
+def test_reminder_task_works_with_csrf_on(app):
+    app.config.update(CSRF_ENABLED=True, TASK_TOKEN="s3cret")
+    response = app.test_client().post("/tasks/send-reminders", headers={"X-Task-Token": "s3cret"})
+    assert response.status_code == 200
+
+
+def test_render_blueprint_is_valid():
+    import yaml
+    blueprint = yaml.safe_load(open("render.yaml"))
+    web = blueprint["services"][0]
+    assert web["disk"]["mountPath"] == "/data"
+    assert {"key": "DATABASE", "value": "/data/sportive_circle.db"} in web["envVars"]

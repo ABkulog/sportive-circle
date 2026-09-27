@@ -57,7 +57,8 @@ def csrf_field():
 
 @bp.before_app_request
 def check_csrf():
-    if request.method == "POST" and current_app.config["CSRF_ENABLED"]:
+    # The scheduler's reminder call proves itself with its own secret token instead (reminders.py).
+    if request.method == "POST" and current_app.config["CSRF_ENABLED"] and request.endpoint != "tasks.send_reminders_task":
         sent = request.form.get("csrf_token", "")
         expected = session.get("csrf_token", "")
         if not sent or not expected or not secrets.compare_digest(sent, expected):

@@ -33,7 +33,8 @@ CONTENT_SECURITY_POLICY = "; ".join([
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
-    public_url = os.environ.get("PUBLIC_URL", "http://localhost:5050")
+    # PUBLIC_URL wins; on Render, RENDER_EXTERNAL_URL (e.g. https://sportive-circle.onrender.com) is set for us.
+    public_url = os.environ.get("PUBLIC_URL") or os.environ.get("RENDER_EXTERNAL_URL") or "http://localhost:5050"
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("SECRET_KEY", DEV_SECRET_KEY),
         DATABASE=os.environ.get("DATABASE", os.path.join(app.instance_path, "sportive_circle.db")),
@@ -59,6 +60,8 @@ def create_app(test_config=None):
         ADMIN_EMAILS=os.environ.get("ADMIN_EMAILS", ""),
         # Where people send privacy questions and appeals (shown on the Privacy and Terms pages).
         CONTACT_EMAIL=os.environ.get("CONTACT_EMAIL", ""),
+        # Secret the scheduler sends to /tasks/send-reminders (unset = that page doesn't exist).
+        TASK_TOKEN=os.environ.get("TASK_TOKEN"),
     )
     if test_config:
         app.config.update(test_config)
@@ -72,7 +75,8 @@ def create_app(test_config=None):
     logging.basicConfig(level=logging.INFO)
 
     db.init_app(app)
-    for blueprint in (auth.bp, events.bp, profile.bp, social.bp, news.bp, clubs.bp, moderation.bp, notifications.bp):
+    for blueprint in (auth.bp, events.bp, profile.bp, social.bp, news.bp, clubs.bp, moderation.bp, notifications.bp,
+                      reminders.bp):
         app.register_blueprint(blueprint)
     pages.register(app)
     app.add_url_rule("/", endpoint="index", view_func=events.feed)

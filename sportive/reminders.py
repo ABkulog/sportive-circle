@@ -1,15 +1,18 @@
 """Email reminders before events.
 
-Run every ~10 minutes (a cron job on the server):
-    flask --app "sportive:create_app()" send-reminders
+Run every ~10 minutes, either as a command on the server:
+    flask --app wsgi send-reminders
+or, on hosts where scheduled jobs can't open the database (like Render), by calling
+    POST /tasks/send-reminders   with the header  X-Task-Token: <TASK_TOKEN>
 Locally:
     .venv/bin/flask --app main send-reminders
 """
+import secrets
 import logging
 from datetime import timedelta
 
 import click
-from flask import current_app
+from flask import Blueprint, abort, current_app, jsonify, request
 from flask.cli import with_appcontext
 
 from .constants import SPORT_EMOJI, SPORTS
@@ -88,6 +91,20 @@ def send_due_reminders():
                    (row["event_id"], row["user_id"]))
         db.commit()
     return sent
+
+
+bp = Blueprint("tasks", __name__)
+
+
+@bp.route("/tasks/send-reminders", methods=("POST",))
+def send_reminders_task():
+    """For a scheduler (e.g. Render's cron job). Only works with the secret TASK_TOKEN; without one set,
+    the page doesn't exist."""
+    token = current_app.config.get("TASK_TOKEN")
+    sent = request.headers.get("X-Task-Token", "")
+    if not token or not secrets.compare_digest(sent, token):
+        abort(404)
+    return jsonify(sent=send_due_reminders())
 
 
 @click.command("send-reminders")

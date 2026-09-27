@@ -6,54 +6,53 @@ A checklist for launching to UW students. It takes about an hour the first time.
 
 - [ ] Tests pass: `.venv/bin/python -m pytest -q` (GitHub Actions also runs them on every push).
 - [ ] Pick a name and domain (optional). A free host address like `sportive-circle.onrender.com` works too.
-- [ ] Set up an email provider (see step 3). Without one, nobody can sign up, because codes can't be sent.
+- [ ] Set up an email provider (see step 2). Without one, nobody can sign up, because codes can't be sent.
 - [ ] Have a friend (or a UW law clinic or ASUW office) read the [Privacy](../sportive/templates/pages/privacy.html)
       and [Terms](../sportive/templates/pages/terms.html) pages.
 - [ ] Decide who the admins are (your UW email, maybe a co-founder's).
 - [ ] Don't use UW logos (the "W" or the Husky dog marks). Purple, gold and place names are fine.
 
-## 2. Host the app (example: Render)
+## 2. Email (Brevo, free)
 
-Any host that runs Python works (Render, Railway, Fly.io, a UW-provided server...). On Render:
+1. Sign up at [brevo.com](https://www.brevo.com) (free plan: 300 emails a day).
+2. **Senders, domains & dedicated IPs → Senders → Add a sender**: use the email you want codes to come from,
+   and confirm it from your inbox.
+3. **SMTP & API → SMTP**: note the **SMTP server** (`smtp-relay.brevo.com`), **login**, and create an
+   **SMTP key** (that's the password).
 
-1. Push the code to GitHub.
-2. Render → **New → Web Service** → pick the repository.
-3. **Build command:** `pip install -r requirements.txt`
-4. **Start command:** `gunicorn wsgi:app --workers 2 --bind 0.0.0.0:$PORT`
-5. **Disk:** add a persistent disk mounted at `/data` (the database lives there; without a disk it's
-   erased on every deploy).
-6. **Environment variables** (copy from [`.env.example`](../.env.example)):
+## 3. Put it online (Render, one Blueprint)
 
-   | Variable | Value |
+The repository has a [`render.yaml`](../render.yaml) Blueprint that sets up everything: the website, a disk for
+the database, a random secret key, and the reminder job that runs every 10 minutes.
+
+1. Sign up at [render.com](https://render.com) with **GitHub**, and add a payment method (the disk needs a
+   paid plan: about $7/month for the website plus about $1/month for the reminder job).
+2. **New → Blueprint →** pick `sportive-circle` → Render reads `render.yaml`.
+3. It asks for the email settings from step 2:
+
+   | Setting | Value |
    |---|---|
-   | `SECRET_KEY` | run `python3 -c "import secrets; print(secrets.token_hex(32))"` |
-   | `PUBLIC_URL` | `https://your-app.onrender.com` (your real address, with https) |
-   | `BEHIND_PROXY` | `1` |
-   | `DATABASE` | `/data/sportive_circle.db` |
-   | `ADMIN_EMAILS` | `you@uw.edu` |
-   | `MAIL_SERVER`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | from your email provider |
+   | `MAIL_SERVER` | `smtp-relay.brevo.com` |
+   | `MAIL_USERNAME` | your Brevo SMTP login |
+   | `MAIL_PASSWORD` | your Brevo SMTP key |
+   | `MAIL_FROM` | `Sportive Circle <the sender email you confirmed>` |
 
-7. Deploy, then open the site and sign up with your own UW email.
+4. **Apply**. The first build takes a few minutes. Your site is at `https://sportive-circle.onrender.com`
+   (or the name Render shows).
+5. Open it, sign up with your UW email (`ADMIN_EMAILS` in `render.yaml` makes that account an admin), and
+   check the code email arrives (look in Junk too).
 
-## 3. Email
+Every push to `main` on GitHub redeploys automatically. The database stays on the disk.
 
-Pick any SMTP provider. Good free or cheap options: **Brevo**, **SendGrid**, **Mailgun**, **Amazon SES**.
+## 4. Reminders
 
-- Verify a sender address or domain with the provider, so emails don't land in spam.
-- UW email filters are strict: send a test code to your `@uw.edu` address and check Junk.
-
-## 4. Reminders (every 10 minutes)
-
-Add a scheduled job (Render → **New → Cron Job**, same repository and environment variables):
-
-- **Schedule:** `*/10 * * * *`
-- **Command:** `flask --app wsgi send-reminders`
-
-It emails everyone going to a game that starts within the next hour.
+Already done by the Blueprint: the `sportive-circle-reminders` cron job calls the site every 10 minutes
+(`POST /tasks/send-reminders` with a secret token) and it emails everyone whose game starts within the hour.
 
 ## 5. Backups
 
-The whole app is one file: `sportive_circle.db`. Back it up daily, for example with a cron job:
+The whole app is one file: `sportive_circle.db` on the disk. Render snapshots paid disks every day
+automatically (Dashboard → your service → Disks). For an extra copy, from the service's **Shell** tab:
 
 ```bash
 sqlite3 /data/sportive_circle.db ".backup '/data/backups/sportive-$(date +%F).db'"
