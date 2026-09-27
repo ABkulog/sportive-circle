@@ -1687,7 +1687,7 @@ def test_follow_is_not_membership(accounts, client, app):
     client.post(f"/clubs/{club}/follow")
     page = client.get(f"/clubs/{club}").data.decode()
     stats = re.findall(r"<strong>(\d+)</strong><span>(\w+)</span>", page)
-    assert ">Following<" in page and ("1", "member") in stats and ("1", "following") in stats   # captain only
+    assert ">Following<" in page and ("1", "member") in stats and ("1", "follower") in stats   # captain only
 
 
 def test_tryouts_flow_with_messages(accounts, client, app):
@@ -2113,3 +2113,13 @@ def test_first_photo_still_required_to_pick_one(accounts, client):
     accounts.signup(photo=False)
     assert b"Choose a photo first" in client.post("/profile/photo", data={}, content_type="multipart/form-data",
                                                   follow_redirects=True).data
+
+
+def test_club_page_counts_followers(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "<span>followers</span>" in page and "<span>following</span>" not in page
+    accounts.logout()
+    accounts.signup(email="fan@uw.edu")
+    client.post(f"/clubs/{club}/follow")
+    assert "<strong>1</strong><span>follower</span>" in client.get(f"/clubs/{club}").data.decode()
