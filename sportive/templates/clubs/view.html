@@ -60,7 +60,7 @@
         </details>
         {% if role == 'follower' %}
           <form method="post" action="{{ url_for('clubs.leave', club_id=club.id) }}">
-            {{ csrf_field() }}<button class="btn btn-ghost">Following</button>
+            {{ csrf_field() }}<button class="btn btn-ghost">Unfollow</button>
           </form>
         {% else %}
           <form method="post" action="{{ url_for('clubs.follow', club_id=club.id) }}">
@@ -123,10 +123,10 @@
       <p class="muted"><a href="{{ url_for('auth.login', next=request.path) }}">Log in</a> to message the officers.</p>
     {% endif %}
 
-    {% if role in ('member', 'follower', 'requested', 'tryout') %}
+    {% if role in ('member', 'requested', 'tryout') %}  {# followers use the Unfollow button at the top #}
       <form method="post" action="{{ url_for('clubs.leave', club_id=club.id) }}" class="quiet-leave"
             {% if role == 'member' %}data-confirm="Leave {{ club.name }}?"{% endif %}>
-        {{ csrf_field() }}<button class="link-button">{{ {'member': 'Leave club', 'follower': 'Unfollow', 'requested': 'Cancel request', 'tryout': 'Cancel tryout sign-up'}[role] }}</button>
+        {{ csrf_field() }}<button class="link-button">{{ {'member': 'Leave club', 'requested': 'Cancel request', 'tryout': 'Cancel tryout sign-up'}[role] }}</button>
       </form>
     {% elif role == 'officer' %}
       <p class="quiet-leave"><a href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit club</a> ·

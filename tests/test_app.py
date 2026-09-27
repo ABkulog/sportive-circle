@@ -1687,7 +1687,7 @@ def test_follow_is_not_membership(accounts, client, app):
     client.post(f"/clubs/{club}/follow")
     page = client.get(f"/clubs/{club}").data.decode()
     stats = re.findall(r"<strong>(\d+)</strong><span>(\w+)</span>", page)
-    assert ">Following<" in page and ("1", "member") in stats and ("1", "follower") in stats   # captain only
+    assert ">Unfollow<" in page and ("1", "member") in stats and ("1", "follower") in stats   # captain only
 
 
 def test_tryouts_flow_with_messages(accounts, client, app):
@@ -1706,7 +1706,7 @@ def test_tryouts_flow_with_messages(accounts, client, app):
     accounts.login(email="hopeful@uw.edu")
     captain = _user_id(app, "captain@uw.edu")
     assert "Thanks so much for trying out" in client.get(f"/messages/{captain}").data.decode()
-    assert "Following" in client.get(f"/clubs/{club}").data.decode()        # still following after "not this time"
+    assert ">Unfollow<" in client.get(f"/clubs/{club}").data.decode()       # still following after "not this time"
 
 
 def test_application_needs_an_answer(accounts, client, app):
@@ -2123,3 +2123,13 @@ def test_club_page_counts_followers(accounts, client, app):
     accounts.signup(email="fan@uw.edu")
     client.post(f"/clubs/{club}/follow")
     assert "<strong>1</strong><span>follower</span>" in client.get(f"/clubs/{club}").data.decode()
+
+
+def test_followers_see_one_unfollow_button(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.logout()
+    accounts.signup(email="fan@uw.edu")
+    client.post(f"/clubs/{club}/follow")
+    assert client.get(f"/clubs/{club}").data.decode().count(">Unfollow<") == 1
+    client.post(f"/clubs/{club}/leave")
+    assert ">Follow<" in client.get(f"/clubs/{club}").data.decode()
