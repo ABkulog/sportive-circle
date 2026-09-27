@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge_tile %}
+{% block title %}Badge locker{% endblock %}
+{% block content %}
+<h1 class="page-title">🏅 Badge locker</h1>
+<p class="muted">Pick <strong>{{ slots }}</strong> badges to show on your profile. The rest stay safe in here,
+  and you can switch them out any time.</p>
+
+<form method="post" class="locker-form" id="locker">
+  {{ csrf_field() }}
+  <div class="locker-bar card">
+    <span><strong id="picked-count">{{ shown|length }}</strong>/{{ slots }} showing</span>
+    <button class="btn">Save showcase</button>
+  </div>
+
+  <h2>Earned ({{ earned|length }})</h2>
+  <ul class="husky-badges">
+    {% for b in badges if b.key in earned %}{{ badge_tile(b, earned, rarity, is_retired, pick=(b.key in shown)) }}
+    {% else %}<li class="muted">No badges yet. Go play a game! 🐾</li>{% endfor %}
+  </ul>
+
+  <h2>Still to earn</h2>
+  <ul class="husky-badges">
+    {% for b in badges if b.key not in earned and not is_retired(b) %}{{ badge_tile(b, earned, rarity, is_retired) }}{% endfor %}
+  </ul>
+</form>
+<script>
+  // Only 3 can be picked: once 3 are checked, the others are disabled.
+  const picks = [...document.querySelectorAll(".showcase-pick")];
+  const count = document.getElementById("picked-count");
+  function update() {
+    const checked = picks.filter((box) => box.checked).length;
+    count.textContent = checked;
+    picks.forEach((box) => { box.disabled = !box.checked && checked >= {{ slots }}; });
+  }
+  picks.forEach((box) => box.addEventListener("change", update));
+  update();
+</script>
+{% endblock %}

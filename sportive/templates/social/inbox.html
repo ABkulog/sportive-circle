@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Messages{% endblock %}
+{% block content %}
+<h1 class="page-title">✉️ Messages</h1>
+<div class="stack">
+  {% for c in conversations %}
+    <a class="card convo {% if c.unread %}is-unread{% endif %}" href="{{ url_for('social.thread', user_id=c.id) }}">
+      {{ avatar(c.id, c.full_name, c.avatar_updated, 44) }}
+      <span class="convo-body">
+        <strong>{{ c.full_name }}</strong>
+        <span class="muted convo-preview">{% if c.sender_id == g.user.id %}You: {% endif %}{{ c.body|truncate(70) }}</span>
+      </span>
+      <span class="convo-meta">
+        <small class="muted">{{ c.created_at|when }}</small>
+        {% if c.unread %}<span class="count-dot">{{ c.unread }}</span>{% endif %}
+      </span>
+    </a>
+  {% else %}
+    <div class="card empty">
+      <p class="empty-emoji" aria-hidden="true">✉️</p>
+      <p><strong>No messages yet.</strong></p>
+      <p class="muted">Message your <a href="{{ url_for('social.friends') }}">friends</a> or anyone you've played with
+        from their profile. For questions about a game, use its 💬 group chat.</p>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

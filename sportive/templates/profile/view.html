@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import event_card, avatar %}
+{% from "_macros.html" import event_card, avatar, badge_tile %}
 {% block title %}{{ user.full_name }}{% endblock %}
 {% block content %}
 <section class="card profile">
@@ -8,11 +8,59 @@
     <h1>{{ user.full_name }}</h1>
     <p class="muted">{% if user.grad_year %}Class of {{ user.grad_year }}{% endif %}{% if user.grad_year and show_email %} · {% endif %}{% if show_email %}<a href="mailto:{{ user.email }}">{{ user.email }}</a>{% endif %}</p>
     {% if user.bio %}<p>{{ user.bio }}</p>{% endif %}
+    {% if showcase %}
+      <ul class="husky-badges showcase" aria-label="Badge showcase">
+        {% for b in showcase %}{{ badge_tile(b, earned, rarity, is_retired) }}{% endfor %}
+      </ul>
+    {% endif %}
+    {% if user.id == g.user.id %}
+      <a class="locker-link" href="{{ url_for('profile.badge_locker') }}">🏅 Badge locker ({{ earned|length }}) · choose your 3</a>
+    {% endif %}
     <div class="badges">
       {% for s in sports %}<span class="chip">{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</span>{% else %}<span class="muted">No sports picked yet.</span>{% endfor %}
     </div>
     {% if user.id == g.user.id %}
       <a class="btn btn-ghost" href="{{ url_for('profile.edit') }}">Edit profile</a>
+    {% elif relation.i_blocked %}
+      <form method="post" action="{{ url_for('social.unblock', user_id=user.id) }}">
+        {{ csrf_field() }}<button class="btn btn-ghost">Unblock</button>
+      </form>
+    {% elif not relation.blocked_me %}
+      <div class="profile-actions">
+        {% if relation.friend == 'friends' %}
+          <span class="done-pill">✅ Friends</span>
+        {% elif relation.friend == 'sent' %}
+          <span class="done-pill">Request sent</span>
+        {% elif relation.friend == 'received' %}
+          <form method="post" action="{{ url_for('social.accept_request', user_id=user.id) }}">
+            {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.path }}">
+            <button class="btn">Accept friend request</button>
+          </form>
+        {% else %}
+          <form method="post" action="{{ url_for('social.send_request', user_id=user.id) }}">
+            {{ csrf_field() }}<button class="btn">+ Add friend</button>
+          </form>
+        {% endif %}
+        {% if relation.can_message %}
+          <a class="btn btn-ghost" href="{{ url_for('social.thread', user_id=user.id) }}">✉️ Message</a>
+        {% endif %}
+        <details class="more-menu">
+          <summary aria-label="More options">⋯</summary>
+          <div class="more-menu-panel">
+          {% if relation.friend == 'friends' %}
+            <form method="post" action="{{ url_for('social.remove_friend', user_id=user.id) }}"
+                  onsubmit="return confirm('Remove {{ user.full_name.split()[0] }} as a friend?')">
+              {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.path }}">
+              <button class="link-button">Unfriend</button>
+            </form>
+          {% endif %}
+          <form method="post" action="{{ url_for('social.block', user_id=user.id) }}"
+                onsubmit="return confirm('Block {{ user.full_name.split()[0] }}? They won\'t be able to message you or add you.')">
+            {{ csrf_field() }}<button class="link-button danger-link">Block</button>
+          </form>
+          </div>
+        </details>
+      </div>
     {% endif %}
   </div>
 </section>
@@ -47,33 +95,6 @@
     <p class="muted">Everyone starts at <strong>Casual 1</strong>. Play games, collect 🤝 props and get ⬆️ vouched
       by teammates to rank up in each sport.</p>
   {% endif %}
-</section>
-
-<section class="card">
-  <h2>🐺 Badges <span class="muted badge-count">{{ earned|length }} earned</span></h2>
-  <ul class="husky-badges">
-    {% for b in badges %}
-      {% set retired = is_retired(b) %}
-      {% set has = b.key in earned %}
-      {% if has or (user.id == g.user.id and not retired) %}
-        <li class="husky-badge {% if not has %}is-locked{% endif %} {% if b.until %}is-limited{% endif %} {% if retired %}is-retired{% endif %}"
-            title="{{ b.how }}">
-          <span class="husky-badge-emoji" aria-hidden="true">{{ b.emoji }}</span>
-          <span>
-            <strong>{{ b.name }}</strong>
-            {% if has %}
-              <small>Earned {{ earned[b.key].strftime('%b %Y') }}{% if rarity.get(b.key) is not none %} · {{ rarity[b.key] }}% of Huskies{% endif %}</small>
-            {% else %}
-              <small>{{ b.how }}</small>
-            {% endif %}
-            {% if retired %}<span class="badge-tag tag-og">OG · Retired</span>
-            {% elif b.until %}<span class="badge-tag tag-limited">Limited · until {{ b.until.strftime('%b') }} {{ b.until.day }}</span>{% endif %}
-          </span>
-        </li>
-      {% endif %}
-    {% endfor %}
-  </ul>
-  {% if not earned and user.id != g.user.id %}<p class="muted">No badges yet. Play a game together!</p>{% endif %}
 </section>
 
 <section>

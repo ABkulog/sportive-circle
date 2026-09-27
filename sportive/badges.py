@@ -149,3 +149,35 @@ def rarity():
     total = db.execute("SELECT COUNT(*) FROM users WHERE verified = 1").fetchone()[0] or 1
     return {row["badge"]: round(100 * row["n"] / total) for row in db.execute(
         "SELECT badge, COUNT(*) AS n FROM user_badges GROUP BY badge")}
+
+
+SHOWCASE_SLOTS = 3
+
+
+def showcase(user_id):
+    """The (up to) 3 badges shown on a profile. Until someone picks, show their 3 rarest."""
+    db = get_db()
+    earned = earned_badges(user_id)
+    by_key = {badge.key: badge for badge in catalog()}
+    row = db.execute("SELECT showcase FROM users WHERE id = ?", (user_id,)).fetchone()
+    if row and row["showcase"] is not None:
+        keys = [key for key in row["showcase"].split(",") if key in earned and key in by_key]
+    else:
+        percent = rarity()
+        keys = sorted(earned, key=lambda key: (percent.get(key, 100), key))
+        keys = [key for key in keys if key in by_key]
+    return [by_key[key] for key in keys[:SHOWCASE_SLOTS]]
+
+
+def set_showcase(user_id, keys):
+    """Save which badges to show. Returns an error message, or None when saved."""
+    earned = earned_badges(user_id)
+    keys = list(dict.fromkeys(keys))  # drop duplicates, keep order
+    if len(keys) > SHOWCASE_SLOTS:
+        return f"You can only show {SHOWCASE_SLOTS} badges. Pick your top {SHOWCASE_SLOTS}!"
+    if any(key not in earned for key in keys):
+        return "You can only show badges you've earned."
+    db = get_db()
+    db.execute("UPDATE users SET showcase = ? WHERE id = ?", (",".join(keys), user_id))
+    db.commit()
+    return None

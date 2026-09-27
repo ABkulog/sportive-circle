@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Friends{% endblock %}
+{% block content %}
+{% macro person_row(p, extra="") %}
+  <a class="person" href="{{ url_for('profile.view', user_id=p.id) }}">{{ avatar(p.id, p.full_name, p.avatar_updated, 40) }}<span><strong>{{ p.full_name }}</strong>{% if extra %}<small class="muted person-extra">{{ extra }}</small>{% endif %}</span></a>
+{% endmacro %}
+<h1 class="page-title">👥 Friends</h1>
+
+{% if incoming %}
+  <section class="card">
+    <h2>Friend requests ({{ incoming|length }})</h2>
+    <ul class="people">
+      {% for p in incoming %}
+        <li class="post-game-row">{{ person_row(p) }}
+          <span class="post-game-actions">
+            <form method="post" action="{{ url_for('social.accept_request', user_id=p.id) }}">{{ csrf_field() }}<button class="btn btn-small">Accept</button></form>
+            <form method="post" action="{{ url_for('social.remove_friend', user_id=p.id) }}">{{ csrf_field() }}<button class="btn btn-small btn-ghost">Decline</button></form>
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
+
+<section class="card">
+  <h2>Your pack ({{ friends|length }})</h2>
+  <ul class="people">
+    {% for p in friends %}
+      <li class="post-game-row">{{ person_row(p) }}
+        <a class="btn btn-small btn-ghost" href="{{ url_for('social.thread', user_id=p.id) }}">✉️ Message</a>
+      </li>
+    {% else %}
+      <li class="muted">No friends yet. Add people you've played with! 🐾</li>
+    {% endfor %}
+  </ul>
+</section>
+
+{% if suggestions %}
+  <section class="card">
+    <h2>People you've played with</h2>
+    <ul class="people">
+      {% for p in suggestions %}
+        <li class="post-game-row">{{ person_row(p, p.games ~ " game" ~ ("s" if p.games != 1 else "") ~ " together") }}
+          <form method="post" action="{{ url_for('social.send_request', user_id=p.id) }}">
+            {{ csrf_field() }}<input type="hidden" name="next" value="{{ url_for('social.friends') }}">
+            <button class="btn btn-small">+ Add friend</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
+
+{% if outgoing %}
+  <section class="card">
+    <h2>Requests you sent</h2>
+    <ul class="people">
+      {% for p in outgoing %}
+        <li class="post-game-row">{{ person_row(p, "Waiting for them to accept") }}
+          <form method="post" action="{{ url_for('social.remove_friend', user_id=p.id) }}">{{ csrf_field() }}<button class="btn btn-small btn-ghost">Cancel</button></form>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
+{% endblock %}

@@ -46,6 +46,11 @@
       </div>
     </div>
     <div class="event-side">
+      {% if e.i_am_going and not e.cancelled %}
+        {% set unread = chat_unread().get(e.id, 0) %}
+        <a class="card-chat" href="{{ url_for('social.event_chat', event_id=e.id) }}"
+           aria-label="Group chat{% if unread %}, {{ unread }} new{% endif %}">💬{% if unread %}<span class="count-dot">{{ unread }}</span>{% endif %}</a>
+      {% endif %}
       <div class="event-count">
         <strong>{{ e.going_count + e.extra_players }}</strong>{% if e.max_players %}/{{ e.max_players }}{% endif %}
         <small>going</small>
@@ -68,4 +73,28 @@
   {%- else -%}
     <span class="avatar-img avatar-initial" style="--size: {{ size }}px" aria-hidden="true">{{ name[:1]|upper }}</span>
   {%- endif -%}
+{% endmacro %}
+
+{% macro badge_tile(b, earned, rarity, is_retired, pick=None) %}
+  {# pick = None (just show) or True/False (a checkbox for the showcase, checked or not) #}
+  {% set retired = is_retired(b) %}
+  {% set has = b.key in earned %}
+  <li class="husky-badge {% if not has %}is-locked{% endif %} {% if b.until %}is-limited{% endif %} {% if retired %}is-retired{% endif %}"
+      title="{{ b.how }}">
+    {% if pick is not none and has %}
+      <input type="checkbox" name="show" value="{{ b.key }}" class="showcase-pick" {% if pick %}checked{% endif %}
+             aria-label="Show {{ b.name }} on my profile">
+    {% endif %}
+    <span class="husky-badge-emoji" aria-hidden="true">{{ b.emoji }}</span>
+    <span>
+      <strong>{{ b.name }}</strong>
+      {% if has %}
+        <small>Earned {{ earned[b.key].strftime('%b %Y') }}{% if rarity.get(b.key) is not none %} · {{ rarity[b.key] }}% of Huskies{% endif %}</small>
+      {% else %}
+        <small>{{ b.how }}</small>
+      {% endif %}
+      {% if retired %}<span class="badge-tag tag-og">OG · Retired</span>
+      {% elif b.until %}<span class="badge-tag tag-limited">Limited · until {{ b.until.strftime('%b') }} {{ b.until.day }}</span>{% endif %}
+    </span>
+  </li>
 {% endmacro %}

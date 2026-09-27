@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Husky news{% endblock %}
+{% block content %}
+<header class="feed-hello">
+  <h1 class="page-title">📰 Husky news</h1>
+  <p class="spirit-line">What's happening with every Washington team. Go Dawgs! 🐺</p>
+</header>
+
+<nav class="card filters" aria-label="Filter news">
+  <div class="segmented" role="group" aria-label="Which teams">
+    <a class="segmented-link {% if scope == 'mine' and not team %}is-on{% endif %}" href="{{ url_for('news.news', scope='mine') }}">My sports</a>
+    <a class="segmented-link {% if scope == 'all' and not team %}is-on{% endif %}" href="{{ url_for('news.news', scope='all') }}">All teams</a>
+  </div>
+  <div class="team-chips">
+    {% for code, (name, emoji, _) in chips %}
+      <a class="chip {% if team == code %}is-on{% endif %}" href="{{ url_for('news.news', team=code) }}">{{ emoji }} {{ name }}</a>
+    {% endfor %}
+  </div>
+</nav>
+
+{% if scope == 'mine' and not team and not has_sports %}
+  <p class="muted">Tip: <a href="{{ url_for('profile.edit') }}">pick your sports</a> to see news for your teams.</p>
+{% endif %}
+
+<div class="stack">
+  {% for s in stories %}
+    <a class="card news-card" href="{{ s.link }}" target="_blank" rel="noopener">
+      <span class="news-emoji" aria-hidden="true">{% if s.general %}🐺{% else %}{{ teams[s.teams[0]][1] }}{% endif %}</span>
+      <span class="news-body">
+        <span class="news-team">{% if s.general %}Washington Athletics{% else %}{% for code in s.teams[:3] %}{{ teams[code][0] }}{% if not loop.last %} · {% endif %}{% endfor %}{% endif %}</span>
+        <strong class="news-title">{{ s.title }}</strong>
+        {% if s.published %}<small class="muted">{{ s.published.strftime('%a %b') }} {{ s.published.day }}</small>{% endif %}
+      </span>
+      <span class="news-arrow" aria-hidden="true">↗</span>
+    </a>
+  {% else %}
+    <div class="card empty">
+      <p class="empty-emoji" aria-hidden="true">📰</p>
+      <p><strong>No news right now.</strong></p>
+      <p class="muted">Either it's a quiet week, or GoHuskies.com isn't answering. Try <a href="{{ url_for('news.news', scope='all') }}">all teams</a>.</p>
+    </div>
+  {% endfor %}
+</div>
+<p class="muted news-credit">Headlines from <a href="https://gohuskies.com" target="_blank" rel="noopener">GoHuskies.com</a>,
+  the official site of Washington Athletics. Tap a story to read it there.</p>
+{% endblock %}

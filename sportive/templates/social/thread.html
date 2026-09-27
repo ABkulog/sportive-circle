@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "social/_chat.html" import chat_box %}
+{% from "_macros.html" import avatar %}
+{% block title %}{{ other.full_name }}{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('social.inbox') }}">← Messages</a>
+<header class="chat-header">
+  <a class="person" href="{{ url_for('profile.view', user_id=other.id) }}">{{ avatar(other.id, other.full_name, other.avatar_updated, 44) }}<h1>{{ other.full_name }}</h1></a>
+</header>
+{% if blocked %}
+  <p class="card muted">You blocked {{ other.full_name.split()[0] }}. Unblock them from their profile to chat again.</p>
+{% else %}
+  {{ chat_box(messages, poll_url, url_for('social.thread', user_id=other.id), allowed,
+              "Message " ~ other.full_name.split()[0] ~ "…", "Say hi! 👋") }}
+  {% if not allowed %}
+    <p class="muted">You can message friends and people you've played with.
+      <a href="{{ url_for('profile.view', user_id=other.id) }}">Send {{ other.full_name.split()[0] }} a friend request</a> first.</p>
+  {% endif %}
+{% endif %}
+{% endblock %}
+{# no Need players / New event bar over the message box #}
+{% block actionbar %}{% endblock %}

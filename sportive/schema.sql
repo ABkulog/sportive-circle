@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
     locked_until    TEXT,                          -- set after too many wrong passwords
     email_reminders INTEGER NOT NULL DEFAULT 1,    -- 0 = don't email me before events
     avatar_updated  TEXT,                          -- when the profile picture changed (NULL = none yet)
+    showcase        TEXT,                          -- up to 3 badge keys shown on the profile, comma-separated
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -96,4 +97,52 @@ CREATE TABLE IF NOT EXISTS ranks_seen (
     sport   TEXT NOT NULL,
     level   INTEGER NOT NULL,
     PRIMARY KEY (user_id, sport)
+);
+
+-- ---------------------------------------------------------------- social
+-- Friend requests. status: 'pending' until the other person accepts.
+CREATE TABLE IF NOT EXISTS friendships (
+    requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    addressee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status       TEXT NOT NULL DEFAULT 'pending',
+    created_at   TEXT NOT NULL,
+    PRIMARY KEY (requester_id, addressee_id)
+);
+
+-- Blocking: the blocked person can't message you or send you friend requests.
+CREATE TABLE IF NOT EXISTS blocks (
+    blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (blocker_id, blocked_id)
+);
+
+-- Direct messages between two people.
+CREATE TABLE IF NOT EXISTS direct_messages (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body         TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    read_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_dm_pair ON direct_messages(sender_id, recipient_id, id);
+CREATE INDEX IF NOT EXISTS idx_dm_unread ON direct_messages(recipient_id, read_at);
+
+-- Group chat for each event (everyone going can read and post).
+CREATE TABLE IF NOT EXISTS event_messages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id   INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    sender_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_event_messages ON event_messages(event_id, id);
+
+-- The last event-chat message each person has seen (for unread dots).
+CREATE TABLE IF NOT EXISTS event_chat_seen (
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    last_id  INTEGER NOT NULL,
+    PRIMARY KEY (event_id, user_id)
 );

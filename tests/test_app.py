@@ -755,8 +755,10 @@ def test_badges(accounts, client, app):
         user_id = get_db().execute("SELECT id FROM users").fetchone()[0]
         assert eligible(user_id) == {"first_game", "rain_or_shine", "early_dawg", "founding_dawg"}
     page = client.get(f"/u/{user_id}").data
-    assert b"Rain or Shine" in page and b"Earned" in page and b"Founding Dawg" in page
-    assert b"Host 5 games" in page  # your own locked badges show how to earn them
+    assert page.count(b'class="husky-badge ') == 3          # only 3 on the profile
+    locker = client.get("/profile/badges").data
+    assert b"Rain or Shine" in locker and b"Founding Dawg" in locker and b"Earned" in locker
+    assert b"Host 5 games" in locker  # badges still to earn show how
 
 
 def test_cancelled_games_dont_count_for_badges(accounts, client, app):
@@ -958,3 +960,191 @@ def test_many_new_badges_share_one_banner(accounts, client, app):
     _played_games(app, "soccer", [me], start="2026-09-22 06:30", end="2026-09-22 07:30")
     feed = client.get("/").data.decode()
     assert "new badges unlocked" in feed and feed.count("New badge unlocked") == 0
+
+
+# ------------------------------------------------------------ badge showcase
+
+def test_showcase_is_three_badges_you_choose(accounts, client, app):
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    _played_games(app, "soccer", [me], start="2026-09-22 06:30", end="2026-09-22 07:30")  # early + autumn...
+    client.get("/")  # unlocks badges
+    with app.app_context():
+        from sportive.badges import earned_badges, showcase
+        earned = list(earned_badges(me))
+        assert len(earned) >= 4 and len(showcase(me)) == 3        # default: 3 rarest
+    assert b"only show 3" in client.post("/profile/badges", data={"show": earned[:4]}, follow_redirects=True).data
+    assert b"badges you&#39;ve earned" in client.post("/profile/badges", data={"show": ["legend"]},
+                                                       follow_redirects=True).data
+    client.post("/profile/badges", data={"show": [earned[1], earned[0]]})
+    with app.app_context():
+        assert [b.key for b in showcase(me)] == [earned[1], earned[0]]
+    accounts.logout()
+    accounts.signup(email="other@uw.edu")
+    public = client.get(f"/u/{me}").data
+    assert public.count(b'class="husky-badge ') == 2 and b"Badge locker" not in public
+
+
+# ---------------------------------------------------------------- friends
+
+def test_friend_requests(accounts, client, app):
+    accounts.signup(email="a@uw.edu")
+    accounts.logout()
+    accounts.signup(email="b@uw.edu")
+    a, b = _user_id(app, "a@uw.edu"), _user_id(app, "b@uw.edu")
+    client.post(f"/friends/request/{a}")
+    assert b"Request sent" in client.get(f"/u/{a}").data
+    accounts.logout()
+    accounts.login(email="a@uw.edu")
+    assert b'<span class="count-dot">1</span>' in client.get("/friends").data   # 1 request in the nav
+    client.post(f"/friends/accept/{b}")
+    assert "✅ Friends".encode() in client.get(f"/u/{b}").data
+    client.post(f"/friends/remove/{b}")
+    assert b"+ Add friend" in client.get(f"/u/{b}").data
+
+
+def test_played_with_suggestions(accounts, client, app):
+    accounts.signup(email="a@uw.edu", name="Alex Ace")
+    accounts.logout()
+    accounts.signup(email="b@uw.edu", name="Blake Buddy")
+    a, b = _user_id(app, "a@uw.edu"), _user_id(app, "b@uw.edu")
+    _played_games(app, "soccer", [a, b], count=2)
+    page = client.get("/friends").data
+    assert "People you've played with".encode() in page and b"Alex Ace" in page and b"2 games together" in page
+
+
+# ---------------------------------------------------------- direct messages
+
+def test_dm_rules_and_unread(accounts, client, app):
+    accounts.signup(email="a@uw.edu")
+    accounts.logout()
+    accounts.signup(email="b@uw.edu")
+    a, b = _user_id(app, "a@uw.edu"), _user_id(app, "b@uw.edu")
+    client.post(f"/messages/{a}", data={"body": "yo"})           # strangers can't DM
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM direct_messages").fetchone()[0] == 0
+    _played_games(app, "soccer", [a, b])                           # now they've played together
+    client.post(f"/messages/{a}", data={"body": "gg today! <script>alert(1)</script>"})
+    accounts.logout()
+    accounts.login(email="a@uw.edu")
+    feed = client.get("/").data
+    assert b'Messages, 1 unread' in feed
+    thread = client.get(f"/messages/{b}").data
+    assert b"gg today!" in thread and b"<script>alert(1)</script>" not in thread   # escaped
+    assert b"Messages, 1 unread" not in client.get("/").data                    # read now
+    client.post(f"/messages/{b}", data={"body": "gg!"})
+    new = client.get(f"/messages/{b}/poll?after=0").get_json()["messages"]
+    assert [m["body"] for m in new][-1] == "gg!" and new[-1]["mine"] is True
+    assert b"up to 1000 characters" in client.post(f"/messages/{b}", data={"body": "x" * 1001},
+                                                   follow_redirects=True).data
+
+
+def test_friends_can_dm_without_playing(accounts, client, app):
+    accounts.signup(email="a@uw.edu")
+    accounts.logout()
+    accounts.signup(email="b@uw.edu")
+    a = _user_id(app, "a@uw.edu")
+    client.post(f"/friends/request/{a}")
+    accounts.logout()
+    accounts.login(email="a@uw.edu")
+    b = _user_id(app, "b@uw.edu")
+    client.post(f"/friends/accept/{b}")
+    client.post(f"/messages/{b}", data={"body": "hey friend"})
+    with app.app_context():
+        assert get_db().execute("SELECT body FROM direct_messages").fetchone()[0] == "hey friend"
+
+
+def test_blocking_stops_messages_and_requests(accounts, client, app):
+    accounts.signup(email="a@uw.edu")
+    accounts.logout()
+    accounts.signup(email="b@uw.edu")
+    a, b = _user_id(app, "a@uw.edu"), _user_id(app, "b@uw.edu")
+    _played_games(app, "soccer", [a, b])
+    accounts.logout()
+    accounts.login(email="a@uw.edu")
+    client.post(f"/block/{b}")
+    accounts.logout()
+    accounts.login(email="b@uw.edu")
+    client.post(f"/messages/{a}", data={"body": "hello?"})
+    client.post(f"/friends/request/{a}")
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT COUNT(*) FROM direct_messages").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM friendships").fetchone()[0] == 0
+    assert b"+ Add friend" not in client.get(f"/u/{a}").data
+
+
+def test_message_rate_limit(accounts, client, app):
+    accounts.signup(email="a@uw.edu")
+    accounts.logout()
+    accounts.signup(email="b@uw.edu")
+    a, b = _user_id(app, "a@uw.edu"), _user_id(app, "b@uw.edu")
+    _played_games(app, "soccer", [a, b])
+    for n in range(20):
+        client.post(f"/messages/{a}", data={"body": f"msg {n}"})
+    assert b"slow down" in client.post(f"/messages/{a}", data={"body": "one more"}, follow_redirects=True).data
+
+
+# -------------------------------------------------------------- event chat
+
+def test_event_group_chat(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    client.post(f"/events/{event_id}/chat", data={"body": "Court 3, bring a light shirt"})
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    outside = client.get(f"/events/{event_id}/chat", follow_redirects=True).data
+    assert b"Join the event to see" in outside and b"Court 3" not in outside
+    assert client.get(f"/events/{event_id}/chat/poll").status_code == 403
+    client.post(f"/events/{event_id}/join")
+    detail = client.get(f"/events/{event_id}").data
+    assert "💬 Group chat".encode() in detail and b'<span class="count-dot">1</span>' in detail
+    assert b"Court 3, bring a light shirt" in client.get(f"/events/{event_id}/chat").data
+    assert b'<span class="count-dot">1</span>' not in client.get(f"/events/{event_id}").data  # seen now
+    client.post(f"/events/{event_id}/chat", data={"body": "on my way!"})
+    msgs = client.get(f"/events/{event_id}/chat/poll?after=1").get_json()["messages"]
+    assert [m["body"] for m in msgs] == ["on my way!"]
+
+
+# -------------------------------------------------------------------- news
+
+SAMPLE_FEED = """<rss version="2.0"><channel>
+<item><title>Huskies Win B1G Opener</title><link>https://gohuskies.com/news/2026/9/25/volleyball-win</link>
+  <category>Volleyball</category><pubDate>Fri, 25 Sep 2026 18:11:00 PST</pubDate></item>
+<item><title>UW Handed First Loss</title><link>https://gohuskies.com/news/2026/9/26/football-loss</link>
+  <category>Football</category><pubDate>Sat, 26 Sep 2026 23:34:00 PST</pubDate></item>
+<item><title>Academic Honor Roll</title><link>https://gohuskies.com/news/2026/9/20/general</link>
+  <category>Cross Country, Football, Men's Basketball, Softball, Volleyball</category>
+  <pubDate>Sun, 20 Sep 2026 10:00:00 PST</pubDate></item>
+<item><title>Sketchy</title><link>https://evil.example/phish</link><category>Football</category></item>
+</channel></rss>"""
+
+
+def test_news_parsing():
+    from sportive.news import parse_feed
+    stories = parse_feed(SAMPLE_FEED)
+    assert [s["title"] for s in stories] == ["Huskies Win B1G Opener", "UW Handed First Loss", "Academic Honor Roll"]
+    assert stories[1]["teams"] == ["football"] and not stories[1]["general"]
+    assert stories[2]["general"]                     # tagged with every team = department news
+
+
+def test_news_page_filters(accounts, client, monkeypatch):
+    from sportive import news
+    monkeypatch.setattr(news, "get_stories", lambda: sorted(news.parse_feed(SAMPLE_FEED),
+                                                           key=lambda s: s["published"], reverse=True))
+    accounts.signup(sports=("football",))
+    mine = client.get("/news").data
+    assert b"UW Handed First Loss" in mine and b"Huskies Win B1G Opener" not in mine
+    everything = client.get("/news?scope=all").data
+    assert b"Huskies Win B1G Opener" in everything and b"Academic Honor Roll" in everything
+    team = client.get("/news?team=wvball").data
+    assert b"Huskies Win B1G Opener" in team and b"UW Handed First Loss" not in team
+    assert b"GoHuskies.com" in mine and b"evil.example" not in everything
+
+
+def test_news_survives_gohuskies_being_down(monkeypatch):
+    from sportive import news
+    def broken(code):
+        raise OSError("down")
+    monkeypatch.setattr(news, "_download", broken)
+    assert news.fetch_all() == []

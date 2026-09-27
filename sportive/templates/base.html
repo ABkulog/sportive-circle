@@ -28,9 +28,12 @@
         </nav>
       {% elif g.user %}
         <nav class="nav">
+          {% set counts = social_counts() %}
           <a href="{{ url_for('events.feed') }}">Feed</a>
+          <a href="{{ url_for('news.news') }}">News</a>
           <a href="{{ url_for('events.my_events') }}">My events</a>
-          <a href="{{ url_for('how_it_works') }}">How it works</a>
+          <a href="{{ url_for('social.inbox') }}" aria-label="Messages{% if counts.messages %}, {{ counts.messages }} unread{% endif %}">✉️{% if counts.messages %}<span class="count-dot">{{ counts.messages }}</span>{% endif %}</a>
+          <a href="{{ url_for('social.friends') }}" aria-label="Friends{% if counts.requests %}, {{ counts.requests }} requests{% endif %}">👥{% if counts.requests %}<span class="count-dot">{{ counts.requests }}</span>{% endif %}</a>
           <a class="nav-avatar" href="{{ url_for('profile.view', user_id=g.user.id) }}">
             {%- if g.user.avatar_updated -%}
               <img class="avatar-img" src="{{ url_for('profile.photo', user_id=g.user.id, v=g.user.avatar_updated) }}" alt="" style="--size: 26px">
@@ -64,15 +67,18 @@
 
   <footer class="site-footer">
     <p class="footer-spirit">Made by Huskies, for Huskies 💜💛 <span>Go Dawgs! 🐺</span></p>
+    <p class="footer-links"><a href="{{ url_for('how_it_works') }}">How it works</a></p>
     <p class="footer-fine">A student project. Not an official University of Washington service.</p>
   </footer>
   <script src="{{ url_for('static', filename='spirit.js') }}" defer></script>
 
+  {% block actionbar %}
   {% if g.user and (g.user.avatar_updated or session.get('photo_skipped')) %}
     <nav class="actionbar" aria-label="Create">
       <a class="btn btn-gold" href="{{ url_for('events.quick') }}">⚡ Need players</a>
       <a class="btn" href="{{ url_for('events.create') }}">+ New event</a>
     </nav>
   {% endif %}
+  {% endblock %}
 </body>
 </html>

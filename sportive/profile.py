@@ -11,8 +11,10 @@ from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
 from .events import celebrate_progress, query_events
 from .photos import make_avatar
-from .badges import catalog, earned_badges, is_retired, rarity, sync_badges
+from .badges import (SHOWCASE_SLOTS, catalog, earned_badges, is_retired, rarity, set_showcase, showcase,
+                     sync_badges)
 from .ranks import LEVELS, user_ranks
+from .social import can_message, friendship_status, i_blocked, is_blocked_between
 from .timeutil import now_local, to_db
 
 bp = Blueprint("profile", __name__)
@@ -111,10 +113,34 @@ def view(user_id):
     else:
         sync_badges(user_id)  # keep their showcase up to date
     ranks = user_ranks(user_id)
+    relation = None
+    if user_id != g.user["id"]:
+        me = g.user["id"]
+        relation = {"friend": friendship_status(me, user_id), "can_message": can_message(me, user_id),
+                    "i_blocked": i_blocked(me, user_id), "blocked_me": is_blocked_between(me, user_id)
+                    and not i_blocked(me, user_id)}
     return render_template("profile/view.html", user=user, sports=user_sports(user_id), hosting=hosting,
                            show_email=show_email, ranks=ranks, levels=LEVELS,
-                           badges=catalog(), earned=earned_badges(user_id), rarity=rarity(),
-                           is_retired=is_retired)
+                           showcase=showcase(user_id), earned=earned_badges(user_id), rarity=rarity(),
+                           is_retired=is_retired, relation=relation)
+
+
+@bp.route("/profile/badges", methods=("GET", "POST"))
+@login_required
+def badge_locker():
+    """Every badge you've earned; pick up to 3 to show on your profile."""
+    me = g.user["id"]
+    if request.method == "POST":
+        error = set_showcase(me, request.form.getlist("show"))
+        if error:
+            flash(error, "error")
+        else:
+            flash("Showcase updated! Flex away 😎", "success")
+            return redirect(url_for("profile.view", user_id=me))
+    sync_badges(me)
+    return render_template("profile/badges.html", badges=catalog(), earned=earned_badges(me),
+                           shown=[badge.key for badge in showcase(me)], rarity=rarity(),
+                           is_retired=is_retired, slots=SHOWCASE_SLOTS)
 
 
 @bp.route("/profile/edit", methods=("GET", "POST"))

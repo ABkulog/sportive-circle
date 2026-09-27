@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from flask import Flask, redirect, render_template, url_for
 
-from . import auth, db, events, profile, ranks, reminders, stats
+from . import auth, db, events, news, profile, ranks, reminders, social, stats
 from .photos import MAX_UPLOAD_MB
 from .constants import LOCATIONS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS, SPORT_MAX_PLAYERS, SPORTS
 from .timeutil import fmt_clock, fmt_relative, fmt_when, same_day
@@ -45,6 +45,8 @@ def create_app(test_config=None):
     app.register_blueprint(auth.bp)
     app.register_blueprint(events.bp)
     app.register_blueprint(profile.bp)
+    app.register_blueprint(social.bp)
+    app.register_blueprint(news.bp)
     app.cli.add_command(reminders.send_reminders_command)
     app.cli.add_command(stats.sport_stats_command)
     app.add_url_rule("/", endpoint="index", view_func=events.feed)
@@ -62,7 +64,7 @@ def create_app(test_config=None):
         csrf_field=auth.csrf_field, SPORTS=SPORTS, SPORT_EMOJI=SPORT_EMOJI,
         LOCATIONS=LOCATIONS, SKILL_LEVELS=SKILL_LEVELS,
         SPORT_RULES={key: {"label": label, "locations": SPORT_LOCATIONS[key], "max": SPORT_MAX_PLAYERS[key]}
-                     for key, label in SPORTS.items()}, spots_left=events.spots_left, event_title=events.event_title, can_join_level=ranks.can_join_level, my_tier_map=ranks.my_tier_map,
+                     for key, label in SPORTS.items()}, spots_left=events.spots_left, event_title=events.event_title, can_join_level=ranks.can_join_level, my_tier_map=ranks.my_tier_map, social_counts=social.counts, chat_unread=social.event_chat_unread,
         LEVEL_TIERS={level: ranks.TIERS.index(tier) for level, tier in ranks.LEVEL_REQUIREMENT.items()}, place_map=events.place_map, same_day=same_day,
     )
     for code, message in ERRORS.items():

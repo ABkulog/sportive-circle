@@ -64,6 +64,10 @@
 
   {% if not event.cancelled and not ended %}
     <div class="detail-actions secondary-actions">
+      {% if event.i_am_going %}
+        {% set unread = chat_unread().get(event.id, 0) %}
+        <a class="btn" href="{{ url_for('social.event_chat', event_id=event.id) }}">💬 Group chat{% if unread %} <span class="count-dot">{{ unread }}</span>{% endif %}</a>
+      {% endif %}
       <button type="button" class="btn btn-ghost" id="share-button"
               data-title="{{ event_title(event) }}" data-url="{{ url_for('events.detail', event_id=event.id, _external=True) }}">🔗 Share</button>
       <a class="btn btn-ghost" href="{{ url_for('events.calendar_file', event_id=event.id) }}">📅 Add to calendar</a>

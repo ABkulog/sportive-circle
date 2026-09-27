@@ -28,6 +28,7 @@ ADDED_COLUMNS = [
     ("users", "email_reminders", "INTEGER NOT NULL DEFAULT 1"),
     ("rsvps", "reminder_sent", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "avatar_updated", "TEXT"),
+    ("users", "showcase", "TEXT"),
 ]
 
 
