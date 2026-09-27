@@ -51,7 +51,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
 | FR-EVT-1 | Create an event with a name, sport, place, start/end time, level, optional player limit and note. | Must | ✅ |
-| FR-EVT-2 | Each sport can only use places where it can really be played (e.g. rowing only at the WAC). | Must | ✅ |
+| FR-EVT-2 | Each sport can only use places where it can really be played (e.g. rowing only at the WAC, pickleball at the IMA courts, IMA Gym B or Green Lake), with good-to-know tips such as court numbers and drop-in hours. | Must | ✅ |
 | FR-EVT-3 | Each sport has a player cap (e.g. basketball 10); an event can't exceed it. | Must | ✅ |
 | FR-EVT-4 | "Need players": post a game that starts within 2 hours in a few taps; it goes to the top of every feed. | Must | ✅ |
 | FR-EVT-5 | Join and leave games. A full game can't be overbooked, even when two people tap Join at once. | Must | ✅ |

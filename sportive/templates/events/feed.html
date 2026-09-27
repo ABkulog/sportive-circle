@@ -57,7 +57,7 @@
       </select>
       <select name="skill" aria-label="Skill level" data-autosubmit>
         <option value="">Any level</option>
-        {% for level in SKILL_LEVELS %}<option {% if filters.skill == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
+        {% for level in SKILL_LEVELS %}<option value="{{ level }}" {% if filters.skill == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
       </select>
     </div>
     <noscript><button class="btn">Apply</button></noscript>

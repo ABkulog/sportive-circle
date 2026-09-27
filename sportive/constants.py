@@ -13,6 +13,7 @@ SPORTS = {
     "spikeball": "Spikeball",
     "ultimate": "Ultimate Frisbee",
     "tennis": "Tennis",
+    "pickleball": "Pickleball",
     "running": "Running",
     "climbing": "Climbing",
     "gym": "Gym Buddy",
@@ -32,6 +33,7 @@ SPORT_EMOJI = {
     "spikeball": "🟡",
     "ultimate": "🥏",
     "tennis": "🎾",
+    "pickleball": "🏓",
     "running": "🏃",
     "climbing": "🧗",
     "gym": "🏋️",
@@ -45,6 +47,8 @@ SPORT_EMOJI = {
 
 LOCATIONS = [
     "IMA (Intramural Activities Building)",
+    "IMA North Tennis Courts",
+    "IMA South Tennis Courts",
     "Fitness Center West (under Elm Hall)",
     "Recreation Field 1 (by the IMA)",
     "Recreation Field 2 (by Husky Track)",
@@ -56,11 +60,15 @@ LOCATIONS = [
     "The Quad",
     "Hec Edmundson Pavilion",
     "Burke-Gilman Trail",
+    "Green Lake Park pickleball courts",
     "Off campus (see note)",
     "Online",
 ]
 
 IMA = "IMA (Intramural Activities Building)"
+# UW Recreation's outdoor courts: South #1-7 (lit at night), North #8-13 (#11 and #12 have pickleball lines).
+IMA_NORTH_COURTS = "IMA North Tennis Courts"
+IMA_SOUTH_COURTS = "IMA South Tennis Courts"
 FITNESS_WEST = "Fitness Center West (under Elm Hall)"
 # UW's official names for the outdoor fields (they used to be called "IMA Sports Fields").
 REC_FIELD_1 = "Recreation Field 1 (by the IMA)"
@@ -72,6 +80,8 @@ WAC = "Waterfront Activities Center (WAC)"
 DENNY = "Denny Field"
 QUAD = "The Quad"
 TRAIL = "Burke-Gilman Trail"
+# Seattle Parks' free public pickleball hub, where the Husky Pickleball Club also plays (about 2 miles north of campus).
+GREEN_LAKE_PICKLEBALL = "Green Lake Park pickleball courts"
 OFF_CAMPUS = "Off campus (see note)"
 ONLINE = "Online"
 
@@ -82,6 +92,8 @@ ONLINE = "Online"
 # "search in Maps" link instead. Off campus / Online have no map at all.
 LOCATION_COORDS = {
     IMA: (47.653743, -122.301231),
+    IMA_NORTH_COURTS: (47.654870, -122.301420),  # the 6 courts just north of the IMA
+    IMA_SOUTH_COURTS: (47.652894, -122.301170),  # the 7 courts just south of the IMA
     FITNESS_WEST: (47.656529, -122.315254),   # Elm Hall
     REC_FIELD_1: (47.654750, -122.300583),    # the turf field just north of the IMA
     REC_FIELD_2: (47.657727, -122.297914),    # north of Husky Track
@@ -93,6 +105,7 @@ LOCATION_COORDS = {
     QUAD: (47.657285, -122.307213),
     "Hec Edmundson Pavilion": (47.652179, -122.302125),
     TRAIL: None,                              # a 20-mile trail: search instead of one pin
+    GREEN_LAKE_PICKLEBALL: (47.681547, -122.328384),  # next to the Green Lake Community Center
 }
 
 # Open grass/turf areas, good for field sports like soccer and frisbee.
@@ -107,7 +120,8 @@ SPORT_LOCATIONS = {
     "volleyball": OPEN_FIELDS + [IMA, OFF_CAMPUS],  # outdoor fields + the IMA's indoor courts
     "spikeball": OPEN_FIELDS + [IMA, OFF_CAMPUS],
     "ultimate": OPEN_FIELDS + [OFF_CAMPUS],
-    "tennis": [IMA, OFF_CAMPUS],
+    "tennis": [IMA_SOUTH_COURTS, IMA_NORTH_COURTS, OFF_CAMPUS],
+    "pickleball": [IMA_NORTH_COURTS, IMA, GREEN_LAKE_PICKLEBALL, OFF_CAMPUS],  # IMA = indoor, in Gym B
     "running": OPEN_FIELDS + [TRAIL, OFF_CAMPUS],   # sprints/intervals on the fields too
     "climbing": [IMA, OFF_CAMPUS],
     "gym": [IMA, FITNESS_WEST, OFF_CAMPUS],
@@ -129,6 +143,7 @@ SPORT_MAX_PLAYERS = {
     "spikeball": 8,     # 2v2 per net; room for a second net or people rotating in
     "ultimate": 14,     # 7v7
     "tennis": 4,        # doubles
+    "pickleball": 8,    # doubles, with people rotating in (or 2 courts)
     "running": 20,
     "climbing": 8,
     "gym": 4,
@@ -145,3 +160,16 @@ SKILL_LEVELS = ["All levels", "Casual", "Intermediate", "Competitive"]
 # "Need players" quick posts: (minutes from now, label)
 QUICK_START_OPTIONS = [(0, "Right now"), (15, "In 15 min"), (30, "In 30 min"), (60, "In 1 hour"), (120, "In 2 hours")]
 QUICK_DURATIONS = [(30, "30 min"), (60, "1 hour"), (90, "1.5 hours"), (120, "2 hours")]
+
+# Good-to-know details for a sport at a place, shown when picking the place and on the event page.
+# From UW Recreation's courts page (washington.edu/ima/ima-building/facility-field-reservations) and
+# Seattle Parks (greenlakepickleball.org), checked Sept 2026.
+PLACE_TIPS = {
+    ("pickleball", IMA_NORTH_COURTS): "Court 12 is for pickleball and court 11 is shared with tennis. "
+                                      "First come, first served.",
+    ("pickleball", IMA): "Indoor pickleball is in Gym B, Thursdays 2-5 PM. Needs an IMA membership.",
+    ("pickleball", GREEN_LAKE_PICKLEBALL): "Free public courts next to the Green Lake Community Center, "
+                                           "open play every day. About 2 miles north of campus.",
+    ("tennis", IMA_SOUTH_COURTS): "Courts 1-7. They have lights for evening games.",
+    ("tennis", IMA_NORTH_COURTS): "Courts 8-13. Court 12 is for pickleball.",
+}

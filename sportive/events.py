@@ -99,6 +99,18 @@ def place_map(location):
 MAX_TRYOUT_SPOTS = 3
 
 
+def read_ranked_options(form, skill_level):
+    """Tryout spots and +1s, from the New event and Need players forms. Returns (tryout_spots, allow_plus_ones, error).
+
+    Both only matter for Intermediate / Competitive games; other levels are open to everyone anyway.
+    """
+    tryout_raw = form.get("tryout_spots", "0").strip() or "0"
+    if not tryout_raw.isdigit() or int(tryout_raw) > MAX_TRYOUT_SPOTS:
+        return 0, 1, f"Tryout spots can be 0 to {MAX_TRYOUT_SPOTS}."
+    tryout_spots = int(tryout_raw) if skill_level in LEVEL_REQUIREMENT else 0
+    return tryout_spots, 1 if form.get("allow_plus_ones") else 0, None
+
+
 def tryout_open(event):
     """Is there a free tryout spot for someone below this game's level?"""
     return event["tryout_spots"] > event["tryouts_used"]
@@ -319,16 +331,15 @@ def read_event_form(form, event=None):
             return None, f"{taken} people are already in, so max players can't be lower than that."
     if len(note) > 500:
         return None, "Note is too long (500 characters max)."
-    tryout_raw = form.get("tryout_spots", "0").strip() or "0"
-    if not tryout_raw.isdigit() or int(tryout_raw) > MAX_TRYOUT_SPOTS:
-        return None, f"Tryout spots can be 0 to {MAX_TRYOUT_SPOTS}."
-    tryout_spots = int(tryout_raw) if skill_level in LEVEL_REQUIREMENT else 0  # only ranked games have tryouts
+    tryout_spots, allow_plus_ones, error = read_ranked_options(form, skill_level)
+    if error:
+        return None, error
 
     return {
         "title": title, "sport": sport, "location": location, "skill_level": skill_level,
         "starts_at": to_db(starts), "ends_at": to_db(ends), "max_players": max_players, "note": note,
         "tryout_spots": tryout_spots,
-        "allow_plus_ones": 1 if form.get("allow_plus_ones") else 0,
+        "allow_plus_ones": allow_plus_ones,
     }, None
 
 
@@ -457,7 +468,8 @@ def tell_players_it_was_cancelled(event):
 @login_required
 def quick():
     form = request.form if request.method == "POST" else MultiDict(
-        {"starts_in": "30", "duration": "60", "needed": "2", "have": "1", "skill_level": "All levels"})
+        {"starts_in": "30", "duration": "60", "needed": "2", "have": "1", "skill_level": "All levels",
+         "tryout_spots": "0", "allow_plus_ones": "1"})
     if request.method == "POST":
         error = None
         sport = form.get("sport", "")
@@ -468,6 +480,7 @@ def quick():
         duration = dict(QUICK_DURATIONS).get(_int(form.get("duration")))
         needed = _int(form.get("needed"))
         have = _int(form.get("have"))
+        tryout_spots, allow_plus_ones, options_error = read_ranked_options(form, skill_level)
 
         if sport not in SPORTS:
             error = "Please choose a sport."
@@ -490,6 +503,11 @@ def quick():
                      f"and {have} + {needed} is {have + needed}.")
         elif len(note) > 500:
             error = "Note is too long (500 characters max)."
+        elif options_error:
+            error = options_error
+        elif tryout_spots > needed:
+            error = (f"You only need {needed} more, so you can have at most {needed} tryout "
+                     f"spot{'s' if needed != 1 else ''}.")
 
         if error is None:
             starts = round_up_5(now_local() + timedelta(minutes=_int(form.get("starts_in"))))
@@ -499,6 +517,7 @@ def quick():
                 "skill_level": skill_level, "starts_at": to_db(starts), "ends_at": to_db(ends),
                 # `have` includes the host, who is counted through their RSVP.
                 "max_players": have + needed, "extra_players": have - 1, "note": note, "is_quick": 1,
+                "tryout_spots": tryout_spots, "allow_plus_ones": allow_plus_ones,
             })
             flash("Posted! The whole pack can see it at the top of the feed 🐺", "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))

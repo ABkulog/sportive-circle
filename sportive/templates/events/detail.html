@@ -36,7 +36,8 @@
       {{ event.starts_at|when }} – {% if same_day(event.starts_at, event.ends_at) %}{{ event.ends_at|clock }}{% else %}{{ event.ends_at|when }}{% endif %}
       {% if not ended and not event.cancelled %}<span class="rel">({{ event.starts_at|relative }})</span>{% endif %}
     </dd></div>
-    <div><dt>Where</dt><dd>{{ event.location }}</dd></div>
+    <div><dt>Where</dt><dd>{{ event.location }}
+      {% set tip = place_tip(event.sport, event.location) %}{% if tip %}<small class="muted place-tip">{{ tip }}</small>{% endif %}</dd></div>
     <div><dt>Host</dt><dd><a class="person" href="{{ url_for('profile.view', user_id=event.host_id) }}">{{ avatar(event.host_id, event.host_name, event.host_avatar, 28) }}{{ event.host_name }}</a></dd></div>
     <div><dt>Players</dt><dd>
       {{ event.going_count + event.extra_players }} going{% if event.max_players %} of {{ event.max_players }}

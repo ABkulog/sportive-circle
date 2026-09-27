@@ -21,7 +21,7 @@ USERS = [
     ("demo.maya@uw.edu", "Maya Chen", 2027, ["basketball", "running", "hiking"], "Pickup hoops most evenings."),
     ("demo.jordan@uw.edu", "Jordan Rivera", 2028, ["soccer", "ultimate", "gym"], "Looking for a gym buddy for 7am lifts."),
     ("demo.sam@uw.edu", "Sam Okafor", 2026, ["climbing", "snow", "hiking"], "Weekend trips to Stevens Pass."),
-    ("demo.priya@uw.edu", "Priya Nair", 2029, ["tennis", "volleyball", "esports"], ""),
+    ("demo.priya@uw.edu", "Priya Nair", 2029, ["tennis", "pickleball", "volleyball", "esports"], ""),
 ]
 
 # (host index, title, sport, location, start = timedelta from now or (days ahead, hour, minute), hours long, skill, max players, extra, note, quick)
@@ -36,8 +36,10 @@ EVENTS = [
      20, 0, "About 9:30/mile pace. Meet at the trail by the UW Tower.", 0),
     (2, "Stevens Pass day trip", "snow", "Off campus (see note)", (6, 6, 0), 12, "All levels", 5, 0,
      "Carpool from the U District at 6am. Split gas.", 0),
-    (3, "Doubles at the courts", "tennis", "IMA (Intramural Activities Building)", (3, 16, 0), 1.5, "Casual", 4, 0,
+    (3, "Doubles at the courts", "tennis", "IMA South Tennis Courts", (3, 16, 0), 1.5, "Casual", 4, 0,
      "", 0),
+    (3, "Pickleball doubles", "pickleball", "IMA North Tennis Courts", (2, 15, 0), 1.5, "All levels", 8, 0,
+     "Court 12. Paddles to share, bring your own if you have one.", 0),
     (1, "Ultimate scrimmage", "ultimate", "Denny Field", (4, 17, 30), 2, "Intermediate", 14, 0,
      "", 0),
     (3, "Valorant 5-stack", "esports", "Online", (1, 21, 0), 2, "All levels", 5, 1, "Discord link in note after you join (coming soon!)", 0),
@@ -63,7 +65,7 @@ HISTORY = [
     (0, "basketball", "IMA (Intramural Activities Building)", 9),  # Maya -> Intermediate in basketball
     (2, "climbing", "IMA (Intramural Activities Building)", 8),    # Sam -> Intermediate in climbing
     (1, "ultimate", "Denny Field", 8),                             # Jordan -> Intermediate in ultimate
-    (3, "tennis", "IMA (Intramural Activities Building)", 3),      # Priya -> still Casual
+    (3, "tennis", "IMA South Tennis Courts", 3),                   # Priya -> still Casual
 ]
 
 

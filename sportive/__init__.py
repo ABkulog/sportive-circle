@@ -7,7 +7,8 @@ from flask import Flask, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from . import auth, clubs, db, events, moderation, news, pages, profile, ranks, reminders, social, stats
-from .constants import LOCATIONS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS, SPORT_MAX_PLAYERS, SPORTS
+from .constants import (LOCATIONS, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS, SPORT_MAX_PLAYERS,
+                        SPORTS)
 from .photos import MAX_UPLOAD_MB
 from .timeutil import fmt_clock, fmt_relative, fmt_when, same_day
 
@@ -89,8 +90,10 @@ def _add_template_helpers(app):
         # forms and lists
         csrf_field=auth.csrf_field, SPORTS=SPORTS, SPORT_EMOJI=SPORT_EMOJI, LOCATIONS=LOCATIONS,
         SKILL_LEVELS=SKILL_LEVELS,
-        SPORT_RULES={key: {"label": label, "locations": SPORT_LOCATIONS[key], "max": SPORT_MAX_PLAYERS[key]}
+        SPORT_RULES={key: {"label": label, "locations": SPORT_LOCATIONS[key], "max": SPORT_MAX_PLAYERS[key],
+                           "tips": {place: tip for (sport, place), tip in PLACE_TIPS.items() if sport == key}}
                      for key, label in SPORTS.items()},
+        place_tip=lambda sport, place: PLACE_TIPS.get((sport, place)),
         LEVEL_TIERS={level: ranks.TIERS.index(tier) for level, tier in ranks.LEVEL_REQUIREMENT.items()},
         # events
         spots_left=events.spots_left, event_title=events.event_title, can_join_or_tryout=events.can_join_or_tryout,

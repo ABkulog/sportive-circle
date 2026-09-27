@@ -15,6 +15,7 @@
   const haveInput = form.querySelector('input[name="have"]');          // Need players form
   const neededInput = form.querySelector('input[name="needed"]');
   const hint = form.querySelector("[data-max-hint]");
+  const placeTip = form.querySelector("[data-place-tip]");
 
   function updatePlaces() {
     const rule = rules[sport.value];
@@ -41,10 +42,19 @@
     }
   }
 
-  sport.addEventListener("change", () => { updatePlaces(); updateLimits(); });
+  // Good-to-know details for this sport at this place (e.g. "Indoor pickleball is in Gym B, Thursdays 2-5 PM").
+  function updateTip() {
+    if (!placeTip) return;
+    const rule = rules[sport.value];
+    placeTip.textContent = (rule && rule.tips[location.value]) || "";
+  }
+
+  sport.addEventListener("change", () => { updatePlaces(); updateLimits(); updateTip(); });
+  location.addEventListener("change", updateTip);
   if (haveInput) haveInput.addEventListener("input", updateLimits);
   updatePlaces();
   updateLimits();
+  updateTip();
 })();
 
 // Skill levels you haven't ranked up to yet are locked (the server checks this too).
@@ -82,7 +92,12 @@
   const fields = document.querySelectorAll("[data-tryout-field]");
   const level = document.querySelector('form[data-sport-form] select[name="skill_level"]');
   if (!fields.length || !level) return;
-  const update = () => fields.forEach((field) => { field.hidden = !["Intermediate", "Competitive"].includes(level.value); });
+  const hint = document.querySelector("[data-ranked-hint]");
+  const update = () => {
+    const ranked = ["Intermediate", "Competitive"].includes(level.value);
+    fields.forEach((field) => { field.hidden = !ranked; });
+    if (hint) hint.textContent = ranked ? "" : "Tryout spots and +1s are for Intermediate and Competitive games.";
+  };
   level.addEventListener("change", update);
   document.querySelector('form[data-sport-form] select[name="sport"]').addEventListener("change", update);
   update();

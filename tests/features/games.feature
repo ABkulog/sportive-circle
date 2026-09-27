@@ -15,6 +15,22 @@ Feature: Games
     When "Maya" tries to host rowing at "Denny Field"
     Then they see "can't be played at Denny Field"
 
+  @FR-EVT-2
+  Scenario Outline: Pickleball can be played where UW students really play it
+    When "Maya" hosts pickleball at "<place>"
+    Then they see "<tip>"
+
+    Examples:
+      | place                                | tip                                        |
+      | IMA North Tennis Courts              | Court 12 is for pickleball                 |
+      | IMA (Intramural Activities Building) | Indoor pickleball is in Gym B, Thursdays   |
+      | Green Lake Park pickleball courts    | next to the Green Lake Community Center    |
+
+  @FR-EVT-2
+  Scenario: Pickleball isn't offered where there are no courts
+    When "Maya" tries to host pickleball at "Denny Field"
+    Then they see "can't be played at Denny Field"
+
   @FR-EVT-3
   Scenario: A game can't be bigger than the sport allows
     When "Maya" tries to host basketball for 30 players

@@ -169,7 +169,7 @@ def test_cancelled_event_leaves_feed(accounts, client):
 def test_feed_shows_my_sports_by_default(accounts, client):
     accounts.signup(sports=("tennis",))
     client.post("/events/new", data=event_form(title="Hoops night", sport="basketball"))
-    client.post("/events/new", data=event_form(title="Tennis doubles", sport="tennis"))
+    client.post("/events/new", data=event_form(title="Tennis doubles", sport="tennis", location="IMA South Tennis Courts"))
     mine = client.get("/").data
     assert b"Tennis doubles" in mine and b"Hoops night" not in mine
     assert b"Hoops night" in client.get("/?scope=all").data
@@ -488,7 +488,7 @@ def test_player_cap_per_sport(accounts, client, app):
 def test_quick_post_player_cap(accounts, client):
     accounts.signup()
     page = client.post("/need-players", data={
-        "sport": "tennis", "location": "IMA (Intramural Activities Building)", "skill_level": "All levels",
+        "sport": "tennis", "location": "IMA North Tennis Courts", "skill_level": "All levels",
         "starts_in": "15", "duration": "60", "have": "3", "needed": "2",
     }).data
     assert b"Tennis games max out at 4 players" in page
@@ -688,9 +688,12 @@ def test_every_campus_place_has_a_map_entry():
             assert place not in LOCATION_COORDS
         else:
             assert place in LOCATION_COORDS, place
-    for coords in filter(None, LOCATION_COORDS.values()):
-        lat, lng = coords
-        assert 47.64 < lat < 47.67 and -122.33 < lng < -122.28  # all on/around the UW campus
+    from math import cos, hypot, radians
+    for place, coords in LOCATION_COORDS.items():
+        if coords:  # every pin is near UW (catches typos like a swapped digit): within 5 km of Red Square
+            lat, lng = coords
+            km = hypot(lat - 47.6560, (lng + 122.3095) * cos(radians(47.656))) * 111.2
+            assert km < 5, (place, round(km, 1))
 
 
 def test_event_page_shows_map_and_directions(accounts, client):
@@ -1932,3 +1935,13 @@ def test_calendar_lines_are_folded():
     folded = ics_fold("DESCRIPTION:" + "é" * 80)
     assert all(len(line.encode()) <= 75 for line in folded.split("\r\n"))
     assert folded.replace("\r\n ", "") == "DESCRIPTION:" + "é" * 80
+
+
+def test_skill_level_options_have_fixed_values(accounts, client):
+    """forms.js adds a 🔒 to locked levels' text; the submitted value must stay the plain level name."""
+    accounts.signup()
+    for page in ("/events/new", "/need-players"):
+        html = client.get(page).data.decode()
+        for level in ("All levels", "Casual", "Intermediate", "Competitive"):
+            assert f'<option value="{level}"' in html, (page, level)
+    assert 'name="tryout_spots"' in client.get("/need-players").data.decode()

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import select %}
+{% from "_macros.html" import select, ranked_options %}
 {% block title %}{{ 'Edit event' if event else 'New event' }}{% endblock %}
 {% block content %}
 <div class="card form-card">
@@ -15,7 +15,7 @@
       {% if not club and not (event and event.club_id) %}
       <label class="field"><span>Skill level</span>
         <select name="skill_level" {% if event %}data-keep="{{ event.sport }}|{{ event.skill_level }}"{% endif %}>
-          {% for level in SKILL_LEVELS %}<option {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
+          {% for level in SKILL_LEVELS %}<option value="{{ level }}" {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
         </select>
         <small class="muted" data-level-hint></small>
       </label>
@@ -26,6 +26,7 @@
         <option value="">Choose a place</option>
         {% for loc in LOCATIONS %}<option {% if form.get('location') == loc %}selected{% endif %}>{{ loc }}</option>{% endfor %}
       </select>
+        <small class="muted place-tip" data-place-tip></small>
     </label>
     <div class="row">
       <label class="field"><span>Starts</span>
@@ -40,19 +41,7 @@
       <label class="field"><span>Max players, including you</span>
         <input name="max_players" type="number" min="2" value="{{ form.get('max_players', '') }}" placeholder="Pick a sport first">
         <small class="muted" data-max-hint></small></label>
-      {% if not club and not (event and event.club_id) %}
-      <label class="field" data-tryout-field>
-        <span>Tryout spots</span>
-        <select name="tryout_spots">
-          {% for n in range(0, 4) %}<option value="{{ n }}" {% if form.get('tryout_spots', '0')|string == n|string %}selected{% endif %}>{{ n if n else 'None' }}</option>{% endfor %}
-        </select>
-        <small class="muted">Spots for players still ranking up.</small>
-      </label>
-      <label class="toggle" data-tryout-field>
-        <input type="checkbox" name="allow_plus_ones" value="1" {% if form.get('allow_plus_ones') %}checked{% endif %}>
-        <span>Let players bring one friend as a +1 <em>(max 2 per game)</em></span>
-      </label>
-      {% endif %}
+      {% if not club and not (event and event.club_id) %}{{ ranked_options(form) }}{% endif %}
       <label class="field"><span>Note</span>
         <textarea name="note" maxlength="500" rows="3" placeholder="Court 3, bring a light and a dark shirt">{{ form.get('note', '') }}</textarea></label>
       </div>

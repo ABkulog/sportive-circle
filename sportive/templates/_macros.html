@@ -25,6 +25,22 @@
   </fieldset>
 {% endmacro %}
 
+{% macro ranked_options(form) %}
+  {# Tryout spots and +1s. forms.js shows them only for Intermediate / Competitive games. #}
+  <small class="muted" data-ranked-hint></small>
+  <label class="field" data-tryout-field>
+    <span>Tryout spots</span>
+    <select name="tryout_spots">
+      {% for n in range(0, 4) %}<option value="{{ n }}" {% if form.get('tryout_spots', '0')|string == n|string %}selected{% endif %}>{{ n if n else 'None' }}</option>{% endfor %}
+    </select>
+    <small class="muted">Spots for players who haven't ranked up yet but want to prove themselves.</small>
+  </label>
+  <label class="toggle" data-tryout-field>
+    <input type="checkbox" name="allow_plus_ones" value="1" {% if form.get('allow_plus_ones') %}checked{% endif %}>
+    <span>Let players bring one friend as a +1 <em>(max 2 per game)</em></span>
+  </label>
+{% endmacro %}
+
 {% macro select(name, label, options, current, placeholder=None) %}
   <label class="field">
     <span>{{ label }}</span>
