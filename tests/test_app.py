@@ -747,26 +747,26 @@ def test_greeting_by_time_of_day():
 
 
 def test_badges(accounts, client, app):
-    from sportive.spirit import earned_badges
+    from sportive.badges import eligible
     accounts.signup()
     client.post("/events/new", data=event_form())
-    _finish_all_events(app)  # a 7 AM game in January
+    _finish_all_events(app)  # a 7 AM game in January 2026 (before the app's first season)
     with app.app_context():
         user_id = get_db().execute("SELECT id FROM users").fetchone()[0]
-        assert earned_badges(user_id) == {"first_game", "rain_or_shine", "early_dawg"}
+        assert eligible(user_id) == {"first_game", "rain_or_shine", "early_dawg", "founding_dawg"}
     page = client.get(f"/u/{user_id}").data
-    assert b"Husky badges" in page and b"3/8" in page and b"Rain or Shine" in page
+    assert b"Rain or Shine" in page and b"Earned" in page and b"Founding Dawg" in page
     assert b"Host 5 games" in page  # your own locked badges show how to earn them
 
 
 def test_cancelled_games_dont_count_for_badges(accounts, client, app):
-    from sportive.spirit import earned_badges
+    from sportive.badges import eligible
     accounts.signup()
     event_id = event_id_from(client.post("/events/new", data=event_form()))
     client.post(f"/events/{event_id}/cancel")
     _finish_all_events(app)
     with app.app_context():
-        assert earned_badges(1) == set()
+        assert eligible(1) == {"founding_dawg"}
 
 
 def test_top_dawgs(accounts, client, app, monkeypatch):
@@ -793,3 +793,168 @@ def test_celebration_and_footer(accounts, client):
     assert b"flash-celebrate" in response and b"Go Dawgs" in response
     assert b"Made by Huskies, for Huskies" in response
     assert b"Not an official University of Washington service" in response
+
+
+# ------------------------------------------------------------ ranks & badges
+
+def _user_id(app, email):
+    with app.app_context():
+        return get_db().execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()[0]
+
+
+def _played_games(app, sport, user_ids, count=1, level="Casual", start="2026-09-22 10:00", end="2026-09-22 11:00"):
+    """Insert finished games (hosted by the first user) that everyone in user_ids played."""
+    ids = []
+    with app.app_context():
+        db = get_db()
+        for _ in range(count):
+            cur = db.execute(
+                "INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level, max_players)"
+                " VALUES (?, 'Past game', ?, 'Denny Field', ?, ?, ?, 22)", (user_ids[0], sport, start, end, level))
+            for user_id in user_ids:
+                db.execute("INSERT INTO rsvps (event_id, user_id, created_at) VALUES (?, ?, '2026-09-01 10:00')",
+                           (cur.lastrowid, user_id))
+            ids.append(cur.lastrowid)
+        db.commit()
+    return ids
+
+
+def test_rank_ladder_needs_rep_and_vouches():
+    from sportive.ranks import compute_rank
+    assert compute_rank("soccer", 0, 0, 0).name == "Casual 1"
+    assert compute_rank("soccer", 95, 0, 0).name == "Casual 3"
+    blocked = compute_rank("soccer", 400, 2, 0)            # lots of rep, not enough vouches
+    assert blocked.name == "Casual 3" and blocked.blocked_by == "Intermediate" and blocked.vouches == 2
+    assert compute_rank("soccer", 400, 3, 0).name == "Intermediate 3"
+    stuck = compute_rank("soccer", 800, 9, 4)              # Competitive needs 5 vouches from Intermediate+
+    assert stuck.name == "Intermediate 3" and stuck.blocked_by == "Competitive"
+    assert compute_rank("soccer", 800, 9, 5).name == "Competitive 2"
+    assert compute_rank("soccer", 5000, 9, 5).name == "Legend"
+
+
+def test_everyone_starts_casual_and_cant_host_higher_levels(accounts, client):
+    accounts.signup()
+    page = client.post("/events/new", data=event_form(skill_level="Competitive")).data
+    assert b"reached Competitive" in page and b"Casual 1" in page
+    assert client.post("/events/new", data=event_form(skill_level="All levels")).status_code == 302
+    quick = client.post("/need-players", data={
+        "sport": "basketball", "location": "IMA (Intramural Activities Building)", "skill_level": "Intermediate",
+        "starts_in": "15", "duration": "60", "have": "2", "needed": "2"}).data
+    assert b"reached Intermediate" in quick
+
+
+def test_casual_players_cant_join_competitive_games(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE events SET skill_level = 'Competitive' WHERE id = ?", (event_id,))
+        db.commit()
+    accounts.logout()
+    accounts.signup(email="newbie@uw.edu")
+    feed = client.get("/?scope=all").data
+    assert "🔒 Competitive+".encode() in feed and f"/events/{event_id}/join".encode() not in feed
+    page = client.post(f"/events/{event_id}/join", follow_redirects=True).data
+    assert b"reached Competitive" in page
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (event_id,)).fetchone()[0] == 1
+
+
+def test_props_and_vouches_rules(accounts, client, app):
+    accounts.signup(email="a@uw.edu")
+    accounts.logout()
+    accounts.signup(email="b@uw.edu")
+    a, b = _user_id(app, "a@uw.edu"), _user_id(app, "b@uw.edu")
+    from sportive.timeutil import now_local, to_db
+    recent_start, recent_end = to_db(now_local() - timedelta(hours=3)), to_db(now_local() - timedelta(hours=2))
+    (game,) = _played_games(app, "soccer", [a, b], start=recent_start, end=recent_end)
+    page = client.get(f"/events/{game}").data
+    assert b"GG! How was the game?" in page
+    assert b"can&#39;t give yourself props" in client.post(f"/events/{game}/props/{b}", follow_redirects=True).data
+    client.post(f"/events/{game}/props/{a}")
+    client.post(f"/events/{game}/props/{a}")          # twice = still once
+    client.post(f"/events/{game}/vouch/{a}")
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT COUNT(*) FROM props").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM vouches WHERE sport = 'soccer'").fetchone()[0] == 1
+        from sportive.ranks import sport_rep
+        assert sport_rep(a)["soccer"] == 10 + 10 + 5   # played + hosted + props
+    (old_game,) = _played_games(app, "soccer", [a, b], start="2026-01-05 10:00", end="2026-01-05 11:00")
+    assert b"up to a week" in client.post(f"/events/{old_game}/props/{a}", follow_redirects=True).data
+
+
+def test_rank_up_to_intermediate_unlocks_games(accounts, client, app):
+    accounts.signup(email="star@uw.edu")
+    star = _user_id(app, "star@uw.edu")
+    teammates = []
+    for n in range(3):
+        accounts.logout()
+        accounts.signup(email=f"mate{n}@uw.edu")
+        teammates.append(_user_id(app, f"mate{n}@uw.edu"))
+    _played_games(app, "soccer", [star] + teammates, count=8)  # 8 hosted games = 160 rep
+    with app.app_context():
+        db = get_db()
+        for mate in teammates:
+            db.execute("INSERT INTO vouches VALUES ('soccer', ?, ?, '2026-09-23 10:00')", (mate, star))
+        db.commit()
+    accounts.logout()
+    accounts.login(email="star@uw.edu")
+    feed = client.get("/").data.decode()
+    assert "RANK UP! Soccer: you&#39;re now Intermediate 1" in feed
+    assert "RANK UP!" not in client.get("/").data.decode()   # celebrated only once
+    ok = client.post("/events/new", data=event_form(sport="soccer", location="Denny Field", skill_level="Intermediate"))
+    assert ok.status_code == 302
+    profile = client.get(f"/u/{star}").data
+    assert b"Intermediate 1" in profile and b"Level Up" in profile
+
+
+def test_season_badges_retire():
+    from datetime import date
+    from sportive.badges import catalog, is_retired, season_of
+    assert season_of(date(2026, 9, 27)) == (2026, "Autumn")
+    assert season_of(date(2027, 2, 1)) == (2027, "Winter")
+    now_badges = {b.key for b in catalog(date(2026, 9, 27))}
+    assert "season-2026-autumn" in now_badges and "season-2027-winter" not in now_badges
+    later = {b.key: b for b in catalog(date(2027, 2, 1))}
+    assert "season-2027-winter" in later
+    assert is_retired(later["season-2026-autumn"], date(2027, 2, 1))
+    assert is_retired(later["founding_dawg"], date(2027, 2, 1))
+    assert not is_retired(later["season-2027-winter"], date(2027, 2, 1))
+
+
+def test_badges_are_kept_forever(accounts, client, app):
+    from sportive.badges import earned_badges, sync_badges
+    accounts.signup(email="host@uw.edu")
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    host, player = _user_id(app, "host@uw.edu"), _user_id(app, "player@uw.edu")
+    _played_games(app, "soccer", [host, player])            # Sept 22, 2026 = Autumn 2026
+    with app.app_context():
+        new = {b.key for b in sync_badges(player)}
+        assert {"first_game", "season-2026-autumn", "founding_dawg"} <= new
+        db = get_db()
+        db.execute("DELETE FROM users WHERE id = ?", (host,))  # host deletes account -> the game is gone
+        db.commit()
+        sync_badges(player)
+        assert "season-2026-autumn" in earned_badges(player)   # the flex stays
+    page = client.get(f"/u/{player}").data
+    assert b"Autumn 2026" in page and b"% of Huskies" in page
+
+
+def test_midnight_games_count_as_night_not_early(accounts, client, app):
+    from sportive.badges import eligible
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    _played_games(app, "soccer", [me], start="2026-09-22 00:43", end="2026-09-22 01:30")
+    with app.app_context():
+        keys = eligible(me)
+    assert "night_dawg" in keys and "early_dawg" not in keys
+
+
+def test_many_new_badges_share_one_banner(accounts, client, app):
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    _played_games(app, "soccer", [me], start="2026-09-22 06:30", end="2026-09-22 07:30")
+    feed = client.get("/").data.decode()
+    assert "new badges unlocked" in feed and feed.count("New badge unlocked") == 0

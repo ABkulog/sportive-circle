@@ -11,9 +11,10 @@
     <div class="row">
       {{ select('sport', 'Sport', SPORTS.items(), form.get('sport', ''), 'Choose a sport') }}
       <label class="field"><span>Skill level</span>
-        <select name="skill_level">
+        <select name="skill_level" {% if event %}data-keep="{{ event.sport }}|{{ event.skill_level }}"{% endif %}>
           {% for level in SKILL_LEVELS %}<option {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
         </select>
+        <small class="muted" data-level-hint></small>
       </label>
     </div>
     <label class="field"><span>Location</span>
@@ -37,5 +38,6 @@
   </form>
 </div>
 <script type="application/json" id="sport-rules">{{ SPORT_RULES|tojson }}</script>
+<script type="application/json" id="my-tiers">{{ {"mine": my_tier_map(), "needs": LEVEL_TIERS}|tojson }}</script>
 <script src="{{ url_for('static', filename='forms.js') }}" defer></script>
 {% endblock %}

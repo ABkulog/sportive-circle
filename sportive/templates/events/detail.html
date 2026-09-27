@@ -82,6 +82,11 @@
         </form>
       {% elif left == 0 %}
         <button class="btn" disabled>Full</button>
+      {% elif not level_ok %}
+        <div class="locked-level">
+          <strong>🔒 {{ event.skill_level }}+ only</strong>
+          <p class="muted">{{ level_reason }}</p>
+        </div>
       {% else %}
         <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
           {{ csrf_field() }}<button class="btn btn-large">Join</button>
@@ -99,6 +104,8 @@
         <a class="person" href="{{ url_for('profile.view', user_id=person.id) }}">{{ avatar(person.id, person.full_name, person.avatar_updated, 36) }}{{ person.full_name }}</a>
         {% if person.grad_year %}<span class="muted">’{{ (person.grad_year|string)[-2:] }}</span>{% endif %}
         {% if person.id == event.host_id %}<span class="badge badge-purple">Host</span>{% endif %}
+        {% set r = ranks[person.id] %}
+        <span class="rank-chip tier-{{ r.tier|lower }}" title="{{ SPORTS[event.sport] }} rank">{{ r.name }}</span>
       </li>
     {% endfor %}
     {% if event.extra_players %}
@@ -106,6 +113,38 @@
     {% endif %}
   </ul>
 </section>
+{% if post_game %}
+  <section class="card post-game" id="post-game">
+    <h2>🏁 GG! How was the game?</h2>
+    <p class="muted">Give your teammates some love. It helps them rank up in {{ SPORTS[event.sport] }}.
+      <strong>🤝 Props</strong> = good teammate. <strong>⬆️ Vouch</strong> = ready for the next level.</p>
+    <ul class="people">
+      {% for person in attendees if person.id != g.user.id %}
+        <li class="post-game-row">
+          <span class="person">{{ avatar(person.id, person.full_name, person.avatar_updated, 32) }}{{ person.full_name }}</span>
+          <span class="post-game-actions">
+            {% if person.id in props_given %}
+              <span class="done-pill">🤝 Props sent</span>
+            {% else %}
+              <form method="post" action="{{ url_for('events.give_props', event_id=event.id, user_id=person.id) }}">
+                {{ csrf_field() }}<button class="btn btn-small">🤝 Props</button>
+              </form>
+            {% endif %}
+            {% if person.id in vouched %}
+              <span class="done-pill">⬆️ Vouched</span>
+            {% else %}
+              <form method="post" action="{{ url_for('events.vouch', event_id=event.id, user_id=person.id) }}">
+                {{ csrf_field() }}<button class="btn btn-small btn-ghost">⬆️ Vouch</button>
+              </form>
+            {% endif %}
+          </span>
+        </li>
+      {% else %}
+        <li class="muted">Nobody else on the app played this one.</li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
 <script>
   // Share: the phone's share sheet (GroupMe, iMessage, Instagram...), or copy the link on desktop.
   const shareButton = document.getElementById("share-button");

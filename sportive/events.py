@@ -9,6 +9,10 @@ from .auth import login_required, safe_next
 from .constants import (LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS, SKILL_LEVELS,
                         SPORT_LOCATIONS, SPORT_MAX_PLAYERS, SPORTS)
 from .db import get_db, user_sports
+from .ranks import (compute_rank, level_allowed, my_ranks, played_together, props_open, sport_rep,
+                    vouch_counts)
+from .badges import sync_badges
+from .ranks import check_rank_ups
 from .spirit import greeting, top_dawgs
 from .timeutil import fmt_clock, from_db, now_local, parse_form, to_db, to_form
 
@@ -109,6 +113,18 @@ def insert_event(data):
 
 # -------------------------------------------------------------------- feed
 
+def celebrate_progress(user_id):
+    """Unlock new badges and celebrate rank-ups (with confetti)."""
+    new = sync_badges(user_id)
+    if len(new) == 1:
+        flash(f"New badge unlocked: {new[0].emoji} {new[0].name}!", "celebrate")
+    elif new:
+        flash(f"{len(new)} new badges unlocked: {' '.join(badge.emoji for badge in new)} "
+              "Check them out on your profile!", "celebrate")
+    for message in check_rank_ups(user_id, my_ranks()):
+        flash(message, "celebrate")
+
+
 @bp.route("/")
 def feed():
     if g.user is None:
@@ -166,6 +182,7 @@ def feed():
          "EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"],
         {"now": to_db(now), "soon": to_db(now + UP_NEXT_WINDOW)}, limit=1)
 
+    celebrate_progress(g.user["id"])
     hello, spirit_line = greeting(g.user["full_name"].split()[0], now)
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
@@ -249,6 +266,8 @@ def create():
         form = request.form
         data, error = read_event_form(form)
         if error is None:
+            error = level_allowed(my_ranks(), data["sport"], data["skill_level"])[1]
+        if error is None:
             duplicate = get_db().execute(
                 "SELECT 1 FROM events WHERE host_id = ? AND title = ? AND starts_at = ? AND cancelled = 0",
                 (g.user["id"], data["title"], data["starts_at"]),
@@ -277,6 +296,8 @@ def edit(event_id):
     if request.method == "POST":
         form = request.form
         data, error = read_event_form(form, event)
+        if error is None and (data["skill_level"], data["sport"]) != (event["skill_level"], event["sport"]):
+            error = level_allowed(my_ranks(), data["sport"], data["skill_level"])[1]
         if error is None:
             db = get_db()
             db.execute(
@@ -337,6 +358,8 @@ def quick():
             error = f"{SPORTS[sport]} can't be played at {location}. Choose another place."
         elif skill_level not in SKILL_LEVELS:
             error = "Please choose a skill level."
+        elif not level_allowed(my_ranks(), sport, skill_level)[0]:
+            error = level_allowed(my_ranks(), sport, skill_level)[1]
         elif starts_in is None or duration is None:
             error = "Please choose when you're playing."
         elif needed is None or not 1 <= needed <= 30:
@@ -384,7 +407,62 @@ def detail(event_id):
         (event_id,),
     ).fetchall()
     ended = from_db(event["ends_at"]) < now_local()
-    return render_template("events/detail.html", event=event, attendees=attendees, ended=ended)
+    sport = event["sport"]
+    ranks = {person["id"]: compute_rank(sport, sport_rep(person["id"]).get(sport, 0),
+                                        *vouch_counts(person["id"], sport))
+             for person in attendees}
+    db = get_db()
+    props_given = {row["receiver_id"] for row in db.execute(
+        "SELECT receiver_id FROM props WHERE event_id = ? AND giver_id = ?", (event_id, g.user["id"]))}
+    vouched = {row["receiver_id"] for row in db.execute(
+        "SELECT receiver_id FROM vouches WHERE sport = ? AND giver_id = ?", (sport, g.user["id"]))}
+    level_ok, level_reason = level_allowed(my_ranks(), sport, event["skill_level"])
+    return render_template("events/detail.html", event=event, attendees=attendees, ended=ended,
+                           ranks=ranks, props_given=props_given, vouched=vouched,
+                           post_game=event["i_am_going"] and props_open(event),
+                           level_ok=level_ok, level_reason=level_reason)
+
+
+@bp.route("/events/<int:event_id>/props/<int:user_id>", methods=("POST",))
+@login_required
+def give_props(event_id, user_id):
+    """🤝 Props: a thumbs-up for a teammate after a game (once per person per game)."""
+    event = get_event(event_id)
+    if user_id == g.user["id"]:
+        flash("Nice try, but you can't give yourself props 😄", "error")
+    elif not props_open(event):
+        flash("Props can be given after a game ends, for up to a week.", "error")
+    elif not played_together(event_id, g.user["id"], user_id):
+        flash("You can only give props to people who played in this game with you.", "error")
+    else:
+        db = get_db()
+        cur = db.execute("INSERT OR IGNORE INTO props (event_id, giver_id, receiver_id, created_at) VALUES (?, ?, ?, ?)",
+                         (event_id, g.user["id"], user_id, to_db(now_local())))
+        db.commit()
+        if cur.rowcount:
+            flash("Props sent! 🤝 That's how Huskies do it.", "success")
+    return redirect(url_for("events.detail", event_id=event_id) + "#post-game")
+
+
+@bp.route("/events/<int:event_id>/vouch/<int:user_id>", methods=("POST",))
+@login_required
+def vouch(event_id, user_id):
+    """⬆️ Vouch: 'they're ready for the next level' in this sport (once per person per sport)."""
+    event = get_event(event_id)
+    if user_id == g.user["id"]:
+        flash("You can't vouch for yourself. Your teammates have to do that! 😄", "error")
+    elif not props_open(event):
+        flash("You can vouch for someone after a game ends, for up to a week.", "error")
+    elif not played_together(event_id, g.user["id"], user_id):
+        flash("You can only vouch for people who played in this game with you.", "error")
+    else:
+        db = get_db()
+        cur = db.execute("INSERT OR IGNORE INTO vouches (sport, giver_id, receiver_id, created_at) VALUES (?, ?, ?, ?)",
+                         (event["sport"], g.user["id"], user_id, to_db(now_local())))
+        db.commit()
+        if cur.rowcount:
+            flash(f"Vouch sent! ⬆️ You helped a teammate on their way up in {SPORTS[event['sport']]}.", "success")
+    return redirect(url_for("events.detail", event_id=event_id) + "#post-game")
 
 
 @bp.route("/events/<int:event_id>/join", methods=("POST",))
@@ -397,6 +475,8 @@ def join(event_id):
         flash("This event already ended.", "error")
     elif event["i_am_going"]:
         flash("You're already going.", "info")
+    elif not level_allowed(my_ranks(), event["sport"], event["skill_level"])[0]:
+        flash(level_allowed(my_ranks(), event["sport"], event["skill_level"])[1], "error")
     else:
         db = get_db()
         # The capacity check and the insert happen in one statement, so two people

@@ -62,3 +62,38 @@ CREATE TABLE IF NOT EXISTS rsvps (
     reminder_sent INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (event_id, user_id)
 );
+
+-- ---------------------------------------------------------------- ranks & badges
+-- 🤝 Props: after a game, players give each other props (once per person per game).
+CREATE TABLE IF NOT EXISTS props (
+    event_id    INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    giver_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (event_id, giver_id, receiver_id)
+);
+
+-- ⬆️ Vouches: "they're ready for the next level" in a sport (once per person per sport).
+CREATE TABLE IF NOT EXISTS vouches (
+    sport       TEXT NOT NULL,
+    giver_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (sport, giver_id, receiver_id)
+);
+
+-- Badges are saved when earned, so they (and the date) stay forever, even limited ones.
+CREATE TABLE IF NOT EXISTS user_badges (
+    user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    badge     TEXT NOT NULL,
+    earned_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, badge)
+);
+
+-- The last rank each person has seen per sport, to celebrate rank-ups.
+CREATE TABLE IF NOT EXISTS ranks_seen (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    sport   TEXT NOT NULL,
+    level   INTEGER NOT NULL,
+    PRIMARY KEY (user_id, sport)
+);

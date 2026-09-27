@@ -1,9 +1,9 @@
-"""Husky spirit: greetings, badges and the Top Dawgs leaderboard. Go Dawgs! 🐺"""
+"""Husky spirit: greetings and the Top Dawgs leaderboard. Go Dawgs! 🐺 (Badges live in badges.py.)"""
 import random
 from datetime import datetime, time
 
 from .db import get_db
-from .timeutil import from_db, now_local, to_db
+from .timeutil import now_local, to_db
 
 SPIRIT_LINES = [
     "Go Dawgs! 🐺",
@@ -13,19 +13,6 @@ SPIRIT_LINES = [
     "The pack is waiting. 🐾",
     "Woof woof. Let's get a game going. 🐺",
 ]
-
-# key: (emoji, name, how to earn it). Order = display order.
-BADGES = {
-    "first_game": ("🐾", "First Game", "Play your first game"),
-    "regular": ("🔥", "Regular", "Play 10 games"),
-    "pack_leader": ("🐺", "Pack Leader", "Host 5 games"),
-    "rain_or_shine": ("🌧️", "Rain or Shine", "Play during Seattle's rainy season (Oct–Mar)"),
-    "early_dawg": ("🌅", "Early Dawg", "Play a game that starts before 8 AM"),
-    "night_dawg": ("🌙", "Night Dawg", "Play a game that starts at 9 PM or later"),
-    "all_rounder": ("🎯", "All-Rounder", "Play 3 different sports"),
-    "explorer": ("🧭", "Campus Explorer", "Play at 5 different places"),
-}
-
 
 def greeting(first_name, now=None):
     """'Evening, Maya!' plus a random spirit line."""
@@ -39,40 +26,6 @@ def greeting(first_name, now=None):
     else:
         part = "Late night"
     return f"{part}, {first_name}!", random.choice(SPIRIT_LINES)
-
-
-def played_games(user_id):
-    """Finished, non-cancelled games this person was part of (as a player or the host)."""
-    return get_db().execute(
-        """SELECT e.* FROM events e JOIN rsvps r ON r.event_id = e.id
-           WHERE r.user_id = ? AND e.cancelled = 0 AND e.ends_at < ?""",
-        (user_id, to_db(now_local())),
-    ).fetchall()
-
-
-def earned_badges(user_id):
-    """Set of badge keys this person has earned."""
-    games = played_games(user_id)
-    starts = [from_db(g["starts_at"]) for g in games]
-    hosted = sum(1 for g in games if g["host_id"] == user_id)
-    earned = set()
-    if games:
-        earned.add("first_game")
-    if len(games) >= 10:
-        earned.add("regular")
-    if hosted >= 5:
-        earned.add("pack_leader")
-    if any(s.month in (10, 11, 12, 1, 2, 3) for s in starts):
-        earned.add("rain_or_shine")
-    if any(s.hour < 8 for s in starts):
-        earned.add("early_dawg")
-    if any(s.hour >= 21 for s in starts):
-        earned.add("night_dawg")
-    if len({g["sport"] for g in games}) >= 3:
-        earned.add("all_rounder")
-    if len({g["location"] for g in games}) >= 5:
-        earned.add("explorer")
-    return earned
 
 
 def top_dawgs(limit=3, now=None):

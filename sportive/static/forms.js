@@ -46,3 +46,32 @@
   updatePlaces();
   updateLimits();
 })();
+
+// Skill levels you haven't ranked up to yet are locked (the server checks this too).
+(function () {
+  const tiersElement = document.getElementById("my-tiers");
+  const form = document.querySelector("form[data-sport-form]");
+  if (!tiersElement || !form) return;
+  const { mine, needs } = JSON.parse(tiersElement.textContent);
+  const sport = form.querySelector('select[name="sport"]');
+  const level = form.querySelector('select[name="skill_level"]');
+  const hint = form.querySelector("[data-level-hint]");
+  const keep = level.dataset.keep || "";  // editing: the event's current level stays allowed
+
+  function update() {
+    const myTier = mine[sport.value] || 0;
+    let locked = [];
+    for (const option of level.options) {
+      const name = option.value;
+      const allowed = !(name in needs) || myTier >= needs[name] || keep === `${sport.value}|${name}`;
+      option.disabled = !allowed;
+      option.textContent = allowed ? name : `${name} 🔒`;
+      if (!allowed) locked.push(name);
+    }
+    if (level.selectedOptions[0] && level.selectedOptions[0].disabled) level.value = "All levels";
+    if (hint) hint.textContent = locked.length && sport.value
+      ? `🔒 ${locked.join(" & ")} unlocks as you rank up in this sport.` : "";
+  }
+  sport.addEventListener("change", update);
+  update();
+})();

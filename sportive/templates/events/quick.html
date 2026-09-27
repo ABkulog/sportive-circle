@@ -31,6 +31,7 @@
       <select name="skill_level">
         {% for level in SKILL_LEVELS %}<option {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
       </select>
+      <small class="muted" data-level-hint></small>
     </label>
     <label class="field"><span>Note <em>(optional)</em></span>
       <textarea name="note" maxlength="500" rows="2" placeholder="Court 2, look for the blue shirts">{{ form.get('note', '') }}</textarea></label>
@@ -38,5 +39,6 @@
   </form>
 </div>
 <script type="application/json" id="sport-rules">{{ SPORT_RULES|tojson }}</script>
+<script type="application/json" id="my-tiers">{{ {"mine": my_tier_map(), "needs": LEVEL_TIERS}|tojson }}</script>
 <script src="{{ url_for('static', filename='forms.js') }}" defer></script>
 {% endblock %}

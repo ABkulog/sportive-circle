@@ -9,9 +9,10 @@ from werkzeug.security import check_password_hash
 from .auth import login_required, safe_next
 from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
-from .events import query_events
+from .events import celebrate_progress, query_events
 from .photos import make_avatar
-from .spirit import BADGES, earned_badges
+from .badges import catalog, earned_badges, is_retired, rarity, sync_badges
+from .ranks import LEVELS, user_ranks
 from .timeutil import now_local, to_db
 
 bp = Blueprint("profile", __name__)
@@ -105,8 +106,15 @@ def view(user_id):
            WHERE mine.user_id = ? AND theirs.user_id = ?""",
         (g.user["id"], user_id),
     ).fetchone() is not None
+    if user_id == g.user["id"]:
+        celebrate_progress(user_id)
+    else:
+        sync_badges(user_id)  # keep their showcase up to date
+    ranks = user_ranks(user_id)
     return render_template("profile/view.html", user=user, sports=user_sports(user_id), hosting=hosting,
-                           show_email=show_email, badges=BADGES, earned=earned_badges(user_id))
+                           show_email=show_email, ranks=ranks, levels=LEVELS,
+                           badges=catalog(), earned=earned_badges(user_id), rarity=rarity(),
+                           is_retired=is_retired)
 
 
 @bp.route("/profile/edit", methods=("GET", "POST"))

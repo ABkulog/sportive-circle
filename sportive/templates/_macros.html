@@ -41,7 +41,8 @@
         {% if e.cancelled %}<span class="badge badge-danger">Cancelled</span>
         {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Hosting</span>
         {% elif e.i_am_going %}<span class="badge badge-success">You're going</span>
-        {% elif left == 0 %}<span class="badge badge-muted">Full</span>{% endif %}
+        {% elif left == 0 %}<span class="badge badge-muted">Full</span>
+        {% elif not can_join_level(e.sport, e.skill_level) %}<span class="badge badge-muted">🔒 {{ e.skill_level }}+</span>{% endif %}
       </div>
     </div>
     <div class="event-side">
@@ -49,7 +50,7 @@
         <strong>{{ e.going_count + e.extra_players }}</strong>{% if e.max_players %}/{{ e.max_players }}{% endif %}
         <small>going</small>
       </div>
-      {% if not e.cancelled and not e.i_am_going and left != 0 %}
+      {% if not e.cancelled and not e.i_am_going and left != 0 and can_join_level(e.sport, e.skill_level) %}
         <form method="post" action="{{ url_for('events.join', event_id=e.id) }}" class="card-join">
           {{ csrf_field() }}
           <input type="hidden" name="next" value="{{ request.full_path }}">

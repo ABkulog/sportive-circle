@@ -402,3 +402,52 @@ h2 { font-weight: 800; }
 @media (prefers-reduced-motion: reduce) {
   .event-card { transition: none; }
 }
+
+/* ---------- ranks (per sport) ---------- */
+.rank-chip {
+  font-family: var(--display); font-weight: 800; font-size: .78rem; letter-spacing: .02em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  background: var(--border); color: var(--text);
+}
+.rank-chip.tier-casual { background: #dfeee4; color: #1e6b3d; }
+.rank-chip.tier-intermediate { background: #efe7d2; color: #6b5a24; }
+.rank-chip.tier-competitive { background: var(--purple); color: #fff; }
+.rank-chip.tier-legend { background: linear-gradient(135deg, #ffc700, #b7a57a); color: var(--purple-strong); box-shadow: 0 0 0 2px var(--purple); }
+@media (prefers-color-scheme: dark) {
+  .rank-chip.tier-casual { background: #1c3a27; color: #8fe0ad; }
+  .rank-chip.tier-intermediate { background: #3a3220; color: #e6d39a; }
+}
+.rank-cards { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.rank-card { border: 1.5px solid var(--border); border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
+.rank-card.tier-competitive { border-color: var(--purple); }
+.rank-card.tier-legend { border-color: var(--spirit-gold); background-image: var(--paws); }
+.rank-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.rank-sport { font-weight: 700; }
+.rank-bar { height: 8px; border-radius: 999px; background: var(--purple-soft); overflow: hidden; }
+.rank-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--purple), var(--spirit-gold)); border-radius: inherit; }
+.rank-meta { margin: 0; font-size: .85rem; color: var(--muted); }
+.rank-meta strong { color: var(--text); }
+
+/* limited / retired badges */
+.badge-tag { display: inline-block; margin-top: 4px; font-size: .7rem; font-weight: 800; letter-spacing: .03em;
+  text-transform: uppercase; padding: 2px 7px; border-radius: 999px; }
+.tag-limited { background: var(--spirit-gold); color: var(--purple-strong); }
+.tag-og { background: var(--purple); color: var(--spirit-gold); }
+.husky-badge.is-retired:not(.is-locked) {
+  background: linear-gradient(135deg, var(--purple), var(--purple-strong)); color: #fff; border-color: var(--spirit-gold);
+  box-shadow: 0 0 0 1px var(--spirit-gold), 0 4px 14px rgba(75, 46, 131, .35);
+}
+.husky-badge.is-retired:not(.is-locked) small { color: #e8e3d3; }
+
+/* post-game props & vouches, locked levels */
+.post-game-row { justify-content: space-between; flex-wrap: wrap; }
+.post-game-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.post-game-actions form { margin: 0; }
+.done-pill { font-size: .85rem; font-weight: 600; color: var(--success); padding: 6px 4px; }
+@media (prefers-color-scheme: dark) { .done-pill { color: #7ed7a2; } }
+.locked-level { border: 1.5px dashed var(--border); border-radius: 12px; padding: 10px 12px; }
+.locked-level p { margin: 4px 0 0; }
+.people .rank-chip { margin-left: auto; }
+.step-rank { border-color: var(--spirit-gold); }
+.step-rank .step-number { background: var(--spirit-gold); }
+.rank-ladder { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

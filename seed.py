@@ -36,9 +36,9 @@ EVENTS = [
      20, 0, "About 9:30/mile pace. Meet at the trail by the UW Tower.", 0),
     (2, "Stevens Pass day trip", "snow", "Off campus (see note)", (6, 6, 0), 12, "All levels", 5, 0,
      "Carpool from the U District at 6am. Split gas.", 0),
-    (3, "Doubles at the courts", "tennis", "IMA (Intramural Activities Building)", (3, 16, 0), 1.5, "Intermediate", 4, 0,
+    (3, "Doubles at the courts", "tennis", "IMA (Intramural Activities Building)", (3, 16, 0), 1.5, "Casual", 4, 0,
      "", 0),
-    (1, "Ultimate scrimmage", "ultimate", "Denny Field", (4, 17, 30), 2, "Competitive", 14, 0,
+    (1, "Ultimate scrimmage", "ultimate", "Denny Field", (4, 17, 30), 2, "Intermediate", 14, 0,
      "", 0),
     (3, "Valorant 5-stack", "esports", "Online", (1, 21, 0), 2, "All levels", 5, 1, "Discord link in note after you join (coming soon!)", 0),
 ]
@@ -56,6 +56,33 @@ def demo_picture(name, color):
     output = BytesIO()
     image.save(output, "PNG")
     return make_avatar(output.getvalue())
+
+
+# Past games so demo players already have ranks: (host index, sport, place, how many games)
+HISTORY = [
+    (0, "basketball", "IMA (Intramural Activities Building)", 9),  # Maya -> Intermediate in basketball
+    (2, "climbing", "IMA (Intramural Activities Building)", 8),    # Sam -> Intermediate in climbing
+    (1, "ultimate", "Denny Field", 8),                             # Jordan -> Intermediate in ultimate
+    (3, "tennis", "IMA (Intramural Activities Building)", 3),      # Priya -> still Casual
+]
+
+
+def add_history(db, ids, now):
+    for host, sport, place, games in HISTORY:
+        for n in range(games):
+            day = now - timedelta(days=n + 2)
+            starts = day.replace(hour=18, minute=0)
+            cur = db.execute(
+                "INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level, max_players)"
+                " VALUES (?, ?, ?, ?, ?, ?, 'Casual', 10)",
+                (ids[host], f"{sport.title()} run #{n + 1}", sport, place, to_db(starts),
+                 to_db(starts + timedelta(hours=1))))
+            for user_id in ids:  # everyone played
+                db.execute("INSERT INTO rsvps (event_id, user_id, created_at, reminder_sent) VALUES (?, ?, ?, 1)",
+                           (cur.lastrowid, user_id, to_db(starts - timedelta(days=1))))
+        for other in ids:  # the other three vouch for the host
+            if other != ids[host] and games >= 8:
+                db.execute("INSERT OR IGNORE INTO vouches VALUES (?, ?, ?, ?)", (sport, other, ids[host], to_db(now)))
 
 
 def main():
@@ -96,8 +123,9 @@ def main():
             for other in ids:  # a few people join a few events
                 if other != ids[host] and (cur.lastrowid + other) % 3 == 0:
                     db.execute("INSERT INTO rsvps (event_id, user_id, created_at) VALUES (?, ?, ?)", (cur.lastrowid, other, joined))
+        add_history(db, ids, now)
         db.commit()
-        print(f"Added {len(USERS)} demo users and {len(EVENTS)} events.")
+        print(f"Added {len(USERS)} demo users and {len(EVENTS)} events, with past games and ranks.")
         print(f"Log in as {USERS[0][0]} with password {DEMO_PASSWORD}")
 
 

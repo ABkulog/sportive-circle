@@ -18,13 +18,57 @@
 </section>
 
 <section class="card">
-  <h2>🐺 Husky badges <span class="muted badge-count">{{ earned|length }}/{{ badges|length }}</span></h2>
+  <h2>🏀 Ranks</h2>
+  {% if ranks %}
+    <div class="rank-cards">
+      {% for sport, r in ranks.items() %}
+        <div class="rank-card tier-{{ r.tier|lower }}">
+          <div class="rank-card-top">
+            <span class="rank-sport">{{ SPORT_EMOJI[sport] }} {{ SPORTS[sport] }}</span>
+            <span class="rank-chip tier-{{ r.tier|lower }}">{{ r.name }}</span>
+          </div>
+          <div class="rank-bar" role="progressbar" aria-valuenow="{{ r.progress }}" aria-valuemin="0" aria-valuemax="100"
+               aria-label="Progress to {{ r.next_name or 'max rank' }}"><span style="width: {{ r.progress }}%"></span></div>
+          <p class="rank-meta">
+            <strong>{{ r.rep }} rep</strong>
+            {% if r.blocked_by %}
+              · needs {{ r.vouches_needed - r.vouches }} more vouch{{ 'es' if r.vouches_needed - r.vouches != 1 }}
+                {% if r.blocked_by == 'Competitive' %}from Intermediate+ players{% endif %} to reach {{ r.blocked_by }}
+            {% elif r.next_name %}
+              · {{ r.next_rep - r.rep }} rep to {{ r.next_name }}
+            {% else %}
+              · max rank 👑
+            {% endif %}
+          </p>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">Everyone starts at <strong>Casual 1</strong>. Play games, collect 🤝 props and get ⬆️ vouched
+      by teammates to rank up in each sport.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>🐺 Badges <span class="muted badge-count">{{ earned|length }} earned</span></h2>
   <ul class="husky-badges">
-    {% for key, (emoji, name, how) in badges.items() %}
-      {% if key in earned or user.id == g.user.id %}
-        <li class="husky-badge {% if key not in earned %}is-locked{% endif %}" title="{{ how }}">
-          <span class="husky-badge-emoji" aria-hidden="true">{{ emoji }}</span>
-          <span><strong>{{ name }}</strong><small>{{ 'Earned!' if key in earned else how }}</small></span>
+    {% for b in badges %}
+      {% set retired = is_retired(b) %}
+      {% set has = b.key in earned %}
+      {% if has or (user.id == g.user.id and not retired) %}
+        <li class="husky-badge {% if not has %}is-locked{% endif %} {% if b.until %}is-limited{% endif %} {% if retired %}is-retired{% endif %}"
+            title="{{ b.how }}">
+          <span class="husky-badge-emoji" aria-hidden="true">{{ b.emoji }}</span>
+          <span>
+            <strong>{{ b.name }}</strong>
+            {% if has %}
+              <small>Earned {{ earned[b.key].strftime('%b %Y') }}{% if rarity.get(b.key) is not none %} · {{ rarity[b.key] }}% of Huskies{% endif %}</small>
+            {% else %}
+              <small>{{ b.how }}</small>
+            {% endif %}
+            {% if retired %}<span class="badge-tag tag-og">OG · Retired</span>
+            {% elif b.until %}<span class="badge-tag tag-limited">Limited · until {{ b.until.strftime('%b') }} {{ b.until.day }}</span>{% endif %}
+          </span>
         </li>
       {% endif %}
     {% endfor %}
