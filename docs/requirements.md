@@ -45,6 +45,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-PROF-2 | Photos are cropped to a square, shrunk to 256 px, and stripped of hidden metadata (like GPS). | Must | ✅ |
 | FR-PROF-3 | Users can edit name, class year, bio, sports, photo, reminder emails and chill mode (hide ranks). Edit and Change photo buttons are on their own profile. | Must | ✅ |
 | FR-PROF-4 | A user's email is shown only to themselves and people they've played a game with. | Must | ✅ |
+| FR-PROF-5 | On the photo page, Save without picking a new photo goes back to the profile, and users can remove their photo (with an "Are you sure?"). | Should | ✅ |
 
 ### Games and events (EVT)
 
@@ -93,6 +94,14 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-SOC-2 | Accept, decline, cancel requests and unfriend. People you've played with are suggested. | Must | ✅ |
 | FR-SOC-3 | Direct messages are allowed only between friends, people who played together, a student and a club officer, or when replying to someone who wrote first. | Must | ✅ |
 | FR-SOC-4 | Blocking stops messages, friend requests and joining each other's games, both ways, and hides you from their search and feed. | Must | ✅ |
+
+### Notifications (NOTIF)
+
+| ID | Requirement | Priority | Status |
+|---|---|---|---|
+| FR-NOTIF-1 | Tabs and icons show how many new things are waiting: messages, friend requests, game chats (Home), club updates and join requests (Clubs), badges (Profile), news (News). A number clears when you open that place. | Must | ✅ |
+| FR-NOTIF-2 | For each kind, users choose "Tab icon", "On my screen" (the What's new box on Home), both or neither. No pop-ups or extra emails. | Must | ✅ |
+| FR-NOTIF-3 | Sensible, quiet defaults: news is off, Need players posts show on the screen but not the tab. New accounts start with nothing to catch up on. | Should | ✅ |
 
 ### Safety and admin (SAFE)
 
@@ -143,6 +152,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 |---|---|---|
 | NFR-UX-1 | Works on phones (bottom tabs), tablets and laptops (sidebar), with the same 5 sections everywhere. | ✅ |
 | NFR-UX-2 | Plain words: short sentences, no unexplained jargon (glossary on How it works). | ✅ |
+| NFR-UX-7 | Long pages are split into clear sections by soft full-width bands; items inside a section are split by thin lines. | ✅ |
 | NFR-UX-3 | Keyboard and screen-reader friendly: labels on every field, skip link, visible focus, `aria-current` on tabs, alt text rules, and text contrast of at least 4.5:1 (WCAG AA). | ✅ |
 | NFR-UX-4 | Light and dark mode; animations are skipped for "reduce motion". | ✅ |
 | NFR-UX-5 | Error messages say what went wrong and how to fix it. Friendly pages for 400/403/404/405/413/500. | ✅ |

@@ -15,12 +15,12 @@
     {{ csrf_field() }}
     <label class="photo-picker">
       <span class="photo-preview" id="photo-preview">
-        {% if g.user.avatar_updated %}{{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 160) }}{% else %}📷{% endif %}
+        {% if g.user.avatar_updated %}{{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 150) }}{% else %}📷{% endif %}
       </span>
       <span class="btn btn-ghost">Choose a photo</span>
-      <input type="file" name="photo" id="photo-input" accept="image/*" required class="file-input">
+      <input type="file" name="photo" id="photo-input" accept="image/*" class="file-input" {% if first_time %}required{% endif %}>
     </label>
-    <button class="btn btn-block">Save photo</button>
+    <button class="btn btn-block">{{ 'Save photo' if first_time else 'Save' }}</button>
   </form>
 
   {% if first_time %}
@@ -28,7 +28,14 @@
       {{ csrf_field() }}<button class="btn btn-ghost">Add later</button>
     </form>
   {% else %}
-    <a href="{{ url_for('profile.edit') }}">Back to profile settings</a>
+    <p class="muted fine-print">Not changing it? Just tap Save to go back.</p>
+    <div class="photo-extra">
+      <a class="btn btn-ghost" href="{{ url_for('profile.view', user_id=g.user.id) }}">Back to my profile</a>
+      <form method="post" action="{{ url_for('profile.photo_remove') }}"
+            data-confirm="Remove your profile picture? People use it to find you at games.">
+        {{ csrf_field() }}<button class="btn btn-danger-ghost">Remove photo</button>
+      </form>
+    </div>
   {% endif %}
 </div>
 {% endblock %}

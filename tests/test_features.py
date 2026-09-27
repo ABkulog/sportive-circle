@@ -692,3 +692,76 @@ def refused(world):
     assert world.response.status_code == 400
     person = next(iter(world.people.values()))
     assert world.db("SELECT full_name FROM users WHERE id = ?", (person.id,))[0]["full_name"] != "Hacked"
+
+
+# ------------------------------------------------------------------ notifications
+
+TAB_LABELS = {"Messages": "Messages", "Clubs": "Clubs", "Home": "Home", "News": "News", "Profile": "Profile",
+              "Friends": "Friends"}
+
+
+def tab_number(world, name, label):
+    """The number on a tab/icon in the navigation (0 if there's none)."""
+    page = world.person(name).client.get("/how-it-works").get_data(as_text=True)
+    nav = page[page.index('<nav class="appnav"'):page.index("</nav>", page.index('<nav class="appnav"'))]
+    match = re.search(r'<span class="tab-icon">(?:(?!</a>).)*?</span>\s*<span class="tab-label">' + label, nav, re.S)
+    assert match, label
+    number = re.search(r'<span class="count-dot">([^<]+)</span>', match.group(0))
+    return int(number.group(1).rstrip("+")) if number else 0
+
+
+@then(parsers.re(r'"(?P<name>[^"]+)" has (?P<n>\d+) on the (?P<label>\w+) (?:tab|icon)'))
+def has_tab_number(world, name, n, label):
+    assert tab_number(world, name, TAB_LABELS[label]) == int(n)
+
+
+@then(parsers.parse('"{name}" sees "{text}" in What\'s new'))
+def sees_whats_new(world, name, text):
+    page = html.unescape(world.person(name).client.get("/").get_data(as_text=True))
+    assert "What's new" in page
+    box = page[page.index('class="whats-new"'):page.index("</section>", page.index('class="whats-new"'))]
+    assert text in box, box
+
+
+@then(parsers.parse('"{name}" doesn\'t see What\'s new'))
+def no_whats_new(world, name):
+    assert 'class="whats-new"' not in world.person(name).client.get("/").get_data(as_text=True)
+
+
+@when(parsers.parse('"{name}" turns off the tab icon for "{kind}"'))
+def turn_off_badge(world, name, kind):
+    from sportive.notifications import KINDS
+    form = {}
+    for k in KINDS:
+        if k.badge and k.key != kind:
+            form[f"{k.key}_badge"] = "1"
+        if k.screen:
+            form[f"{k.key}_screen"] = "1"
+    world.person(name).client.post("/profile/notifications", data=form)
+
+
+@when(parsers.parse('"{name}" turns off every notification'))
+def turn_off_all(world, name):
+    world.person(name).client.post("/profile/notifications", data={})
+
+
+@when(parsers.parse('"{name}" opens her messages from "{other}"'))
+def open_thread(world, name, other):
+    world.person(name).client.get(f"/messages/{world.person(other).id}")
+
+
+@given(parsers.parse('"{name}" follows "{club}"'))
+@when(parsers.parse('"{name}" follows "{club}"'))
+def follow_club(world, name, club):
+    world.person(name).client.post(f"/clubs/{club_id(world, club)}/follow")
+
+
+@given(parsers.parse('"{officer}" posts the club update "{text}"'))
+@when(parsers.parse('"{officer}" posts the club update "{text}"'))
+def post_update(world, officer, text):
+    world.person(officer).client.post("/clubs/updates", data={"club": club_id(world, "UW Spikeball Club"), "body": text})
+
+
+@when(parsers.parse('"{name}" opens Club updates'))
+def open_club_updates(world, name):
+    world.person(name).client.get("/clubs/updates")

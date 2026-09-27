@@ -17,6 +17,7 @@ from .db import get_db
 from .links import public_url
 from .mail import send_email
 from .moderation import is_admin
+from .notifications import mark_seen
 from .textutil import one_line
 from .timeutil import now_local, to_db
 
@@ -521,6 +522,7 @@ def updates():
              AND EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = ?)
            ORDER BY p.id DESC LIMIT 100""", (me,)).fetchall()
     following = db.execute("SELECT COUNT(*) FROM club_members WHERE user_id = ?", (me,)).fetchone()[0]
+    mark_seen("club_updates")
     return render_template("clubs/updates.html", posts=posts, my_officer_clubs=my_officer_clubs,
                            following=following)
 

@@ -17,11 +17,11 @@
 </head>
 {% set app_nav = g.user and (g.user.avatar_updated or session.get('photo_skipped')) %}
 {% set ep = request.endpoint or '' %}
-{% set nav_counts = social_counts() if app_nav else {} %}
+{% set nav_badges = tab_badges() if app_nav else {} %}
 {% macro icon(name) %}<svg class="icon" aria-hidden="true"><use href="#i-{{ name }}"/></svg>{% endmacro %}
 {% macro tab(url, icon_name, label, active, badge=0, extra_class='') %}
   <a class="tab {{ extra_class }} {% if active %}is-active{% endif %}" href="{{ url }}" {% if active %}aria-current="page"{% endif %}>
-    <span class="tab-icon">{{ icon(icon_name) }}{% if badge %}<span class="count-dot">{{ badge }}</span>{% endif %}</span>
+    <span class="tab-icon">{{ icon(icon_name) }}{% if badge %}<span class="count-dot">{{ badge_text(badge) }}</span>{% endif %}</span>
     <span class="tab-label">{{ label }}{% if badge %}<span class="visually-hidden"> ({{ badge }} new)</span>{% endif %}</span>
   </a>
 {% endmacro %}
@@ -37,8 +37,8 @@
         <nav class="top-icons" aria-label="Shortcuts">
           {% if is_admin() %}{% set open_reports = open_report_count() %}<a href="{{ url_for('moderation.admin_reports') }}" aria-label="Reports{% if open_reports %}, {{ open_reports }} open{% endif %}" title="Reports">{{ icon('shield') }}{% if open_reports %}<span class="count-dot">{{ open_reports }}</span>{% endif %}</a>{% endif %}
           <a href="{{ url_for('how_it_works') }}" aria-label="How it works" title="How it works">{{ icon('help') }}</a>
-          <a href="{{ url_for('social.friends') }}" aria-label="Friends{% if nav_counts.requests %}, {{ nav_counts.requests }} requests{% endif %}" title="Friends">{{ icon('friends') }}{% if nav_counts.requests %}<span class="count-dot">{{ nav_counts.requests }}</span>{% endif %}</a>
-          <a href="{{ url_for('social.inbox') }}" aria-label="Messages{% if nav_counts.messages %}, {{ nav_counts.messages }} unread{% endif %}" title="Messages">{{ icon('send') }}{% if nav_counts.messages %}<span class="count-dot">{{ nav_counts.messages }}</span>{% endif %}</a>
+          <a href="{{ url_for('social.friends') }}" aria-label="Friends{% if nav_badges.friends %}, {{ nav_badges.friends }} new{% endif %}" title="Friends">{{ icon('friends') }}{% if nav_badges.friends %}<span class="count-dot">{{ badge_text(nav_badges.friends) }}</span>{% endif %}</a>
+          <a href="{{ url_for('social.inbox') }}" aria-label="Messages{% if nav_badges.messages %}, {{ nav_badges.messages }} unread{% endif %}" title="Messages">{{ icon('send') }}{% if nav_badges.messages %}<span class="count-dot">{{ badge_text(nav_badges.messages) }}</span>{% endif %}</a>
         </nav>
       {% elif g.user %}
         {# Still setting up (no profile picture yet). #}
@@ -63,14 +63,14 @@
     {# The same 5 sections everywhere: a bottom tab bar on phones/tablets, a sidebar on laptops. #}
     <nav class="appnav" aria-label="Main">
       <a class="brand side-only" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='icon.svg') }}" alt="" width="28" height="28"><span>Sportive<span class="brand-accent">Circle</span></span></a>
-      {{ tab(url_for('events.feed'), 'home', 'Home', ep in ('events.feed', 'index', 'events.my_events', 'events.detail')) }}
-      {{ tab(url_for('clubs.directory'), 'clubs', 'Clubs', ep.startswith('clubs.') and ep not in ('clubs.create', 'clubs.review_queue')) }}
+      {{ tab(url_for('events.feed'), 'home', 'Home', ep in ('events.feed', 'index', 'events.my_events', 'events.detail'), nav_badges.home) }}
+      {{ tab(url_for('clubs.directory'), 'clubs', 'Clubs', ep.startswith('clubs.') and ep not in ('clubs.create', 'clubs.review_queue'), nav_badges.clubs) }}
       {{ tab(url_for('create_menu'), 'plus', 'Create', ep in ('create_menu', 'events.create', 'events.quick', 'clubs.create'), extra_class='tab-create') }}
-      {{ tab(url_for('news.news'), 'news', 'News', ep == 'news.news') }}
-      {{ tab(url_for('profile.view', user_id=g.user.id), 'user', 'Profile', ep.startswith('profile.') and (ep != 'profile.view' or request.view_args.get('user_id') == g.user.id)) }}
+      {{ tab(url_for('news.news'), 'news', 'News', ep == 'news.news', nav_badges.news) }}
+      {{ tab(url_for('profile.view', user_id=g.user.id), 'user', 'Profile', (ep.startswith('profile.') or ep.startswith('notifications.')) and (ep != 'profile.view' or request.view_args.get('user_id') == g.user.id), nav_badges.profile) }}
       <div class="side-only side-extra">
-        {{ tab(url_for('social.inbox'), 'send', 'Messages', ep == 'social.inbox' or ep == 'social.thread', nav_counts.messages) }}
-        {{ tab(url_for('social.friends'), 'friends', 'Friends', ep == 'social.friends', nav_counts.requests) }}
+        {{ tab(url_for('social.inbox'), 'send', 'Messages', ep == 'social.inbox' or ep == 'social.thread', nav_badges.messages) }}
+        {{ tab(url_for('social.friends'), 'friends', 'Friends', ep == 'social.friends', nav_badges.friends) }}
         {{ tab(url_for('how_it_works'), 'help', 'How it works', ep == 'how_it_works') }}
         {% if is_admin() %}
           {{ tab(url_for('moderation.admin_reports'), 'shield', 'Reports', ep.startswith('moderation.admin'), open_report_count()) }}

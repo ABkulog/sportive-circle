@@ -9,12 +9,13 @@ from werkzeug.security import check_password_hash
 from .auth import MAX_NAME_LENGTH, hash_password, login_required, password_problem, safe_next
 from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
-from .events import celebrate_progress, query_events
+from .events import celebrate_progress, query_events, tell_players_it_was_cancelled
 from .photos import make_avatar
 from .badges import (SHOWCASE_SLOTS, catalog, earned_badges, is_retired, rarity, set_showcase, showcase,
                      sync_badges)
 from .ranks import LEVELS, user_ranks
 from .moderation import is_admin
+from .notifications import mark_seen
 from .textutil import one_line
 from .social import can_message, friendship_status, i_blocked, is_blocked_between
 from .timeutil import now_local, to_db
@@ -43,6 +44,9 @@ def photo_upload():
     first_time = not g.user["avatar_updated"]
     if request.method == "POST":
         upload = request.files.get("photo")
+        if (upload is None or not upload.filename) and not first_time:
+            # Saved without picking a new photo: keep the current one and go back to the profile.
+            return redirect(url_for("profile.view", user_id=g.user["id"]))
         if upload is None or not upload.filename:
             flash("Choose a photo first.", "error")
         else:
@@ -67,6 +71,19 @@ def photo_upload():
                 flash("Profile picture updated.", "success")
                 return redirect(url_for("profile.view", user_id=g.user["id"]))
     return render_template("profile/photo.html", first_time=first_time)
+
+
+@bp.route("/profile/photo/remove", methods=("POST",))
+@login_required
+def photo_remove():
+    """Remove your photo. You won't be sent back to the "add a photo" step; a banner gently reminds you."""
+    db = get_db()
+    db.execute("DELETE FROM avatars WHERE user_id = ?", (g.user["id"],))
+    db.execute("UPDATE users SET avatar_updated = NULL WHERE id = ?", (g.user["id"],))
+    db.commit()
+    session["photo_skipped"] = True
+    flash("Photo removed. Add one any time, so people recognize you at the game.", "info")
+    return redirect(url_for("profile.view", user_id=g.user["id"]))
 
 
 @bp.route("/profile/photo/skip", methods=("POST",))
@@ -112,6 +129,7 @@ def view(user_id):
     ).fetchone() is not None
     if user_id == g.user["id"]:
         celebrate_progress(user_id)
+        mark_seen("badges")
     else:
         sync_badges(user_id)  # keep their showcase up to date
     ranks = user_ranks(user_id)
@@ -140,6 +158,7 @@ def badge_locker():
             flash("Showcase updated! Flex away 😎", "success")
             return redirect(url_for("profile.view", user_id=me))
     sync_badges(me)
+    mark_seen("badges")
     return render_template("profile/badges.html", badges=catalog(), earned=earned_badges(me),
                            shown=[badge.key for badge in showcase(me)], rarity=rarity(),
                            is_retired=is_retired, slots=SHOWCASE_SLOTS)
@@ -252,6 +271,10 @@ def delete_account():
     if not check_password_hash(g.user["password_hash"], request.form.get("password", "")):
         flash("That password isn't right, so your account was not deleted.", "error")
         return redirect(url_for("profile.delete_account"))
+    # Games they host disappear with the account, so warn everyone who joined (like canceling would).
+    for event in query_events(["e.host_id = :me", "e.cancelled = 0", "e.ends_at >= :now"],
+                              {"now": to_db(now_local())}):
+        tell_players_it_was_cancelled(event)
     db = get_db()
     # ON DELETE CASCADE (schema.sql) also removes your sports, RSVPs and hosted events.
     db.execute("DELETE FROM users WHERE id = ?", (g.user["id"],))

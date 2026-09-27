@@ -7,6 +7,8 @@
   <a class="edit-photo" href="{{ url_for('profile.photo_upload') }}">
     {{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 72) }}
     <span>{{ 'Change profile picture' if g.user.avatar_updated else 'Add a profile picture' }}</span></a>
+  <a class="settings-row" href="{{ url_for('notifications.notification_settings') }}">
+    <span><span aria-hidden="true">🔔</span> Notifications</span><span class="muted">Choose what you hear about ›</span></a>
   <form method="post" class="form">
     {{ csrf_field() }}
     <label class="field"><span>Full name</span>

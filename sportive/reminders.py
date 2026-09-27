@@ -67,7 +67,7 @@ def send_due_reminders():
            FROM rsvps r
            JOIN events e ON e.id = r.event_id
            JOIN users u ON u.id = r.user_id
-           WHERE r.reminder_sent = 0 AND e.cancelled = 0 AND u.verified = 1 AND u.email_reminders = 1
+           WHERE r.reminder_sent = 0 AND e.cancelled = 0 AND u.verified = 1 AND u.suspended = 0 AND u.email_reminders = 1
              AND e.starts_at > :now AND e.starts_at <= :soon""",
         {"now": to_db(now), "soon": to_db(now + REMIND_BEFORE)},
     ).fetchall()

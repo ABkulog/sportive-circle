@@ -13,6 +13,7 @@ from .constants import (LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START
                         SPORT_LOCATIONS, SPORT_MAX_PLAYERS, SPORTS)
 from .db import get_db, user_sports
 from .links import public_url
+from .notifications import mark_seen, on_screen
 from .mail import send_email
 from .ranks import (LEVEL_REQUIREMENT, check_rank_ups, compute_rank, level_allowed, my_ranks, played_together,
                     props_open, sport_rep, vouch_counts)
@@ -277,9 +278,11 @@ def feed():
 
     celebrate_progress(g.user["id"])
     hello, spirit_line = greeting(g.user["full_name"].split()[0], now)
+    whats_new = on_screen()   # before marking Need players as seen: you're looking at them right now
+    mark_seen("need_players")
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
-                           hello=hello, spirit_line=spirit_line, top_dawgs=top_dawgs(now=now),
+                           hello=hello, spirit_line=spirit_line, top_dawgs=top_dawgs(now=now), whats_new=whats_new,
                            club_picks=suggested_clubs(g.user["id"], my_sports))
 
 

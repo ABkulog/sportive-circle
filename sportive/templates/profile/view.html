@@ -78,7 +78,7 @@
 </section>
 
 {% if showcase or me %}
-<section class="card">
+<section class="band">
   <div class="section-head">
     <h2>Badges</h2>
     {% if me %}<a href="{{ url_for('profile.badge_locker') }}">All {{ earned|length }} · choose 3</a>{% endif %}
@@ -96,7 +96,7 @@
 </section>
 {% endif %}
 
-<section class="card">
+<section class="band">
   <h2>Ranks</h2>
   {% if not user.show_ranks and user.id != g.user.id %}
     <p class="muted">🧘 {{ user.full_name.split()[0] }} is in chill mode, so their ranks are hidden. Just here to play!</p>
@@ -140,7 +140,7 @@
   {% endif %}
 </section>
 
-<section>
+<section class="band">
   <h2 class="section-title">{{ 'Games you host' if me else 'Games ' ~ user.full_name.split()[0] ~ ' hosts' }}</h2>
   <div class="stack">
     {% for e in hosting %}{{ event_card(e) }}{% else %}<p class="muted">Nothing coming up.</p>{% endfor %}

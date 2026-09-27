@@ -2063,3 +2063,53 @@ def test_leap_day_birthdays():
     assert is_birthday(leap_baby, date(2027, 2, 28)) and not is_birthday(leap_baby, date(2028, 2, 28))
     assert is_birthday(leap_baby, date(2028, 2, 29))
     assert is_birthday(date(2005, 1, 15), date(2027, 1, 15)) and not is_birthday(date(2005, 1, 15), date(2027, 1, 16))
+
+
+def test_deleting_an_account_warns_people_in_their_games(accounts, client, app):
+    accounts.signup(email="host@uw.edu", name="Host Husky")
+    event_id = event_id_from(client.post("/events/new", data=event_form(title="Saturday hoops")))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post("/profile/delete", data={"confirm": "DELETE", "password": "purple-and-gold"})
+    outbox = app.extensions.get("outbox", [])
+    assert any(m["to"] == "player@uw.edu" and m["subject"].startswith("Canceled: Saturday hoops") for m in outbox)
+
+
+def test_officers_see_how_many_are_waiting_on_their_club_card(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.logout()
+    accounts.signup(email="newbie@uw.edu")
+    client.post(f"/clubs/{club}/join", data={"message": "hi"})
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    assert "1 waiting to join" in client.get("/clubs?mine=1").data.decode()
+
+
+def test_saving_the_photo_page_without_a_new_photo_goes_back_to_profile(accounts, client, app):
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    response = client.post("/profile/photo", data={}, content_type="multipart/form-data")
+    assert response.headers["Location"].endswith(f"/u/{me}")
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM avatars").fetchone()[0] == 1   # photo kept
+
+
+def test_remove_profile_photo(accounts, client, app):
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    assert b"Remove photo" in client.get("/profile/photo").data
+    client.post("/profile/photo/remove")
+    with app.app_context():
+        assert get_db().execute("SELECT avatar_updated FROM users WHERE id = ?", (me,)).fetchone()[0] is None
+        assert get_db().execute("SELECT COUNT(*) FROM avatars").fetchone()[0] == 0
+    page = client.get("/")                        # not forced back to the "add a photo" step...
+    assert page.status_code == 200 and b"Add a profile picture so people know" in page.data   # ...just reminded
+
+
+def test_first_photo_still_required_to_pick_one(accounts, client):
+    accounts.signup(photo=False)
+    assert b"Choose a photo first" in client.post("/profile/photo", data={}, content_type="multipart/form-data",
+                                                  follow_redirects=True).data

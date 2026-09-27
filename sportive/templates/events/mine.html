@@ -5,7 +5,7 @@
 {{ home_tabs('mine') }}
 <h1 class="page-title">My events</h1>
 
-<section>
+<section class="band">
   <h2>Hosting</h2>
   <div class="stack">
     {% for e in hosting %}{{ event_card(e) }}{% else %}
@@ -14,7 +14,7 @@
   </div>
 </section>
 
-<section>
+<section class="band">
   <h2>Going</h2>
   <div class="stack">
     {% for e in going %}{{ event_card(e) }}{% else %}
@@ -24,7 +24,7 @@
 </section>
 
 {% if past %}
-<section>
+<section class="band">
   <h2>Past</h2>
   <ul class="past-list card">
     {% for e in past %}

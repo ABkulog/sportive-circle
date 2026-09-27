@@ -12,9 +12,23 @@
   <p class="spirit-line">{{ spirit_line }}</p>
 </header>
 
+{% if whats_new %}
+  <section class="whats-new" aria-label="What's new">
+    <div class="whats-new-head">
+      <h2>What's new</h2>
+      <a href="{{ url_for('notifications.notification_settings') }}">Choose what shows here</a>
+    </div>
+    <ul>
+      {% for emoji, text, url in whats_new %}
+        <li><a href="{{ url }}"><span aria-hidden="true">{{ emoji }}</span> {{ text }}<span class="whats-new-go" aria-hidden="true">›</span></a></li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
+
 {# "Now" row, like Instagram Stories: what's happening soon, one swipe away. #}
 {% if up_next or need_players %}
-  <nav class="now-row" aria-label="Happening soon">
+  <nav class="now-row" id="now" aria-label="Happening soon">
     {% if up_next %}
       <a class="now-tile is-mine" href="{{ url_for('events.detail', event_id=up_next.id) }}" aria-label="Up next: {{ event_title(up_next) }}, {{ up_next.starts_at|relative }}">
         <span class="now-ring" aria-hidden="true">{{ SPORT_EMOJI[up_next.sport] }}</span>
@@ -82,7 +96,7 @@
 </div>
 
 {% if club_picks %}
-  <section class="club-picks">
+  <section class="club-picks band">
     <h2 class="section-title">Clubs for you</h2>
     <div class="club-strip">
       {% for c in club_picks %}
@@ -97,7 +111,7 @@
 {% endif %}
 
 {% if top_dawgs %}
-  <section class="card top-dawgs">
+  <section class="top-dawgs band">
     <h2 class="section-title">Top Dawgs this month</h2>
     <ol>
       {% for dawg in top_dawgs %}

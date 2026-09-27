@@ -31,6 +31,8 @@ It is a student project, not an official University of Washington service.
   Forgot-password and change-password flows.
 - Profiles with photos (cropped, shrunk, and stripped of location data).
 - **Friends:** search by name, or add people you've played with. Direct messages with anti-spam rules.
+- **Notifications you control:** numbers on the tabs and a "What's new" box on Home; each person picks
+  which kinds show where (no pop-ups, no spam).
 - **Ranks per sport** (Casual → Intermediate → Competitive → Legend) earned by playing and by
   teammate vouches; tryout spots and "+1" invites so skill levels can mix; chill mode hides ranks.
 - **Badges**, including limited ones that retire each quarter; show your top 3.

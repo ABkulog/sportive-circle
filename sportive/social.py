@@ -120,39 +120,21 @@ def clean_body(text):
     return body, None
 
 
-def counts():
-    """Unread DMs and pending friend requests for the nav bar (computed once per request)."""
-    if "social_counts" not in g:
-        if g.get("user") is None:
-            g.social_counts = {"messages": 0, "requests": 0}
-        else:
-            db = get_db()
-            me = g.user["id"]
-            g.social_counts = {
-                "messages": db.execute(
-                    """SELECT COUNT(*) FROM direct_messages
-                       WHERE recipient_id = ? AND read_at IS NULL
-                         AND sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)""",
-                    (me, me)).fetchone()[0],
-                "requests": db.execute(
-                    "SELECT COUNT(*) FROM friendships WHERE addressee_id = ? AND status = 'pending'",
-                    (me,)).fetchone()[0],
-            }
-    return g.social_counts
-
-
 def event_chat_unread():
-    """{event_id: unread chat messages} for events I'm going to (computed once per request)."""
+    """{event_id: unread chat messages} for games I'm going to that aren't canceled or long over
+    (computed once per request)."""
     if "chat_unread" not in g:
         g.chat_unread = {}
         if g.get("user") is not None:
             me = g.user["id"]
+            recent = to_db(now_local() - timedelta(days=1))
             for row in get_db().execute(
                     """SELECT m.event_id, COUNT(*) AS n FROM event_messages m
+                       JOIN events e ON e.id = m.event_id AND e.cancelled = 0 AND e.ends_at >= ?
                        JOIN rsvps r ON r.event_id = m.event_id AND r.user_id = ?
                        LEFT JOIN event_chat_seen s ON s.event_id = m.event_id AND s.user_id = ?
                        WHERE m.sender_id != ? AND m.id > COALESCE(s.last_id, 0)
-                       GROUP BY m.event_id""", (me, me, me)):
+                       GROUP BY m.event_id""", (recent, me, me, me)):
                 g.chat_unread[row["event_id"]] = row["n"]
     return g.chat_unread
 

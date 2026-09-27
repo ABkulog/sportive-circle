@@ -101,7 +101,7 @@
       image.src = URL.createObjectURL(file);
       image.alt = "";
       image.className = "avatar-img";
-      image.style.setProperty("--size", "160px");
+      image.style.setProperty("--size", "150px");
       photoPreview.replaceChildren(image);
     });
   }

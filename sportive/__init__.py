@@ -6,7 +6,8 @@ from datetime import timedelta
 from flask import Flask, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from . import auth, clubs, db, events, moderation, news, pages, profile, ranks, reminders, social, stats
+from . import (auth, clubs, db, events, moderation, news, notifications, pages, profile, ranks, reminders, social,
+               stats)
 from .constants import (LOCATIONS, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS, SPORT_MAX_PLAYERS,
                         SPORTS)
 from .photos import MAX_UPLOAD_MB
@@ -71,7 +72,7 @@ def create_app(test_config=None):
     logging.basicConfig(level=logging.INFO)
 
     db.init_app(app)
-    for blueprint in (auth.bp, events.bp, profile.bp, social.bp, news.bp, clubs.bp, moderation.bp):
+    for blueprint in (auth.bp, events.bp, profile.bp, social.bp, news.bp, clubs.bp, moderation.bp, notifications.bp):
         app.register_blueprint(blueprint)
     pages.register(app)
     app.add_url_rule("/", endpoint="index", view_func=events.feed)
@@ -103,7 +104,8 @@ def _add_template_helpers(app):
         # ranks
         can_join_level=ranks.can_join_level, my_tier_map=ranks.my_tier_map,
         # menu counters
-        social_counts=social.counts, chat_unread=social.event_chat_unread, is_admin=moderation.is_admin,
+        tab_badges=notifications.tab_badges, badge_text=notifications.badge_text,
+        chat_unread=social.event_chat_unread, is_admin=moderation.is_admin,
         open_report_count=moderation.open_report_count, pending_club_count=clubs.pending_club_count,
     )
     app.jinja_env.filters.update(when=fmt_when, clock=fmt_clock, relative=fmt_relative)

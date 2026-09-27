@@ -127,7 +127,7 @@
   {% endif %}
 </article>
 
-<section class="card">
+<section class="band">
   <h2>Who's going</h2>
   <ul class="people">
     {% for person in attendees %}
@@ -150,7 +150,7 @@
   </ul>
 </section>
 {% if plus_one.eligible %}
-  <details class="card fold" id="plus-one" {% if plus_one.sent %}open{% endif %}>
+  <details class="band fold" id="plus-one" {% if plus_one.sent %}open{% endif %}>
     <summary><strong>🤝 Bring a friend</strong> <span class="muted">· one +1 for this game</span></summary>
     {% if plus_one.sent %}
       <p>You invited <strong>{{ plus_one.sent.full_name }}</strong> as your +1.
@@ -181,7 +181,7 @@
 {% endif %}
 
 {% if post_game %}
-  <section class="card post-game" id="post-game">
+  <section class="band post-game" id="post-game">
     <h2>GG! How was the game?</h2>
     <p class="muted">Give your teammates some love. It helps them rank up in {{ SPORTS[event.sport] }}.
       <strong>🤝 Props</strong> = good teammate. <strong>⬆️ Vouch</strong> = ready for the next level.</p>

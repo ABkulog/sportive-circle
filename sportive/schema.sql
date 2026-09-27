@@ -232,6 +232,26 @@ CREATE TABLE IF NOT EXISTS club_posts (
 );
 CREATE INDEX IF NOT EXISTS idx_club_posts ON club_posts(club_id, id);
 
+-- ---------------------------------------------------------------- notifications
+-- Which notifications each person wants on their tab icons and on their screen. Only changes from
+-- the defaults (in notifications.py) are stored.
+CREATE TABLE IF NOT EXISTS notification_settings (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind    TEXT NOT NULL,
+    badge   INTEGER NOT NULL,   -- 1 = show a number on the tab icon
+    screen  INTEGER NOT NULL,   -- 1 = show it in the "What's new" card on Home
+    PRIMARY KEY (user_id, kind)
+);
+
+-- When someone last looked at each place (the newest club post id, news time...), so only newer
+-- things count as new.
+CREATE TABLE IF NOT EXISTS seen_markers (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind    TEXT NOT NULL,
+    value   TEXT NOT NULL,
+    PRIMARY KEY (user_id, kind)
+);
+
 -- ---------------------------------------------------------------- reports
 -- Reports from students about people or messages. Only admins can see these.
 -- `snapshot` keeps a copy of the reported message, so the evidence stays even if it's deleted.

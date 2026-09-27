@@ -43,6 +43,7 @@
         {% if c.status == 'approved' %}<span class="badge badge-verified">✅ Verified</span>
         {% elif c.status == 'pending' %}<span class="badge badge-gold">⏳ In review</span>
         {% else %}<span class="badge badge-danger">Needs changes</span>{% endif %}
+        {% if c.my_status == 'officer' and c.waiting %}<span class="badge badge-gold">🙋 {{ c.waiting }} waiting to join</span>{% endif %}
         {% if c.my_status in ('member', 'officer') %}<span class="badge badge-success">{{ 'Officer' if c.my_status == 'officer' else 'Member' }}</span>
         {% elif c.my_status == 'follower' %}<span class="badge">Following</span>
         {% elif c.my_status in ('requested', 'tryout') %}<span class="badge badge-gold">Waiting</span>{% endif %}

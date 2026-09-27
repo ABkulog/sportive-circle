@@ -253,6 +253,8 @@ def verify():
                 " verify_attempts = 0, verify_sent_at = NULL WHERE id = ?",
                 (user["id"],),
             )
+            from .notifications import start_markers  # imported here: notifications.py imports this module
+            start_markers(user["id"])
             db.commit()
             destination = log_in(user)
             flash(f"Welcome to the pack, {user['full_name'].split()[0]}! 🐺", "celebrate")

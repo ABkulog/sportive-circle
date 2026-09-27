@@ -15,6 +15,7 @@ from flask import Blueprint, g, render_template, request
 
 from .auth import login_required
 from .db import user_sports
+from .notifications import mark_seen
 
 bp = Blueprint("news", __name__)
 log = logging.getLogger(__name__)
@@ -109,6 +110,11 @@ def get_stories():
         return _cache["stories"]
 
 
+def cached_stories():
+    """Whatever was last downloaded (maybe nothing yet), without ever fetching."""
+    return _cache["stories"]
+
+
 def story_sports(story):
     return {TEAMS[code][2] for code in story["teams"] if TEAMS[code][2]}
 
@@ -120,6 +126,7 @@ def news():
     scope = request.args.get("scope") or ("mine" if mine else "all")
     team = request.args.get("team", "")
     stories = get_stories()
+    mark_seen("news")
     if team in TEAMS:
         stories = [s for s in stories if team in s["teams"] and not s["general"]]
     elif scope == "mine":

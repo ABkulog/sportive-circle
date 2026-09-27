@@ -13,7 +13,7 @@
   <button class="btn">Search</button>
 </form>
 {% if q %}
-  <section class="card" aria-live="polite">
+  <section class="band" aria-live="polite">
     <h2>{% if q|length < 2 %}Type at least 2 letters{% elif results %}Results for “{{ q }}”{% else %}No one found for “{{ q }}”{% endif %}</h2>
     {% if results %}
       <ul class="people">
@@ -41,7 +41,7 @@
 {% endif %}
 
 {% if incoming %}
-  <section class="card">
+  <section class="band">
     <h2>Friend requests ({{ incoming|length }})</h2>
     <ul class="people">
       {% for p in incoming %}
@@ -56,7 +56,7 @@
   </section>
 {% endif %}
 
-<section class="card">
+<section class="band">
   <h2>Your pack ({{ friends|length }})</h2>
   <ul class="people">
     {% for p in friends %}
@@ -70,7 +70,7 @@
 </section>
 
 {% if suggestions %}
-  <section class="card">
+  <section class="band">
     <h2>People you've played with</h2>
     <ul class="people">
       {% for p in suggestions %}
@@ -86,7 +86,7 @@
 {% endif %}
 
 {% if outgoing %}
-  <section class="card">
+  <section class="band">
     <h2>Requests you sent</h2>
     <ul class="people">
       {% for p in outgoing %}
