@@ -1344,9 +1344,9 @@ CLUB = {"name": "UW Spikeball Club", "sport": "spikeball",
         "meets": "Tuesdays 5-7 PM", "location": "The Quad", "contact_url": "https://uwspikeball.example.com",
         "club_kind": "rso", "verification_url": "https://huskylink.washington.edu/organization/uwspikeball",
         "officer_role": "President", "member_estimate": "30", "focus": "recreational", "joining": "open",
-        "experience": "none", "who_can_join": "everyone", "dues": "", "gear": "Nets provided",
+        "experience": "none", "who_can_join": "everyone", "dues": "Free", "gear": "Nets provided",
         "how_to_join": "Come to any Tuesday practice!", "club_email": "spike@uw.edu", "instagram": "@uwspikeball",
-        "attest": "1"}
+        "join_question": "Have you played spikeball before?", "attest": "1"}
 
 
 def _club_id(app, name="UW Spikeball Club"):
@@ -1393,14 +1393,18 @@ def test_join_leave_and_officers(accounts, client, app):
     assert b"only officer" in client.post(f"/clubs/{club}/leave", follow_redirects=True).data
     accounts.logout()
     accounts.signup(email="fan@uw.edu", name="Fan Person")
-    client.post(f"/clubs/{club}/join")
+    client.post(f"/clubs/{club}/join", data={"message": "Never played, excited to learn!"})
     page = client.get(f"/clubs/{club}").data.decode()
-    assert "You're a member" in page and "Fan Person" in page
-    assert client.post(f"/clubs/{club}/posts", data={"body": "hi"}).status_code == 403   # members can't post
+    assert "Request sent" in page and "You're a member" not in page       # NOT a member yet
+    assert client.post(f"/clubs/{club}/posts", data={"body": "hi"}).status_code == 403
     accounts.logout()
     accounts.login(email="captain@uw.edu")
+    requests = client.get(f"/clubs/{club}").data.decode()
+    assert "Join requests (1)" in requests and "Never played, excited to learn!" in requests
+    fan = _user_id(app, "fan@uw.edu")
+    client.post(f"/clubs/{club}/members/{fan}/approve")
     client.post(f"/clubs/{club}/posts", data={"body": "Nets are at the Quad by 5!"})
-    client.post(f"/clubs/{club}/officers/{_user_id(app, 'fan@uw.edu')}")
+    client.post(f"/clubs/{club}/officers/{fan}")
     assert b"You left the club" in client.post(f"/clubs/{club}/leave", follow_redirects=True).data
     assert b"Nets are at the Quad by 5!" in client.get(f"/clubs/{club}").data
 
@@ -1630,3 +1634,136 @@ def test_clubs_featured_on_landing_and_home(accounts, client, app):
     assert "Clubs for you" in home and "UW Spikeball Club" in home
     client.post(f"/clubs/{_club_id(app)}/join")
     assert "Clubs for you" not in client.get("/").data.decode()     # already joined
+
+
+def test_joining_a_club_jumps_to_how_to_join(accounts, client, app):
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    club = _club_id(app)
+    _approve(app, club)
+    accounts.logout()
+    accounts.signup(email="fan@uw.edu")
+    response = client.post(f"/clubs/{club}/join")
+    assert response.headers["Location"].endswith(f"/clubs/{club}#how-to-join")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert page.index('id="how-to-join"') < page.index('class="quick-facts"')   # before the Quick facts
+
+
+
+# ---------------------------------------------------------- club membership
+
+def _approved_club(accounts, client, app, **overrides):
+    accounts.signup(email="captain@uw.edu", name="Cap Tain")
+    client.post("/clubs/new", data={**CLUB, **overrides})
+    club = _club_id(app, overrides.get("name", CLUB["name"]))
+    _approve(app, club)
+    accounts.logout()
+    return club
+
+
+def test_follow_is_not_membership(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="curious@uw.edu")
+    client.post(f"/clubs/{club}/follow")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Following" in page and "1 member here" in page and "1 following" in page   # only the captain is a member
+
+
+def test_tryouts_flow_with_messages(accounts, client, app):
+    club = _approved_club(accounts, client, app, joining="tryouts")
+    accounts.signup(email="hopeful@uw.edu", name="Hope Ful")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Sign up for tryouts" in page and "Have you played spikeball before?" in page
+    client.post(f"/clubs/{club}/join", data={"message": "Yes, 2 years in high school"})
+    assert "Signed up for tryouts" in client.get(f"/clubs/{club}").data.decode()
+    hopeful = _user_id(app, "hopeful@uw.edu")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    assert "Made the team" in client.get(f"/clubs/{club}").data.decode()
+    client.post(f"/clubs/{club}/members/{hopeful}/decline")
+    accounts.logout()
+    accounts.login(email="hopeful@uw.edu")
+    captain = _user_id(app, "captain@uw.edu")
+    assert "Thanks so much for trying out" in client.get(f"/messages/{captain}").data.decode()
+    assert "Following" in client.get(f"/clubs/{club}").data.decode()        # still following after "not this time"
+
+
+def test_application_needs_an_answer(accounts, client, app):
+    club = _approved_club(accounts, client, app, joining="application")
+    accounts.signup(email="applicant@uw.edu")
+    assert b"answer the club&#39;s question" in client.post(f"/clubs/{club}/join", follow_redirects=True).data
+    client.post(f"/clubs/{club}/join", data={"message": "I love spikeball"})
+    with app.app_context():
+        row = get_db().execute("SELECT role, message FROM club_members WHERE user_id = ?",
+                               (_user_id(app, "applicant@uw.edu"),)).fetchone()
+        assert (row["role"], row["message"]) == ("requested", "I love spikeball")
+
+
+def test_confirmed_member_gets_welcome_message(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu")
+    client.post(f"/clubs/{club}/join", data={"message": "hi"})
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    client.post(f"/clubs/{club}/members/{_user_id(app, 'fan@uw.edu')}/approve")
+    accounts.logout()
+    accounts.login(email="fan@uw.edu")
+    assert "You&#39;re officially a member" in client.get(f"/messages/{_user_id(app, 'captain@uw.edu')}").data.decode()
+    assert "You're a member" in client.get(f"/clubs/{club}").data.decode()
+
+
+def test_all_club_info_is_required(accounts, client):
+    accounts.signup()
+    for field in ("meets", "location", "dues", "gear", "how_to_join", "join_question", "club_email"):
+        page = client.post("/clubs/new", data={**CLUB, field: ""}).data
+        assert b"Please add" in page, field
+    # Socials and website are optional: a club with only an email can register.
+    client.post("/clubs/new", data={**CLUB, "instagram": "", "contact_url": ""})
+    with client.application.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == 1
+
+
+def test_anyone_can_contact_a_club(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    visitor = client.get(f"/clubs/{club}").data.decode()          # logged out
+    assert "Contact the club" in visitor and "spike@uw.edu" in visitor and "@uwspikeball" in visitor
+    accounts.signup(email="question@uw.edu")
+    page = client.get(f"/clubs/{club}").data.decode()
+    captain = _user_id(app, "captain@uw.edu")
+    assert f"/messages/{captain}" in page                          # message an officer before joining
+    client.post(f"/messages/{captain}", data={"body": "Do I need my own net?"})
+    with app.app_context():
+        assert get_db().execute("SELECT body FROM direct_messages").fetchone()[0] == "Do I need my own net?"
+
+
+def test_club_updates_feed(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.login(email="captain@uw.edu")
+    composer = client.get("/clubs/updates").data.decode()
+    assert "Post an update" in composer and "Posting as" in composer
+    client.post("/clubs/updates", data={"club": club, "body": "Practice moved to the Quad!"})
+    accounts.logout()
+    accounts.signup(email="stranger@uw.edu")
+    feed = client.get("/clubs/updates").data.decode()
+    assert "Practice moved to the Quad!" not in feed and "Follow clubs to see their updates" in feed
+    assert "Post an update" not in feed
+    assert client.post("/clubs/updates", data={"club": club, "body": "spam"}).status_code == 403   # not an officer
+    client.post(f"/clubs/{club}/follow")
+    assert "Practice moved to the Quad!" in client.get("/clubs/updates").data.decode()
+
+
+
+def test_club_socials(accounts, client, app):
+    accounts.signup(email="captain@uw.edu")
+    bad = client.post("/clubs/new", data={**CLUB, "facebook": "https://evil.example/fb"}).data.decode()
+    assert "That Facebook doesn&#39;t look right" in bad
+    assert "That TikTok doesn&#39;t look right" in client.post("/clubs/new", data={**CLUB, "tiktok": "no spaces allowed"}).data.decode()
+    client.post("/clubs/new", data={**CLUB, "tiktok": "@uwspike", "snapchat": "uwspike", "x_handle": "@uwspike",
+                                    "facebook": "https://www.facebook.com/uwspike", "youtube": "https://youtube.com/@uwspike"})
+    club = _club_id(app)
+    _approve(app, club)
+    accounts.logout()
+    page = client.get(f"/clubs/{club}").data.decode()
+    for link in ("https://www.tiktok.com/@uwspike", "https://www.snapchat.com/add/uwspike", "https://x.com/uwspike",
+                 "https://www.facebook.com/uwspike", "https://youtube.com/@uwspike", "https://instagram.com/uwspikeball"):
+        assert f'href="{link}"' in page, link

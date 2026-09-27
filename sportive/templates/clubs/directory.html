@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Clubs{% endblock %}
 {% block content %}
+{% from "_macros.html" import clubs_tabs %}
+{{ clubs_tabs('find') }}
 <header class="feed-hello">
   <h1 class="page-title">🏛️ Clubs</h1>
   <p class="spirit-line">Verified, active UW clubs. Find your people. 🐺</p>

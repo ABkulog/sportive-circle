@@ -15,6 +15,7 @@
 <div class="card form-card club-form">
   <h1>{{ 'Edit club' if club else '🏛️ Register your club' }}</h1>
   {% if not club %}
+    <p class="muted"><strong>Everything is required except social media</strong>, so students have the full picture and a way to reach you.</p>
     <p class="muted">Sportive Circle lists <strong>active UW clubs</strong>. Tell us about yours and share its official
       page. We'll verify it (usually within 2 days) and email you when it's live. You'll be its first officer here.</p>
   {% endif %}
@@ -45,35 +46,53 @@
     {{ choice('joining', joining, "How do people join?") }}
     {{ choice('experience', experience, "How much experience do new members need?") }}
     {{ choice('who_can_join', who, "Who can join?") }}
+    <label class="field"><span>A question for people who want to join</span>
+      <input name="join_question" maxlength="150" value="{{ form.get('join_question', '') }}"
+             placeholder="What position do you play, and how long have you played?" required>
+      <small class="muted">They answer it when they ask to join or sign up for tryouts, and you see it in your requests.</small></label>
     <label class="toggle"><input type="checkbox" name="competes" value="1" {% if form.get('competes') %}checked{% endif %}>
       <span>We compete against other schools</span></label>
 
     <h2 class="form-step"><span>3</span> Practices & costs</h2>
     <div class="row">
-      <label class="field"><span>When you practice <em>(optional)</em></span>
-        <input name="meets" maxlength="120" value="{{ form.get('meets', '') }}" placeholder="Tue & Thu 7-9 PM"></label>
-      <label class="field"><span>Where <em>(optional)</em></span>
-        <input name="location" maxlength="120" value="{{ form.get('location', '') }}" list="places" placeholder="Denny Field"></label>
+      <label class="field"><span>When you practice</span>
+        <input name="meets" maxlength="120" value="{{ form.get('meets', '') }}" placeholder="Tue & Thu 7-9 PM" required></label>
+      <label class="field"><span>Where</span>
+        <input name="location" maxlength="120" value="{{ form.get('location', '') }}" list="places" placeholder="Denny Field" required></label>
       <datalist id="places">{% for place in locations %}<option value="{{ place }}">{% endfor %}</datalist>
     </div>
     <div class="row">
-      <label class="field"><span>Dues <em>(leave empty if free)</em></span>
-        <input name="dues" maxlength="60" value="{{ form.get('dues', '') }}" placeholder="$40/quarter"></label>
-      <label class="field"><span>Gear <em>(optional)</em></span>
-        <input name="gear" maxlength="120" value="{{ form.get('gear', '') }}" placeholder="Cleats; discs provided"></label>
+      <label class="field"><span>Dues <em>(type Free if none)</em></span>
+        <input name="dues" maxlength="60" value="{{ form.get('dues', '') }}" placeholder="$40/quarter or Free" required></label>
+      <label class="field"><span>Gear</span>
+        <input name="gear" maxlength="120" value="{{ form.get('gear', '') }}" placeholder="Cleats; discs provided (or None needed)" required></label>
     </div>
-    <label class="field"><span>How to join: first steps for new members <em>(optional)</em></span>
-      <textarea name="how_to_join" rows="2" maxlength="500"
+    <label class="field"><span>How to join: first steps for new members</span>
+      <textarea name="how_to_join" rows="2" maxlength="500" required
                 placeholder="Sign the waiver on HuskyLink, then come to any Tuesday practice!">{{ form.get('how_to_join', '') }}</textarea></label>
 
     <h2 class="form-step"><span>4</span> Contact</h2>
-    <div class="row">
-      <label class="field"><span>Club email <em>(optional)</em></span>
-        <input name="club_email" type="email" maxlength="120" value="{{ form.get('club_email', '') }}" placeholder="yourclub@uw.edu"></label>
-      <label class="field"><span>Instagram <em>(optional)</em></span>
-        <input name="instagram" maxlength="31" value="{{ form.get('instagram', '') }}" placeholder="@uwyourclub"></label>
-    </div>
-    <label class="field"><span>Website or Discord <em>(optional)</em></span>
+    <label class="field"><span>Club email</span>
+      <input name="club_email" type="email" maxlength="120" value="{{ form.get('club_email', '') }}" placeholder="yourclub@uw.edu" required>
+      <small class="muted">Required, so students (and our team) can always reach the club.</small></label>
+    <fieldset class="field">
+      <legend>Social media <em>(optional, add any your club uses)</em></legend>
+      <div class="social-grid">
+        <label class="field"><span>📸 Instagram</span>
+          <input name="instagram" maxlength="31" value="{{ form.get('instagram', '') }}" placeholder="@uwyourclub"></label>
+        <label class="field"><span>🎵 TikTok</span>
+          <input name="tiktok" maxlength="25" value="{{ form.get('tiktok', '') }}" placeholder="@uwyourclub"></label>
+        <label class="field"><span>👻 Snapchat</span>
+          <input name="snapchat" maxlength="16" value="{{ form.get('snapchat', '') }}" placeholder="uwyourclub"></label>
+        <label class="field"><span>𝕏 X / Twitter</span>
+          <input name="x_handle" maxlength="16" value="{{ form.get('x_handle', '') }}" placeholder="@uwyourclub"></label>
+        <label class="field"><span>📘 Facebook page</span>
+          <input name="facebook" type="url" maxlength="170" value="{{ form.get('facebook', '') }}" placeholder="https://facebook.com/uwyourclub"></label>
+        <label class="field"><span>▶️ YouTube</span>
+          <input name="youtube" type="url" maxlength="170" value="{{ form.get('youtube', '') }}" placeholder="https://youtube.com/@uwyourclub"></label>
+      </div>
+    </fieldset>
+    <label class="field"><span>Website, Discord or GroupMe <em>(optional)</em></span>
       <input name="contact_url" type="url" maxlength="200" value="{{ form.get('contact_url', '') }}" placeholder="https://…"></label>
 
     <h2 class="form-step"><span>5</span> About you</h2>

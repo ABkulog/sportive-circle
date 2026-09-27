@@ -70,20 +70,26 @@ HISTORY = [
 # Demo clubs (clearly marked as demos, never pretending to be a real UW club).
 DEMO_CLUBS = [
     dict(name="Demo Spikeball Club", sport="spikeball", focus="recreational", joining="open", experience="none",
-         who_can_join="everyone", dues="", gear="Nets provided", competes=0, member_estimate=35,
+         who_can_join="everyone", gear="Nets provided", competes=0, member_estimate=35,
          meets="Tuesdays 5-7 PM", location="The Quad", officer=0,
          description="A demo club for trying out Sportive Circle: casual roundnet on the Quad, all levels welcome.",
-         how_to_join="Just show up to any Tuesday session!"),
+         how_to_join="Just show up to any Tuesday session!", dues="Free",
+         join_question="Have you played roundnet before?", club_email="demo-spikeball@example.com",
+         contact_url="https://example.com/demo-spikeball"),
     dict(name="Demo Club Ultimate", sport="ultimate", focus="competitive", joining="tryouts", experience="some",
          who_can_join="everyone", dues="$60/quarter", gear="Cleats", competes=1, member_estimate=28,
          meets="Mon, Wed & Fri 6-8 PM", location="Recreation Field 1 (by the IMA)", officer=1,
          description="A demo competitive team: we travel to college tournaments. Tryouts happen in fall quarter.",
-         how_to_join="Come to our open tryout practices during the first two weeks of the quarter."),
+         how_to_join="Come to our open tryout practices during the first two weeks of the quarter.",
+         join_question="What position do you play, and where have you played before?",
+         club_email="demo-ultimate@example.com", contact_url="https://example.com/demo-ultimate"),
     dict(name="Demo Climbing Crew", sport="climbing", focus="instructional", joining="open", experience="none",
          who_can_join="everyone", dues="$15/quarter", gear="Shoes available to borrow", competes=0, member_estimate=50,
          meets="Thursdays 7-9 PM", location="IMA (Intramural Activities Building)", officer=2,
          description="A demo club that teaches bouldering and top-roping from zero. Beginners are our favorite people.",
-         how_to_join="Sign up for a Thursday intro session."),
+         how_to_join="Sign up for a Thursday intro session.",
+         join_question="Have you climbed before? (It's totally fine if not!)",
+         club_email="demo-climbing@example.com", contact_url="https://example.com/demo-climbing"),
 ]
 
 

@@ -52,6 +52,13 @@ ADDED_COLUMNS = [
     ("clubs", "instagram", "TEXT NOT NULL DEFAULT ''"),
     ("clubs", "review_note", "TEXT NOT NULL DEFAULT ''"),
     ("clubs", "reviewed_at", "TEXT"),
+    ("clubs", "join_question", "TEXT NOT NULL DEFAULT ''"),
+    ("club_members", "message", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "tiktok", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "snapchat", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "x_handle", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "facebook", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "youtube", "TEXT NOT NULL DEFAULT ''"),
 ]
 
 

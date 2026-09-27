@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "_macros.html" import clubs_tabs, avatar %}
+{% block title %}Club updates{% endblock %}
+{% block content %}
+{{ clubs_tabs('updates') }}
+<header class="feed-hello">
+  <h1 class="page-title">📣 Club updates</h1>
+  <p class="spirit-line">News from the clubs you follow and belong to.</p>
+</header>
+
+{% if my_officer_clubs %}
+  <form method="post" class="card update-composer">
+    {{ csrf_field() }}
+    <label class="field"><span>✏️ Post an update</span>
+      <textarea name="body" rows="3" maxlength="1000" required
+                placeholder="Practice moved to the Quad this week! Bring water. 💧"></textarea></label>
+    <div class="composer-row">
+      {% if my_officer_clubs|length == 1 %}
+        <input type="hidden" name="club" value="{{ my_officer_clubs[0].id }}">
+        <span class="muted">Posting as {{ SPORT_EMOJI[my_officer_clubs[0].sport] }} <strong>{{ my_officer_clubs[0].name }}</strong></span>
+      {% else %}
+        <select name="club" aria-label="Which club" required>
+          {% for c in my_officer_clubs %}<option value="{{ c.id }}">{{ SPORT_EMOJI[c.sport] }} {{ c.name }}</option>{% endfor %}
+        </select>
+      {% endif %}
+      <button class="btn">Post</button>
+    </div>
+  </form>
+{% endif %}
+
+<div class="stack">
+  {% for p in posts %}
+    <article class="card club-update">
+      <header class="club-update-head">
+        <a class="club-update-club" href="{{ url_for('clubs.view', club_id=p.club_id) }}">
+          <span class="club-emoji small" aria-hidden="true">{{ SPORT_EMOJI[p.sport] }}</span>
+          <span><strong>{{ p.club_name }}</strong>
+            <small class="muted">{{ p.full_name or 'An officer' }}{% if p.author_role == 'officer' %} · Officer{% endif %} · {{ p.created_at|when }}</small></span>
+        </a>
+      </header>
+      <p class="club-update-body">{{ p.body }}</p>
+    </article>
+  {% else %}
+    <div class="card empty">
+      <p class="empty-emoji" aria-hidden="true">📣</p>
+      {% if following %}
+        <p><strong>No updates yet.</strong></p>
+        <p class="muted">When your clubs post, it shows up here.</p>
+      {% else %}
+        <p><strong>Follow clubs to see their updates here.</strong></p>
+        <p class="muted">Tap ⭐ Follow on any club: practice changes, events and news show up in this feed.</p>
+        <a class="btn" href="{{ url_for('clubs.directory') }}">Find clubs</a>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -679,3 +679,33 @@ body.hide-tabs { padding-bottom: 0; }
 .club-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: 10px;
   overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
 .club-strip .club-card { scroll-snap-align: start; }
+.how-to-join { background: color-mix(in srgb, var(--spirit-gold) 12%, transparent); scroll-margin-top: 90px; }
+.how-to-join:target { box-shadow: 0 0 0 4px color-mix(in srgb, var(--spirit-gold) 45%, transparent); }
+
+/* ---------- club membership & contact ---------- */
+.join-panel { width: 100%; }
+.join-panel > summary { list-style: none; display: inline-flex; }
+.join-panel > summary::-webkit-details-marker { display: none; }
+.join-panel[open] > summary { margin-bottom: 10px; }
+.join-panel .form { margin: 0; padding: 12px; border: 1.5px solid var(--border); border-radius: 12px; }
+.waiting-box { width: 100%; border: 1.5px dashed var(--spirit-gold); border-radius: 12px; padding: 12px 14px; }
+.waiting-box p { margin: 4px 0 8px; }
+.contact-list { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 8px; }
+.contact-list li { display: flex; gap: 10px; align-items: center; overflow-wrap: anywhere; }
+#contact h3 { margin: 14px 0 8px; font-size: 1rem; }
+.request-row { display: grid; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.request-row:last-child { border-bottom: 0; }
+.request-answer { margin: 0; padding: 8px 12px; background: var(--bg); border-radius: 10px; white-space: pre-line; }
+.requests-card { border-color: var(--spirit-gold); }
+
+/* ---------- club updates feed ---------- */
+.update-composer { margin-bottom: 14px; display: grid; gap: 10px; border-color: var(--spirit-gold); }
+.update-composer .field { margin: 0; }
+.composer-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.composer-row select { width: auto; flex: 1; min-width: 180px; }
+.club-update-club { display: flex; gap: 10px; align-items: center; color: inherit; text-decoration: none; }
+.club-update-club small { display: block; }
+.club-emoji.small { width: 38px; height: 38px; font-size: 1.2rem; border-radius: 10px; flex: none; }
+.club-update-body { margin: 10px 0 0; white-space: pre-line; overflow-wrap: anywhere; }
+.social-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.social-grid .field > span { font-size: .88rem; }

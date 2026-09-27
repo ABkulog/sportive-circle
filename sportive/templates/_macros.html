@@ -1,3 +1,9 @@
+{% macro clubs_tabs(active) %}
+  <nav class="home-tabs" aria-label="Clubs">
+    <a href="{{ url_for('clubs.directory') }}" {% if active == 'find' %}class="is-on" aria-current="page"{% endif %}>Find clubs</a>
+    {% if g.user %}<a href="{{ url_for('clubs.updates') }}" {% if active == 'updates' %}class="is-on" aria-current="page"{% endif %}>Updates</a>{% endif %}
+  </nav>
+{% endmacro %}
 {% macro home_tabs(active) %}
   <nav class="home-tabs" aria-label="Home">
     <a href="{{ url_for('events.feed') }}" {% if active == 'feed' %}class="is-on" aria-current="page"{% endif %}>For you</a>

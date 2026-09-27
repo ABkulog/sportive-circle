@@ -185,6 +185,12 @@ CREATE TABLE IF NOT EXISTS clubs (
     gear             TEXT NOT NULL DEFAULT '',  -- e.g. 'Provided' or 'Bring cleats'
     competes         INTEGER NOT NULL DEFAULT 0,  -- 1 = plays other schools
     how_to_join      TEXT NOT NULL DEFAULT '',  -- first steps for new members
+    join_question    TEXT NOT NULL DEFAULT '',  -- asked to people who want to join, e.g. "What position do you play?"
+    tiktok           TEXT NOT NULL DEFAULT '',  -- optional socials (handles/usernames, or page links for FB/YouTube)
+    snapchat         TEXT NOT NULL DEFAULT '',
+    x_handle         TEXT NOT NULL DEFAULT '',
+    facebook         TEXT NOT NULL DEFAULT '',
+    youtube          TEXT NOT NULL DEFAULT '',
     club_email       TEXT NOT NULL DEFAULT '',
     instagram        TEXT NOT NULL DEFAULT '',  -- handle without the @
     review_note      TEXT NOT NULL DEFAULT '',  -- admin's note (e.g. why it was rejected)
@@ -193,11 +199,17 @@ CREATE TABLE IF NOT EXISTS clubs (
     created_at  TEXT NOT NULL
 );
 
--- role: 'officer' (can edit the club, post announcements, create club events) or 'member'
+-- role:
+--   'follower'  - following the club (announcements & events), NOT a member
+--   'requested' - asked to join; waiting for an officer to confirm
+--   'tryout'    - signed up for tryouts; an officer marks the result
+--   'member'    - confirmed by an officer
+--   'officer'   - can edit the club, post announcements, create club events, confirm members
 CREATE TABLE IF NOT EXISTS club_members (
     club_id   INTEGER NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
     user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role      TEXT NOT NULL DEFAULT 'member',
+    message   TEXT NOT NULL DEFAULT '',     -- their answer to the club's join question
     joined_at TEXT NOT NULL,
     PRIMARY KEY (club_id, user_id)
 );

@@ -60,10 +60,20 @@ def shared_an_event(a, b):
            WHERE r1.user_id = ? AND r2.user_id = ? LIMIT 1""", (a, b)).fetchone() is not None
 
 
+def officer_connection(a, b):
+    """True if either of them is an officer of a verified club. Officers are the club's public contact,
+    so students can ask them questions before joining (and officers can reply)."""
+    return get_db().execute(
+        """SELECT 1 FROM club_members m JOIN clubs c ON c.id = m.club_id
+           WHERE m.user_id IN (?, ?) AND m.role = 'officer' AND c.status = 'approved' LIMIT 1""",
+        (a, b)).fetchone() is not None
+
+
 def can_message(me, other):
     if me == other or is_blocked_between(me, other):
         return False
-    return friendship_status(me, other) == "friends" or shared_an_event(me, other)
+    return (friendship_status(me, other) == "friends" or shared_an_event(me, other)
+            or officer_connection(me, other))
 
 
 def too_many_messages(me):
