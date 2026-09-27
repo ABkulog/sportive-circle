@@ -25,6 +25,7 @@
         <span class="badge">{{ SPORTS[event.sport] }}</span>
         <span class="badge">{{ event.skill_level }}</span>
         {% if event.is_quick %}<span class="badge badge-gold">Need players</span>{% endif %}
+        {% if event.club_id %}<a class="badge badge-club" href="{{ url_for('clubs.view', club_id=event.club_id) }}">🏛️ {{ event.club_name }}</a>{% endif %}
         {% if event.cancelled %}<span class="badge badge-danger">Cancelled</span>{% elif ended %}<span class="badge badge-muted">Ended</span>{% endif %}
       </div>
     </div>

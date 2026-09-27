@@ -34,6 +34,7 @@ ADDED_COLUMNS = [
     ("rsvps", "is_tryout", "INTEGER NOT NULL DEFAULT 0"),
     ("events", "allow_plus_ones", "INTEGER NOT NULL DEFAULT 1"),
     ("rsvps", "plus_one_of", "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
+    ("events", "club_id", "INTEGER REFERENCES clubs(id) ON DELETE SET NULL"),
 ]
 
 

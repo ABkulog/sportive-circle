@@ -14,36 +14,39 @@
   <meta name="apple-mobile-web-app-title" content="Sportive Circle">
   {% block head %}{% endblock %}
 </head>
-<body>
+{% set app_nav = g.user and (g.user.avatar_updated or session.get('photo_skipped')) %}
+{% set ep = request.endpoint or '' %}
+{% set counts = social_counts() if app_nav else {} %}
+{% macro tab(url, icon, label, active, badge=0, extra_class='') %}
+  <a class="tab {{ extra_class }} {% if active %}is-active{% endif %}" href="{{ url }}" {% if active %}aria-current="page"{% endif %}>
+    <span class="tab-icon" aria-hidden="true">{{ icon }}{% if badge %}<span class="count-dot">{{ badge }}</span>{% endif %}</span>
+    <span class="tab-label">{{ label }}{% if badge %}<span class="visually-hidden"> ({{ badge }} new)</span>{% endif %}</span>
+  </a>
+{% endmacro %}
+<body class="{% if app_nav %}has-app-nav{% endif %} {% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  {# Top bar: logo + quick icons on phones; for visitors it holds the whole menu. #}
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="{{ url_for('index') }}">Sportive<span>Circle</span></a>
-      {% if g.user and not g.user.avatar_updated and not session.get('photo_skipped') %}
-        {# Still setting up (no profile picture yet): the other pages aren't open yet. #}
+      {% if app_nav %}
+        <nav class="top-icons" aria-label="Shortcuts">
+          <a href="{{ url_for('how_it_works') }}" aria-label="How it works" title="How it works">❔</a>
+          <a href="{{ url_for('social.friends') }}" aria-label="Friends{% if counts.requests %}, {{ counts.requests }} requests{% endif %}" title="Friends">👥{% if counts.requests %}<span class="count-dot">{{ counts.requests }}</span>{% endif %}</a>
+          <a href="{{ url_for('social.inbox') }}" aria-label="Messages{% if counts.messages %}, {{ counts.messages }} unread{% endif %}" title="Messages">✉️{% if counts.messages %}<span class="count-dot">{{ counts.messages }}</span>{% endif %}</a>
+        </nav>
+      {% elif g.user %}
+        {# Still setting up (no profile picture yet). #}
         <nav class="nav">
           <a href="{{ url_for('how_it_works') }}">How it works</a>
           <form method="post" action="{{ url_for('auth.logout') }}">
             {{ csrf_field() }}<button class="link-button">Log out</button>
           </form>
         </nav>
-      {% elif g.user %}
-        <nav class="nav">
-          {% set counts = social_counts() %}
-          <a href="{{ url_for('events.feed') }}">Feed</a>
-          <a href="{{ url_for('news.news') }}">News</a>
-          <a href="{{ url_for('events.my_events') }}">My events</a>
-          <a href="{{ url_for('social.inbox') }}" aria-label="Messages{% if counts.messages %}, {{ counts.messages }} unread{% endif %}">✉️{% if counts.messages %}<span class="count-dot">{{ counts.messages }}</span>{% endif %}</a>
-          <a href="{{ url_for('social.friends') }}" aria-label="Friends{% if counts.requests %}, {{ counts.requests }} requests{% endif %}">👥{% if counts.requests %}<span class="count-dot">{{ counts.requests }}</span>{% endif %}</a>
-          <a class="nav-avatar" href="{{ url_for('profile.view', user_id=g.user.id) }}">
-            {%- if g.user.avatar_updated -%}
-              <img class="avatar-img" src="{{ url_for('profile.photo', user_id=g.user.id, v=g.user.avatar_updated) }}" alt="" style="--size: 26px">
-            {%- endif -%}Profile</a>
-          <form method="post" action="{{ url_for('auth.logout') }}">
-            {{ csrf_field() }}<button class="link-button">Log out</button>
-          </form>
-        </nav>
       {% else %}
         <nav class="nav">
+          <a href="{{ url_for('clubs.directory') }}">Clubs</a>
           <a href="{{ url_for('how_it_works') }}">How it works</a>
           <a href="{{ url_for('auth.login') }}">Log in</a>
           <a class="nav-cta" href="{{ url_for('auth.signup') }}">Sign up</a>
@@ -52,7 +55,27 @@
     </div>
   </header>
 
-  <main class="page">
+  {% if app_nav %}
+    {# The same 5 sections everywhere: a bottom tab bar on phones/tablets, a sidebar on laptops. #}
+    <nav class="appnav" aria-label="Main">
+      <a class="brand side-only" href="{{ url_for('index') }}">Sportive<span>Circle</span></a>
+      {{ tab(url_for('events.feed'), '🏠', 'Home', ep in ('events.feed', 'index', 'events.my_events', 'events.detail')) }}
+      {{ tab(url_for('clubs.directory'), '🏛️', 'Clubs', ep.startswith('clubs.') and ep != 'clubs.create') }}
+      {{ tab(url_for('create_menu'), '+', 'Create', ep in ('create_menu', 'events.create', 'events.quick', 'clubs.create'), extra_class='tab-create') }}
+      {{ tab(url_for('news.news'), '📰', 'News', ep == 'news.news') }}
+      {{ tab(url_for('profile.view', user_id=g.user.id), '👤', 'Me', ep.startswith('profile.') and (ep != 'profile.view' or request.view_args.get('user_id') == g.user.id)) }}
+      <div class="side-only side-extra">
+        {{ tab(url_for('social.inbox'), '✉️', 'Messages', ep == 'social.inbox' or ep == 'social.thread', counts.messages) }}
+        {{ tab(url_for('social.friends'), '👥', 'Friends', ep == 'social.friends', counts.requests) }}
+        {{ tab(url_for('how_it_works'), '❔', 'How it works', ep == 'how_it_works') }}
+        <form method="post" action="{{ url_for('auth.logout') }}" class="side-logout">
+          {{ csrf_field() }}<button class="tab"><span class="tab-icon" aria-hidden="true">🚪</span><span class="tab-label">Log out</span></button>
+        </form>
+      </div>
+    </nav>
+  {% endif %}
+
+  <main class="page" id="main">
     {% if g.user and not g.user.avatar_updated and session.get('photo_skipped') and request.endpoint != 'profile.photo_upload' %}
       <a class="photo-nudge" href="{{ url_for('profile.photo_upload') }}">
         <span>📷 Add a profile picture so people know who they're playing with.</span>
@@ -67,18 +90,9 @@
 
   <footer class="site-footer">
     <p class="footer-spirit">Made by Huskies, for Huskies 💜💛 <span>Go Dawgs! 🐺</span></p>
-    <p class="footer-links"><a href="{{ url_for('how_it_works') }}">How it works</a></p>
+    <p class="footer-links"><a href="{{ url_for('how_it_works') }}">How it works</a> · <a href="{{ url_for('clubs.directory') }}">Clubs</a></p>
     <p class="footer-fine">A student project. Not an official University of Washington service.</p>
   </footer>
   <script src="{{ url_for('static', filename='spirit.js') }}" defer></script>
-
-  {% block actionbar %}
-  {% if g.user and (g.user.avatar_updated or session.get('photo_skipped')) %}
-    <nav class="actionbar" aria-label="Create">
-      <a class="btn btn-gold" href="{{ url_for('events.quick') }}">⚡ Need players</a>
-      <a class="btn" href="{{ url_for('events.create') }}">+ New event</a>
-    </nav>
-  {% endif %}
-  {% endblock %}
 </body>
 </html>

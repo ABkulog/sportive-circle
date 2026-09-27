@@ -2,9 +2,9 @@
 import os
 from datetime import timedelta
 
-from flask import Flask, redirect, render_template, url_for
+from flask import Flask, g, redirect, render_template, url_for
 
-from . import auth, db, events, news, profile, ranks, reminders, social, stats
+from . import auth, clubs, db, events, news, profile, ranks, reminders, social, stats
 from .photos import MAX_UPLOAD_MB
 from .constants import LOCATIONS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS, SPORT_MAX_PLAYERS, SPORTS
 from .timeutil import fmt_clock, fmt_relative, fmt_when, same_day
@@ -47,11 +47,14 @@ def create_app(test_config=None):
     app.register_blueprint(profile.bp)
     app.register_blueprint(social.bp)
     app.register_blueprint(news.bp)
+    app.register_blueprint(clubs.bp)
     app.cli.add_command(reminders.send_reminders_command)
     app.cli.add_command(stats.sport_stats_command)
     app.add_url_rule("/", endpoint="index", view_func=events.feed)
     app.add_url_rule("/how-it-works", endpoint="how_it_works",
                      view_func=lambda: render_template("how_it_works.html"))
+    app.add_url_rule("/create", endpoint="create_menu", view_func=auth.login_required(
+        lambda: render_template("create.html", officer_clubs=clubs.officer_clubs(g.user["id"]))))
     # Browsers ask for /favicon.ico on their own; point them at the real icon.
     app.add_url_rule("/favicon.ico", endpoint="favicon",
                      view_func=lambda: redirect(url_for("static", filename="icon.svg")))

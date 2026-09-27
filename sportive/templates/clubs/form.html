@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit club' if club else 'Start a club' }}{% endblock %}
+{% block content %}
+<div class="card form-card">
+  <h1>{{ 'Edit club' if club else '🏛️ Start a club' }}</h1>
+  {% if not club %}<p class="muted">Clubs are open to every Husky, and there are no ranks here. You'll be the club's first officer.</p>{% endif %}
+  <form method="post" class="form">
+    {{ csrf_field() }}
+    <label class="field"><span>Club name</span>
+      <input name="name" maxlength="60" value="{{ form.get('name', '') }}" placeholder="UW Spikeball Club" required></label>
+    <label class="field"><span>Main sport</span>
+      <select name="sport" required>
+        <option value="">Choose a sport</option>
+        {% for key, label in SPORTS.items() %}<option value="{{ key }}" {% if form.get('sport') == key %}selected{% endif %}>{{ SPORT_EMOJI[key] }} {{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>About the club</span>
+      <textarea name="description" rows="4" maxlength="1000" required
+                placeholder="Who you are, what you do, and who should join (hint: everyone!)">{{ form.get('description', '') }}</textarea></label>
+    <div class="row">
+      <label class="field"><span>When you meet <em>(optional)</em></span>
+        <input name="meets" maxlength="120" value="{{ form.get('meets', '') }}" placeholder="Tuesdays 7-9 PM"></label>
+      <label class="field"><span>Where <em>(optional)</em></span>
+        <input name="location" maxlength="120" value="{{ form.get('location', '') }}" list="places" placeholder="The Quad"></label>
+      <datalist id="places">{% for place in locations %}<option value="{{ place }}">{% endfor %}</datalist>
+    </div>
+    <label class="field"><span>Contact link <em>(optional: Instagram, website, Discord…)</em></span>
+      <input name="contact_url" type="url" maxlength="200" value="{{ form.get('contact_url', '') }}" placeholder="https://instagram.com/yourclub"></label>
+    <button class="btn btn-block">{{ 'Save changes' if club else 'Create club' }}</button>
+  </form>
+</div>
+{% endblock %}

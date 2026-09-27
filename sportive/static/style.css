@@ -87,15 +87,7 @@ em { font-style: normal; color: var(--muted); font-weight: 400; }
 .btn-block { width: 100%; }
 .link-button { background: none; border: 0; padding: 0; font: inherit; color: var(--link); cursor: pointer; text-decoration: underline; }
 
-.actionbar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
-  display: flex; justify-content: center; gap: 10px;
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  background: color-mix(in srgb, var(--card) 92%, transparent);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid var(--border);
-}
-.actionbar .btn { flex: 1; max-width: 220px; }
+/* (the old floating action bar was replaced by the app navigation below) */
 
 /* ---------- cards & lists ---------- */
 .card {
@@ -537,3 +529,102 @@ h2 { font-weight: 800; }
 .delete-confirm { margin-top: 16px; }
 .delete-confirm summary { cursor: pointer; color: var(--danger); font-weight: 600; text-align: center; }
 @media (prefers-color-scheme: dark) { .delete-confirm summary { color: #f2a097; } }
+
+
+/* ======================= App navigation (same sections on every device) =======================
+   Phones & tablets (< 1000px): top bar (logo + ❓ 👥 ✉️) and a bottom tab bar, like Instagram/Strava.
+   Laptops & desktops (>= 1000px): a left sidebar with the same sections, like Instagram/X on the web. */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.skip-link { position: absolute; left: -9999px; }
+.skip-link:focus { left: 12px; top: 12px; z-index: 100; background: var(--card); color: var(--text); padding: 8px 12px; border-radius: 8px; }
+
+.top-icons { display: flex; gap: 4px; }
+.top-icons a { position: relative; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%;
+  font-size: 1.2rem; text-decoration: none; }
+.top-icons a:hover, .top-icons a:focus-visible { background: rgba(255, 255, 255, .14); }
+.top-icons .count-dot { position: absolute; top: 2px; right: 0; margin: 0; }
+
+.appnav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  display: flex; justify-content: space-around; align-items: stretch;
+  background: color-mix(in srgb, var(--card) 94%, transparent); backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border);
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+}
+.appnav .side-only { display: none; }
+.tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 52px; justify-content: center;
+  padding: 4px 2px; border-radius: 12px; border: 0; background: none; cursor: pointer;
+  color: var(--muted); text-decoration: none; font: 600 .7rem/1.1 system-ui, -apple-system, sans-serif;
+}
+.tab-icon { position: relative; font-size: 1.35rem; line-height: 1; }
+.tab-icon .count-dot { position: absolute; top: -6px; right: -14px; margin: 0; }
+.tab.is-active { color: var(--purple); }
+.tab.is-active .tab-label { font-weight: 800; }
+@media (prefers-color-scheme: dark) { .tab.is-active { color: var(--spirit-gold); } }
+.tab:focus-visible { outline: 2px solid var(--purple); outline-offset: -2px; }
+.tab-create .tab-icon { width: 46px; height: 32px; display: grid; place-items: center; border-radius: 12px;
+  background: var(--purple); color: #fff; font: 800 1.5rem/1 system-ui, sans-serif; box-shadow: 0 0 0 2px var(--spirit-gold); }
+.side-logout { margin: 0; }
+
+/* inside a chat or the delete page, phones get the whole screen (like chat apps) */
+body.hide-tabs .appnav { display: none; }
+body.hide-tabs { padding-bottom: 0; }
+
+@media (min-width: 1000px) {
+  body.has-app-nav { padding-left: 250px; padding-bottom: 0; }
+  body.has-app-nav .topbar { display: none; }
+  body.hide-tabs .appnav { display: flex; }
+  .appnav {
+    top: 0; right: auto; width: 250px; flex-direction: column; justify-content: flex-start; gap: 4px;
+    padding: 22px 14px; border-top: 0; border-right: 4px solid var(--spirit-gold);
+    background-color: var(--purple); background-image: var(--paws); backdrop-filter: none;
+  }
+  .appnav .side-only { display: block; }
+  .appnav .brand { color: #fff; padding: 4px 14px 20px; }
+  .side-extra { display: flex !important; flex-direction: column; gap: 4px; margin-top: 18px;
+    padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, .18); }
+  .tab { flex: 0 0 auto; flex-direction: row; justify-content: flex-start; gap: 14px; min-height: 0; width: 100%;
+    padding: 11px 14px; color: rgba(255, 255, 255, .88); font-size: 1rem; text-align: left; }
+  .tab:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+  .tab.is-active, .tab.is-active:hover { background: rgba(255, 255, 255, .16); color: #fff; box-shadow: inset 4px 0 0 var(--spirit-gold); }
+  .tab-icon { width: 28px; text-align: center; }
+  .tab-icon .count-dot { top: -4px; right: -8px; }
+  .tab-create .tab-icon { width: 28px; height: 28px; border-radius: 8px; font-size: 1.2rem; box-shadow: none; background: var(--spirit-gold); color: var(--purple-strong); }
+  .tab:focus-visible { outline-color: var(--spirit-gold); }
+  .page { padding-top: 28px; }
+}
+
+/* Home tabs: For you | My events (like the tabs at the top of X or Instagram) */
+.home-tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--border); margin: -4px 0 16px; }
+.home-tabs a { padding: 10px 2px; color: var(--muted); text-decoration: none; font-weight: 700; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+.home-tabs a.is-on { color: var(--text); border-bottom-color: var(--spirit-gold); }
+.welcome-help { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px;
+  padding: 10px 14px; border-radius: 12px; background: var(--purple-soft); border: 1.5px solid var(--spirit-gold); }
+.welcome-help[hidden] { display: none; }
+
+/* Create menu */
+.create-grid { display: grid; gap: 12px; margin-bottom: 16px; }
+@media (min-width: 640px) { .create-grid { grid-template-columns: repeat(3, 1fr); } }
+.create-option { display: grid; gap: 6px; align-content: start; text-decoration: none; color: inherit; }
+.create-option:hover { border-color: var(--purple); transform: translateY(-1px); }
+.create-option strong { font-family: var(--display); font-size: 1.2rem; }
+.create-gold { border-color: var(--spirit-gold); }
+.create-emoji { font-size: 2rem; }
+
+/* ---------- clubs ---------- */
+.club-search { grid-template-columns: 2fr 1fr !important; }
+.club-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.club-card { display: grid; gap: 8px; align-content: start; text-decoration: none; color: inherit; }
+.club-card:hover { border-color: var(--purple); transform: translateY(-1px); }
+.club-emoji { width: 48px; height: 48px; border-radius: 14px; background: var(--purple-soft); display: grid; place-items: center; font-size: 1.6rem; }
+.club-name { font-family: var(--display); font-size: 1.2rem; font-weight: 800; }
+.club-desc { font-size: .9rem; }
+.club-about { white-space: pre-line; }
+.badge-club { background: var(--purple); color: #fff; text-decoration: none; }
+.club-banner { background: var(--purple-soft); border-radius: 10px; padding: 10px 12px; }
+.club-post-form { grid-template-columns: 1fr auto; align-items: end; margin: 0 0 12px; }
+.club-posts { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.club-posts li { border-left: 3px solid var(--spirit-gold); padding: 4px 0 4px 12px; }
+.club-posts p { margin: 0 0 2px; white-space: pre-line; }
+.inline-form { display: inline; margin-left: 8px; }

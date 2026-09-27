@@ -1,3 +1,9 @@
+{% macro home_tabs(active) %}
+  <nav class="home-tabs" aria-label="Home">
+    <a href="{{ url_for('events.feed') }}" {% if active == 'feed' %}class="is-on" aria-current="page"{% endif %}>For you</a>
+    <a href="{{ url_for('events.my_events') }}" {% if active == 'mine' %}class="is-on" aria-current="page"{% endif %}>My events</a>
+  </nav>
+{% endmacro %}
 {% macro sport_checkboxes(form) %}
   <fieldset class="field">
     <legend>Sports you're interested in</legend>
@@ -36,6 +42,7 @@
       </div>
       <div class="event-meta">📍 {{ e.location }}</div>
       <div class="badges">
+        {% if e.club_name %}<span class="badge badge-club">🏛️ {{ e.club_name }}</span>{% endif %}
         <span class="badge">{{ SPORTS[e.sport] }}</span>
         <span class="badge">{{ e.skill_level }}</span>
         {% if e.cancelled %}<span class="badge badge-danger">Cancelled</span>

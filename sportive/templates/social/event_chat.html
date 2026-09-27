@@ -14,5 +14,4 @@
             "Message the group…", "No messages yet. Ask a question or say hi to the squad! 👋") }}
 {% if event.cancelled %}<p class="muted">This event was cancelled, so the chat is closed.</p>{% endif %}
 {% endblock %}
-{# no Need players / New event bar over the message box #}
-{% block actionbar %}{% endblock %}
+{% block body_class %}hide-tabs{% endblock %}

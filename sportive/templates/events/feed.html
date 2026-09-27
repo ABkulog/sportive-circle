@@ -1,7 +1,25 @@
 {% extends "base.html" %}
-{% from "_macros.html" import event_card, avatar %}
+{% from "_macros.html" import event_card, avatar, home_tabs %}
 {% block title %}Feed{% endblock %}
 {% block content %}
+{{ home_tabs('feed') }}
+<aside class="welcome-help" id="welcome-help" hidden>
+  <span>👋 New here? <a href="{{ url_for('how_it_works') }}">See how Sportive Circle works</a> in 1 minute.</span>
+  <button type="button" class="link-button" aria-label="Dismiss" id="welcome-help-close">✕</button>
+</aside>
+<script>
+  // First-visit help banner (hidden again once dismissed on this device).
+  (function () {
+    const box = document.getElementById("welcome-help");
+    let seen = false;
+    try { seen = localStorage.getItem("sc-help-dismissed") === "1"; } catch (e) {}
+    if (!seen) box.hidden = false;
+    document.getElementById("welcome-help-close").addEventListener("click", () => {
+      box.hidden = true;
+      try { localStorage.setItem("sc-help-dismissed", "1"); } catch (e) {}
+    });
+  })();
+</script>
 <header class="feed-hello">
   <h1 class="page-title">{{ hello }}</h1>
   <p class="spirit-line">{{ spirit_line }}</p>

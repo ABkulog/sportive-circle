@@ -1335,3 +1335,98 @@ def test_plus_one_rules(accounts, client, app):
     accounts.logout()
     accounts.login(email="buddy2@uw.edu")
     assert b"reached Competitive" in client.post(f"/events/{event_id}/join", follow_redirects=True).data
+
+
+# ------------------------------------------------------------------- clubs
+
+CLUB = {"name": "UW Spikeball Club", "sport": "spikeball",
+        "description": "Casual roundnet on the Quad. Everyone welcome, nets provided!",
+        "meets": "Tuesdays 5-7 PM", "location": "The Quad", "contact_url": "https://instagram.com/uwspikeball"}
+
+
+def _club_id(app, name="UW Spikeball Club"):
+    with app.app_context():
+        return get_db().execute("SELECT id FROM clubs WHERE name = ?", (name,)).fetchone()[0]
+
+
+def test_clubs_are_open_to_everyone(accounts, client, app):
+    accounts.signup(email="captain@uw.edu", name="Cap Tain")
+    client.post("/clubs/new", data=CLUB)
+    club = _club_id(app)
+    accounts.logout()
+    directory = client.get("/clubs").data.decode()          # no account needed
+    assert "UW Spikeball Club" in directory and "1 member" in directory
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Casual roundnet" in page and "All levels welcome" in page and "Sign up to join" in page
+    assert "Cap Tain" not in page                             # member names need an account
+
+
+def test_club_create_validation(accounts, client):
+    accounts.signup()
+    assert b"https://" in client.post("/clubs/new", data={**CLUB, "contact_url": "javascript:alert(1)"}).data
+    client.post("/clubs/new", data=CLUB)
+    assert b"already exists" in client.post("/clubs/new", data={**CLUB, "name": "uw spikeball CLUB"}).data
+
+
+def test_join_leave_and_officers(accounts, client, app):
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    club = _club_id(app)
+    assert b"only officer" in client.post(f"/clubs/{club}/leave", follow_redirects=True).data
+    accounts.logout()
+    accounts.signup(email="fan@uw.edu", name="Fan Person")
+    client.post(f"/clubs/{club}/join")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "You're a member" in page and "Fan Person" in page
+    assert client.post(f"/clubs/{club}/posts", data={"body": "hi"}).status_code == 403   # members can't post
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    client.post(f"/clubs/{club}/posts", data={"body": "Nets are at the Quad by 5!"})
+    client.post(f"/clubs/{club}/officers/{_user_id(app, 'fan@uw.edu')}")
+    assert b"You left the club" in client.post(f"/clubs/{club}/leave", follow_redirects=True).data
+    assert b"Nets are at the Quad by 5!" in client.get(f"/clubs/{club}").data
+
+
+def test_club_events_are_all_levels(accounts, client, app):
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    club = _club_id(app)
+    form_page = client.get(f"/events/new?club={club}").data.decode()
+    assert "Club event for" in form_page and 'name="skill_level"' not in form_page
+    response = client.post("/events/new", data={**event_form(title="Club night", sport="spikeball",
+                                                             location="The Quad", skill_level="Competitive"),
+                                                "club": club})
+    event_id = event_id_from(response)
+    with app.app_context():
+        row = get_db().execute("SELECT skill_level, club_id FROM events WHERE id = ?", (event_id,)).fetchone()
+        assert (row["skill_level"], row["club_id"]) == ("All levels", club)
+    assert "🏛️ UW Spikeball Club".encode() in client.get(f"/events/{event_id}").data
+    assert b"Club night" in client.get(f"/clubs/{club}").data
+    accounts.logout()
+    accounts.signup(email="random@uw.edu")
+    assert client.get(f"/events/new?club={club}").status_code == 403       # only officers
+
+
+# -------------------------------------------------------------- navigation
+
+def test_same_sections_everywhere(accounts, client):
+    accounts.signup()
+    page = client.get("/").data.decode()
+    for label in ("Home", "Clubs", "Create", "News", "Me", "Messages", "Friends", "How it works"):
+        assert f'<span class="tab-label">{label}' in page, label
+    assert 'class="tab  is-active" href="/" aria-current="page"' in page     # Home is highlighted
+    assert 'aria-label="How it works"' in page                              # ❓ in the top bar too
+    assert "For you" in page and "My events" in page                        # Home tabs
+    menu = client.get("/create").data.decode()
+    assert "Need players" in menu and "New event" in menu and "New club" in menu
+
+
+def test_visitors_get_simple_menu(client):
+    page = client.get("/").data.decode()
+    assert 'class="appnav"' not in page and "/clubs" in page and "How it works" in page
+
+
+def test_chats_hide_the_tab_bar_on_phones(accounts, client):
+    accounts.signup()
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    assert b'class="has-app-nav hide-tabs"' in client.get(f"/events/{event_id}/chat").data

@@ -20,7 +20,12 @@
       {% for s in sports %}<span class="chip">{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</span>{% else %}<span class="muted">No sports picked yet.</span>{% endfor %}
     </div>
     {% if user.id == g.user.id %}
-      <a class="btn btn-ghost" href="{{ url_for('profile.edit') }}">Edit profile</a>
+      <div class="profile-actions">
+        <a class="btn btn-ghost" href="{{ url_for('profile.edit') }}">⚙️ Edit profile & settings</a>
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          {{ csrf_field() }}<button class="btn btn-ghost">🚪 Log out</button>
+        </form>
+      </div>
     {% elif relation.i_blocked %}
       <form method="post" action="{{ url_for('social.unblock', user_id=user.id) }}">
         {{ csrf_field() }}<button class="btn btn-ghost">Unblock</button>

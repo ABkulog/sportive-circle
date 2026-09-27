@@ -34,11 +34,11 @@ def query_events(where, params=None, order="e.starts_at", limit=100):
     """
     params = {"me": g.user["id"], **(params or {})}
     sql = f"""
-        SELECT e.*, u.full_name AS host_name, u.avatar_updated AS host_avatar,
+        SELECT e.*, u.full_name AS host_name, u.avatar_updated AS host_avatar, cl.name AS club_name,
                (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id) AS going_count,
                EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me) AS i_am_going,
                (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id AND r.is_tryout = 1) AS tryouts_used
-        FROM events e JOIN users u ON u.id = e.host_id
+        FROM events e JOIN users u ON u.id = e.host_id LEFT JOIN clubs cl ON cl.id = e.club_id
         WHERE {" AND ".join(where)}
         ORDER BY {order}
         LIMIT {int(limit)}"""
@@ -162,10 +162,11 @@ def insert_event(data):
     db = get_db()
     cur = db.execute(
         """INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level,
-                               max_players, extra_players, note, is_quick, tryout_spots, allow_plus_ones)
+                               max_players, extra_players, note, is_quick, tryout_spots, allow_plus_ones, club_id)
            VALUES (:host_id, :title, :sport, :location, :starts_at, :ends_at, :skill_level,
-                   :max_players, :extra_players, :note, :is_quick, :tryout_spots, :allow_plus_ones)""",
-        {"host_id": g.user["id"], "extra_players": 0, "is_quick": 0, "tryout_spots": 0, "allow_plus_ones": 1, **data},
+                   :max_players, :extra_players, :note, :is_quick, :tryout_spots, :allow_plus_ones, :club_id)""",
+        {"host_id": g.user["id"], "extra_players": 0, "is_quick": 0, "tryout_spots": 0, "allow_plus_ones": 1,
+         "club_id": None, **data},
     )
     # The host is automatically going to their own event.
     db.execute("INSERT INTO rsvps (event_id, user_id, created_at) VALUES (?, ?, ?)",
@@ -331,9 +332,13 @@ def default_times():
 @bp.route("/events/new", methods=("GET", "POST"))
 @login_required
 def create():
+    club = club_for_new_event(request.values.get("club", type=int))
     if request.method == "POST":
         form = request.form
         data, error = read_event_form(form)
+        if error is None and club is not None:
+            # Club events are for everyone: no ranks, no tryouts, no +1s needed.
+            data.update(club_id=club["id"], skill_level="All levels", tryout_spots=0)
         if error is None:
             error = level_allowed(my_ranks(), data["sport"], data["skill_level"])[1]
         if error is None:
@@ -351,8 +356,21 @@ def create():
     else:
         starts, ends = default_times()
         form = MultiDict({"starts_at": starts, "ends_at": ends, "skill_level": "All levels", "allow_plus_ones": "1",
-                          "sport": request.args.get("sport", "")})
-    return render_template("events/form.html", form=form, event=None, min_start=now_local().strftime("%Y-%m-%dT%H:%M"))
+                          "sport": request.args.get("sport", "") or (club["sport"] if club else "")})
+    return render_template("events/form.html", form=form, event=None, club=club,
+                           min_start=now_local().strftime("%Y-%m-%dT%H:%M"))
+
+
+def club_for_new_event(club_id):
+    """The club an officer is creating an event for (None for a normal event)."""
+    if not club_id:
+        return None
+    club = get_db().execute(
+        """SELECT c.* FROM clubs c JOIN club_members m ON m.club_id = c.id
+           WHERE c.id = ? AND m.user_id = ? AND m.role = 'officer'""", (club_id, g.user["id"])).fetchone()
+    if club is None:
+        abort(403)
+    return club
 
 
 @bp.route("/events/<int:event_id>/edit", methods=("GET", "POST"))
@@ -365,6 +383,8 @@ def edit(event_id):
     if request.method == "POST":
         form = request.form
         data, error = read_event_form(form, event)
+        if error is None and event["club_id"]:
+            data.update(skill_level="All levels", tryout_spots=0)
         if error is None and (data["skill_level"], data["sport"]) != (event["skill_level"], event["sport"]):
             error = level_allowed(my_ranks(), data["sport"], data["skill_level"])[1]
         if error is None:

@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS events (
     is_quick      INTEGER NOT NULL DEFAULT 0,      -- 1 = "Need players" quick post
     tryout_spots  INTEGER NOT NULL DEFAULT 0,      -- spots lower-ranked players can take to prove themselves
     allow_plus_ones INTEGER NOT NULL DEFAULT 1,    -- ranked players may bring one friend (+1)
+    club_id       INTEGER REFERENCES clubs(id) ON DELETE SET NULL,  -- a club's event (always all levels)
     cancelled     INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -160,3 +161,36 @@ CREATE TABLE IF NOT EXISTS plus_one_invites (
     created_at TEXT NOT NULL,
     PRIMARY KEY (event_id, guest_id)
 );
+
+-- ---------------------------------------------------------------- clubs
+-- Clubs are open to everyone: anyone can browse them, any member can join. No ranks here.
+CREATE TABLE IF NOT EXISTS clubs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    sport       TEXT NOT NULL,
+    description TEXT NOT NULL,
+    meets       TEXT NOT NULL DEFAULT '',      -- e.g. "Tuesdays & Thursdays, 7-9 PM"
+    location    TEXT NOT NULL DEFAULT '',
+    contact_url TEXT NOT NULL DEFAULT '',      -- Instagram, website, Discord... (https only)
+    created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at  TEXT NOT NULL
+);
+
+-- role: 'officer' (can edit the club, post announcements, create club events) or 'member'
+CREATE TABLE IF NOT EXISTS club_members (
+    club_id   INTEGER NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+    user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role      TEXT NOT NULL DEFAULT 'member',
+    joined_at TEXT NOT NULL,
+    PRIMARY KEY (club_id, user_id)
+);
+
+-- Announcements from club officers.
+CREATE TABLE IF NOT EXISTS club_posts (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    club_id    INTEGER NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+    author_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    body       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_club_posts ON club_posts(club_id, id);

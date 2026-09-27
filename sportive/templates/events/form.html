@@ -4,18 +4,22 @@
 {% block content %}
 <div class="card form-card">
   <h1>{{ 'Edit event' if event else 'Create event' }}</h1>
+  {% if club %}<p class="club-banner">🏛️ Club event for <strong>{{ club.name }}</strong>. Club events are open to all levels.</p>{% endif %}
   <form method="post" class="form" data-sport-form>
     {{ csrf_field() }}
+    {% if club %}<input type="hidden" name="club" value="{{ club.id }}">{% endif %}
     <label class="field"><span>Event name</span>
       <input name="title" maxlength="80" value="{{ form.get('title', '') }}" placeholder="Sunday 5v5 at the IMA" required></label>
     <div class="row">
       {{ select('sport', 'Sport', SPORTS.items(), form.get('sport', ''), 'Choose a sport') }}
+      {% if not club and not (event and event.club_id) %}
       <label class="field"><span>Skill level</span>
         <select name="skill_level" {% if event %}data-keep="{{ event.sport }}|{{ event.skill_level }}"{% endif %}>
           {% for level in SKILL_LEVELS %}<option {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
         </select>
         <small class="muted" data-level-hint></small>
       </label>
+      {% endif %}
     </div>
     <label class="field"><span>Location</span>
       <select name="location" required>
@@ -32,6 +36,7 @@
     <label class="field"><span>Max players, including you <em>(optional)</em></span>
       <input name="max_players" type="number" min="2" value="{{ form.get('max_players', '') }}" placeholder="Pick a sport first">
       <small class="muted" data-max-hint></small></label>
+    {% if not club and not (event and event.club_id) %}
     <label class="field" data-tryout-field>
       <span>🎟️ Tryout spots <em>(for players who haven't ranked up yet)</em></span>
       <select name="tryout_spots">
@@ -43,6 +48,7 @@
       <input type="checkbox" name="allow_plus_ones" value="1" {% if form.get('allow_plus_ones') %}checked{% endif %}>
       <span>🤝 Let players bring one friend as a +1 <em>(max 2 per game)</em></span>
     </label>
+    {% endif %}
     <label class="field"><span>Note <em>(optional)</em></span>
       <textarea name="note" maxlength="500" rows="3" placeholder="Court 3, bring a light and a dark shirt">{{ form.get('note', '') }}</textarea></label>
     <button class="btn btn-block">{{ 'Save changes' if event else 'Create event' }}</button>

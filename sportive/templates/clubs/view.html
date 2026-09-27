@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}{{ club.name }}{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('clubs.directory') }}">← All clubs</a>
+<article class="card club-hero">
+  <div class="detail-head">
+    <div class="event-emoji big" aria-hidden="true">{{ SPORT_EMOJI[club.sport] }}</div>
+    <div>
+      <h1>{{ club.name }}</h1>
+      <div class="badges">
+        <span class="badge">{{ SPORTS[club.sport] }}</span>
+        <span class="badge badge-success">All levels welcome</span>
+        <span class="badge">👥 {{ club.member_count }} member{{ 's' if club.member_count != 1 }}</span>
+      </div>
+    </div>
+  </div>
+  <p class="club-about">{{ club.description }}</p>
+  <dl class="facts">
+    {% if club.meets %}<div><dt>When</dt><dd>🗓️ {{ club.meets }}</dd></div>{% endif %}
+    {% if club.location %}<div><dt>Where</dt><dd>📍 {{ club.location }}</dd></div>{% endif %}
+    {% if club.contact_url %}<div><dt>Contact</dt><dd><a href="{{ club.contact_url }}" target="_blank" rel="noopener nofollow">{{ club.contact_url|replace('https://', '')|truncate(40) }} ↗</a></dd></div>{% endif %}
+  </dl>
+  <div class="detail-actions">
+    {% if not g.user %}
+      <a class="btn btn-large" href="{{ url_for('auth.signup', next=request.path) }}">Sign up to join</a>
+      <a class="btn btn-ghost" href="{{ url_for('auth.login', next=request.path) }}">Log in</a>
+    {% elif role %}
+      <span class="going-pill">✅ You're {{ 'an officer' if role == 'officer' else 'a member' }}</span>
+      {% if role == 'officer' %}
+        <a class="btn" href="{{ url_for('events.create', club=club.id) }}">📅 New club event</a>
+        <a class="btn btn-ghost" href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit club</a>
+      {% endif %}
+      <form method="post" action="{{ url_for('clubs.leave', club_id=club.id) }}" onsubmit="return confirm('Leave {{ club.name }}?')">
+        {{ csrf_field() }}<button class="btn btn-ghost">Leave</button>
+      </form>
+    {% else %}
+      <form method="post" action="{{ url_for('clubs.join', club_id=club.id) }}">
+        {{ csrf_field() }}<button class="btn btn-large">Join club</button>
+      </form>
+    {% endif %}
+  </div>
+</article>
+
+<section class="card" id="events">
+  <h2>📅 Upcoming club events</h2>
+  <ul class="people">
+    {% for e in events %}
+      <li class="post-game-row">
+        <span>{{ SPORT_EMOJI[e.sport] }} <strong>{{ e.title }}</strong><br><small class="muted">{{ e.starts_at|when }} · 📍 {{ e.location }}</small></span>
+        {% if g.user %}<a class="btn btn-small" href="{{ url_for('events.detail', event_id=e.id) }}">View</a>{% endif %}
+      </li>
+    {% else %}
+      <li class="muted">No events coming up right now.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card" id="announcements">
+  <h2>📣 Announcements</h2>
+  {% if role == 'officer' %}
+    <form method="post" action="{{ url_for('clubs.post', club_id=club.id) }}" class="form club-post-form">
+      {{ csrf_field() }}
+      <textarea name="body" rows="2" maxlength="1000" placeholder="Share news with the club…" required aria-label="Announcement"></textarea>
+      <button class="btn btn-small">Post</button>
+    </form>
+  {% endif %}
+  <ul class="club-posts">
+    {% for p in posts %}
+      <li>
+        <p>{{ p.body }}</p>
+        <small class="muted">{{ p.full_name or 'An officer' }} · {{ p.created_at|when }}</small>
+        {% if role == 'officer' %}
+          <form method="post" action="{{ url_for('clubs.delete_post', club_id=club.id, post_id=p.id) }}" class="inline-form">
+            {{ csrf_field() }}<button class="link-button danger-link">Delete</button>
+          </form>
+        {% endif %}
+      </li>
+    {% else %}
+      <li class="muted">No announcements yet.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card" id="members">
+  <h2>👥 Members ({{ club.member_count }})</h2>
+  {% if g.user %}
+    <ul class="people">
+      {% for m in members %}
+        <li class="post-game-row">
+          <a class="person" href="{{ url_for('profile.view', user_id=m.id) }}">{{ avatar(m.id, m.full_name, m.avatar_updated, 32) }}{{ m.full_name }}</a>
+          {% if m.role == 'officer' %}<span class="badge badge-purple">🎖️ Officer</span>
+          {% elif role == 'officer' %}
+            <form method="post" action="{{ url_for('clubs.make_officer', club_id=club.id, user_id=m.id) }}">
+              {{ csrf_field() }}<button class="btn btn-small btn-ghost">Make officer</button>
+            </form>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted"><a href="{{ url_for('auth.signup', next=request.path) }}">Sign up</a> with your UW email to see who's in the club.</p>
+  {% endif %}
+</section>
+{% endblock %}

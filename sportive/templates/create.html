@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Create{% endblock %}
+{% block content %}
+<h1 class="page-title">➕ Create</h1>
+<p class="muted">What do you want to start?</p>
+<div class="create-grid">
+  <a class="card create-option create-gold" href="{{ url_for('events.quick') }}">
+    <span class="create-emoji" aria-hidden="true">⚡</span>
+    <strong>Need players</strong>
+    <span class="muted">Playing <em>right now</em> and short a few people? Post it in seconds.</span>
+  </a>
+  <a class="card create-option" href="{{ url_for('events.create') }}">
+    <span class="create-emoji" aria-hidden="true">📅</span>
+    <strong>New event</strong>
+    <span class="muted">Plan a game ahead: pick the day, time, place and how many people.</span>
+  </a>
+  <a class="card create-option" href="{{ url_for('clubs.create') }}">
+    <span class="create-emoji" aria-hidden="true">🏛️</span>
+    <strong>New club</strong>
+    <span class="muted">Start a club anyone can find and join. Great for teams and groups that meet regularly.</span>
+  </a>
+</div>
+{% if officer_clubs %}
+  <section class="card">
+    <h2>📅 Event for your club</h2>
+    <ul class="people">
+      {% for c in officer_clubs %}
+        <li class="post-game-row">
+          <span><strong>{{ SPORT_EMOJI[c.sport] }} {{ c.name }}</strong></span>
+          <a class="btn btn-small" href="{{ url_for('events.create', club=c.id) }}">+ Club event</a>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
+{% endblock %}
