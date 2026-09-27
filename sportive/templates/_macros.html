@@ -49,8 +49,7 @@
       <div class="event-meta">📍 {{ e.location }}</div>
       <div class="badges">
         {% if e.club_name %}<span class="badge badge-club">🏛️ {{ e.club_name }}</span>{% endif %}
-        <span class="badge">{{ SPORTS[e.sport] }}</span>
-        <span class="badge">{{ e.skill_level }}</span>
+        {% if e.skill_level in ('Intermediate', 'Competitive') %}<span class="badge badge-level">{{ e.skill_level }}</span>{% endif %}
         {% if e.cancelled %}<span class="badge badge-danger">Cancelled</span>
         {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Hosting</span>
         {% elif e.i_am_going %}<span class="badge badge-success">You're going</span>

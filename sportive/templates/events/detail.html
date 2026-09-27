@@ -46,77 +46,82 @@
 
   {% if event.note %}<p class="note">{{ event.note }}</p>{% endif %}
 
-  {% if place and not event.cancelled and not ended %}
-    <div class="map-card">
-      {% if place.lat %}
-        <div id="event-map" class="event-map" role="img" aria-label="Map showing {{ place.name }}"
-             data-lat="{{ place.lat }}" data-lng="{{ place.lng }}" data-name="{{ place.name }}"></div>
-      {% endif %}
-      <div class="map-actions">
-        <a class="btn" href="{{ place.google }}" target="_blank" rel="noopener">🧭 Directions</a>
-        <a class="btn btn-ghost" href="{{ place.apple }}" target="_blank" rel="noopener">Apple Maps</a>
-        {% if place.lat %}<button type="button" class="btn btn-ghost" id="locate-me">📍 Where am I?</button>{% endif %}
-      </div>
-      <p class="muted map-status" id="map-status" aria-live="polite"></p>
-    </div>
-  {% elif event.location.startswith('Off campus') and not event.cancelled and not ended %}
-    <p class="muted">📍 Off campus: check the note above for the exact address.</p>
-  {% endif %}
-
   {% if not event.cancelled and not ended %}
-    <div class="detail-actions secondary-actions">
-      {% if event.i_am_going %}
-        {% set unread = chat_unread().get(event.id, 0) %}
-        <a class="btn" href="{{ url_for('social.event_chat', event_id=event.id) }}">💬 Group chat{% if unread %} <span class="count-dot">{{ unread }}</span>{% endif %}</a>
-      {% endif %}
-      <button type="button" class="btn btn-ghost" id="share-button"
-              data-title="{{ event_title(event) }}" data-url="{{ url_for('events.detail', event_id=event.id, _external=True) }}">🔗 Share</button>
-      <a class="btn btn-ghost" href="{{ url_for('events.calendar_file', event_id=event.id) }}">📅 Add to calendar</a>
-    </div>
-    <div class="detail-actions">
+    {# 1. The one main action #}
+    <div class="primary-action">
       {% if is_host %}
-        <a class="btn" href="{{ url_for('events.edit', event_id=event.id) }}">Edit</a>
-        <form method="post" action="{{ url_for('events.cancel', event_id=event.id) }}"
-              onsubmit="return confirm('Cancel this event for everyone?')">
-          {{ csrf_field() }}<button class="btn btn-danger-ghost">Cancel event</button>
-        </form>
+        <span class="going-pill">⭐ You're hosting</span>
       {% elif event.i_am_going %}
         <span class="going-pill">✅ You're going</span>
-        <form method="post" action="{{ url_for('events.leave', event_id=event.id) }}">
-          {{ csrf_field() }}<button class="btn btn-ghost">Leave</button>
-        </form>
       {% elif left == 0 %}
-        <button class="btn" disabled>Full</button>
+        <button class="btn btn-large btn-block" disabled>Full</button>
       {% elif my_invite %}
-        <div class="locked-level tryout-box">
-          <strong>🤝 {{ my_invite.full_name.split()[0] }} invited you as their +1!</strong>
-          <p class="muted">This is a {{ event.skill_level }} game, but you can play because your friend is bringing you.
-            Have fun, and don't be shy asking for ⬆️ vouches after!</p>
-          <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
-            {{ csrf_field() }}<button class="btn btn-gold">🤝 Join as {{ my_invite.full_name.split()[0] }}'s +1</button>
-          </form>
-        </div>
+        <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
+          {{ csrf_field() }}<button class="btn btn-gold btn-large btn-block">🤝 Join as {{ my_invite.full_name.split()[0] }}'s +1</button>
+        </form>
+        <p class="hint">{{ my_invite.full_name.split()[0] }} is bringing you to this {{ event.skill_level }} game.</p>
       {% elif tryout %}
-        <div class="locked-level tryout-box">
-          <strong>🎟️ Tryout spot open!</strong>
-          <p class="muted">This is a {{ event.skill_level }} game. The host saved {{ event.tryout_spots }} tryout
-            spot{{ 's' if event.tryout_spots != 1 }} for players who haven't ranked up yet. Play well and ask for
-            ⬆️ vouches after: 3 vouches from good players can place you straight into a higher rank.</p>
-          <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
-            {{ csrf_field() }}<button class="btn btn-gold">🎟️ Try out</button>
-          </form>
-        </div>
+        <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
+          {{ csrf_field() }}<button class="btn btn-gold btn-large btn-block">🎟️ Try out</button>
+        </form>
+        <p class="hint">A tryout spot for players still ranking up. Play well, then ask for vouches.</p>
       {% elif not level_ok %}
-        <div class="locked-level">
-          <strong>🔒 {{ event.skill_level }}+ only</strong>
-          <p class="muted">{{ level_reason }}</p>
-        </div>
+        <button class="btn btn-large btn-block" disabled>🔒 {{ event.skill_level }}+ only</button>
+        <p class="hint">{{ level_reason }}</p>
       {% else %}
         <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
-          {{ csrf_field() }}<button class="btn btn-large">Join</button>
+          {{ csrf_field() }}<button class="btn btn-large btn-block">Join</button>
         </form>
       {% endif %}
     </div>
+
+    {# 2. Quick actions as a row of icons #}
+    <nav class="icon-actions" aria-label="Event actions">
+      {% if event.i_am_going %}
+        {% set unread = chat_unread().get(event.id, 0) %}
+        <a class="icon-action" href="{{ url_for('social.event_chat', event_id=event.id) }}">
+          <span aria-hidden="true">💬{% if unread %}<span class="count-dot">{{ unread }}</span>{% endif %}</span>Chat</a>
+      {% endif %}
+      {% if place %}
+        <a class="icon-action" href="{{ place.google }}" target="_blank" rel="noopener"><span aria-hidden="true">🧭</span>Directions</a>
+      {% endif %}
+      <button type="button" class="icon-action" id="share-button"
+              data-title="{{ event_title(event) }}" data-url="{{ url_for('events.detail', event_id=event.id, _external=True) }}">
+        <span aria-hidden="true">🔗</span>Share</button>
+      <a class="icon-action" href="{{ url_for('events.calendar_file', event_id=event.id) }}"><span aria-hidden="true">📅</span>Calendar</a>
+      {% if is_host %}
+        <a class="icon-action" href="{{ url_for('events.edit', event_id=event.id) }}"><span aria-hidden="true">✏️</span>Edit</a>
+      {% elif event.i_am_going %}
+        <form method="post" action="{{ url_for('events.leave', event_id=event.id) }}" class="icon-action-form">
+          {{ csrf_field() }}<button class="icon-action"><span aria-hidden="true">👋</span>Leave</button>
+        </form>
+      {% endif %}
+    </nav>
+
+    {# 3. The map, one tap away #}
+    {% if place and place.lat %}
+      <details class="map-details">
+        <summary>🗺️ Map <span class="muted">· {{ place.name }}</span></summary>
+        <div class="map-card">
+          <div id="event-map" class="event-map" role="img" aria-label="Map showing {{ place.name }}"
+               data-lat="{{ place.lat }}" data-lng="{{ place.lng }}" data-name="{{ place.name }}"></div>
+          <div class="map-actions">
+            <button type="button" class="btn btn-small btn-ghost" id="locate-me">📍 Where am I?</button>
+            <a class="btn btn-small btn-ghost" href="{{ place.apple }}" target="_blank" rel="noopener">Apple Maps</a>
+          </div>
+          <p class="muted map-status" id="map-status" aria-live="polite"></p>
+        </div>
+      </details>
+    {% elif event.location.startswith('Off campus') %}
+      <p class="muted">📍 Off campus: the address is in the note.</p>
+    {% endif %}
+
+    {% if is_host %}
+      <form method="post" action="{{ url_for('events.cancel', event_id=event.id) }}" class="cancel-event"
+            onsubmit="return confirm('Cancel this event for everyone?')">
+        {{ csrf_field() }}<button class="link-button danger-link">Cancel event</button>
+      </form>
+    {% endif %}
   {% endif %}
 </article>
 
@@ -143,8 +148,8 @@
   </ul>
 </section>
 {% if plus_one.eligible %}
-  <section class="card" id="plus-one">
-    <h2>🤝 Bring a friend</h2>
+  <details class="card fold" id="plus-one" {% if plus_one.sent %}open{% endif %}>
+    <summary><strong>🤝 Bring a friend</strong> <span class="muted">· one +1 for this game</span></summary>
     {% if plus_one.sent %}
       <p>You invited <strong>{{ plus_one.sent.full_name }}</strong> as your +1.
         {% if plus_one.sent.joined %}They're in! ✅{% else %}Waiting for them to join.{% endif %}</p>
@@ -156,8 +161,7 @@
     {% elif plus_one.full %}
       <p class="muted">This game already has the max number of +1s.</p>
     {% else %}
-      <p class="muted">Want to play with a friend who hasn't ranked up yet? You can bring <strong>one friend</strong>
-        as your +1, even if they're not {{ event.skill_level }}.</p>
+      <p class="muted">Bring a friend who isn't {{ event.skill_level }} yet.</p>
       <ul class="people">
         {% for f in plus_one.friends %}
           <li class="post-game-row">
@@ -171,7 +175,7 @@
         {% endfor %}
       </ul>
     {% endif %}
-  </section>
+  </details>
 {% endif %}
 
 {% if post_game %}

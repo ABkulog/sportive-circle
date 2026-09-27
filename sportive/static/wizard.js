@@ -1,0 +1,53 @@
+// Step-by-step forms: one section at a time with a progress bar, like signing up in a phone app.
+// "Next" checks the current step first. Without JavaScript, the whole form simply shows.
+(function () {
+  const form = document.querySelector("form[data-wizard]");
+  if (!form) return;
+  const steps = [...form.querySelectorAll(".wizard-step")];
+  const nav = form.querySelector(".wizard-nav");
+  const back = form.querySelector("[data-wizard-back]");
+  const next = form.querySelector("[data-wizard-next]");
+  const submit = form.querySelector("[data-wizard-submit]");
+  const progress = document.createElement("div");
+  progress.className = "wizard-progress";
+  progress.innerHTML = '<div class="wizard-bar"><span></span></div><p class="wizard-count" aria-live="polite"></p>';
+  form.prepend(progress);
+  nav.hidden = false;
+
+  // If the server sent the form back with an error, start on the first step (the error banner explains it).
+  let current = 0;
+
+  function show(index) {
+    current = index;
+    steps.forEach((step, i) => { step.hidden = i !== index; });
+    back.style.visibility = index === 0 ? "hidden" : "visible";
+    next.hidden = index === steps.length - 1;
+    submit.hidden = index !== steps.length - 1;
+    progress.querySelector("span").style.width = `${((index + 1) / steps.length) * 100}%`;
+    const title = steps[index].querySelector(".form-step");
+    progress.querySelector(".wizard-count").textContent =
+      `Step ${index + 1} of ${steps.length}: ${title ? title.textContent.replace(/^\s*\d+\s*/, "") : ""}`;
+  }
+
+  function stepIsValid() {
+    // Show the browser's own "please fill this in" message for the first problem in this step.
+    for (const field of steps[current].querySelectorAll("input, select, textarea")) {
+      if (!field.checkValidity()) { field.reportValidity(); return false; }
+    }
+    return true;
+  }
+
+  next.addEventListener("click", () => {
+    if (!stepIsValid()) return;
+    show(current + 1);
+    form.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
+  back.addEventListener("click", () => show(current - 1));
+  form.addEventListener("keydown", (event) => {  // Enter moves to the next step instead of submitting early
+    if (event.key === "Enter" && event.target.tagName === "INPUT" && current < steps.length - 1) {
+      event.preventDefault();
+      next.click();
+    }
+  });
+  show(0);
+})();

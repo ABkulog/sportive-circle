@@ -20,76 +20,66 @@
     });
   })();
 </script>
-<header class="feed-hello">
+<header class="feed-hello compact">
   <h1 class="page-title">{{ hello }}</h1>
   <p class="spirit-line">{{ spirit_line }}</p>
 </header>
 
-{% if up_next %}
-  <a class="up-next" href="{{ url_for('events.detail', event_id=up_next.id) }}">
-    <span class="up-next-label">⏰ Up next</span>
-    <span><strong>{{ event_title(up_next) }}</strong> · {{ up_next.starts_at|relative }} · {{ up_next.location }}</span>
-  </a>
+{# "Now" row, like Instagram Stories: what's happening soon, one swipe away. #}
+{% if up_next or need_players %}
+  <nav class="now-row" aria-label="Happening soon">
+    {% if up_next %}
+      <a class="now-tile is-mine" href="{{ url_for('events.detail', event_id=up_next.id) }}">
+        <span class="now-ring" aria-hidden="true">{{ SPORT_EMOJI[up_next.sport] }}</span>
+        <strong>Up next</strong>
+        <small>{{ up_next.starts_at|relative }}</small>
+      </a>
+    {% endif %}
+    {% for e in need_players if not up_next or e.id != up_next.id %}
+      <a class="now-tile" href="{{ url_for('events.detail', event_id=e.id) }}">
+        <span class="now-ring is-hot" aria-hidden="true">{{ SPORT_EMOJI[e.sport] }}</span>
+        <strong>{% set left = spots_left(e) %}{% if left %}Need {{ left }}{% else %}{{ SPORTS[e.sport] }}{% endif %}</strong>
+        <small>{{ e.starts_at|relative }}</small>
+      </a>
+    {% endfor %}
+  </nav>
 {% endif %}
 
-{% if need_players %}
-  <section class="need-players">
-    <h2>⚡ Need players now</h2>
-    <div class="stack">
-      {% for e in need_players %}{{ event_card(e) }}{% endfor %}
-    </div>
-  </section>
-{% endif %}
-
-{% if club_picks %}
-  <section class="club-picks">
-    <h2>🏛️ Clubs for you</h2>
-    <div class="club-strip">
-      {% for c in club_picks %}
-        <a class="card club-card" href="{{ url_for('clubs.view', club_id=c.id) }}">
-          <span class="club-emoji" aria-hidden="true">{{ SPORT_EMOJI[c.sport] }}</span>
-          <strong class="club-name">{{ c.name }}</strong>
-          <span class="badges"><span class="badge badge-verified">✅ Verified</span>
-            <span class="badge">👥 {{ c.member_count }}</span></span>
-        </a>
-      {% endfor %}
-    </div>
-  </section>
-{% endif %}
-
-<form method="get" class="filters card" aria-label="Filter events">
-  <div class="segmented" role="radiogroup" aria-label="Which sports">
+{% set active_filters = [filters.sport, filters.when, filters.location, filters.skill]|select|list|length %}
+<form method="get" class="filter-bar" aria-label="Filter games">
+  <div class="segmented small" role="radiogroup" aria-label="Which sports">
     <label><input type="radio" name="scope" value="interests" {% if filters.scope == 'interests' %}checked{% endif %} onchange="this.form.submit()"><span>My sports</span></label>
-    <label><input type="radio" name="scope" value="all" {% if filters.scope == 'all' %}checked{% endif %} onchange="this.form.submit()"><span>All sports</span></label>
+    <label><input type="radio" name="scope" value="all" {% if filters.scope == 'all' %}checked{% endif %} onchange="this.form.submit()"><span>All</span></label>
   </div>
-  <div class="filter-row">
-    <select name="sport" aria-label="Sport" onchange="this.form.submit()">
-      <option value="">Any sport</option>
-      {% for key, label in SPORTS.items() %}<option value="{{ key }}" {% if filters.sport == key %}selected{% endif %}>{{ SPORT_EMOJI[key] }} {{ label }}</option>{% endfor %}
-    </select>
-    <select name="when" aria-label="When" onchange="this.form.submit()">
-      <option value="">Upcoming</option>
-      <option value="today" {% if filters.when == 'today' %}selected{% endif %}>Today</option>
-      <option value="week" {% if filters.when == 'week' %}selected{% endif %}>This week</option>
-      <option value="month" {% if filters.when == 'month' %}selected{% endif %}>This month</option>
-    </select>
-    <select name="location" aria-label="Location" onchange="this.form.submit()">
-      <option value="">Anywhere</option>
-      {% for loc in LOCATIONS %}<option {% if filters.location == loc %}selected{% endif %}>{{ loc }}</option>{% endfor %}
-    </select>
-    <select name="skill" aria-label="Skill level" onchange="this.form.submit()">
-      <option value="">Any level</option>
-      {% for level in SKILL_LEVELS %}<option {% if filters.skill == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
-    </select>
-  </div>
-  <noscript><button class="btn">Apply</button></noscript>
-  {% if filters.sport or filters.when or filters.location or filters.skill %}
-    <a class="clear-filters" href="{{ url_for('events.feed', scope=filters.scope) }}">Clear filters</a>
-  {% endif %}
+  <details class="filter-more" {% if active_filters %}open{% endif %}>
+    <summary class="chip">⚙️ Filters{% if active_filters %} · {{ active_filters }}{% endif %}</summary>
+    <div class="filter-row">
+      <select name="sport" aria-label="Sport" onchange="this.form.submit()">
+        <option value="">Any sport</option>
+        {% for key, label in SPORTS.items() %}<option value="{{ key }}" {% if filters.sport == key %}selected{% endif %}>{{ SPORT_EMOJI[key] }} {{ label }}</option>{% endfor %}
+      </select>
+      <select name="when" aria-label="When" onchange="this.form.submit()">
+        <option value="">Upcoming</option>
+        <option value="today" {% if filters.when == 'today' %}selected{% endif %}>Today</option>
+        <option value="week" {% if filters.when == 'week' %}selected{% endif %}>This week</option>
+        <option value="month" {% if filters.when == 'month' %}selected{% endif %}>This month</option>
+      </select>
+      <select name="location" aria-label="Location" onchange="this.form.submit()">
+        <option value="">Anywhere</option>
+        {% for loc in LOCATIONS %}<option {% if filters.location == loc %}selected{% endif %}>{{ loc }}</option>{% endfor %}
+      </select>
+      <select name="skill" aria-label="Skill level" onchange="this.form.submit()">
+        <option value="">Any level</option>
+        {% for level in SKILL_LEVELS %}<option {% if filters.skill == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
+      </select>
+    </div>
+    <noscript><button class="btn">Apply</button></noscript>
+    {% if active_filters %}<a class="clear-filters" href="{{ url_for('events.feed', scope=filters.scope) }}">Clear filters</a>{% endif %}
+  </details>
 </form>
 
 {% if filters.scope == 'interests' and not my_sports %}
-  <p class="muted">Tip: <a href="{{ url_for('profile.edit') }}">pick your sports</a> to get a feed made for you.</p>
+  <p class="muted"><a href="{{ url_for('profile.edit') }}">Pick your sports</a> for a feed made for you.</p>
 {% endif %}
 
 <div class="stack">
@@ -98,16 +88,30 @@
   {% else %}
     <div class="card empty">
       <p class="empty-emoji" aria-hidden="true">🐾</p>
-      <p><strong>No games here yet.</strong></p>
-      <p class="muted">Be the Dawg who starts it. Most pickup games just need someone to post first.</p>
-      <a class="btn" href="{{ url_for('events.create', sport=filters.sport) }}">+ Create an event</a>
+      <p><strong>No games yet.</strong> Be the one who starts it!</p>
+      <a class="btn" href="{{ url_for('events.create', sport=filters.sport) }}">+ New event</a>
     </div>
   {% endfor %}
 </div>
 
+{% if club_picks %}
+  <section class="club-picks">
+    <h2 class="section-title">🏛️ Clubs for you</h2>
+    <div class="club-strip">
+      {% for c in club_picks %}
+        <a class="card club-card mini" href="{{ url_for('clubs.view', club_id=c.id) }}">
+          <span class="club-emoji" aria-hidden="true">{{ SPORT_EMOJI[c.sport] }}</span>
+          <strong class="club-name">{{ c.name }}</strong>
+          <small class="muted">✅ Verified · {{ c.member_count }} members</small>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
 {% if top_dawgs %}
   <section class="card top-dawgs">
-    <h2>🏆 Top Dawgs this month</h2>
+    <h2 class="section-title">🏆 Top Dawgs this month</h2>
     <ol>
       {% for dawg in top_dawgs %}
         <li>
@@ -117,7 +121,6 @@
         </li>
       {% endfor %}
     </ol>
-    <p class="muted">Play games this month to climb the board. Go Dawgs! 🐺</p>
   </section>
 {% endif %}
 {% endblock %}

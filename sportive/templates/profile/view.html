@@ -79,7 +79,15 @@
   {% if not user.show_ranks and user.id != g.user.id %}
     <p class="muted">🧘 {{ user.full_name.split()[0] }} is in chill mode, so their ranks are hidden. Just here to play!</p>
   {% elif ranks %}
-    {% if not user.show_ranks %}<p class="muted">🧘 Chill mode is on: only you can see your ranks.</p>{% endif %}
+    {% if not user.show_ranks %}<p class="muted">🧘 Chill mode: only you can see these.</p>{% endif %}
+    <ul class="rank-chips" aria-label="Ranks by sport">
+      {% for sport, r in ranks.items() %}
+        <li class="rank-chip tier-{{ r.tier|lower }}">{{ SPORT_EMOJI[sport] }} {{ r.name }}</li>
+      {% endfor %}
+    </ul>
+    {% if user.id == g.user.id %}
+    <details class="fold rank-progress">
+      <summary>See my progress</summary>
     <div class="rank-cards">
       {% for sport, r in ranks.items() %}
         <div class="rank-card tier-{{ r.tier|lower }}">
@@ -103,9 +111,10 @@
         </div>
       {% endfor %}
     </div>
+    </details>
+    {% endif %}
   {% else %}
-    <p class="muted">Everyone starts at <strong>Casual 1</strong>. Play games, collect 🤝 props and get ⬆️ vouched
-      by teammates to rank up in each sport.</p>
+    <p class="muted">Everyone starts at Casual 1. Play games to rank up.</p>
   {% endif %}
 </section>
 

@@ -15,13 +15,11 @@
 <div class="card form-card club-form">
   <h1>{{ 'Edit club' if club else '🏛️ Register your club' }}</h1>
   {% if not club %}
-    <p class="muted"><strong>Everything is required except social media</strong>, so students have the full picture and a way to reach you.</p>
-    <p class="muted">Sportive Circle lists <strong>active UW clubs</strong>. Tell us about yours and share its official
-      page. We'll verify it (usually within 2 days) and email you when it's live. You'll be its first officer here.</p>
+    <p class="muted">For active UW clubs. We verify each one (usually within 2 days) and email you when it's live.</p>
   {% endif %}
-  <form method="post" class="form">
+  <form method="post" class="form" {% if not club %}data-wizard{% endif %}>
     {{ csrf_field() }}
-
+    <section class="wizard-step" data-step="1">
     <h2 class="form-step"><span>1</span> Your club</h2>
     <label class="field"><span>Club name</span>
       <input name="name" maxlength="60" value="{{ form.get('name', '') }}" placeholder="UW Women's Ultimate" required></label>
@@ -40,7 +38,8 @@
     <label class="field"><span>About the club</span>
       <textarea name="description" rows="4" maxlength="1000" required
                 placeholder="What you do, what a practice looks like, and who should join.">{{ form.get('description', '') }}</textarea></label>
-
+    </section>
+    <section class="wizard-step" data-step="2">
     <h2 class="form-step"><span>2</span> Who it's for</h2>
     {{ choice('focus', focus, "What's the club's focus?") }}
     {{ choice('joining', joining, "How do people join?") }}
@@ -52,7 +51,8 @@
       <small class="muted">They answer it when they ask to join or sign up for tryouts, and you see it in your requests.</small></label>
     <label class="toggle"><input type="checkbox" name="competes" value="1" {% if form.get('competes') %}checked{% endif %}>
       <span>We compete against other schools</span></label>
-
+    </section>
+    <section class="wizard-step" data-step="3">
     <h2 class="form-step"><span>3</span> Practices & costs</h2>
     <div class="row">
       <label class="field"><span>When you practice</span>
@@ -70,7 +70,8 @@
     <label class="field"><span>How to join: first steps for new members</span>
       <textarea name="how_to_join" rows="2" maxlength="500" required
                 placeholder="Sign the waiver on HuskyLink, then come to any Tuesday practice!">{{ form.get('how_to_join', '') }}</textarea></label>
-
+    </section>
+    <section class="wizard-step" data-step="4">
     <h2 class="form-step"><span>4</span> Contact</h2>
     <label class="field"><span>Club email</span>
       <input name="club_email" type="email" maxlength="120" value="{{ form.get('club_email', '') }}" placeholder="yourclub@uw.edu" required>
@@ -94,7 +95,8 @@
     </fieldset>
     <label class="field"><span>Website, Discord or GroupMe <em>(optional)</em></span>
       <input name="contact_url" type="url" maxlength="200" value="{{ form.get('contact_url', '') }}" placeholder="https://…"></label>
-
+    </section>
+    <section class="wizard-step" data-step="5">
     <h2 class="form-step"><span>5</span> About you</h2>
     <div class="row">
       <label class="field"><span>Your role in the club</span>
@@ -105,8 +107,13 @@
     </div>
     <label class="toggle attest"><input type="checkbox" name="attest" value="1" required {% if club %}checked{% endif %}>
       <span>I'm a current officer of this club, and it's active this quarter.</span></label>
-
-    <button class="btn btn-block btn-large">{{ 'Save changes' if club else 'Submit for verification' }}</button>
+    </section>
+    <div class="wizard-nav" hidden>
+      <button type="button" class="btn btn-ghost" data-wizard-back>← Back</button>
+      <button type="button" class="btn" data-wizard-next>Next →</button>
+    </div>
+    <button class="btn btn-block btn-large" data-wizard-submit>{{ 'Save changes' if club else 'Submit for verification' }}</button>
   </form>
 </div>
+<script src="{{ url_for('static', filename='wizard.js') }}" defer></script>
 {% endblock %}

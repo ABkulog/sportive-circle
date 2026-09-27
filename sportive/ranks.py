@@ -170,9 +170,8 @@ def level_allowed(ranks, sport, skill_level):
     if tier_index(ranks, sport) >= TIERS.index(needed):
         return True, None
     current = ranks[sport].name if sport in ranks else "Casual 1"
-    return False, (f"{skill_level} {SPORTS[sport]} games are for players who've reached {needed} "
-                   f"in {SPORTS[sport]} (you're {current}). Keep playing, collect props and get "
-                   f"vouched by teammates to rank up! 🐺")
+    return False, (f"For players who've reached {needed} in {SPORTS[sport]}. You're {current}: "
+                   f"keep playing and get vouched to rank up! 🐺")
 
 
 def my_tier_map():

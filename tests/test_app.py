@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 from io import BytesIO
 
@@ -174,7 +175,11 @@ def test_quick_post_counts_existing_players(accounts, client):
     page = client.get(f"/events/{event_id_from(response)}").data
     assert b"Need 2 more for Soccer" in page
     assert b"8 going of 10" in page
-    assert b"Need players now" in client.get("/").data
+    assert "<strong>Up next</strong>" in client.get("/").data.decode()   # the poster sees their own game once
+    accounts.logout()
+    accounts.signup(email="someone.else@uw.edu")
+    home = client.get("/").data.decode()
+    assert 'aria-label="Happening soon"' in home and "<strong>Need 2</strong>" in home   # everyone else: "Need 2"
 
 
 # ------------------------------------------------------------------ security
@@ -699,7 +704,7 @@ def test_off_campus_and_online_have_no_map(accounts, client):
     online = client.get(f"/events/{event_id_from(client.post('/events/new', data=event_form(sport='esports', location='Online')))}").data
     assert b"Directions" not in online
     off = client.get(f"/events/{event_id_from(client.post('/events/new', data=event_form(title='Hike', sport='hiking', location='Off campus (see note)')))}").data
-    assert b"check the note above for the exact address" in off
+    assert b"the address is in the note" in off
 
 
 def test_this_month_filter(accounts, client, app, monkeypatch):
@@ -1100,7 +1105,7 @@ def test_event_group_chat(accounts, client, app):
     assert client.get(f"/events/{event_id}/chat/poll").status_code == 403
     client.post(f"/events/{event_id}/join")
     detail = client.get(f"/events/{event_id}").data
-    assert "💬 Group chat".encode() in detail and b'<span class="count-dot">1</span>' in detail
+    assert f'href="/events/{event_id}/chat"'.encode() in detail and b'<span class="count-dot">1</span>' in detail
     assert b"Court 3, bring a light shirt" in client.get(f"/events/{event_id}/chat").data
     assert b'<span class="count-dot">1</span>' not in client.get(f"/events/{event_id}").data  # seen now
     client.post(f"/events/{event_id}/chat", data={"body": "on my way!"})
@@ -1232,7 +1237,7 @@ def test_chill_mode_hides_ranks(accounts, client, app):
     _played_games(app, "soccer", [chill])
     client.post("/profile/edit", data={"full_name": "Chill Dawg", "sports": ["soccer"]})  # show_ranks unchecked
     own = client.get(f"/u/{chill}").data.decode()
-    assert "only you can see your ranks" in own and "Casual 1" in own
+    assert "Chill mode: only you can see these" in own and "Casual 1" in own
     accounts.logout()
     accounts.signup(email="other@uw.edu")
     other = client.get(f"/u/{chill}").data.decode()
@@ -1370,7 +1375,7 @@ def test_clubs_are_open_to_everyone(accounts, client, app):
     directory = client.get("/clubs").data.decode()          # no account needed
     assert "UW Spikeball Club" in directory and "1 member" in directory
     page = client.get(f"/clubs/{club}").data.decode()
-    assert "Casual roundnet" in page and "Verified UW club" in page and "Sign up to join" in page
+    assert "Casual roundnet" in page and "✅ Verified" in page and "Sign up to join" in page
     assert "No experience needed" in page and "Come to any Tuesday practice!" in page and "@uwspikeball" in page
     assert "Cap Tain" not in page                             # member names need an account
 
@@ -1666,7 +1671,8 @@ def test_follow_is_not_membership(accounts, client, app):
     accounts.signup(email="curious@uw.edu")
     client.post(f"/clubs/{club}/follow")
     page = client.get(f"/clubs/{club}").data.decode()
-    assert "Following" in page and "1 member here" in page and "1 following" in page   # only the captain is a member
+    stats = re.findall(r"<strong>(\d+)</strong><span>(\w+)</span>", page)
+    assert "⭐ Following" in page and ("1", "member") in stats and ("1", "following") in stats   # captain only
 
 
 def test_tryouts_flow_with_messages(accounts, client, app):
@@ -1709,7 +1715,7 @@ def test_confirmed_member_gets_welcome_message(accounts, client, app):
     accounts.logout()
     accounts.login(email="fan@uw.edu")
     assert "You&#39;re officially a member" in client.get(f"/messages/{_user_id(app, 'captain@uw.edu')}").data.decode()
-    assert "You're a member" in client.get(f"/clubs/{club}").data.decode()
+    assert "✅ Member" in client.get(f"/clubs/{club}").data.decode()
 
 
 def test_all_club_info_is_required(accounts, client):
@@ -1726,7 +1732,7 @@ def test_all_club_info_is_required(accounts, client):
 def test_anyone_can_contact_a_club(accounts, client, app):
     club = _approved_club(accounts, client, app)
     visitor = client.get(f"/clubs/{club}").data.decode()          # logged out
-    assert "Contact the club" in visitor and "spike@uw.edu" in visitor and "@uwspikeball" in visitor
+    assert "📬 Contact" in visitor and "spike@uw.edu" in visitor and "@uwspikeball" in visitor
     accounts.signup(email="question@uw.edu")
     page = client.get(f"/clubs/{club}").data.decode()
     captain = _user_id(app, "captain@uw.edu")
@@ -1767,3 +1773,16 @@ def test_club_socials(accounts, client, app):
     for link in ("https://www.tiktok.com/@uwspike", "https://www.snapchat.com/add/uwspike", "https://x.com/uwspike",
                  "https://www.facebook.com/uwspike", "https://youtube.com/@uwspike", "https://instagram.com/uwspikeball"):
         assert f'href="{link}"' in page, link
+
+
+def test_page_titles_are_clean(accounts, client, app):
+    """No page should leak markup into the browser tab title."""
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    club = _club_id(app)
+    _approve(app, club)
+    for url in ("/", "/clubs", "/clubs/new", f"/clubs/{club}", f"/clubs/{club}/edit", "/events/new", "/need-players",
+                "/news", "/how-it-works", "/create", "/me/events", "/friends", "/messages", "/profile/edit",
+                "/profile/badges", "/clubs/updates"):
+        title = re.search(r"<title>(.*?)</title>", client.get(url).data.decode(), re.S).group(1)
+        assert "<" not in title and ">" not in title, (url, title)
