@@ -18,7 +18,7 @@ def send_email(to, subject, body):
         raise RuntimeError("MAIL_SERVER is not configured, so emails can't be sent.")
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = cfg["MAIL_FROM"]
+    msg["From"] = cfg.get("MAIL_FROM") or f"Sportive Circle <{cfg['MAIL_USERNAME']}>"
     msg["To"] = to
     msg.set_content(body)
     with smtplib.SMTP(cfg["MAIL_SERVER"], cfg["MAIL_PORT"]) as smtp:

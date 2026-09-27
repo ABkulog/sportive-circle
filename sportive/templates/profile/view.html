@@ -14,16 +14,16 @@
       </ul>
     {% endif %}
     {% if user.id == g.user.id %}
-      <a class="locker-link" href="{{ url_for('profile.badge_locker') }}">🏅 Badge locker ({{ earned|length }}) · choose your 3</a>
+      <a class="locker-link" href="{{ url_for('profile.badge_locker') }}">Badge locker ({{ earned|length }}) · choose your 3</a>
     {% endif %}
     <div class="badges">
       {% for s in sports %}<span class="chip">{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</span>{% else %}<span class="muted">No sports picked yet.</span>{% endfor %}
     </div>
     {% if user.id == g.user.id %}
       <div class="profile-actions">
-        <a class="btn btn-ghost" href="{{ url_for('profile.edit') }}">⚙️ Edit profile & settings</a>
+        <a class="btn btn-ghost" href="{{ url_for('profile.edit') }}">Edit profile & settings</a>
         <form method="post" action="{{ url_for('auth.logout') }}">
-          {{ csrf_field() }}<button class="btn btn-ghost">🚪 Log out</button>
+          {{ csrf_field() }}<button class="btn btn-ghost">Log out</button>
         </form>
       </div>
     {% elif relation.i_blocked %}
@@ -31,7 +31,7 @@
         <form method="post" action="{{ url_for('social.unblock', user_id=user.id) }}">
           {{ csrf_field() }}<button class="btn btn-ghost">Unblock</button>
         </form>
-        <a class="btn btn-ghost danger-link" href="{{ url_for('moderation.report', target_type='user', target_id=user.id) }}">🚩 Report</a>
+        <a class="btn btn-ghost danger-link" href="{{ url_for('moderation.report', target_type='user', target_id=user.id) }}">Report</a>
       </div>
     {% elif not relation.blocked_me %}
       <div class="profile-actions">
@@ -50,7 +50,7 @@
           </form>
         {% endif %}
         {% if relation.can_message %}
-          <a class="btn btn-ghost" href="{{ url_for('social.thread', user_id=user.id) }}">✉️ Message</a>
+          <a class="btn btn-ghost" href="{{ url_for('social.thread', user_id=user.id) }}">Message</a>
         {% endif %}
         <details class="more-menu">
           <summary aria-label="More options">⋯</summary>
@@ -75,7 +75,7 @@
 </section>
 
 <section class="card">
-  <h2>🏀 Ranks</h2>
+  <h2>Ranks</h2>
   {% if not user.show_ranks and user.id != g.user.id %}
     <p class="muted">🧘 {{ user.full_name.split()[0] }} is in chill mode, so their ranks are hidden. Just here to play!</p>
   {% elif ranks %}
@@ -119,7 +119,7 @@
 </section>
 
 <section>
-  <h2>Upcoming events hosted</h2>
+  <h2>Hosting</h2>
   <div class="stack">
     {% for e in hosting %}{{ event_card(e) }}{% else %}<p class="muted">Nothing coming up.</p>{% endfor %}
   </div>

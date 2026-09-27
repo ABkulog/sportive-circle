@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Reports{% endblock %}
 {% block content %}
-<h1 class="page-title">🛡️ Reports</h1>
+<h1 class="page-title">Reports</h1>
 <nav class="home-tabs" aria-label="Report status">
   {% for key, label in [('open', 'Open'), ('reviewed', 'Reviewed'), ('dismissed', 'Dismissed')] %}
     <a href="{{ url_for('moderation.admin_reports', status=key) }}" {% if status == key %}class="is-on" aria-current="page"{% endif %}>
@@ -11,7 +11,7 @@
 
 {% if flagged and status == 'open' %}
   <section class="card flagged">
-    <h2>⚠️ Reported by several people</h2>
+    <h2>Reported by several people</h2>
     <ul class="people">
       {% for u in flagged %}
         <li class="post-game-row"><a href="{{ url_for('profile.view', user_id=u.id) }}"><strong>{{ u.full_name }}</strong></a>
@@ -37,7 +37,7 @@
       <div class="detail-actions">
         {% if status == 'open' %}
           <form method="post" action="{{ url_for('moderation.resolve', report_id=r.id, action='reviewed', **{'from': status}) }}">
-            {{ csrf_field() }}<button class="btn btn-small">✅ Mark reviewed</button></form>
+            {{ csrf_field() }}<button class="btn btn-small">Mark reviewed</button></form>
           <form method="post" action="{{ url_for('moderation.resolve', report_id=r.id, action='dismissed', **{'from': status}) }}">
             {{ csrf_field() }}<button class="btn btn-small btn-ghost">Dismiss</button></form>
         {% else %}

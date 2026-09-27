@@ -79,7 +79,7 @@ DEMO_CLUBS = [
     dict(name="Demo Club Ultimate", sport="ultimate", focus="competitive", joining="tryouts", experience="some",
          who_can_join="everyone", dues="$60/quarter", gear="Cleats", competes=1, member_estimate=28,
          meets="Mon, Wed & Fri 6-8 PM", location="Recreation Field 1 (by the IMA)", officer=1,
-         description="A demo competitive team: we travel to college tournaments. Tryouts happen in fall quarter.",
+         description="A demo competitive team: we travel to college tournaments. Tryouts happen in autumn quarter.",
          how_to_join="Come to our open tryout practices during the first two weeks of the quarter.",
          join_question="What position do you play, and where have you played before?",
          club_email="demo-ultimate@example.com", contact_url="https://example.com/demo-ultimate"),
@@ -99,7 +99,7 @@ def add_clubs(db, ids, now):
         cur = db.execute(
             f"""INSERT INTO clubs ({", ".join(club)}, club_kind, verification_url, officer_role, status,
                                    created_by, created_at)
-                VALUES ({", ".join("?" for _ in club)}, 'rso', 'https://huskylink.washington.edu/organization/demo',
+                VALUES ({", ".join("?" for _ in club)}, 'rso', 'https://huskylink.washington.edu/organizations',
                         'President', 'approved', ?, ?)""",
             (*club.values(), officer, to_db(now)))
         for user_id in ids:

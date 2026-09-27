@@ -42,7 +42,7 @@
         <small class="muted" data-max-hint></small></label>
       {% if not club and not (event and event.club_id) %}
       <label class="field" data-tryout-field>
-        <span>🎟️ Tryout spots</span>
+        <span>Tryout spots</span>
         <select name="tryout_spots">
           {% for n in range(0, 4) %}<option value="{{ n }}" {% if form.get('tryout_spots', '0')|string == n|string %}selected{% endif %}>{{ n if n else 'None' }}</option>{% endfor %}
         </select>
@@ -50,7 +50,7 @@
       </label>
       <label class="toggle" data-tryout-field>
         <input type="checkbox" name="allow_plus_ones" value="1" {% if form.get('allow_plus_ones') %}checked{% endif %}>
-        <span>🤝 Let players bring one friend as a +1 <em>(max 2 per game)</em></span>
+        <span>Let players bring one friend as a +1 <em>(max 2 per game)</em></span>
       </label>
       {% endif %}
       <label class="field"><span>Note</span>

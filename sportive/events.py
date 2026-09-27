@@ -185,8 +185,11 @@ def celebrate_progress(user_id):
     elif new:
         flash(f"{len(new)} new badges unlocked: {' '.join(badge.emoji for badge in new)} "
               "Check them out on your profile!", "celebrate")
-    for message in check_rank_ups(user_id, my_ranks()):
-        flash(message, "celebrate")
+    rank_ups = check_rank_ups(user_id, my_ranks())
+    if len(rank_ups) == 1:
+        flash(rank_ups[0], "celebrate")
+    elif rank_ups:
+        flash(f"You ranked up in {len(rank_ups)} sports! 🔥 See your ranks on your profile.", "celebrate")
 
 
 @bp.route("/")
@@ -249,10 +252,10 @@ def feed():
 
     celebrate_progress(g.user["id"])
     from .clubs import suggested_clubs
-    hello, spirit_line = greeting(g.user["full_name"].split()[0], now)
+    hello, _ = greeting(g.user["full_name"].split()[0], now)
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
-                           hello=hello, spirit_line=spirit_line, top_dawgs=top_dawgs(now=now),
+                           hello=hello, top_dawgs=top_dawgs(now=now),
                            club_picks=suggested_clubs(g.user["id"], my_sports))
 
 
@@ -382,7 +385,7 @@ def club_for_new_event(club_id):
 def edit(event_id):
     event = get_event(event_id, host_only=True)
     if event["cancelled"]:
-        flash("This event was cancelled, so it can't be edited.", "error")
+        flash("This event was canceled, so it can't be edited.", "error")
         return redirect(url_for("events.detail", event_id=event_id))
     if request.method == "POST":
         form = request.form
@@ -423,7 +426,7 @@ def cancel(event_id):
     db = get_db()
     db.execute("UPDATE events SET cancelled = 1 WHERE id = ?", (event_id,))
     db.commit()
-    flash("Event cancelled. People who joined will see it as cancelled.", "info")
+    flash("Event canceled. Everyone who joined will see it's canceled.", "info")
     return redirect(url_for("events.my_events"))
 
 
@@ -582,7 +585,7 @@ def cancel_plus_one(event_id):
                   AND guest_id NOT IN (SELECT user_id FROM rsvps WHERE event_id = ?)""",
                (event_id, g.user["id"], event_id))
     db.commit()
-    flash("+1 invite cancelled.", "info")
+    flash("+1 invite canceled.", "info")
     return redirect(url_for("events.detail", event_id=event_id) + "#plus-one")
 
 
@@ -612,7 +615,7 @@ def vouch(event_id, user_id):
 def join(event_id):
     event = get_event(event_id)
     if event["cancelled"]:
-        flash("This event was cancelled.", "error")
+        flash("This event was canceled.", "error")
     elif from_db(event["ends_at"]) < now_local():
         flash("This event already ended.", "error")
     elif event["i_am_going"]:

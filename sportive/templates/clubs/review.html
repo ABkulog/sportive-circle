@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Club requests{% endblock %}
 {% block content %}
-<h1 class="page-title">🏛️ Club requests</h1>
+<h1 class="page-title">Club requests</h1>
 <p class="muted">Check each club's official page: is it a real UW club, active this quarter, and is the applicant listed
   as an officer (or can you confirm it another way)?</p>
 <nav class="home-tabs" aria-label="Status">
@@ -27,7 +27,7 @@
       {% if status != 'approved' %}
         <div class="review-actions">
           <form method="post" action="{{ url_for('clubs.review', club_id=c.id, decision='approve') }}">
-            {{ csrf_field() }}<button class="btn">✅ Approve</button></form>
+            {{ csrf_field() }}<button class="btn">Approve</button></form>
           <form method="post" action="{{ url_for('clubs.review', club_id=c.id, decision='reject') }}" class="reject-form">
             {{ csrf_field() }}
             <input name="note" maxlength="500" placeholder="What should they fix? (required)" aria-label="Reason">

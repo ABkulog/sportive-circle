@@ -171,7 +171,7 @@ def level_allowed(ranks, sport, skill_level):
         return True, None
     current = ranks[sport].name if sport in ranks else "Casual 1"
     return False, (f"For players who've reached {needed} in {SPORTS[sport]}. You're {current}: "
-                   f"keep playing and get vouched to rank up! 🐺")
+                   f"keep playing and get vouched to rank up.")
 
 
 def my_tier_map():

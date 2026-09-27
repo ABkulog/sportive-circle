@@ -202,13 +202,28 @@ def what_you_would_lose(user_id):
     }
 
 
+def clubs_only_i_lead(user_id):
+    """Clubs where this person is the only officer (they'd be left without a leader)."""
+    return get_db().execute(
+        """SELECT c.id, c.name FROM clubs c JOIN club_members m ON m.club_id = c.id
+           WHERE m.user_id = ? AND m.role = 'officer'
+             AND (SELECT COUNT(*) FROM club_members o WHERE o.club_id = c.id AND o.role = 'officer') = 1""",
+        (user_id,)).fetchall()
+
+
 @bp.route("/profile/delete", methods=("GET", "POST"))
 @login_required
 def delete_account():
     """Step 1 (GET): an "Are you sure?" page showing what you'd lose.
     Step 2 (POST): delete, only with your password AND the word DELETE typed in."""
+    sole_officer = clubs_only_i_lead(g.user["id"])
     if request.method == "GET":
-        return render_template("profile/delete.html", lose=what_you_would_lose(g.user["id"]), word=CONFIRM_WORD)
+        return render_template("profile/delete.html", lose=what_you_would_lose(g.user["id"]), word=CONFIRM_WORD,
+                               sole_officer=sole_officer)
+    if sole_officer:
+        flash(f"You're the only officer of {sole_officer[0]['name']}. Make someone else an officer first, "
+              "so the club isn't left without a leader.", "error")
+        return redirect(url_for("profile.delete_account"))
     if request.form.get("confirm", "").strip().upper() != CONFIRM_WORD:
         flash(f"Type {CONFIRM_WORD} in the box to confirm. Your account was not deleted.", "error")
         return redirect(url_for("profile.delete_account"))

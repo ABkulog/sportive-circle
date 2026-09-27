@@ -18,7 +18,8 @@ def create_app(test_config=None):
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("SECRET_KEY", DEV_SECRET_KEY),
         DATABASE=os.path.join(app.instance_path, "sportive_circle.db"),
-        ALLOWED_EMAIL_DOMAIN="uw.edu",
+        # UW email addresses: @uw.edu is standard; older accounts may still use @u.washington.edu.
+        ALLOWED_EMAIL_DOMAINS=("uw.edu", "u.washington.edu"),
         CSRF_ENABLED=True,
         # PBKDF2 works on every Python build (scrypt is missing on macOS's system Python).
         PASSWORD_HASH_METHOD="pbkdf2:sha256:600000",
@@ -34,7 +35,7 @@ def create_app(test_config=None):
         PUBLIC_URL=os.environ.get("PUBLIC_URL", "http://localhost:5050"),
         # Who can see and handle reports (comma-separated emails), e.g. "you@uw.edu".
         ADMIN_EMAILS=os.environ.get("ADMIN_EMAILS", ""),
-        MAIL_FROM=os.environ.get("MAIL_FROM", "Sportive Circle <no-reply@sportivecircle.app>"),
+        MAIL_FROM=os.environ.get("MAIL_FROM"),  # defaults to MAIL_USERNAME (never a domain we don't own)
     )
     if test_config:
         app.config.update(test_config)

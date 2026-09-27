@@ -6,12 +6,12 @@
 <header class="chat-header">
   <span class="event-emoji" aria-hidden="true">{{ SPORT_EMOJI[event.sport] }}</span>
   <div>
-    <h1>💬 {{ event_title(event) if event.is_quick else event.title }}</h1>
+    <h1>{{ event_title(event) if event.is_quick else event.title }}</h1>
     <p class="muted">{{ when }} · 📍 {{ event.location }} · {{ people }} going</p>
   </div>
 </header>
 {{ chat_box(messages, poll_url, url_for('social.event_chat', event_id=event.id), not event.cancelled,
             "Message the group…", "No messages yet. Ask a question or say hi to the squad! 👋") }}
-{% if event.cancelled %}<p class="muted">This event was cancelled, so the chat is closed.</p>{% endif %}
+{% if event.cancelled %}<p class="muted">This event was canceled, so the chat is closed.</p>{% endif %}
 {% endblock %}
 {% block body_class %}hide-tabs{% endblock %}

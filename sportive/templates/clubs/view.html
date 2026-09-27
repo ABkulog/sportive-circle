@@ -29,14 +29,14 @@
      onclick="this.classList.toggle('is-open')">{{ club.description }}</p>
 
   <div class="club-actions" id="join">
-    {% set cta = {'tryouts': '🎟️ Sign up for tryouts', 'application': '📝 Apply to join'}.get(club.joining, '🙋 Request to join') %}
+    {% set cta = {'tryouts': 'Sign up for tryouts', 'application': 'Apply to join'}.get(club.joining, 'Request to join') %}
     {% if not g.user %}
       <a class="btn btn-block" href="{{ url_for('auth.signup', next=request.path) }}">Sign up to join</a>
     {% elif club.status != 'approved' %}
       {% if role == 'officer' %}<a class="btn btn-ghost btn-block" href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit application</a>{% endif %}
     {% elif role in ('member', 'officer') %}
       <div class="action-pair">
-        <span class="btn btn-ghost is-static">✅ {{ 'Officer' if role == 'officer' else 'Member' }}</span>
+        <span class="btn btn-ghost is-static">{{ 'Officer' if role == 'officer' else 'Member' }}</span>
         {% if role == 'officer' %}
           <a class="btn" href="{{ url_for('events.create', club=club.id) }}">+ Club event</a>
         {% endif %}
@@ -61,11 +61,11 @@
         </details>
         {% if role == 'follower' %}
           <form method="post" action="{{ url_for('clubs.leave', club_id=club.id) }}">
-            {{ csrf_field() }}<button class="btn btn-ghost">⭐ Following</button>
+            {{ csrf_field() }}<button class="btn btn-ghost">Following</button>
           </form>
         {% else %}
           <form method="post" action="{{ url_for('clubs.follow', club_id=club.id) }}">
-            {{ csrf_field() }}<button class="btn btn-ghost">⭐ Follow</button>
+            {{ csrf_field() }}<button class="btn btn-ghost">Follow</button>
           </form>
         {% endif %}
       </div>
@@ -100,7 +100,7 @@
       </ul>
     {% endif %}
 
-    <h2 class="section-title" id="contact">📬 Contact</h2>
+    <h2 class="section-title" id="contact">Contact</h2>
     <ul class="contact-list">
       {% if club.club_email %}<li><span aria-hidden="true">✉️</span> <a href="mailto:{{ club.club_email }}">{{ club.club_email }}</a></li>{% endif %}
       {% for label, emoji, url, shown in socials %}
@@ -180,7 +180,7 @@
   <section class="tab-panel" data-tab-panel="members" id="members" role="tabpanel">
     {% if role == 'officer' %}
       <div class="requests-card" id="requests">
-        <h2 class="section-title">📥 Join requests ({{ requests|length }})</h2>
+        <h2 class="section-title">Join requests ({{ requests|length }})</h2>
         <ul class="people">
           {% for r in requests %}
             <li class="request-row">
@@ -191,7 +191,7 @@
               {% if r.message %}<p class="request-answer"><small class="muted">{{ club.join_question or 'Their message' }}</small><br>{{ r.message }}</p>{% endif %}
               <div class="post-game-actions">
                 <form method="post" action="{{ url_for('clubs.decide', club_id=club.id, user_id=r.id, decision='approve') }}">
-                  {{ csrf_field() }}<button class="btn btn-small">{{ '✅ Made the team' if r.role == 'tryout' else '✅ Confirm member' }}</button></form>
+                  {{ csrf_field() }}<button class="btn btn-small">{{ 'Made the team' if r.role == 'tryout' else 'Confirm member' }}</button></form>
                 <form method="post" action="{{ url_for('clubs.decide', club_id=club.id, user_id=r.id, decision='decline') }}">
                   {{ csrf_field() }}<button class="btn btn-small btn-ghost">{{ 'Not this time' if r.role == 'tryout' else 'Decline' }}</button></form>
                 <a class="btn btn-small btn-ghost" href="{{ url_for('social.thread', user_id=r.id) }}">Message</a>
@@ -203,13 +203,13 @@
         </ul>
       </div>
     {% endif %}
-    <h2 class="section-title">👥 Members ({{ club.member_count }})</h2>
+    <h2 class="section-title">Members ({{ club.member_count }})</h2>
     {% if g.user %}
       <ul class="people">
         {% for m in members %}
           <li class="post-game-row">
             <a class="person" href="{{ url_for('profile.view', user_id=m.id) }}">{{ avatar(m.id, m.full_name, m.avatar_updated, 32) }}{{ m.full_name }}</a>
-            {% if m.role == 'officer' %}<span class="badge badge-purple">🎖️ Officer</span>
+            {% if m.role == 'officer' %}<span class="badge badge-purple">Officer</span>
             {% elif role == 'officer' %}
               <details class="more-menu">
                 <summary aria-label="Options for {{ m.full_name }}">⋯</summary>

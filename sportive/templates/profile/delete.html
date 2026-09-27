@@ -20,7 +20,12 @@
     {% endif %}
   </ul>
 
-  <a class="btn btn-large btn-block" href="{{ url_for('profile.view', user_id=g.user.id) }}">No, keep my account 💜</a>
+  {% if sole_officer %}
+    <p class="flash flash-error">You're the only officer of
+      {% for c in sole_officer %}<a href="{{ url_for('clubs.view', club_id=c.id) }}#members">{{ c.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
+      Make another member an officer first (Members tab → ⋯), so the club isn't left without a leader.</p>
+  {% endif %}
+  <a class="btn btn-large btn-block" href="{{ url_for('profile.view', user_id=g.user.id) }}">No, keep my account</a>
 
   <details class="delete-confirm">
     <summary>I understand, continue to delete</summary>

@@ -456,7 +456,7 @@ def leave(club_id):
     elif role is not None:
         db.execute("DELETE FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, g.user["id"]))
         db.commit()
-        flash({"follower": "Unfollowed.", "requested": "Request cancelled.", "tryout": "Tryout sign-up cancelled."}
+        flash({"follower": "Unfollowed.", "requested": "Request canceled.", "tryout": "Tryout sign-up canceled."}
               .get(role, "You left the club."), "info")
     return redirect(url_for("clubs.view", club_id=club_id))
 

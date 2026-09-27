@@ -5,7 +5,7 @@
 {% macro person_row(p, extra="") %}
   <a class="person" href="{{ url_for('profile.view', user_id=p.id) }}">{{ avatar(p.id, p.full_name, p.avatar_updated, 40) }}<span><strong>{{ p.full_name }}</strong>{% if extra %}<small class="muted person-extra">{{ extra }}</small>{% endif %}</span></a>
 {% endmacro %}
-<h1 class="page-title">👥 Friends</h1>
+<h1 class="page-title">Friends</h1>
 
 {% if incoming %}
   <section class="card">
@@ -28,7 +28,7 @@
   <ul class="people">
     {% for p in friends %}
       <li class="post-game-row">{{ person_row(p) }}
-        <a class="btn btn-small btn-ghost" href="{{ url_for('social.thread', user_id=p.id) }}">✉️ Message</a>
+        <a class="btn btn-small btn-ghost" href="{{ url_for('social.thread', user_id=p.id) }}">Message</a>
       </li>
     {% else %}
       <li class="muted">No friends yet. Add people you've played with! 🐾</li>

@@ -1,3 +1,4 @@
+{% macro icon(name) %}<svg class="icon" aria-hidden="true"><use href="#i-{{ name }}"/></svg>{% endmacro %}
 {% macro clubs_tabs(active) %}
   <nav class="home-tabs" aria-label="Clubs">
     <a href="{{ url_for('clubs.directory') }}" {% if active == 'find' %}class="is-on" aria-current="page"{% endif %}>Find clubs</a>
@@ -46,11 +47,11 @@
       <div class="event-meta">
         {{ e.starts_at|when }} <span class="dot">·</span> <span class="rel">{{ e.starts_at|relative }}</span>
       </div>
-      <div class="event-meta">📍 {{ e.location }}</div>
+      <div class="event-meta">{{ e.location }}</div>
       <div class="badges">
         {% if e.club_name %}<span class="badge badge-club">🏛️ {{ e.club_name }}</span>{% endif %}
         {% if e.skill_level in ('Intermediate', 'Competitive') %}<span class="badge badge-level">{{ e.skill_level }}</span>{% endif %}
-        {% if e.cancelled %}<span class="badge badge-danger">Cancelled</span>
+        {% if e.cancelled %}<span class="badge badge-danger">Canceled</span>
         {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Hosting</span>
         {% elif e.i_am_going %}<span class="badge badge-success">You're going</span>
         {% elif left == 0 %}<span class="badge badge-muted">Full</span>
@@ -63,7 +64,7 @@
       {% if e.i_am_going and not e.cancelled %}
         {% set unread = chat_unread().get(e.id, 0) %}
         <a class="card-chat" href="{{ url_for('social.event_chat', event_id=e.id) }}"
-           aria-label="Group chat{% if unread %}, {{ unread }} new{% endif %}">💬{% if unread %}<span class="count-dot">{{ unread }}</span>{% endif %}</a>
+           aria-label="Group chat{% if unread %}, {{ unread }} new{% endif %}">{{ icon('chat') }}{% if unread %}<span class="count-dot">{{ unread }}</span>{% endif %}</a>
       {% endif %}
       <div class="event-count">
         <strong>{{ e.going_count + e.extra_players }}</strong>{% if e.max_players %}/{{ e.max_players }}{% endif %}
@@ -75,7 +76,7 @@
           {{ csrf_field() }}
           <input type="hidden" name="next" value="{{ request.full_path }}">
           <button class="btn btn-small {% if way_in in ('tryout', 'plus_one') %}btn-gold{% endif %}"
-                  aria-label="Join {{ event_title(e) }}">{{ '🎟️ Try out' if way_in == 'tryout' else ('🤝 Join as +1' if way_in == 'plus_one' else 'Join') }}</button>
+                  aria-label="Join {{ event_title(e) }}">{{ 'Try out' if way_in == 'tryout' else ('Join as +1' if way_in == 'plus_one' else 'Join') }}</button>
         </form>
       {% endif %}
     </div>

@@ -30,7 +30,16 @@ def test_landing_page_for_visitors(client):
 
 def test_signup_requires_uw_email(accounts, client):
     response = accounts.signup(email="someone@gmail.com", verify=False)
-    assert b"Please use your @uw.edu email." in response.data
+    assert b"Please use your UW email address" in response.data
+
+
+def test_older_uw_addresses_work(accounts, client, app):
+    accounts.signup(email="husky@u.washington.edu", verify=False)
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM users WHERE email = 'husky@u.washington.edu'").fetchone()[0] == 1
+    assert b"Please use your UW email" in client.post("/signup", data={
+        "full_name": "X", "email": "x@washington.edu.evil.com", "password": "longenough1",
+        "password2": "longenough1", "birth_date": "2005-01-01"}).data
 
 
 def test_signup_rejects_mismatched_passwords(client):
@@ -801,7 +810,7 @@ def test_celebration_and_footer(accounts, client):
     response = client.post("/events/new", data=event_form(), follow_redirects=True).data
     assert b"flash-celebrate" in response and b"Go Dawgs" in response
     assert b"Made by Huskies, for Huskies" in response
-    assert b"Not an official University of Washington service" in response
+    assert b"not an official University of Washington service" in response
 
 
 # ------------------------------------------------------------ ranks & badges
@@ -1210,7 +1219,7 @@ def test_tryout_spots(accounts, client, app):
     accounts.logout()
     accounts.signup(email="newbie@uw.edu")
     feed = client.get("/?scope=all").data.decode()
-    assert "🎟️ 1 tryout spot" in feed and "🎟️ Try out" in feed
+    assert "🎟️ 1 tryout spot" in feed and ">Try out<" in feed.replace("\n", "").replace("  ", "")
     page = client.post(f"/events/{event_id}/join", follow_redirects=True).data.decode()
     assert "You&#39;re in as a tryout" in page and "🎟️ Tryout</span>" in page
     accounts.logout()
@@ -1308,7 +1317,7 @@ def test_bring_a_friend_to_a_competitive_game(accounts, client, app):
     accounts.logout()
     accounts.login(email="buddy@uw.edu")
     assert "invited you as my +1" in client.get(f"/messages/{pro}").data.decode()      # got a DM
-    assert "🤝 Join as +1" in client.get("/?scope=all").data.decode()                   # card shows the way in
+    assert "Join as +1" in client.get("/?scope=all").data.decode()                   # card shows the way in
     joined = client.post(f"/events/{event_id}/join", follow_redirects=True).data.decode()
     assert "You&#39;re in as Pat&#39;s +1" in joined and "🤝 Pat's +1" in joined
     with app.app_context():
@@ -1440,8 +1449,8 @@ def test_club_events_are_all_levels(accounts, client, app):
 def test_same_sections_everywhere(accounts, client):
     accounts.signup()
     page = client.get("/").data.decode()
-    for label in ("Home", "Clubs", "Create", "News", "Me", "Messages", "Friends", "How it works"):
-        assert f'<span class="tab-label">{label}' in page, label
+    for label in ("Home", "Clubs", "Create", "News", "Profile", "Messages", "Friends", "How it works"):
+        assert f'<span class="tab-label">{label}<' in page, label
     assert 'class="tab  is-active" href="/" aria-current="page"' in page     # Home is highlighted
     assert 'aria-label="How it works"' in page                              # ❓ in the top bar too
     assert "For you" in page and "My events" in page                        # Home tabs
@@ -1551,7 +1560,7 @@ def test_admin_reports_page(accounts, client, app):
     accounts.signup(email="admin@uw.edu")
     page = client.get("/admin/reports").data.decode()
     assert "Reported by several people" in page and "Bad Actor" in page and "3 different people" in page
-    assert "🛡️" in page and "Threats or violence" in page
+    assert 'aria-label="Reports' in page and "Threats or violence" in page
     with app.app_context():
         report_id = get_db().execute("SELECT id FROM reports").fetchone()[0]
     client.post(f"/admin/reports/{report_id}/reviewed")
@@ -1672,7 +1681,7 @@ def test_follow_is_not_membership(accounts, client, app):
     client.post(f"/clubs/{club}/follow")
     page = client.get(f"/clubs/{club}").data.decode()
     stats = re.findall(r"<strong>(\d+)</strong><span>(\w+)</span>", page)
-    assert "⭐ Following" in page and ("1", "member") in stats and ("1", "following") in stats   # captain only
+    assert ">Following<" in page and ("1", "member") in stats and ("1", "following") in stats   # captain only
 
 
 def test_tryouts_flow_with_messages(accounts, client, app):
@@ -1715,7 +1724,7 @@ def test_confirmed_member_gets_welcome_message(accounts, client, app):
     accounts.logout()
     accounts.login(email="fan@uw.edu")
     assert "You&#39;re officially a member" in client.get(f"/messages/{_user_id(app, 'captain@uw.edu')}").data.decode()
-    assert "✅ Member" in client.get(f"/clubs/{club}").data.decode()
+    assert ">Member</span>" in client.get(f"/clubs/{club}").data.decode()
 
 
 def test_all_club_info_is_required(accounts, client):
@@ -1732,7 +1741,7 @@ def test_all_club_info_is_required(accounts, client):
 def test_anyone_can_contact_a_club(accounts, client, app):
     club = _approved_club(accounts, client, app)
     visitor = client.get(f"/clubs/{club}").data.decode()          # logged out
-    assert "📬 Contact" in visitor and "spike@uw.edu" in visitor and "@uwspikeball" in visitor
+    assert 'id="contact">Contact' in visitor and "spike@uw.edu" in visitor and "@uwspikeball" in visitor
     accounts.signup(email="question@uw.edu")
     page = client.get(f"/clubs/{club}").data.decode()
     captain = _user_id(app, "captain@uw.edu")
@@ -1786,3 +1795,30 @@ def test_page_titles_are_clean(accounts, client, app):
                 "/profile/badges", "/clubs/updates"):
         title = re.search(r"<title>(.*?)</title>", client.get(url).data.decode(), re.S).group(1)
         assert "<" not in title and ">" not in title, (url, title)
+
+
+def test_need_players_chat_opens(accounts, client):
+    """Regression: the chat of a quick "Need players" post used to crash (it needs live player counts)."""
+    accounts.signup()
+    response = client.post("/need-players", data={
+        "sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
+        "starts_in": "15", "duration": "60", "have": "8", "needed": "2"})
+    event_id = event_id_from(response)
+    page = client.get(f"/events/{event_id}/chat")
+    assert page.status_code == 200 and b"Need 2 more for Soccer" in page.data
+
+
+def test_only_officer_cant_delete_account(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.login(email="captain@uw.edu")
+    assert "the only officer" in client.get("/profile/delete").data.decode()
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM users WHERE email = 'captain@uw.edu'").fetchone()[0] == 1
+
+
+def test_signup_cant_flood_an_inbox(accounts, client):
+    accounts.signup(email="target@uw.edu", verify=False)
+    client.post("/logout")
+    again = accounts.signup(email="target@uw.edu", verify=False).data
+    assert b"We just sent a code to that email" in again

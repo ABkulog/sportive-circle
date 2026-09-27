@@ -2,7 +2,7 @@
 {% from "_macros.html" import avatar %}
 {% block title %}Messages{% endblock %}
 {% block content %}
-<h1 class="page-title">✉️ Messages</h1>
+<h1 class="page-title">Messages</h1>
 <div class="stack">
   {% for c in conversations %}
     <a class="card convo {% if c.unread %}is-unread{% endif %}" href="{{ url_for('social.thread', user_id=c.id) }}">

@@ -13,7 +13,7 @@
 {% endmacro %}
 {% block content %}
 <div class="card form-card club-form">
-  <h1>{{ 'Edit club' if club else '🏛️ Register your club' }}</h1>
+  <h1>{{ 'Edit club' if club else 'Register your club' }}</h1>
   {% if not club %}
     <p class="muted">For active UW clubs. We verify each one (usually within 2 days) and email you when it's live.</p>
   {% endif %}

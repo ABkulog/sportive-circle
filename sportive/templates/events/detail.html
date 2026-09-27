@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import avatar %}
+{% from "_macros.html" import avatar, icon %}
 {% block title %}{{ event_title(event) }}{% endblock %}
 {% set place = place_map(event.location) %}
 {% block head %}
@@ -26,7 +26,7 @@
         <span class="badge">{{ event.skill_level }}</span>
         {% if event.is_quick %}<span class="badge badge-gold">Need players</span>{% endif %}
         {% if event.club_id %}<a class="badge badge-club" href="{{ url_for('clubs.view', club_id=event.club_id) }}">🏛️ {{ event.club_name }}</a>{% endif %}
-        {% if event.cancelled %}<span class="badge badge-danger">Cancelled</span>{% elif ended %}<span class="badge badge-muted">Ended</span>{% endif %}
+        {% if event.cancelled %}<span class="badge badge-danger">Canceled</span>{% elif ended %}<span class="badge badge-muted">Ended</span>{% endif %}
       </div>
     </div>
   </div>
@@ -36,7 +36,7 @@
       {{ event.starts_at|when }} – {% if same_day(event.starts_at, event.ends_at) %}{{ event.ends_at|clock }}{% else %}{{ event.ends_at|when }}{% endif %}
       {% if not ended and not event.cancelled %}<span class="rel">({{ event.starts_at|relative }})</span>{% endif %}
     </dd></div>
-    <div><dt>Where</dt><dd>📍 {{ event.location }}</dd></div>
+    <div><dt>Where</dt><dd>{{ event.location }}</dd></div>
     <div><dt>Host</dt><dd><a class="person" href="{{ url_for('profile.view', user_id=event.host_id) }}">{{ avatar(event.host_id, event.host_name, event.host_avatar, 28) }}{{ event.host_name }}</a></dd></div>
     <div><dt>Players</dt><dd>
       {{ event.going_count + event.extra_players }} going{% if event.max_players %} of {{ event.max_players }}
@@ -57,16 +57,16 @@
         <button class="btn btn-large btn-block" disabled>Full</button>
       {% elif my_invite %}
         <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
-          {{ csrf_field() }}<button class="btn btn-gold btn-large btn-block">🤝 Join as {{ my_invite.full_name.split()[0] }}'s +1</button>
+          {{ csrf_field() }}<button class="btn btn-gold btn-large btn-block">Join as {{ my_invite.full_name.split()[0] }}'s +1</button>
         </form>
         <p class="hint">{{ my_invite.full_name.split()[0] }} is bringing you to this {{ event.skill_level }} game.</p>
       {% elif tryout %}
         <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
-          {{ csrf_field() }}<button class="btn btn-gold btn-large btn-block">🎟️ Try out</button>
+          {{ csrf_field() }}<button class="btn btn-gold btn-large btn-block">Try out</button>
         </form>
         <p class="hint">A tryout spot for players still ranking up. Play well, then ask for vouches.</p>
       {% elif not level_ok %}
-        <button class="btn btn-large btn-block" disabled>🔒 {{ event.skill_level }}+ only</button>
+        <button class="btn btn-large btn-block" disabled>{{ event.skill_level }}+ only</button>
         <p class="hint">{{ level_reason }}</p>
       {% else %}
         <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
@@ -80,20 +80,20 @@
       {% if event.i_am_going %}
         {% set unread = chat_unread().get(event.id, 0) %}
         <a class="icon-action" href="{{ url_for('social.event_chat', event_id=event.id) }}">
-          <span aria-hidden="true">💬{% if unread %}<span class="count-dot">{{ unread }}</span>{% endif %}</span>Chat</a>
+          <span>{{ icon('chat') }}{% if unread %}<span class="count-dot">{{ unread }}</span>{% endif %}</span>Chat</a>
       {% endif %}
       {% if place %}
-        <a class="icon-action" href="{{ place.google }}" target="_blank" rel="noopener"><span aria-hidden="true">🧭</span>Directions</a>
+        <a class="icon-action" href="{{ place.google }}" target="_blank" rel="noopener"><span>{{ icon('directions') }}</span>Directions</a>
       {% endif %}
       <button type="button" class="icon-action" id="share-button"
               data-title="{{ event_title(event) }}" data-url="{{ url_for('events.detail', event_id=event.id, _external=True) }}">
-        <span aria-hidden="true">🔗</span>Share</button>
-      <a class="icon-action" href="{{ url_for('events.calendar_file', event_id=event.id) }}"><span aria-hidden="true">📅</span>Calendar</a>
+        <span>{{ icon('share') }}</span>Share</button>
+      <a class="icon-action" href="{{ url_for('events.calendar_file', event_id=event.id) }}"><span>{{ icon('calendar') }}</span>Calendar</a>
       {% if is_host %}
-        <a class="icon-action" href="{{ url_for('events.edit', event_id=event.id) }}"><span aria-hidden="true">✏️</span>Edit</a>
+        <a class="icon-action" href="{{ url_for('events.edit', event_id=event.id) }}"><span>{{ icon('edit') }}</span>Edit</a>
       {% elif event.i_am_going %}
         <form method="post" action="{{ url_for('events.leave', event_id=event.id) }}" class="icon-action-form">
-          {{ csrf_field() }}<button class="icon-action"><span aria-hidden="true">👋</span>Leave</button>
+          {{ csrf_field() }}<button class="icon-action"><span>{{ icon('logout') }}</span>Leave</button>
         </form>
       {% endif %}
     </nav>
@@ -101,12 +101,12 @@
     {# 3. The map, one tap away #}
     {% if place and place.lat %}
       <details class="map-details">
-        <summary>🗺️ Map <span class="muted">· {{ place.name }}</span></summary>
+        <summary><span>Map <span class="muted">· {{ place.name }}</span></span></summary>
         <div class="map-card">
           <div id="event-map" class="event-map" role="img" aria-label="Map showing {{ place.name }}"
                data-lat="{{ place.lat }}" data-lng="{{ place.lng }}" data-name="{{ place.name }}"></div>
           <div class="map-actions">
-            <button type="button" class="btn btn-small btn-ghost" id="locate-me">📍 Where am I?</button>
+            <button type="button" class="btn btn-small btn-ghost" id="locate-me">Where am I?</button>
             <a class="btn btn-small btn-ghost" href="{{ place.apple }}" target="_blank" rel="noopener">Apple Maps</a>
           </div>
           <p class="muted map-status" id="map-status" aria-live="polite"></p>
@@ -167,7 +167,7 @@
           <li class="post-game-row">
             <span class="person">{{ avatar(f.id, f.full_name, f.avatar_updated, 32) }}{{ f.full_name }}</span>
             <form method="post" action="{{ url_for('events.invite_plus_one', event_id=event.id, friend_id=f.id) }}">
-              {{ csrf_field() }}<button class="btn btn-small">🤝 Invite as +1</button>
+              {{ csrf_field() }}<button class="btn btn-small">Invite as +1</button>
             </form>
           </li>
         {% else %}
@@ -180,7 +180,7 @@
 
 {% if post_game %}
   <section class="card post-game" id="post-game">
-    <h2>🏁 GG! How was the game?</h2>
+    <h2>GG! How was the game?</h2>
     <p class="muted">Give your teammates some love. It helps them rank up in {{ SPORTS[event.sport] }}.
       <strong>🤝 Props</strong> = good teammate. <strong>⬆️ Vouch</strong> = ready for the next level.</p>
     <ul class="people">
@@ -192,14 +192,14 @@
               <span class="done-pill">🤝 Props sent</span>
             {% else %}
               <form method="post" action="{{ url_for('events.give_props', event_id=event.id, user_id=person.id) }}">
-                {{ csrf_field() }}<button class="btn btn-small">🤝 Props</button>
+                {{ csrf_field() }}<button class="btn btn-small">Props</button>
               </form>
             {% endif %}
             {% if person.id in vouched %}
               <span class="done-pill">⬆️ Vouched</span>
             {% else %}
               <form method="post" action="{{ url_for('events.vouch', event_id=event.id, user_id=person.id) }}">
-                {{ csrf_field() }}<button class="btn btn-small btn-ghost">⬆️ Vouch</button>
+                {{ csrf_field() }}<button class="btn btn-small btn-ghost">Vouch</button>
               </form>
             {% endif %}
           </span>

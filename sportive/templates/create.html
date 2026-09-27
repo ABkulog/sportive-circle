@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Create{% endblock %}
 {% block content %}
-<h1 class="page-title">➕ Create</h1>
+<h1 class="page-title">Create</h1>
 <p class="muted">What do you want to start?</p>
 <div class="create-grid">
   <a class="card create-option create-gold" href="{{ url_for('events.quick') }}">
@@ -22,7 +22,7 @@
 </div>
 {% if officer_clubs %}
   <section class="card">
-    <h2>📅 Event for your club</h2>
+    <h2>Event for your club</h2>
     <ul class="people">
       {% for c in officer_clubs %}
         <li class="post-game-row">

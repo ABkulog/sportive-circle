@@ -126,13 +126,13 @@ def start_verification(email):
 # ----------------------------------------------------------------- sign up
 
 def validate_signup(full_name, email, password, password2, grad_year, birth_date):
-    domain = current_app.config["ALLOWED_EMAIL_DOMAIN"]
+    domains = current_app.config["ALLOWED_EMAIL_DOMAINS"]
     if not full_name:
         return "Full name cannot be empty."
     if not email:
         return "Email cannot be empty."
-    if email.count("@") != 1 or not email.endswith("@" + domain) or email.startswith("@"):
-        return f"Please use your @{domain} email."
+    if email.count("@") != 1 or email.startswith("@") or email.split("@")[1] not in domains:
+        return "Please use your UW email address (ending in @uw.edu)."
     if len(password) < MIN_PASSWORD_LENGTH:
         return f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
     if password != password2:
@@ -168,6 +168,11 @@ def signup():
         sports = [s for s in form.getlist("sports") if s in SPORTS]
 
         error = validate_signup(full_name, email, password, password2, grad_year, birth_date)
+        if error is None:
+            recent = get_db().execute("SELECT verify_sent_at FROM users WHERE email = ? AND verified = 0",
+                                      (email,)).fetchone()
+            if recent and recent["verify_sent_at"] and now_local() < from_db(recent["verify_sent_at"]) + RESEND_COOLDOWN:
+                error = "We just sent a code to that email. Check your inbox, or wait a minute and try again."
         if error is None:
             db = get_db()
             # An unverified account never proved it owns the email, so it can be replaced.

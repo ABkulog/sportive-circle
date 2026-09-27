@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% from "_macros.html" import event_card, avatar, home_tabs %}
-{% block title %}Feed{% endblock %}
+{% from "_macros.html" import event_card, avatar, home_tabs, icon %}
+{% block title %}Home{% endblock %}
 {% block content %}
 {{ home_tabs('feed') }}
 <aside class="welcome-help" id="welcome-help" hidden>
   <span>👋 New here? <a href="{{ url_for('how_it_works') }}">See how Sportive Circle works</a> in 1 minute.</span>
-  <button type="button" class="link-button" aria-label="Dismiss" id="welcome-help-close">✕</button>
+  <button type="button" class="link-button" aria-label="Dismiss" id="welcome-help-close">{{ icon('x') }}</button>
 </aside>
 <script>
   // First-visit help banner (hidden again once dismissed on this device).
@@ -22,7 +22,6 @@
 </script>
 <header class="feed-hello compact">
   <h1 class="page-title">{{ hello }}</h1>
-  <p class="spirit-line">{{ spirit_line }}</p>
 </header>
 
 {# "Now" row, like Instagram Stories: what's happening soon, one swipe away. #}
@@ -52,7 +51,7 @@
     <label><input type="radio" name="scope" value="all" {% if filters.scope == 'all' %}checked{% endif %} onchange="this.form.submit()"><span>All</span></label>
   </div>
   <details class="filter-more" {% if active_filters %}open{% endif %}>
-    <summary class="chip">⚙️ Filters{% if active_filters %} · {{ active_filters }}{% endif %}</summary>
+    <summary class="chip">{{ icon('sliders') }}Filters{% if active_filters %} · {{ active_filters }}{% endif %}</summary>
     <div class="filter-row">
       <select name="sport" aria-label="Sport" onchange="this.form.submit()">
         <option value="">Any sport</option>
@@ -96,7 +95,7 @@
 
 {% if club_picks %}
   <section class="club-picks">
-    <h2 class="section-title">🏛️ Clubs for you</h2>
+    <h2 class="section-title">Clubs for you</h2>
     <div class="club-strip">
       {% for c in club_picks %}
         <a class="card club-card mini" href="{{ url_for('clubs.view', club_id=c.id) }}">
@@ -111,7 +110,7 @@
 
 {% if top_dawgs %}
   <section class="card top-dawgs">
-    <h2 class="section-title">🏆 Top Dawgs this month</h2>
+    <h2 class="section-title">Top Dawgs this month</h2>
     <ol>
       {% for dawg in top_dawgs %}
         <li>

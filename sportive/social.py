@@ -340,14 +340,11 @@ def thread_poll(user_id):
 # -------------------------------------------------------------- event chat
 
 def _event_for_chat(event_id):
-    """The event, if I'm going to it (everyone going, including the host, can chat)."""
-    db = get_db()
-    event = db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
-    if event is None:
-        abort(404)
-    going = db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?",
-                       (event_id, g.user["id"])).fetchone()
-    return event, going is not None
+    """The event (with player counts, like the event page), and whether I'm going to it.
+    Everyone going, including the host, can chat."""
+    from .events import get_event  # imported here: events.py also uses this module's helpers
+    event = get_event(event_id)
+    return event, bool(event["i_am_going"])
 
 
 def _chat_rows(event_id, after=0):
@@ -377,7 +374,7 @@ def event_chat(event_id):
         if error:
             flash(error, "error")
         elif event["cancelled"]:
-            flash("This event was cancelled, so its chat is closed.", "error")
+            flash("This event was canceled, so its chat is closed.", "error")
         else:
             db = get_db()
             db.execute("INSERT INTO event_messages (event_id, sender_id, body, created_at) VALUES (?, ?, ?, ?)",
