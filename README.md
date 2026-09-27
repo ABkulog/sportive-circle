@@ -86,7 +86,15 @@ This runs about 190 checks:
     Then they see "Sorry, this event is full"
   ```
 
-GitHub Actions runs everything on every push (`.github/workflows/tests.yml`).
+**The full check** (run after every change, before committing):
+
+```bash
+.venv/bin/python tools/check.py
+```
+
+It runs the code check, all tests, a crawl of every page as a visitor, student and admin (0 broken links
+allowed), and 1,000+ junk requests to every form and URL (0 crashes allowed). GitHub Actions runs the same
+full check on every push (`.github/workflows/tests.yml`).
 
 ## Project layout
 
@@ -116,6 +124,7 @@ sportive/
   static/             styles, icons, and small scripts (no inline JavaScript anywhere)
 docs/                 requirements, system map, deployment guide
 tests/                unit tests and Gherkin scenarios
+tools/check.py        the full check: run after every change
 Sportive Sircle.py    the original Turkish desktop app
 sportive_circle_en.py the original app translated to English
 ```

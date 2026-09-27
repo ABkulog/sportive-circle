@@ -96,7 +96,8 @@ DEMO_CLUBS = [
 
 
 def add_clubs(db, ids, now):
-    for club in DEMO_CLUBS:
+    for demo in DEMO_CLUBS:
+        club = dict(demo)  # a copy, so seeding twice (e.g. in tools/check.py) works
         officer = ids[club.pop("officer")]
         cur = db.execute(
             f"""INSERT INTO clubs ({", ".join(club)}, club_kind, verification_url, officer_role, status,
