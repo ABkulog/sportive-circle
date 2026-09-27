@@ -348,7 +348,7 @@ def test_email_only_visible_to_people_you_played_with(accounts, client, app):
 def test_friendly_404(accounts, client):
     accounts.signup()
     response = client.get("/events/9999")
-    assert response.status_code == 404 and b"Back to the feed" in response.data
+    assert response.status_code == 404 and b"Go home" in response.data
 
 
 def test_refuses_to_run_publicly_without_secret_key(tmp_path):
@@ -771,7 +771,7 @@ def test_badges(accounts, client, app):
         user_id = get_db().execute("SELECT id FROM users").fetchone()[0]
         assert eligible(user_id) == {"first_game", "rain_or_shine", "early_dawg", "founding_dawg"}
     page = client.get(f"/u/{user_id}").data
-    assert page.count(b'class="husky-badge ') == 3          # only 3 on the profile
+    assert page.count(b'class="showcase-badge') == 3        # only 3 on the profile
     locker = client.get("/profile/badges").data
     assert b"Rain or Shine" in locker and b"Founding Dawg" in locker and b"Earned" in locker
     assert b"Host 5 games" in locker  # badges still to earn show how
@@ -810,7 +810,7 @@ def test_celebration_and_footer(accounts, client):
     response = client.post("/events/new", data=event_form(), follow_redirects=True).data
     assert b"flash-celebrate" in response and b"Go Dawgs" in response
     assert b"Made by Huskies, for Huskies" in response
-    assert b"not an official University of Washington service" in response
+    assert b"Not an official University of Washington service" in response
 
 
 # ------------------------------------------------------------ ranks & badges
@@ -957,7 +957,8 @@ def test_badges_are_kept_forever(accounts, client, app):
         sync_badges(player)
         assert "season-2026-autumn" in earned_badges(player)   # the flex stays
     page = client.get(f"/u/{player}").data
-    assert b"Autumn 2026" in page and b"% of Huskies" in page
+    assert b"Autumn 2026" in page
+    assert b"% of Huskies" in client.get("/profile/badges").data
 
 
 def test_midnight_games_count_as_night_not_early(accounts, client, app):
@@ -998,7 +999,7 @@ def test_showcase_is_three_badges_you_choose(accounts, client, app):
     accounts.logout()
     accounts.signup(email="other@uw.edu")
     public = client.get(f"/u/{me}").data
-    assert public.count(b'class="husky-badge ') == 2 and b"Badge locker" not in public
+    assert public.count(b'class="showcase-badge') == 2 and b"choose 3" not in public
 
 
 # ---------------------------------------------------------------- friends
@@ -1809,7 +1810,7 @@ def test_need_players_chat_opens(accounts, client):
 
 
 def test_only_officer_cant_delete_account(accounts, client, app):
-    club = _approved_club(accounts, client, app)
+    _approved_club(accounts, client, app)
     accounts.login(email="captain@uw.edu")
     assert "the only officer" in client.get("/profile/delete").data.decode()
     client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
@@ -1822,3 +1823,112 @@ def test_signup_cant_flood_an_inbox(accounts, client):
     client.post("/logout")
     again = accounts.signup(email="target@uw.edu", verify=False).data
     assert b"We just sent a code to that email" in again
+
+
+# ------------------------------------------------------------ launch-readiness checks
+
+def test_people_search_treats_wildcards_as_text(accounts, client):
+    accounts.signup(email="maya@uw.edu", name="Maya Chen")
+    accounts.logout()
+    accounts.signup(email="jordan@uw.edu", name="Jordan Rivera")
+    assert b"Maya Chen" in client.get("/friends?q=ma").data
+    assert b"Maya Chen" not in client.get("/friends?q=%25%25").data      # "%%" is not "match anything"
+    assert b"Maya Chen" not in client.get("/friends?q=m").data           # at least 2 letters
+    assert b"Jordan Rivera" not in client.get("/friends?q=jordan").data  # never yourself
+
+
+def test_officers_can_message_their_followers_and_reply(accounts, client, app):
+    club = _approved_club(accounts, client, app)                          # captain@uw.edu is the officer
+    accounts.logout()
+    accounts.signup(email="stranger@uw.edu", name="Stranger Danger")
+    stranger = _user_id(app, "stranger@uw.edu")
+    accounts.logout()
+    accounts.signup(email="fan@uw.edu", name="Big Fan")
+    fan = _user_id(app, "fan@uw.edu")
+    client.post(f"/clubs/{club}/follow")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    client.post(f"/messages/{fan}", data={"body": "Practice is at 5!"})
+    client.post(f"/messages/{stranger}", data={"body": "Join us!!"})
+    with app.app_context():
+        bodies = {row[0] for row in get_db().execute("SELECT body FROM direct_messages")}
+    assert "Practice is at 5!" in bodies and "Join us!!" not in bodies
+
+
+def test_anyone_can_reply_to_someone_who_wrote_first(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    captain = _user_id(app, "captain@uw.edu")
+    accounts.logout()
+    accounts.signup(email="asker@uw.edu", name="Curious Husky")
+    client.post(f"/messages/{captain}", data={"body": "Do you need cleats?"})   # students can ask officers
+    asker = _user_id(app, "asker@uw.edu")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    client.post(f"/clubs/{club}/leave")  # even if they weren't an officer anymore, they could reply
+    client.post(f"/messages/{asker}", data={"body": "Nope, just come!"})
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM direct_messages").fetchone()[0] == 2
+
+
+def test_security_headers_everywhere(client):
+    response = client.get("/")
+    assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert "geolocation=(self)" in response.headers["Permissions-Policy"]
+
+
+def test_no_inline_scripts_in_any_template():
+    import pathlib
+    for template in pathlib.Path("sportive/templates").rglob("*.html"):
+        text = template.read_text()
+        assert not re.search(r"\son(submit|click|change|input|load)=", text), template
+        assert not re.search(r"<script>", text), template
+
+
+def test_change_password_needs_current_password(accounts, client):
+    accounts.signup()
+    page = client.post("/profile/password", data={"current_password": "wrong", "password": "new-password-1",
+                                                  "password2": "new-password-1"}, follow_redirects=True).data
+    assert b"current password isn" in page
+    accounts.logout()
+    assert b"Wrong email or password" in client.post("/login", data={"email": "dubs@uw.edu",
+                                                                     "password": "new-password-1"}).data
+
+
+def test_suspending_cancels_their_upcoming_games(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    host = _user_id(app, "host@uw.edu")
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    client.post(f"/admin/users/{host}/suspend")
+    with app.app_context():
+        assert get_db().execute("SELECT cancelled FROM events WHERE id = ?", (event_id,)).fetchone()[0] == 1
+    client.post(f"/admin/users/{_user_id(app, 'admin@uw.edu')}/suspend")   # admins can't be suspended here
+    with app.app_context():
+        assert get_db().execute("SELECT suspended FROM users WHERE email = 'admin@uw.edu'").fetchone()[0] == 0
+
+
+def test_club_form_points_at_the_field_with_the_problem(accounts, client):
+    accounts.signup()
+    page = client.post("/clubs/new", data={**CLUB, "club_email": "not-an-email"}).data
+    assert b'data-error-field="club_email"' in page
+
+
+def test_info_pages_and_friendly_server_error(client, app):
+    @app.route("/boom")
+    def boom():
+        raise RuntimeError("test")
+    app.config["PROPAGATE_EXCEPTIONS"] = False
+    for path in ("/privacy", "/terms", "/how-it-works"):
+        assert client.get(path).status_code == 200
+    response = client.get("/boom")
+    assert response.status_code == 500 and b"Something broke on our side" in response.data
+
+
+def test_calendar_lines_are_folded():
+    from sportive.events import ics_fold
+    folded = ics_fold("DESCRIPTION:" + "é" * 80)
+    assert all(len(line.encode()) <= 75 for line in folded.split("\r\n"))
+    assert folded.replace("\r\n ", "") == "DESCRIPTION:" + "é" * 80

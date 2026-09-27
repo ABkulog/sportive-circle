@@ -59,6 +59,7 @@ ADDED_COLUMNS = [
     ("clubs", "x_handle", "TEXT NOT NULL DEFAULT ''"),
     ("clubs", "facebook", "TEXT NOT NULL DEFAULT ''"),
     ("clubs", "youtube", "TEXT NOT NULL DEFAULT ''"),
+    ("users", "suspended", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

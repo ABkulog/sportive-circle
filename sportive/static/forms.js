@@ -55,6 +55,7 @@
   const { mine, needs } = JSON.parse(tiersElement.textContent);
   const sport = form.querySelector('select[name="sport"]');
   const level = form.querySelector('select[name="skill_level"]');
+  if (!level) return;  // club events have no skill level
   const hint = form.querySelector("[data-level-hint]");
   const keep = level.dataset.keep || "";  // editing: the event's current level stays allowed
 

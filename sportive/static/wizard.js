@@ -14,7 +14,6 @@
   form.prepend(progress);
   nav.hidden = false;
 
-  // If the server sent the form back with an error, start on the first step (the error banner explains it).
   let current = 0;
 
   function show(index) {
@@ -49,5 +48,12 @@
       next.click();
     }
   });
-  show(0);
+  // If the server sent the form back with a problem, open the step that has it and put the cursor there.
+  const errorField = form.dataset.errorField && form.querySelector(`[name="${form.dataset.errorField}"]`);
+  const errorStep = errorField ? steps.findIndex((step) => step.contains(errorField)) : -1;
+  show(Math.max(errorStep, 0));
+  if (errorField) {
+    errorField.setAttribute("aria-invalid", "true");
+    errorField.focus();
+  }
 })();

@@ -25,8 +25,7 @@
     <li><strong>{{ followers }}</strong><span>following</span></li>
     <li><strong>{{ events|length }}</strong><span>event{{ 's' if events|length != 1 }}</span></li>
   </ul>
-  <p class="club-about clamp" id="club-about" title="Tap to read more"
-     onclick="this.classList.toggle('is-open')">{{ club.description }}</p>
+  <p class="club-about clamp" id="club-about" title="Tap to read more" data-expand>{{ club.description }}</p>
 
   <div class="club-actions" id="join">
     {% set cta = {'tryouts': 'Sign up for tryouts', 'application': 'Apply to join'}.get(club.joining, 'Request to join') %}
@@ -126,13 +125,13 @@
 
     {% if role in ('member', 'follower', 'requested', 'tryout') %}
       <form method="post" action="{{ url_for('clubs.leave', club_id=club.id) }}" class="quiet-leave"
-            {% if role == 'member' %}onsubmit="return confirm('Leave {{ club.name }}?')"{% endif %}>
+            {% if role == 'member' %}data-confirm="Leave {{ club.name }}?"{% endif %}>
         {{ csrf_field() }}<button class="link-button">{{ {'member': 'Leave club', 'follower': 'Unfollow', 'requested': 'Cancel request', 'tryout': 'Cancel tryout sign-up'}[role] }}</button>
       </form>
     {% elif role == 'officer' %}
       <p class="quiet-leave"><a href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit club</a> ·
         <form method="post" action="{{ url_for('clubs.leave', club_id=club.id) }}" class="inline-form"
-              onsubmit="return confirm('Leave {{ club.name }}?')">{{ csrf_field() }}<button class="link-button">Leave club</button></form></p>
+              data-confirm="Leave {{ club.name }}?">{{ csrf_field() }}<button class="link-button">Leave club</button></form></p>
     {% endif %}
   </section>
 
@@ -217,7 +216,7 @@
                   <form method="post" action="{{ url_for('clubs.make_officer', club_id=club.id, user_id=m.id) }}">
                     {{ csrf_field() }}<button class="link-button">Make officer</button></form>
                   <form method="post" action="{{ url_for('clubs.decide', club_id=club.id, user_id=m.id, decision='remove') }}"
-                        onsubmit="return confirm('Remove {{ m.full_name }} from the club?')">
+                        data-confirm="Remove {{ m.full_name }} from the club?">
                     {{ csrf_field() }}<button class="link-button danger-link">Remove</button></form>
                 </div>
               </details>

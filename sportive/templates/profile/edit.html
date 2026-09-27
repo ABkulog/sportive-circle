@@ -1,20 +1,18 @@
 {% extends "base.html" %}
-{% from "_macros.html" import sport_checkboxes %}
+{% from "_macros.html" import sport_checkboxes, avatar %}
 {% block title %}Edit profile{% endblock %}
 {% block content %}
 <div class="card form-card">
   <h1>Edit profile</h1>
-  <a class="person" href="{{ url_for('profile.photo_upload') }}">
-    {%- if g.user.avatar_updated -%}
-      <img class="avatar-img" src="{{ url_for('profile.photo', user_id=g.user.id, v=g.user.avatar_updated) }}" alt="" style="--size: 56px">
-    {%- endif -%}
-    Change profile picture</a>
+  <a class="edit-photo" href="{{ url_for('profile.photo_upload') }}">
+    {{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 72) }}
+    <span>{{ 'Change profile picture' if g.user.avatar_updated else 'Add a profile picture' }}</span></a>
   <form method="post" class="form">
     {{ csrf_field() }}
     <label class="field"><span>Full name</span>
       <input name="full_name" value="{{ form.get('full_name', '') }}" required></label>
     <label class="field"><span>Graduation year <em>(optional)</em></span>
-      <input name="grad_year" type="number" min="1950" value="{{ form.get('grad_year', '') }}"></label>
+      <input name="grad_year" type="number" min="1950" max="{{ max_grad_year }}" value="{{ form.get('grad_year', '') }}"></label>
     <label class="field"><span>Bio <em>(optional)</em></span>
       <textarea name="bio" maxlength="300" rows="3" placeholder="CSE '28. Always down for pickup hoops.">{{ form.get('bio', '') }}</textarea></label>
     {{ sport_checkboxes(form) }}
@@ -29,6 +27,24 @@
     <button class="btn btn-block">Save</button>
   </form>
 </div>
+
+<details class="card form-card fold" id="password">
+  <summary><strong>Change password</strong></summary>
+  <form method="post" action="{{ url_for('profile.change_password') }}" class="form">
+    {{ csrf_field() }}
+    <label class="field"><span>Current password</span>
+      <input name="current_password" type="password" autocomplete="current-password" required></label>
+    <label class="field"><span>New password <em>(at least 8 characters)</em></span>
+      <input name="password" type="password" minlength="8" autocomplete="new-password" required></label>
+    <label class="field"><span>New password (again)</span>
+      <input name="password2" type="password" minlength="8" autocomplete="new-password" required></label>
+    <button class="btn btn-block">Change password</button>
+  </form>
+</details>
+
+<form method="post" action="{{ url_for('auth.logout') }}" class="card form-card center">
+  {{ csrf_field() }}<button class="btn btn-ghost btn-block">Log out</button>
+</form>
 
 <div class="card form-card danger-zone">
   <h2>Delete my account</h2>

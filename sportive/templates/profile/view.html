@@ -1,78 +1,100 @@
 {% extends "base.html" %}
-{% from "_macros.html" import event_card, avatar, badge_tile %}
+{% from "_macros.html" import event_card, avatar %}
 {% block title %}{{ user.full_name }}{% endblock %}
 {% block content %}
-<section class="card profile">
-  {{ avatar(user.id, user.full_name, user.avatar_updated, 88) }}
-  <div class="profile-info">
-    <h1>{{ user.full_name }}</h1>
-    <p class="muted">{% if user.grad_year %}Class of {{ user.grad_year }}{% endif %}{% if user.grad_year and show_email %} · {% endif %}{% if show_email %}<a href="mailto:{{ user.email }}">{{ user.email }}</a>{% endif %}</p>
-    {% if user.bio %}<p>{{ user.bio }}</p>{% endif %}
-    {% if showcase %}
-      <ul class="husky-badges showcase" aria-label="Badge showcase">
-        {% for b in showcase %}{{ badge_tile(b, earned, rarity, is_retired) }}{% endfor %}
-      </ul>
+{% set me = user.id == g.user.id %}
+<section class="profile">
+  <div class="profile-top">
+    {% if me %}
+      <a class="profile-photo" href="{{ url_for('profile.photo_upload') }}" aria-label="Change profile picture">
+        {{ avatar(user.id, user.full_name, user.avatar_updated, 84) }}<span class="photo-badge" aria-hidden="true">📷</span></a>
+    {% else %}
+      <span class="profile-photo">{{ avatar(user.id, user.full_name, user.avatar_updated, 84) }}</span>
     {% endif %}
-    {% if user.id == g.user.id %}
-      <a class="locker-link" href="{{ url_for('profile.badge_locker') }}">Badge locker ({{ earned|length }}) · choose your 3</a>
-    {% endif %}
-    <div class="badges">
-      {% for s in sports %}<span class="chip">{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</span>{% else %}<span class="muted">No sports picked yet.</span>{% endfor %}
+    <div class="profile-name">
+      <h1>{{ user.full_name }}</h1>
+      <p class="muted">{% if user.grad_year %}Class of {{ user.grad_year }}{% else %}Husky{% endif %}
+        {% if show_email %}<br><a href="mailto:{{ user.email }}">{{ user.email }}</a>{% endif %}</p>
     </div>
-    {% if user.id == g.user.id %}
-      <div class="profile-actions">
-        <a class="btn btn-ghost" href="{{ url_for('profile.edit') }}">Edit profile & settings</a>
-        <form method="post" action="{{ url_for('auth.logout') }}">
-          {{ csrf_field() }}<button class="btn btn-ghost">Log out</button>
+  </div>
+
+  {% if user.bio %}<p class="profile-bio">{{ user.bio }}</p>{% endif %}
+
+  {% if me %}
+    <div class="profile-buttons">
+      <a class="btn btn-ghost" href="{{ url_for('profile.edit') }}">Edit profile</a>
+      <a class="btn btn-ghost" href="{{ url_for('profile.photo_upload') }}">Change photo</a>
+    </div>
+  {% elif relation.i_blocked %}
+    <div class="profile-buttons">
+      <form method="post" action="{{ url_for('social.unblock', user_id=user.id) }}">
+        {{ csrf_field() }}<button class="btn btn-ghost">Unblock</button>
+      </form>
+      <a class="btn btn-ghost danger-link" href="{{ url_for('moderation.report', target_type='user', target_id=user.id) }}">Report</a>
+    </div>
+  {% elif not relation.blocked_me %}
+    <div class="profile-buttons">
+      {% if relation.friend == 'friends' %}
+        <span class="btn btn-ghost is-static">✅ Friends</span>
+      {% elif relation.friend == 'sent' %}
+        <span class="btn btn-ghost is-static">Request sent</span>
+      {% elif relation.friend == 'received' %}
+        <form method="post" action="{{ url_for('social.accept_request', user_id=user.id) }}">
+          {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.path }}">
+          <button class="btn">Accept friend request</button>
         </form>
-      </div>
-    {% elif relation.i_blocked %}
-      <div class="profile-actions">
-        <form method="post" action="{{ url_for('social.unblock', user_id=user.id) }}">
-          {{ csrf_field() }}<button class="btn btn-ghost">Unblock</button>
+      {% else %}
+        <form method="post" action="{{ url_for('social.send_request', user_id=user.id) }}">
+          {{ csrf_field() }}<button class="btn">+ Add friend</button>
         </form>
-        <a class="btn btn-ghost danger-link" href="{{ url_for('moderation.report', target_type='user', target_id=user.id) }}">Report</a>
-      </div>
-    {% elif not relation.blocked_me %}
-      <div class="profile-actions">
+      {% endif %}
+      {% if relation.can_message %}
+        <a class="btn btn-ghost" href="{{ url_for('social.thread', user_id=user.id) }}">Message</a>
+      {% endif %}
+      <details class="more-menu">
+        <summary class="btn btn-ghost" aria-label="More options">⋯</summary>
+        <div class="more-menu-panel right">
         {% if relation.friend == 'friends' %}
-          <span class="done-pill">✅ Friends</span>
-        {% elif relation.friend == 'sent' %}
-          <span class="done-pill">Request sent</span>
-        {% elif relation.friend == 'received' %}
-          <form method="post" action="{{ url_for('social.accept_request', user_id=user.id) }}">
+          <form method="post" action="{{ url_for('social.remove_friend', user_id=user.id) }}"
+                data-confirm="Remove {{ user.full_name.split()[0] }} as a friend?">
             {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.path }}">
-            <button class="btn">Accept friend request</button>
-          </form>
-        {% else %}
-          <form method="post" action="{{ url_for('social.send_request', user_id=user.id) }}">
-            {{ csrf_field() }}<button class="btn">+ Add friend</button>
+            <button class="link-button">Unfriend</button>
           </form>
         {% endif %}
-        {% if relation.can_message %}
-          <a class="btn btn-ghost" href="{{ url_for('social.thread', user_id=user.id) }}">Message</a>
-        {% endif %}
-        <details class="more-menu">
-          <summary aria-label="More options">⋯</summary>
-          <div class="more-menu-panel">
-          {% if relation.friend == 'friends' %}
-            <form method="post" action="{{ url_for('social.remove_friend', user_id=user.id) }}"
-                  onsubmit="return confirm('Remove {{ user.full_name.split()[0] }} as a friend?')">
-              {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.path }}">
-              <button class="link-button">Unfriend</button>
-            </form>
-          {% endif %}
-          <form method="post" action="{{ url_for('social.block', user_id=user.id) }}"
-                onsubmit="return confirm('Block {{ user.full_name.split()[0] }}? They won\'t be able to message you or add you.')">
-            {{ csrf_field() }}<button class="link-button danger-link">Block</button>
-          </form>
-          <a class="danger-link" href="{{ url_for('moderation.report', target_type='user', target_id=user.id) }}">🚩 Report</a>
-          </div>
-        </details>
-      </div>
-    {% endif %}
+        <form method="post" action="{{ url_for('social.block', user_id=user.id) }}"
+              data-confirm="Block {{ user.full_name.split()[0] }}? They won't be able to message you or add you.">
+          {{ csrf_field() }}<button class="link-button danger-link">Block</button>
+        </form>
+        <a class="danger-link" href="{{ url_for('moderation.report', target_type='user', target_id=user.id) }}">🚩 Report</a>
+        </div>
+      </details>
+    </div>
+  {% endif %}
+
+  <div class="badges profile-sports">
+    {% for s in sports %}<span class="chip">{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</span>
+    {% else %}<span class="muted">{% if me %}<a href="{{ url_for('profile.edit') }}">Pick your sports</a>{% else %}No sports picked yet.{% endif %}</span>{% endfor %}
   </div>
 </section>
+
+{% if showcase or me %}
+<section class="card">
+  <div class="section-head">
+    <h2>Badges</h2>
+    {% if me %}<a href="{{ url_for('profile.badge_locker') }}">All {{ earned|length }} · choose 3</a>{% endif %}
+  </div>
+  {% if showcase %}
+    <ul class="showcase-row" aria-label="Badge showcase">
+      {% for b in showcase %}
+        <li class="showcase-badge {% if b.until %}is-limited{% endif %}" title="{{ b.how }}">
+          <span class="showcase-emoji" aria-hidden="true">{{ b.emoji }}</span><strong>{{ b.name }}</strong></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">No badges yet. Play your first game to earn 🐾 First Game.</p>
+  {% endif %}
+</section>
+{% endif %}
 
 <section class="card">
   <h2>Ranks</h2>
@@ -85,7 +107,7 @@
         <li class="rank-chip tier-{{ r.tier|lower }}">{{ SPORT_EMOJI[sport] }} {{ r.name }}</li>
       {% endfor %}
     </ul>
-    {% if user.id == g.user.id %}
+    {% if me %}
     <details class="fold rank-progress">
       <summary>See my progress</summary>
     <div class="rank-cards">
@@ -119,7 +141,7 @@
 </section>
 
 <section>
-  <h2>Hosting</h2>
+  <h2 class="section-title">{{ 'Games you host' if me else 'Games ' ~ user.full_name.split()[0] ~ ' hosts' }}</h2>
   <div class="stack">
     {% for e in hosting %}{{ event_card(e) }}{% else %}<p class="muted">Nothing coming up.</p>{% endfor %}
   </div>

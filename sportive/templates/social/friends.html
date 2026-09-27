@@ -7,6 +7,39 @@
 {% endmacro %}
 <h1 class="page-title">Friends</h1>
 
+<form method="get" class="people-search" role="search" aria-label="Find people">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search Huskies by name" aria-label="Search by name"
+         minlength="2" maxlength="60" autocomplete="off" {% if not friends and not q %}autofocus{% endif %}>
+  <button class="btn">Search</button>
+</form>
+{% if q %}
+  <section class="card" aria-live="polite">
+    <h2>{% if q|length < 2 %}Type at least 2 letters{% elif results %}Results for “{{ q }}”{% else %}No one found for “{{ q }}”{% endif %}</h2>
+    {% if results %}
+      <ul class="people">
+        {% for p in results %}
+          <li class="post-game-row">{{ person_row(p, "Class of " ~ p.grad_year if p.grad_year else "") }}
+            {% if p.status == 'friends' %}<span class="done-pill">✅ Friends</span>
+            {% elif p.status == 'sent' %}<span class="done-pill">Request sent</span>
+            {% elif p.status == 'received' %}
+              <form method="post" action="{{ url_for('social.accept_request', user_id=p.id) }}">
+                {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.full_path }}">
+                <button class="btn btn-small">Accept</button></form>
+            {% else %}
+              <form method="post" action="{{ url_for('social.send_request', user_id=p.id) }}">
+                {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.full_path }}">
+                <button class="btn btn-small">+ Add friend</button></form>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% elif q|length >= 2 %}
+      <p class="muted">Check the spelling, or ask them to sign up with their UW email.</p>
+    {% endif %}
+    <p><a href="{{ url_for('social.friends') }}">Clear search</a></p>
+  </section>
+{% endif %}
+
 {% if incoming %}
   <section class="card">
     <h2>Friend requests ({{ incoming|length }})</h2>
@@ -31,7 +64,7 @@
         <a class="btn btn-small btn-ghost" href="{{ url_for('social.thread', user_id=p.id) }}">Message</a>
       </li>
     {% else %}
-      <li class="muted">No friends yet. Add people you've played with! 🐾</li>
+      <li class="muted">No friends yet. Search for someone above, or add people you've played with. 🐾</li>
     {% endfor %}
   </ul>
 </section>

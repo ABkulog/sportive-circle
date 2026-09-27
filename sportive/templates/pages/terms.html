@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Terms{% endblock %}
+{% set contact = config.CONTACT_EMAIL or (config.ADMIN_EMAILS.split(',')[0].strip() if config.ADMIN_EMAILS else '') %}
+{% block content %}
+<article class="card form-card legal">
+  <p class="eyebrow">Terms</p>
+  <h1>The rules of the pack</h1>
+  <p class="muted">Last updated September 27, 2026</p>
+
+  <p>By using Sportive Circle you agree to these rules. They're short, so please read them.</p>
+
+  <h2>Who can use it</h2>
+  <ul>
+    <li>UW students with a working UW email address, age 15 or older.</li>
+    <li>One account per person, with your real name and a photo of you.</li>
+  </ul>
+
+  <h2>Be a good teammate</h2>
+  <ul>
+    <li>No harassment, bullying, hate, threats or sexual content.</li>
+    <li>No spam, scams or selling things.</li>
+    <li>Don't pretend to be someone else, or register a club you aren't an officer of.</li>
+    <li>If you can't make a game, tap Leave. If you host, cancel the event when plans change.</li>
+    <li>Follow the <a href="https://www.washington.edu/cssc/" target="_blank" rel="noopener">UW Student Conduct Code</a>
+      when you meet up on campus.</li>
+  </ul>
+  <p>We can remove content or suspend accounts that break these rules. If you think we got it wrong,
+    {% if contact %}email <a href="mailto:{{ contact }}">{{ contact }}</a>{% else %}contact an admin{% endif %}.</p>
+
+  <h2>Playing safely</h2>
+  <ul>
+    <li>Sports can cause injuries. You play at your own risk and are responsible for your own safety and gear.</li>
+    <li>Sportive Circle doesn't reserve courts or fields. UW Recreation facilities like the IMA may require a
+      UW Recreation membership or Husky Card, and their rules apply.</li>
+    <li>Meet in public places. If you ever feel unsafe, leave, and in an emergency call 911.
+      UW Police's non-emergency line is 206-685-8973, and SafeCampus is 206-685-7233.</li>
+  </ul>
+
+  <h2>The fine print</h2>
+  <ul>
+    <li>Sportive Circle is a student project, not an official University of Washington service. UW names are used
+      only to describe where and with whom you can play.</li>
+    <li>The app is provided as is. It may have bugs or downtime, and features may change.</li>
+    <li>What you post is yours. You let us show it in the app so it works (for example, your event on the feed).</li>
+    <li>See the <a href="{{ url_for('privacy') }}">Privacy page</a> for how we handle your data.</li>
+  </ul>
+</article>
+{% endblock %}

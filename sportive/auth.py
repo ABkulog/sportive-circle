@@ -30,6 +30,7 @@ MIN_PASSWORD_LENGTH = 8
 # ---------------------------------------------------------------- helpers
 
 def login_required(view):
+    """Send logged-out visitors to the login page, then back here afterwards."""
     @functools.wraps(view)
     def wrapped(**kwargs):
         if g.user is None:
@@ -64,7 +65,7 @@ def load_logged_in_user():
     g.user = None
     if user_id is not None:
         g.user = get_db().execute(
-            "SELECT * FROM users WHERE id = ? AND verified = 1", (user_id,)
+            "SELECT * FROM users WHERE id = ? AND verified = 1 AND suspended = 0", (user_id,)
         ).fetchone()
 
 
@@ -90,27 +91,36 @@ def log_in(user):
         born = date.fromisoformat(user["birth_date"])
         today = now_local().date()
         if (born.month, born.day) == (today.month, today.day):
-            # Kept from the original app :)
-            flash("🎂 Happy 'escaped from your mom' anniversary — you won a coupon!", "birthday")
+            flash(f"🎂 Happy birthday, {user['full_name'].split()[0]}! Go Dawgs!", "birthday")
     return safe_next(after)
 
 
 # ---------------------------------------------------------- verification
 
-def send_verification_email(email, code):
-    sent = send_email(
-        email,
-        f"Your Sportive Circle code: {code}",
-        f"Your Sportive Circle verification code is {code}.\n"
-        f"It expires in {CODE_TTL.seconds // 60} minutes.\n\n"
-        "If you didn't sign up, you can ignore this email.",
-    )
-    if not sent:
+def send_verification_email(email, code, purpose="signup"):
+    minutes = CODE_TTL.seconds // 60
+    if purpose == "reset":
+        subject = f"Reset your Sportive Circle password: {code}"
+        body = (f"Your code to reset your Sportive Circle password is {code}.\n"
+                f"It expires in {minutes} minutes.\n\n"
+                "If you didn't ask for this, ignore this email. Your password hasn't changed.")
+    else:
+        subject = f"Your Sportive Circle code: {code}"
+        body = (f"Welcome, Husky! Your Sportive Circle verification code is {code}.\n"
+                f"It expires in {minutes} minutes.\n\n"
+                "If you didn't sign up, you can ignore this email.")
+    if not send_email(email, subject, body):
         # Local development: no email server, so show the code instead.
         flash(f"Dev mode (no email server set up): your code is {code}", "info")
 
 
-def start_verification(email):
+def code_recently_sent(email):
+    """True if we emailed this address a code less than a minute ago (stops email spam)."""
+    row = get_db().execute("SELECT verify_sent_at FROM users WHERE email = ?", (email,)).fetchone()
+    return bool(row and row["verify_sent_at"] and now_local() < from_db(row["verify_sent_at"]) + RESEND_COOLDOWN)
+
+
+def start_verification(email, session_key="pending_email"):
     code = f"{secrets.randbelow(10**6):06d}"
     db = get_db()
     db.execute(
@@ -119,8 +129,8 @@ def start_verification(email):
         (code, to_db(now_local() + CODE_TTL), to_db(now_local()), email),
     )
     db.commit()
-    session["pending_email"] = email
-    send_verification_email(email, code)
+    session[session_key] = email
+    send_verification_email(email, code, "reset" if session_key == "reset_email" else "signup")
 
 
 # ----------------------------------------------------------------- sign up
@@ -133,10 +143,9 @@ def validate_signup(full_name, email, password, password2, grad_year, birth_date
         return "Email cannot be empty."
     if email.count("@") != 1 or email.startswith("@") or email.split("@")[1] not in domains:
         return "Please use your UW email address (ending in @uw.edu)."
-    if len(password) < MIN_PASSWORD_LENGTH:
-        return f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
-    if password != password2:
-        return "Passwords do not match."
+    problem = password_problem(password, password2)
+    if problem:
+        return problem
     if grad_year and (not grad_year.isdigit() or not 1950 <= int(grad_year) <= now_local().year + 8):
         return "Please enter a valid graduation year."
     if not birth_date:
@@ -168,11 +177,8 @@ def signup():
         sports = [s for s in form.getlist("sports") if s in SPORTS]
 
         error = validate_signup(full_name, email, password, password2, grad_year, birth_date)
-        if error is None:
-            recent = get_db().execute("SELECT verify_sent_at FROM users WHERE email = ? AND verified = 0",
-                                      (email,)).fetchone()
-            if recent and recent["verify_sent_at"] and now_local() < from_db(recent["verify_sent_at"]) + RESEND_COOLDOWN:
-                error = "We just sent a code to that email. Check your inbox, or wait a minute and try again."
+        if error is None and code_recently_sent(email):
+            error = "We just sent a code to that email. Check your inbox, or wait a minute and try again."
         if error is None:
             db = get_db()
             # An unverified account never proved it owns the email, so it can be replaced.
@@ -181,7 +187,7 @@ def signup():
                 cur = db.execute(
                     "INSERT INTO users (email, password_hash, full_name, grad_year, birth_date)"
                     " VALUES (?, ?, ?, ?, ?)",
-                    (email, generate_password_hash(password, current_app.config["PASSWORD_HASH_METHOD"]), full_name,
+                    (email, hash_password(password), full_name,
                      int(grad_year) if grad_year else None, birth_date),
                 )
                 set_user_sports(cur.lastrowid, sports)
@@ -228,7 +234,7 @@ def verify():
         if error is None:
             db.execute(
                 "UPDATE users SET verified = 1, verify_code = NULL, verify_expires = NULL,"
-                " verify_attempts = 0 WHERE id = ?",
+                " verify_attempts = 0, verify_sent_at = NULL WHERE id = ?",
                 (user["id"],),
             )
             db.commit()
@@ -244,8 +250,7 @@ def resend_code():
     email = session.get("pending_email")
     if not email:
         return redirect(url_for("auth.login"))
-    user = get_db().execute("SELECT verify_sent_at FROM users WHERE email = ?", (email,)).fetchone()
-    if user and user["verify_sent_at"] and now_local() < from_db(user["verify_sent_at"]) + RESEND_COOLDOWN:
+    if code_recently_sent(email):
         flash("We just sent you a code. Wait a minute before asking for another one.", "error")
         return redirect(url_for("auth.verify"))
     start_verification(email)
@@ -275,13 +280,85 @@ def login():
                            (0 if locked else failed, locked, user["id"]))
                 db.commit()
             flash("Wrong email or password!", "error")
+        elif user["suspended"]:
+            flash("This account is suspended because it broke the community rules. "
+                  "If you think that's a mistake, contact us (see the Terms page).", "error")
         elif not user["verified"]:
-            start_verification(email)
-            flash("Please verify your email first. We sent you a new code.", "info")
+            if code_recently_sent(email):
+                session["pending_email"] = email
+                flash("Please verify your email first. Use the code we just sent you.", "info")
+            else:
+                start_verification(email)
+                flash("Please verify your email first. We sent you a new code.", "info")
             return redirect(url_for("auth.verify"))
         else:
             return redirect(log_in(user))
     return render_template("auth/login.html", next_url=next_url)
+
+
+# --------------------------------------------------------- forgot password
+
+@bp.route("/forgot", methods=("GET", "POST"))
+def forgot_password():
+    """Step 1: email a 6-digit code. The answer is the same whether or not the account exists,
+    so nobody can use this page to find out who has an account."""
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        user = get_db().execute("SELECT verified, suspended FROM users WHERE email = ?", (email,)).fetchone()
+        if user and user["verified"] and not user["suspended"] and not code_recently_sent(email):
+            start_verification(email, session_key="reset_email")
+        session["reset_email"] = email
+        flash("If that email has an account, we sent it a 6-digit code.", "info")
+        return redirect(url_for("auth.reset_password"))
+    return render_template("auth/forgot.html")
+
+
+@bp.route("/reset", methods=("GET", "POST"))
+def reset_password():
+    """Step 2: the code plus a new password."""
+    email = session.get("reset_email")
+    if not email:
+        return redirect(url_for("auth.forgot_password"))
+    if request.method == "POST":
+        code = request.form.get("code", "").strip()
+        password = request.form.get("password", "")
+        db = get_db()
+        user = db.execute("SELECT * FROM users WHERE email = ? AND verified = 1", (email,)).fetchone()
+        error = None
+        if user is None or not user["verify_code"]:
+            error = "That code isn't right. Ask for a new one."
+        elif user["verify_attempts"] >= MAX_CODE_ATTEMPTS:
+            error = "Too many wrong tries. Ask for a new code."
+        elif now_local() > from_db(user["verify_expires"]):
+            error = "That code expired. Ask for a new one."
+        elif not secrets.compare_digest(code, user["verify_code"]):
+            db.execute("UPDATE users SET verify_attempts = verify_attempts + 1 WHERE id = ?", (user["id"],))
+            db.commit()
+            error = "Wrong code, try again."
+        else:
+            error = password_problem(password, request.form.get("password2", ""))
+        if error is None:
+            db.execute("UPDATE users SET password_hash = ?, verify_code = NULL, verify_expires = NULL,"
+                       " verify_attempts = 0 WHERE id = ?", (hash_password(password), user["id"]))
+            db.commit()
+            destination = log_in(user)
+            flash("Password changed. You're logged in. 🐺", "success")
+            return redirect(destination)
+        flash(error, "error")
+    return render_template("auth/reset.html", email=email)
+
+
+def hash_password(password):
+    return generate_password_hash(password, current_app.config["PASSWORD_HASH_METHOD"])
+
+
+def password_problem(password, password2):
+    """The error message for a new password, or None if it's fine."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
+    if password != password2:
+        return "Passwords do not match."
+    return None
 
 
 @bp.route("/logout", methods=("POST",))

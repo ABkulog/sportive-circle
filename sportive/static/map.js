@@ -2,7 +2,15 @@
 // plus how far it is. Your location stays in your browser; it's never sent to our server.
 (function () {
   const box = document.getElementById("event-map");
-  if (!box || typeof L === "undefined") return;
+  if (!box) return;
+  // The map library comes from a CDN. If a network or ad blocker stops it, skip the map
+  // but keep "Where am I?" working: it can still say how far away the event is.
+  const hasMap = typeof L !== "undefined";
+  if (!hasMap) {
+    box.hidden = true;
+    const note = document.getElementById("map-status");
+    if (note) note.textContent = "The map couldn't load on this network, but Where am I? and Directions still work.";
+  }
 
   const folded = box.closest("details");
   if (folded && !folded.open) {
@@ -14,12 +22,12 @@
   function start() {
     box.dataset.ready = "1";
     const place = [parseFloat(box.dataset.lat), parseFloat(box.dataset.lng)];
-    const map = L.map(box, { scrollWheelZoom: false }).setView(place, 17);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const map = hasMap ? L.map(box, { scrollWheelZoom: false }).setView(place, 17) : null;
+    if (map) L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
-    L.marker(place, { title: box.dataset.name }).addTo(map).bindPopup(box.dataset.name).openPopup();
+    if (map) L.marker(place, { title: box.dataset.name }).addTo(map).bindPopup(box.dataset.name).openPopup();
 
     const button = document.getElementById("locate-me");
     const status = document.getElementById("map-status");
@@ -63,11 +71,13 @@
 
     function showMe(position) {
       const here = [position.coords.latitude, position.coords.longitude];
-      if (me) me.setLatLng(here);
-      else me = L.circleMarker(here, {
-        radius: 8, color: "#fff", weight: 3, fillColor: "#1a73e8", fillOpacity: 1,
-      }).addTo(map).bindTooltip("You");
-      map.fitBounds(L.latLngBounds([here, place]), { padding: [40, 40], maxZoom: 17 });
+      if (map) {
+        if (me) me.setLatLng(here);
+        else me = L.circleMarker(here, {
+          radius: 8, color: "#fff", weight: 3, fillColor: "#1a73e8", fillOpacity: 1,
+        }).addTo(map).bindTooltip("You");
+        map.fitBounds(L.latLngBounds([here, place]), { padding: [40, 40], maxZoom: 17 });
+      }
       status.textContent = describe(metersBetween(here, place));
     }
 

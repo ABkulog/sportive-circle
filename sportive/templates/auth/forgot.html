@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Forgot password{% endblock %}
+{% block content %}
+<div class="card form-card">
+  <h1>Forgot your password?</h1>
+  <p class="muted">No worries. Enter your UW email and we'll send you a 6-digit code to set a new one.</p>
+  <form method="post" class="form">
+    {{ csrf_field() }}
+    <label class="field"><span>UW email</span>
+      <input name="email" type="email" placeholder="netid@uw.edu" autocomplete="email" required autofocus></label>
+    <button class="btn btn-block">Send me a code</button>
+  </form>
+  <p class="muted center"><a href="{{ url_for('auth.login') }}">Back to log in</a></p>
+</div>
+{% endblock %}

@@ -7,10 +7,10 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash   TEXT NOT NULL,                 -- never the plain password
     full_name       TEXT NOT NULL,
     grad_year       INTEGER,
-    birth_date      TEXT,                          -- YYYY-MM-DD (for the birthday coupon)
+    birth_date      TEXT,                          -- YYYY-MM-DD (age check, birthday greeting)
     bio             TEXT NOT NULL DEFAULT '',
     verified        INTEGER NOT NULL DEFAULT 0,    -- 1 once the email code is confirmed
-    verify_code     TEXT,
+    verify_code     TEXT,                          -- 6-digit code for signing up or resetting a password
     verify_expires  TEXT,
     verify_attempts INTEGER NOT NULL DEFAULT 0,
     verify_sent_at  TEXT,                          -- for the "wait before resending" limit
@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_updated  TEXT,                          -- when the profile picture changed (NULL = none yet)
     showcase        TEXT,                          -- up to 3 badge keys shown on the profile, comma-separated
     show_ranks      INTEGER NOT NULL DEFAULT 1,    -- 0 = chill mode (ranks hidden from others)
+    suspended       INTEGER NOT NULL DEFAULT 0,    -- 1 = an admin suspended the account (can't log in)
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -70,6 +71,8 @@ CREATE TABLE IF NOT EXISTS rsvps (
     PRIMARY KEY (event_id, user_id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_rsvps_user ON rsvps(user_id);
+
 -- ---------------------------------------------------------------- ranks & badges
 -- 🤝 Props: after a game, players give each other props (once per person per game).
 CREATE TABLE IF NOT EXISTS props (
@@ -88,6 +91,7 @@ CREATE TABLE IF NOT EXISTS vouches (
     created_at  TEXT NOT NULL,
     PRIMARY KEY (sport, giver_id, receiver_id)
 );
+CREATE INDEX IF NOT EXISTS idx_vouches_receiver ON vouches(receiver_id, sport);
 
 -- Badges are saved when earned, so they (and the date) stay forever, even limited ones.
 CREATE TABLE IF NOT EXISTS user_badges (
@@ -114,6 +118,8 @@ CREATE TABLE IF NOT EXISTS friendships (
     created_at   TEXT NOT NULL,
     PRIMARY KEY (requester_id, addressee_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON friendships(addressee_id, status);
 
 -- Blocking: the blocked person can't message you or send you friend requests.
 CREATE TABLE IF NOT EXISTS blocks (
@@ -163,7 +169,7 @@ CREATE TABLE IF NOT EXISTS plus_one_invites (
 );
 
 -- ---------------------------------------------------------------- clubs
--- Clubs are open to everyone: anyone can browse them, any member can join. No ranks here.
+-- Verified UW clubs. Anyone can browse approved clubs; officers confirm who becomes a member. No ranks here.
 CREATE TABLE IF NOT EXISTS clubs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -213,6 +219,8 @@ CREATE TABLE IF NOT EXISTS club_members (
     joined_at TEXT NOT NULL,
     PRIMARY KEY (club_id, user_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_club_members_user ON club_members(user_id);
 
 -- Announcements from club officers.
 CREATE TABLE IF NOT EXISTS club_posts (

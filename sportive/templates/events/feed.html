@@ -3,39 +3,27 @@
 {% block title %}Home{% endblock %}
 {% block content %}
 {{ home_tabs('feed') }}
-<aside class="welcome-help" id="welcome-help" hidden>
+<aside class="welcome-help" data-tip="welcome" hidden>
   <span>👋 New here? <a href="{{ url_for('how_it_works') }}">See how Sportive Circle works</a> in 1 minute.</span>
-  <button type="button" class="link-button" aria-label="Dismiss" id="welcome-help-close">{{ icon('x') }}</button>
+  <button type="button" class="link-button" aria-label="Dismiss" data-tip-close>{{ icon('x') }}</button>
 </aside>
-<script>
-  // First-visit help banner (hidden again once dismissed on this device).
-  (function () {
-    const box = document.getElementById("welcome-help");
-    let seen = false;
-    try { seen = localStorage.getItem("sc-help-dismissed") === "1"; } catch (e) {}
-    if (!seen) box.hidden = false;
-    document.getElementById("welcome-help-close").addEventListener("click", () => {
-      box.hidden = true;
-      try { localStorage.setItem("sc-help-dismissed", "1"); } catch (e) {}
-    });
-  })();
-</script>
 <header class="feed-hello compact">
   <h1 class="page-title">{{ hello }}</h1>
+  <p class="spirit-line">{{ spirit_line }}</p>
 </header>
 
 {# "Now" row, like Instagram Stories: what's happening soon, one swipe away. #}
 {% if up_next or need_players %}
   <nav class="now-row" aria-label="Happening soon">
     {% if up_next %}
-      <a class="now-tile is-mine" href="{{ url_for('events.detail', event_id=up_next.id) }}">
+      <a class="now-tile is-mine" href="{{ url_for('events.detail', event_id=up_next.id) }}" aria-label="Up next: {{ event_title(up_next) }}, {{ up_next.starts_at|relative }}">
         <span class="now-ring" aria-hidden="true">{{ SPORT_EMOJI[up_next.sport] }}</span>
         <strong>Up next</strong>
         <small>{{ up_next.starts_at|relative }}</small>
       </a>
     {% endif %}
     {% for e in need_players if not up_next or e.id != up_next.id %}
-      <a class="now-tile" href="{{ url_for('events.detail', event_id=e.id) }}">
+      <a class="now-tile" href="{{ url_for('events.detail', event_id=e.id) }}" aria-label="{{ event_title(e) }}, {{ e.starts_at|relative }}">
         <span class="now-ring is-hot" aria-hidden="true">{{ SPORT_EMOJI[e.sport] }}</span>
         <strong>{% set left = spots_left(e) %}{% if left %}Need {{ left }}{% else %}{{ SPORTS[e.sport] }}{% endif %}</strong>
         <small>{{ e.starts_at|relative }}</small>
@@ -47,27 +35,27 @@
 {% set active_filters = [filters.sport, filters.when, filters.location, filters.skill]|select|list|length %}
 <form method="get" class="filter-bar" aria-label="Filter games">
   <div class="segmented small" role="radiogroup" aria-label="Which sports">
-    <label><input type="radio" name="scope" value="interests" {% if filters.scope == 'interests' %}checked{% endif %} onchange="this.form.submit()"><span>My sports</span></label>
-    <label><input type="radio" name="scope" value="all" {% if filters.scope == 'all' %}checked{% endif %} onchange="this.form.submit()"><span>All</span></label>
+    <label><input type="radio" name="scope" value="interests" {% if filters.scope == 'interests' %}checked{% endif %} data-autosubmit><span>My sports</span></label>
+    <label><input type="radio" name="scope" value="all" {% if filters.scope == 'all' %}checked{% endif %} data-autosubmit><span>All</span></label>
   </div>
   <details class="filter-more" {% if active_filters %}open{% endif %}>
     <summary class="chip">{{ icon('sliders') }}Filters{% if active_filters %} · {{ active_filters }}{% endif %}</summary>
     <div class="filter-row">
-      <select name="sport" aria-label="Sport" onchange="this.form.submit()">
+      <select name="sport" aria-label="Sport" data-autosubmit>
         <option value="">Any sport</option>
         {% for key, label in SPORTS.items() %}<option value="{{ key }}" {% if filters.sport == key %}selected{% endif %}>{{ SPORT_EMOJI[key] }} {{ label }}</option>{% endfor %}
       </select>
-      <select name="when" aria-label="When" onchange="this.form.submit()">
+      <select name="when" aria-label="When" data-autosubmit>
         <option value="">Upcoming</option>
         <option value="today" {% if filters.when == 'today' %}selected{% endif %}>Today</option>
         <option value="week" {% if filters.when == 'week' %}selected{% endif %}>This week</option>
         <option value="month" {% if filters.when == 'month' %}selected{% endif %}>This month</option>
       </select>
-      <select name="location" aria-label="Location" onchange="this.form.submit()">
+      <select name="location" aria-label="Location" data-autosubmit>
         <option value="">Anywhere</option>
         {% for loc in LOCATIONS %}<option {% if filters.location == loc %}selected{% endif %}>{{ loc }}</option>{% endfor %}
       </select>
-      <select name="skill" aria-label="Skill level" onchange="this.form.submit()">
+      <select name="skill" aria-label="Skill level" data-autosubmit>
         <option value="">Any level</option>
         {% for level in SKILL_LEVELS %}<option {% if filters.skill == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
       </select>

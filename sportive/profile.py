@@ -6,7 +6,7 @@ from flask import (Blueprint, Response, abort, flash, g, redirect, render_templa
 from werkzeug.datastructures import MultiDict
 from werkzeug.security import check_password_hash
 
-from .auth import login_required, safe_next
+from .auth import hash_password, login_required, password_problem, safe_next
 from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
 from .events import celebrate_progress, query_events
@@ -21,8 +21,8 @@ bp = Blueprint("profile", __name__)
 
 # Pages you can still open before adding a profile picture.
 ALLOWED_WITHOUT_PHOTO = {"profile.photo_upload", "profile.photo_skip", "profile.photo", "profile.delete_account",
-                         "auth.logout", "how_it_works", "static", "favicon",
-                         "touch_icon_apple_touch_icon_png", "touch_icon_apple_touch_icon_precomposed_png"}
+                         "auth.logout", "how_it_works", "privacy", "terms", "static", "favicon", "touch_icon",
+                         "touch_icon_precomposed"}
 
 
 @bp.before_app_request
@@ -179,7 +179,25 @@ def edit():
                          + [("sports", s) for s in user_sports(me["id"])]
                          + ([("email_reminders", "1")] if me["email_reminders"] else [])
                          + ([("show_ranks", "1")] if me["show_ranks"] else []))
-    return render_template("profile/edit.html", form=form)
+    return render_template("profile/edit.html", form=form, max_grad_year=now_local().year + 8)
+
+
+@bp.route("/profile/password", methods=("POST",))
+@login_required
+def change_password():
+    form = request.form
+    if not check_password_hash(g.user["password_hash"], form.get("current_password", "")):
+        error = "Your current password isn't right."
+    else:
+        error = password_problem(form.get("password", ""), form.get("password2", ""))
+    if error:
+        flash(f"{error} Your password was not changed.", "error")
+    else:
+        db = get_db()
+        db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(form["password"]), g.user["id"]))
+        db.commit()
+        flash("Password changed.", "success")
+    return redirect(url_for("profile.edit") + "#password")
 
 
 CONFIRM_WORD = "DELETE"

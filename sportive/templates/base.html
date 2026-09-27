@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Find pickup games, verified UW clubs and people to play sports with. For UW Huskies.">
   <title>{% block title %}Home{% endblock %} · Sportive Circle</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,7 +32,7 @@
   {# Top bar: logo + quick icons on phones; for visitors it holds the whole menu. #}
   <header class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="{{ url_for('index') }}">Sportive<span>Circle</span></a>
+      <a class="brand" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='icon.svg') }}" alt="" width="28" height="28"><span>Sportive<span class="brand-accent">Circle</span></span></a>
       {% if app_nav %}
         <nav class="top-icons" aria-label="Shortcuts">
           {% if is_admin() %}{% set open_reports = open_report_count() %}<a href="{{ url_for('moderation.admin_reports') }}" aria-label="Reports{% if open_reports %}, {{ open_reports }} open{% endif %}" title="Reports">{{ icon('shield') }}{% if open_reports %}<span class="count-dot">{{ open_reports }}</span>{% endif %}</a>{% endif %}
@@ -49,8 +50,8 @@
         </nav>
       {% else %}
         <nav class="nav">
-          <a href="{{ url_for('clubs.directory') }}">Clubs</a>
-          <a href="{{ url_for('how_it_works') }}">How it works</a>
+          <a class="wide-only" href="{{ url_for('clubs.directory') }}">Clubs</a>
+          <a class="wide-only" href="{{ url_for('how_it_works') }}">How it works</a>
           <a href="{{ url_for('auth.login') }}">Log in</a>
           <a class="nav-cta" href="{{ url_for('auth.signup') }}">Sign up</a>
         </nav>
@@ -61,7 +62,7 @@
   {% if app_nav %}
     {# The same 5 sections everywhere: a bottom tab bar on phones/tablets, a sidebar on laptops. #}
     <nav class="appnav" aria-label="Main">
-      <a class="brand side-only" href="{{ url_for('index') }}">Sportive<span>Circle</span></a>
+      <a class="brand side-only" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='icon.svg') }}" alt="" width="28" height="28"><span>Sportive<span class="brand-accent">Circle</span></span></a>
       {{ tab(url_for('events.feed'), 'home', 'Home', ep in ('events.feed', 'index', 'events.my_events', 'events.detail')) }}
       {{ tab(url_for('clubs.directory'), 'clubs', 'Clubs', ep.startswith('clubs.') and ep not in ('clubs.create', 'clubs.review_queue')) }}
       {{ tab(url_for('create_menu'), 'plus', 'Create', ep in ('create_menu', 'events.create', 'events.quick', 'clubs.create'), extra_class='tab-create') }}
@@ -96,8 +97,12 @@
   </main>
 
   <footer class="site-footer">
-    <p>Made by Huskies, for Huskies · <a href="{{ url_for('how_it_works') }}">How it works</a> · A student project, not an official University of Washington service.</p>
+    <p>Made by Huskies, for Huskies 💜💛 Go Dawgs!</p>
+    <p><a href="{{ url_for('how_it_works') }}">How it works</a> · <a href="{{ url_for('privacy') }}">Privacy</a> ·
+      <a href="{{ url_for('terms') }}">Terms</a></p>
+    <p class="footer-fine">A student project. Not an official University of Washington service.</p>
   </footer>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
   <script src="{{ url_for('static', filename='spirit.js') }}" defer></script>
 </body>
 </html>

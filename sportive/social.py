@@ -1,8 +1,9 @@
 """Friends, blocking, direct messages and event group chats.
 
 Safety rules:
-- You can DM your friends, or anyone you've shared an event with. Everyone else needs
-  to be your friend first (send a friend request).
+- You can DM your friends, anyone you've shared an event with, and officers of verified clubs
+  (they're the club's public contact). Officers can message people connected to their club.
+  Anyone can reply to someone who messaged them. Everyone else: send a friend request first.
 - Blocking someone stops all messages and friend requests between you, both ways.
 - Event chats are only for people going to that event.
 """
@@ -10,7 +11,7 @@ from datetime import timedelta
 
 from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
 
-from .auth import login_required
+from .auth import login_required, safe_next
 from .db import get_db
 from .timeutil import fmt_clock, fmt_when, now_local, to_db
 
@@ -60,20 +61,41 @@ def shared_an_event(a, b):
            WHERE r1.user_id = ? AND r2.user_id = ? LIMIT 1""", (a, b)).fetchone() is not None
 
 
-def officer_connection(a, b):
-    """True if either of them is an officer of a verified club. Officers are the club's public contact,
-    so students can ask them questions before joining (and officers can reply)."""
+def is_club_officer(user_id):
+    """Officers of verified clubs are the club's public contact: any student can ask them a question."""
     return get_db().execute(
         """SELECT 1 FROM club_members m JOIN clubs c ON c.id = m.club_id
-           WHERE m.user_id IN (?, ?) AND m.role = 'officer' AND c.status = 'approved' LIMIT 1""",
-        (a, b)).fetchone() is not None
+           WHERE m.user_id = ? AND m.role = 'officer' AND c.status = 'approved' LIMIT 1""",
+        (user_id,)).fetchone() is not None
+
+
+def officer_of_their_club(officer, other):
+    """True if `officer` runs a club that `other` follows, asked to join, tried out for, or is in."""
+    return get_db().execute(
+        """SELECT 1 FROM club_members mine JOIN club_members theirs ON theirs.club_id = mine.club_id
+           WHERE mine.user_id = ? AND mine.role = 'officer' AND theirs.user_id = ? LIMIT 1""",
+        (officer, other)).fetchone() is not None
+
+
+def they_messaged_me(me, other):
+    return get_db().execute("SELECT 1 FROM direct_messages WHERE sender_id = ? AND recipient_id = ? LIMIT 1",
+                            (other, me)).fetchone() is not None
 
 
 def can_message(me, other):
     if me == other or is_blocked_between(me, other):
         return False
     return (friendship_status(me, other) == "friends" or shared_an_event(me, other)
-            or officer_connection(me, other))
+            or is_club_officer(other) or officer_of_their_club(me, other) or they_messaged_me(me, other))
+
+
+def block_user(me, other):
+    """Block someone: no more messages or friend requests either way, and any friendship ends."""
+    db = get_db()
+    db.execute("INSERT OR IGNORE INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, ?)",
+               (me, other, to_db(now_local())))
+    db.execute("""DELETE FROM friendships WHERE (requester_id = ? AND addressee_id = ?)
+                  OR (requester_id = ? AND addressee_id = ?)""", (me, other, other, me))
 
 
 def too_many_messages(me):
@@ -182,13 +204,39 @@ def friends():
              AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = ?)
            GROUP BY u.id ORDER BY games DESC, u.full_name LIMIT 10""",
         (to_db(now_local()), me, me, me, me, me)).fetchall()
+    q = request.args.get("q", "").strip()
     return render_template("social/friends.html", incoming=incoming, outgoing=outgoing,
-                           friends=friend_list, suggestions=suggestions)
+                           friends=friend_list, suggestions=suggestions, q=q, results=search_people(me, q))
+
+
+MIN_SEARCH_LENGTH = 2
+MAX_SEARCH_RESULTS = 20
+
+
+def search_people(me, q):
+    """Huskies whose name matches the search (first name, last name, or both), for "Add friend".
+
+    Only names, photos and class years are shown. People who blocked you (or you blocked) never appear.
+    """
+    if len(q) < MIN_SEARCH_LENGTH:
+        return []
+    words = q.lower().split()[:3]
+    where = " AND ".join("LOWER(u.full_name) LIKE ? ESCAPE '\\'" for _ in words)
+    like = ["%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%" for word in words]
+    rows = get_db().execute(
+        f"""SELECT u.id, u.full_name, u.avatar_updated, u.grad_year FROM users u
+            WHERE u.verified = 1 AND u.suspended = 0 AND u.id != ? AND {where}
+              AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
+              AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = ?)
+            ORDER BY LOWER(u.full_name) LIKE ? DESC, u.full_name LIMIT ?""",
+        (me, *like, me, me, words[0] + "%", MAX_SEARCH_RESULTS)).fetchall()
+    return [{**dict(row), "status": friendship_status(me, row["id"])} for row in rows]
 
 
 def _back(default):
+    """Go back to the page the button was on (a hidden "next" field), or to `default`."""
     target = request.form.get("next", "")
-    return redirect(target if target.startswith("/") and not target.startswith("//") else default)
+    return redirect(safe_next(target) if target else default)
 
 
 @bp.route("/friends/request/<int:user_id>", methods=("POST",))
@@ -245,12 +293,8 @@ def block(user_id):
     me = g.user["id"]
     get_user(user_id)
     if user_id != me:
-        db = get_db()
-        db.execute("INSERT OR IGNORE INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, ?)",
-                   (me, user_id, to_db(now_local())))
-        db.execute("""DELETE FROM friendships WHERE (requester_id = ? AND addressee_id = ?)
-                      OR (requester_id = ? AND addressee_id = ?)""", (me, user_id, user_id, me))
-        db.commit()
+        block_user(me, user_id)
+        get_db().commit()
         flash("Blocked. They can't message you or send you friend requests anymore.", "info")
     return redirect(url_for("profile.view", user_id=user_id))
 
@@ -307,7 +351,8 @@ def thread(user_id):
     allowed = can_message(me, user_id)
     if request.method == "POST":
         if not allowed:
-            flash("You can message friends and people you've played with. Send a friend request first!", "error")
+            flash("You can message friends, people you've played with, and club officers. "
+                  "Send a friend request first!", "error")
         else:
             body, error = clean_body(request.form.get("body"))
             if error:

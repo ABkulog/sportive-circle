@@ -11,6 +11,9 @@ log = logging.getLogger(__name__)
 def send_email(to, subject, body):
     """Send an email. Returns False in local development, where nothing is actually sent."""
     cfg = current_app.config
+    if current_app.testing:
+        # Tests read what would have been sent from app.extensions["outbox"].
+        current_app.extensions.setdefault("outbox", []).append({"to": to, "subject": subject, "body": body})
     if not cfg.get("MAIL_SERVER"):
         if current_app.debug or current_app.testing:
             log.warning("DEV email (not sent) to %s: %s\n%s", to, subject, body)

@@ -1,21 +1,44 @@
 {% extends "base.html" %}
+{% block title %}Play sports with Huskies{% endblock %}
 {% block content %}
-<section class="hero">
-  <p class="eyebrow">🐺 For UW Huskies</p>
-  <h1>Bow down to Washington.<br><span class="gold">Then go play.</span></h1>
-  <p class="lead">Pickup basketball at the IMA, a run on the Burke-Gilman, climbing partners, ski trips.
-    Sportive Circle connects Huskies who want to play. Find people to play with, today.</p>
+<section class="hero husky-hero">
+  <p class="eyebrow">🐾 For UW students</p>
+  <h1>Find people to play with.<br><span class="gold">Go Dawgs.</span></h1>
+  <p class="lead">Pickup games, running buddies and verified UW clubs, all in one place.
+    Sign up with your UW email and join a game today.</p>
   <div class="hero-actions">
-    <a class="btn btn-large" href="{{ url_for('auth.signup') }}">Sign up with your UW email</a>
-    <a class="btn btn-ghost btn-large" href="{{ url_for('clubs.directory') }}">Browse UW clubs</a>
+    <a class="btn btn-large btn-on-purple" href="{{ url_for('auth.signup') }}">Sign up with your UW email</a>
+    <a class="btn btn-large btn-outline-light" href="{{ url_for('auth.login') }}">Log in</a>
   </div>
-  <p class="muted">Already have an account? <a href="{{ url_for('auth.login') }}">Log in</a></p>
-  <p class="muted"><a href="{{ url_for('how_it_works') }}">New here? See how it works in 1 minute →</a></p>
+</section>
+
+<section class="how-strip" aria-label="How it works">
+  <ol>
+    <li><span aria-hidden="true">1</span><strong>Sign up</strong><small>with your @uw.edu email</small></li>
+    <li><span aria-hidden="true">2</span><strong>Pick a game</strong><small>or post your own</small></li>
+    <li><span aria-hidden="true">3</span><strong>Show up & play</strong><small>maps and reminders included</small></li>
+  </ol>
+  <p><a href="{{ url_for('how_it_works') }}">More about how it works →</a> ·
+    <a href="{{ url_for('clubs.directory') }}">Browse clubs →</a></p>
+</section>
+
+<section class="features">
+  <div class="feature">
+    <h3>⚡ Short a few players?</h3>
+    <p>Post "need 2 for 5v5" in seconds. It shows up at the top of everyone's feed.</p>
+  </div>
+  <div class="feature">
+    <h3>🏛️ Real UW clubs</h3>
+    <p>Every club is checked against HuskyLink or UW Recreation before it's listed.</p>
+  </div>
+  <div class="feature">
+    <h3>🐺 Only Huskies</h3>
+    <p>Every account uses a verified UW email, so you know who you're playing with.</p>
+  </div>
 </section>
 
 <section class="landing-clubs">
   <h2>Verified UW clubs</h2>
-  <p class="muted">Every club on Sportive Circle is a real, active UW club, checked by us.</p>
   {% if clubs %}
     <div class="club-grid">
       {% for c in clubs %}
@@ -30,26 +53,12 @@
     </div>
     <p><a class="btn btn-ghost" href="{{ url_for('clubs.directory') }}">See all clubs →</a></p>
   {% else %}
-    <p class="card muted">Clubs are joining now. Officer of a UW club? <a href="{{ url_for('auth.signup', next=url_for('clubs.create')) }}">Register it</a>.</p>
+    <p class="card muted">Clubs are joining now. Officer of a UW club?
+      <a href="{{ url_for('auth.signup', next=url_for('clubs.create')) }}">Register it</a>.</p>
   {% endif %}
 </section>
 
-<section class="features">
-  <div class="feature">
-    <h3>⚡ Need players?</h3>
-    <p>Short 2 for a 5v5? Post it in seconds and it goes to the top of everyone's feed.</p>
-  </div>
-  <div class="feature">
-    <h3>🎯 Your sports, your level</h3>
-    <p>See events for the sports you care about, filtered by place, day and skill level.</p>
-  </div>
-  <div class="feature">
-    <h3>🐺 Only Huskies</h3>
-    <p>Every account is a verified @uw.edu email, so you know who you're playing with.</p>
-  </div>
-</section>
-
-<section class="sport-cloud" aria-label="Sports">
+<section class="sport-cloud" aria-label="Sports you can play">
   {% for key, label in SPORTS.items() %}<span class="chip">{{ SPORT_EMOJI[key] }} {{ label }}</span>{% endfor %}
 </section>
 {% endblock %}

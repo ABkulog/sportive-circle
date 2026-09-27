@@ -10,3 +10,6 @@ __pycache__/
 instance/
 *.db
 *.sqlite
+
+# Secrets: real settings never go to GitHub (.env.example is the template)
+.env

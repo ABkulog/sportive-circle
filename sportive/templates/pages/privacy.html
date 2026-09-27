@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Privacy{% endblock %}
+{% set contact = config.CONTACT_EMAIL or (config.ADMIN_EMAILS.split(',')[0].strip() if config.ADMIN_EMAILS else '') %}
+{% block content %}
+<article class="card form-card legal">
+  <p class="eyebrow">Privacy</p>
+  <h1>Your data, in plain words</h1>
+  <p class="muted">Last updated September 27, 2026</p>
+
+  <p>Sportive Circle is a student project that helps UW students find people to play sports with.
+    It is not run by the University of Washington. We collect only what the app needs, we never sell it,
+    and there are no ads.</p>
+
+  <h2>What we collect</h2>
+  <ul>
+    <li><strong>Your account:</strong> name, UW email, password (stored scrambled, never readable), date of birth
+      (only to check you're old enough and to say happy birthday), and graduation year if you add it.</li>
+    <li><strong>Your profile:</strong> photo, bio, the sports you like, and whether ranks are shown.</li>
+    <li><strong>What you do in the app:</strong> games you host or join, props and vouches, badges, friends,
+      clubs you follow or join, messages, and reports you send.</li>
+  </ul>
+
+  <h2>What we don't collect</h2>
+  <ul>
+    <li><strong>Your location.</strong> "Where am I?" on a map runs only in your browser and is never sent to us.</li>
+    <li><strong>Photo metadata.</strong> We remove hidden info (like where a photo was taken) when you upload it.</li>
+    <li>No tracking cookies and no advertising. The only cookie keeps you logged in.</li>
+  </ul>
+
+  <h2>Who can see what</h2>
+  <ul>
+    <li>Your name, photo, class year, bio, sports, badges and ranks are visible to other logged-in UW students.
+      Turn on chill mode to hide your ranks.</li>
+    <li>Your email is visible only to you and people you've played a game with.</li>
+    <li>Direct messages are visible to you and the other person. Event chats are visible to everyone going to that event.</li>
+    <li>If you report something, a copy goes to our admins so they can review it. The person isn't told who reported them.</li>
+    <li>Admins can see account details when they need to handle a report or verify a club.</li>
+  </ul>
+
+  <h2>Other services the app uses</h2>
+  <ul>
+    <li><strong>Email:</strong> codes, reminders and club notices are sent through our email provider.</li>
+    <li><strong>Maps:</strong> map images come from OpenStreetMap, and the map code from cdnjs. Your browser
+      downloads them directly, so those services see your IP address, like any website you visit.
+      Directions open in Google Maps or Apple Maps only if you tap them.</li>
+    <li><strong>Fonts:</strong> one font comes from Google Fonts.</li>
+    <li><strong>News:</strong> headlines come from GoHuskies.com. Our server fetches them; your data isn't shared.</li>
+  </ul>
+
+  <h2>Your choices</h2>
+  <ul>
+    <li>Edit your profile, photo, sports and email reminders any time in <strong>Profile → Edit profile</strong>.</li>
+    <li><strong>Delete your account</strong> from the same page. Your profile, photo, games you host, messages and badges are
+      deleted right away. Reports about other people stay for safety, without your name.</li>
+  </ul>
+
+  <h2>Questions</h2>
+  <p>{% if contact %}Email <a href="mailto:{{ contact }}">{{ contact }}</a>.{% else %}Message an admin through the app.{% endif %}
+    If we ever change how we use your data, we'll update this page and tell you in the app.</p>
+</article>
+{% endblock %}

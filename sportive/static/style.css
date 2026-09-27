@@ -7,7 +7,7 @@
   --purple: #4b2e83;           /* UW purple: main buttons, active tab */
   --purple-strong: #32006e;
   --gold: #b7a57a;             /* UW gold: rare highlights */
-  --spirit-gold: #e8b600;
+  --spirit-gold: #ffc700;      /* UW Spirit Gold */
   --accent: var(--purple);     /* text/icon accent (lighter in dark mode) */
   --accent-soft: #f1edf8;
 
@@ -68,16 +68,23 @@ small { font-size: .82rem; }
 
 .page { max-width: 640px; margin: 0 auto; padding: 16px 16px 24px; }
 .page-title { font-size: 1.5rem; margin: 4px 0 14px; }
+.spirit-line { margin: -10px 0 14px; font-size: .9rem; font-weight: 600; color: #8a6d00; }
+@media (prefers-color-scheme: dark) { .spirit-line { color: var(--spirit-gold); } }
 .section-title { font-size: 1rem; font-weight: 700; margin: 26px 0 8px; }
 .stack { display: grid; }
 
 /* ============================== Top bar (phones) & logo ============================== */
 .topbar { position: sticky; top: 0; z-index: 30; background: var(--bg); border-bottom: 1px solid var(--line); }
+/* The Husky stripe: a thin purple-to-gold line along the very top of every page. */
+body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 40;
+  background: linear-gradient(90deg, var(--purple) 0 60%, var(--spirit-gold) 60% 100%); }
 .topbar-inner { max-width: 640px; margin: 0 auto; padding: 0 12px 0 16px; height: 56px;
   display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .brand { font-family: var(--display); font-weight: 900; font-size: 1.3rem; letter-spacing: -.01em;
   color: var(--text); text-decoration: none; }
-.brand span { color: var(--accent); }
+.brand { display: inline-flex; align-items: center; gap: 8px; }
+.brand img { width: 28px; height: 28px; flex: none; }
+.brand-accent { color: var(--accent); }
 .brand:hover { text-decoration: none; }
 .top-icons { display: flex; gap: 2px; }
 .top-icons a { position: relative; width: 40px; height: 40px; display: grid; place-items: center;
@@ -87,6 +94,8 @@ small { font-size: .82rem; }
 .nav { display: flex; align-items: center; gap: 16px; }
 .nav a, .nav .link-button { color: var(--text); font-weight: 600; font-size: .95rem; }
 .nav form { margin: 0; }
+.nav a { white-space: nowrap; }
+@media (max-width: 520px) { .nav .wide-only { display: none; } }
 .nav-cta { background: var(--purple); color: #fff !important; padding: 7px 14px; border-radius: 999px; }
 .nav-cta:hover { background: var(--purple-strong); text-decoration: none; }
 
@@ -110,6 +119,8 @@ small { font-size: .82rem; }
 .tab.is-active { color: var(--text); }
 .tab.is-active .icon { stroke-width: 2.4; color: var(--accent); }
 .tab.is-active .tab-label { font-weight: 700; }
+.tab.is-active .tab-icon::after { content: ""; position: absolute; bottom: -5px; left: 50%; width: 4px; height: 4px;
+  margin-left: -2px; border-radius: 50%; background: var(--spirit-gold); }
 .side-logout { margin: 0; }
 body.hide-tabs .appnav { display: none; }
 body.hide-tabs { padding-bottom: 0; }
@@ -371,11 +382,34 @@ form[data-wizard] .form-step { display: none; }
 .post-game h2 { margin-bottom: 4px; }
 
 /* ============================== Profiles & badges ============================== */
-.profile { display: flex; gap: 18px; align-items: center; border: 0; padding: 0; }
-.profile-info { flex: 1; min-width: 0; display: grid; gap: 6px; justify-items: start; }
-.profile-info h1, .profile-info p { margin: 0; overflow-wrap: anywhere; }
-.profile-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.profile-actions form { margin: 0; }
+/* Profile header, like Instagram: photo + name, then bio, then full-width buttons. */
+.profile { display: grid; gap: 12px; margin-bottom: 18px; }
+.profile-top { display: flex; gap: 16px; align-items: center; }
+.profile-photo { position: relative; flex: none; border-radius: 50%; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--purple); }
+.profile-photo:hover { text-decoration: none; }
+.photo-badge { position: absolute; right: -4px; bottom: -4px; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; font-size: .9rem; background: var(--bg); box-shadow: 0 0 0 1px var(--line); }
+.profile-name { min-width: 0; }
+.profile-name h1 { margin: 0 0 2px; overflow-wrap: anywhere; }
+.profile-name p { margin: 0; font-size: .92rem; overflow-wrap: anywhere; }
+.profile-bio { margin: 0; overflow-wrap: anywhere; }
+.profile-buttons { display: flex; gap: 8px; }
+.profile-buttons > * { flex: 1; margin: 0; }
+.profile-buttons form .btn, .profile-buttons > .btn { width: 100%; justify-content: center; text-align: center; }
+.profile-buttons .more-menu { flex: 0 0 auto; }
+.profile-sports { gap: 6px; }
+.edit-photo { display: grid; justify-items: center; gap: 8px; margin: 4px 0 16px; font-weight: 600; }
+.edit-photo:hover { text-decoration: none; }
+.people-search { display: flex; gap: 8px; margin: 0 0 16px; }
+.people-search input { flex: 1; min-width: 0; }
+.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.section-head a { font-size: .9rem; font-weight: 600; }
+.showcase-row { list-style: none; padding: 0; margin: 4px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.showcase-badge { display: grid; justify-items: center; gap: 4px; padding: 12px 6px; border-radius: var(--radius);
+  background: var(--surface); text-align: center; }
+.showcase-badge strong { font-size: .78rem; line-height: 1.2; overflow-wrap: anywhere; }
+.showcase-badge.is-limited { box-shadow: inset 0 0 0 1.5px var(--gold); }
+.showcase-emoji { font-size: 1.6rem; }
 .more-menu { position: relative; }
 .more-menu > summary { list-style: none; cursor: pointer; padding: 6px 12px; border-radius: 8px; background: var(--surface); font-weight: 700; }
 .more-menu > summary::-webkit-details-marker { display: none; }
@@ -554,6 +588,25 @@ form[data-wizard] .form-step { display: none; }
 .hero { padding: 32px 0 12px; }
 .hero h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1.05; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0 10px; }
+/* Landing hero: UW purple with gold, the one big splash of color in the app. */
+.husky-hero { margin: 4px -16px 0; padding: 36px 20px 28px; color: #fff; border-radius: 0 0 22px 22px;
+  background: radial-gradient(120% 90% at 100% 0%, #6a4aa8 0%, transparent 60%), var(--purple); }
+.husky-hero .eyebrow { color: var(--spirit-gold); }
+.husky-hero .gold { color: var(--spirit-gold); }
+.husky-hero .lead { color: rgba(255, 255, 255, .85); }
+.btn-on-purple { background: var(--spirit-gold); color: #1f1235; }
+.btn-on-purple:hover { background: #ffd43b; }
+.btn-outline-light { background: transparent; color: #fff; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .6); }
+.btn-outline-light:hover { background: rgba(255, 255, 255, .1); }
+@media (min-width: 700px) { .husky-hero { margin: 8px 0 0; border-radius: 22px; padding: 44px 36px 34px; } }
+.how-strip { margin: 24px 0 8px; }
+.how-strip ol { list-style: none; padding: 0; margin: 0 0 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.how-strip li { display: grid; justify-items: center; text-align: center; gap: 2px; padding: 14px 6px;
+  border-radius: var(--radius); background: var(--surface); }
+.how-strip li span { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--purple); color: var(--spirit-gold); font-weight: 800; margin-bottom: 4px; }
+.how-strip strong { font-size: .92rem; }
+.how-strip small { color: var(--muted); font-size: .76rem; line-height: 1.25; }
 .features { display: grid; gap: 0; margin: 28px 0; }
 .feature { padding: 14px 0; border-bottom: 1px solid var(--line); }
 .feature h3 { margin: 0 0 2px; }
@@ -571,6 +624,15 @@ form[data-wizard] .form-step { display: none; }
 .faq summary { font-weight: 600; }
 .faq details p { margin: 8px 0 0; color: var(--muted); }
 .how-cta { text-align: center; padding: 28px 0 8px; }
+.step-number { background: var(--purple); color: var(--spirit-gold); }
+.glossary { margin: 0; }
+.glossary div { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.glossary dt { font-weight: 700; }
+.glossary dd { margin: 2px 0 0; color: var(--muted); }
+.faq + .faq { margin-top: 20px; }
+/* Privacy & Terms */
+.legal h2 { margin-top: 22px; }
+.legal li { margin-bottom: 6px; }
 
 /* ============================== Misc pages ============================== */
 .past-list { list-style: none; margin: 0; padding: 0; border: 0; }
@@ -597,7 +659,8 @@ form[data-wizard] .form-step { display: none; }
 
 /* ============================== Footer ============================== */
 .site-footer { max-width: 640px; margin: 24px auto 0; padding: 16px; text-align: center; color: var(--faint); font-size: .76rem; }
-.site-footer p { margin: 0; }
+.site-footer p { margin: 0 0 4px; }
+.footer-fine { font-size: .72rem; }
 .site-footer a { color: var(--muted); }
 
 /* ============================== Confetti (celebrations) ============================== */

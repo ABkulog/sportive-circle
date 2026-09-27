@@ -13,7 +13,7 @@
   {{ chat_box(messages, poll_url, url_for('social.thread', user_id=other.id), allowed,
               "Message " ~ other.full_name.split()[0] ~ "…", "Say hi! 👋") }}
   {% if not allowed %}
-    <p class="muted">You can message friends and people you've played with.
+    <p class="muted">To keep spam out, you can message friends, people you've played with, and club officers.
       <a href="{{ url_for('profile.view', user_id=other.id) }}">Send {{ other.full_name.split()[0] }} a friend request</a> first.</p>
   {% endif %}
 {% endif %}

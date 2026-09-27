@@ -1,22 +1,26 @@
 """Feed, event create/edit/cancel, RSVPs, 'Need players' quick posts, and My events."""
-from datetime import datetime, time, timedelta
+import logging
+from datetime import datetime, time, timedelta, timezone
 from urllib.parse import quote
 
 from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
 
 from .auth import login_required, safe_next
+from .badges import sync_badges
+from .clubs import featured_clubs, suggested_clubs
 from .constants import (LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS, SKILL_LEVELS,
                         SPORT_LOCATIONS, SPORT_MAX_PLAYERS, SPORTS)
 from .db import get_db, user_sports
-from .ranks import (LEVEL_REQUIREMENT, compute_rank, level_allowed, my_ranks, played_together, props_open,
-                    sport_rep, vouch_counts)
-from .badges import sync_badges
-from .ranks import check_rank_ups
+from .links import public_url
+from .mail import send_email
+from .ranks import (LEVEL_REQUIREMENT, check_rank_ups, compute_rank, level_allowed, my_ranks, played_together,
+                    props_open, sport_rep, vouch_counts)
 from .spirit import greeting, top_dawgs
 from .timeutil import fmt_clock, fmt_when, from_db, now_local, parse_form, to_db, to_form
 
 bp = Blueprint("events", __name__)
+log = logging.getLogger(__name__)
 
 MAX_EVENT_LENGTH = timedelta(days=3)   # long enough for a ski or hiking trip
 MAX_DAYS_AHEAD = 365
@@ -195,7 +199,6 @@ def celebrate_progress(user_id):
 @bp.route("/")
 def feed():
     if g.user is None:
-        from .clubs import featured_clubs
         return render_template("landing.html", clubs=featured_clubs())
 
     my_sports = user_sports(g.user["id"])
@@ -251,11 +254,10 @@ def feed():
         {"now": to_db(now), "soon": to_db(now + UP_NEXT_WINDOW)}, limit=1)
 
     celebrate_progress(g.user["id"])
-    from .clubs import suggested_clubs
-    hello, _ = greeting(g.user["full_name"].split()[0], now)
+    hello, spirit_line = greeting(g.user["full_name"].split()[0], now)
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
-                           hello=hello, top_dawgs=top_dawgs(now=now),
+                           hello=hello, spirit_line=spirit_line, top_dawgs=top_dawgs(now=now),
                            club_picks=suggested_clubs(g.user["id"], my_sports))
 
 
@@ -422,12 +424,31 @@ def edit(event_id):
 @bp.route("/events/<int:event_id>/cancel", methods=("POST",))
 @login_required
 def cancel(event_id):
-    get_event(event_id, host_only=True)
+    event = get_event(event_id, host_only=True)
+    if event["cancelled"] or from_db(event["ends_at"]) < now_local():
+        return redirect(url_for("events.detail", event_id=event_id))
     db = get_db()
     db.execute("UPDATE events SET cancelled = 1 WHERE id = ?", (event_id,))
     db.commit()
-    flash("Event canceled. Everyone who joined will see it's canceled.", "info")
+    tell_players_it_was_cancelled(event)
+    flash("Event canceled. We let everyone who joined know.", "info")
     return redirect(url_for("events.my_events"))
+
+
+def tell_players_it_was_cancelled(event):
+    """Email everyone who joined (except the host), so nobody shows up to an empty field."""
+    players = get_db().execute(
+        """SELECT u.email, u.full_name FROM rsvps r JOIN users u ON u.id = r.user_id
+           WHERE r.event_id = ? AND r.user_id != ?""", (event["id"], event["host_id"])).fetchall()
+    title, when = event_title(event), fmt_when(event["starts_at"])
+    for player in players:
+        try:
+            send_email(player["email"], f"Canceled: {title} ({when})",
+                       f"Hey {player['full_name'].split()[0]},\n\n"
+                       f"Heads up: {event['host_name']} canceled {title} ({when}, {event['location']}).\n\n"
+                       f"Find another game: {public_url('events.feed')}\n\nGo Dawgs!\nSportive Circle")
+        except Exception:  # one bad address shouldn't stop the others
+            log.exception("Couldn't email %s about a canceled event", player["email"])
 
 
 # ------------------------------------------------------ "Need players" post
@@ -524,6 +545,7 @@ def detail(event_id):
                            my_invite=None if level_ok or event["i_am_going"] else my_plus_one_invite(event_id),
                            plus_one=plus_one_state(event),
                            names={person["id"]: person["full_name"].split()[0] for person in attendees},
+                           share_url=public_url("events.detail", event_id=event_id),
                            ranked_game=event["skill_level"] in LEVEL_REQUIREMENT)
 
 
@@ -567,7 +589,7 @@ def invite_plus_one(event_id, friend_id):
         now = to_db(now_local())
         db.execute("INSERT INTO plus_one_invites (event_id, sponsor_id, guest_id, created_at) VALUES (?, ?, ?, ?)",
                    (event_id, g.user["id"], friend_id, now))
-        link = url_for("events.detail", event_id=event_id, _external=True)
+        link = public_url("events.detail", event_id=event_id)
         db.execute("INSERT INTO direct_messages (sender_id, recipient_id, body, created_at) VALUES (?, ?, ?, ?)",
                    (g.user["id"], friend_id,
                     f"🤝 I invited you as my +1 to {event_title(event)} ({fmt_when(event['starts_at'])}). "
@@ -667,6 +689,33 @@ def overlapping_event(event):
     return rows[0] if rows else None
 
 
+# Seattle's time zone rules, so calendar apps put the event at the right local time (RFC 5545).
+ICS_TIMEZONE = [
+    "BEGIN:VTIMEZONE", "TZID:America/Los_Angeles",
+    "BEGIN:DAYLIGHT", "TZOFFSETFROM:-0800", "TZOFFSETTO:-0700", "TZNAME:PDT", "DTSTART:19700308T020000",
+    "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU", "END:DAYLIGHT",
+    "BEGIN:STANDARD", "TZOFFSETFROM:-0700", "TZOFFSETTO:-0800", "TZNAME:PST", "DTSTART:19701101T020000",
+    "RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU", "END:STANDARD",
+    "END:VTIMEZONE",
+]
+
+
+def ics_fold(line):
+    """Calendar files allow at most 75 bytes per line; longer lines continue on the next line after a space."""
+    data = line.encode("utf-8")
+    if len(data) <= 75:
+        return line
+    parts, current = [], b""
+    for char in line:
+        encoded = char.encode("utf-8")
+        if len(current) + len(encoded) > (75 if not parts else 74):
+            parts.append(current.decode("utf-8"))
+            current = b""
+        current += encoded
+    parts.append(current.decode("utf-8"))
+    return "\r\n ".join(parts)
+
+
 @bp.route("/events/<int:event_id>/calendar.ics")
 @login_required
 def calendar_file(event_id):
@@ -679,18 +728,23 @@ def calendar_file(event_id):
     def ics_text(value):
         return value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
+    link = public_url("events.detail", event_id=event["id"])
     lines = [
-        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Sportive Circle UW//EN", "BEGIN:VEVENT",
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Sportive Circle UW//EN", "CALSCALE:GREGORIAN",
+        *ICS_TIMEZONE,
+        "BEGIN:VEVENT",
         f"UID:event-{event['id']}@sportivecircle",
-        f"DTSTAMP:{now_local().strftime('%Y%m%dT%H%M%S')}",
+        f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
         f"DTSTART;TZID=America/Los_Angeles:{ics_time(event['starts_at'])}",
         f"DTEND;TZID=America/Los_Angeles:{ics_time(event['ends_at'])}",
         f"SUMMARY:{ics_text(event_title(event))}",
         f"LOCATION:{ics_text(event['location'])}",
-        f"DESCRIPTION:{ics_text(event['note'] + chr(10) + url_for('events.detail', event_id=event['id'], _external=True))}",
+        f"DESCRIPTION:{ics_text((event['note'] + chr(10) if event['note'] else '') + link)}",
+        f"URL:{link}",
+        f"STATUS:{'CANCELLED' if event['cancelled'] else 'CONFIRMED'}",
         "END:VEVENT", "END:VCALENDAR",
     ]
-    return Response("\r\n".join(lines) + "\r\n", mimetype="text/calendar",
+    return Response("\r\n".join(ics_fold(line) for line in lines) + "\r\n", mimetype="text/calendar",
                     headers={"Content-Disposition": f"attachment; filename=sportive-circle-{event['id']}.ics"})
 
 
@@ -700,6 +754,8 @@ def leave(event_id):
     event = get_event(event_id)
     if event["host_id"] == g.user["id"]:
         flash("You're the host. Cancel the event instead if you can't make it.", "error")
+    elif from_db(event["ends_at"]) < now_local():
+        flash("This game is over, so it stays in your history.", "info")
     else:
         db = get_db()
         db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, g.user["id"]))

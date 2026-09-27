@@ -1,5 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <circle cx="32" cy="32" r="30" fill="#4b2e83"/>
-  <circle cx="32" cy="32" r="30" fill="none" stroke="#ffc700" stroke-width="4"/>
-  <text x="32" y="41" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="26" font-weight="800" text-anchor="middle" fill="#ffc700">SC</text>
+  <circle cx="32" cy="32" r="28" fill="none" stroke="#ffc700" stroke-width="3"/>
+  <g fill="#ffc700">
+    <ellipse cx="32" cy="40" rx="10" ry="8.5"/>
+    <ellipse cx="19.5" cy="29" rx="4.2" ry="5.4" transform="rotate(-20 19.5 29)"/>
+    <ellipse cx="27.5" cy="21.5" rx="4.2" ry="5.6" transform="rotate(-6 27.5 21.5)"/>
+    <ellipse cx="36.5" cy="21.5" rx="4.2" ry="5.6" transform="rotate(6 36.5 21.5)"/>
+    <ellipse cx="44.5" cy="29" rx="4.2" ry="5.4" transform="rotate(20 44.5 29)"/>
+  </g>
 </svg>

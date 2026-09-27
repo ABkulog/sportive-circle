@@ -31,18 +31,4 @@
     <a href="{{ url_for('profile.edit') }}">Back to profile settings</a>
   {% endif %}
 </div>
-<script>
-  // Show the chosen photo right away (the server crops it to a square when you save).
-  document.getElementById("photo-input").addEventListener("change", (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    const preview = document.getElementById("photo-preview");
-    const image = new Image();
-    image.src = URL.createObjectURL(file);
-    image.alt = "";
-    image.className = "avatar-img";
-    image.style.setProperty("--size", "160px");
-    preview.replaceChildren(image);
-  });
-</script>
 {% endblock %}

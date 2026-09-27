@@ -1,4 +1,6 @@
 Flask>=3.0
-Pillow  # profile pictures
-tzdata  # timezone data on Windows
-pytest  # for running tests
+Pillow          # profile pictures
+tzdata          # timezone data on Windows
+gunicorn        # production web server (see wsgi.py)
+pytest          # tests
+pytest-bdd      # Gherkin scenarios (tests/features)

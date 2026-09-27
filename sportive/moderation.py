@@ -4,12 +4,14 @@ Students can report a profile, a direct message sent to them, or a message in an
 chat they're part of. The reported person is never told who reported them. Admins (the
 emails in the ADMIN_EMAILS setting) review reports on /admin/reports.
 """
+import functools
 from datetime import timedelta
 
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
 from .auth import login_required
 from .db import get_db
+from .social import block_user
 from .timeutil import now_local, to_db
 
 bp = Blueprint("moderation", __name__)
@@ -100,11 +102,7 @@ def report(target_type, target_id):
                     (me, target["user_id"], target_type, target_id, reason, details, target["snapshot"],
                      to_db(now_local())))
             if request.form.get("block"):
-                db.execute("INSERT OR IGNORE INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, ?)",
-                           (me, target["user_id"], to_db(now_local())))
-                db.execute("""DELETE FROM friendships WHERE (requester_id = ? AND addressee_id = ?)
-                              OR (requester_id = ? AND addressee_id = ?)""",
-                           (me, target["user_id"], target["user_id"], me))
+                block_user(me, target["user_id"])
             db.commit()
             flash("Thanks for letting us know. 🙏 We'll review it, and they won't be told who reported them."
                   + (" You've also blocked them." if request.form.get("block") else ""), "info")
@@ -116,12 +114,12 @@ def report(target_type, target_id):
 # ------------------------------------------------------------------- admins
 
 def admin_required(view):
+    @functools.wraps(view)
     @login_required
     def wrapped(**kwargs):
         if not is_admin():
             abort(404)  # pretend the page doesn't exist
         return view(**kwargs)
-    wrapped.__name__ = view.__name__
     return wrapped
 
 
@@ -134,13 +132,13 @@ def admin_reports():
     db = get_db()
     reports = db.execute(
         """SELECT r.*, reporter.full_name AS reporter_name, reported.full_name AS reported_name,
-                  reported.email AS reported_email
+                  reported.email AS reported_email, reported.suspended AS reported_suspended
            FROM reports r
            LEFT JOIN users reporter ON reporter.id = r.reporter_id
            LEFT JOIN users reported ON reported.id = r.reported_user_id
            WHERE r.status = ? ORDER BY r.id DESC LIMIT 200""", (status,)).fetchall()
     flagged = db.execute(
-        """SELECT u.id, u.full_name, u.email, COUNT(DISTINCT r.reporter_id) AS reporters
+        """SELECT u.id, u.full_name, u.email, u.suspended, COUNT(DISTINCT r.reporter_id) AS reporters
            FROM reports r JOIN users u ON u.id = r.reported_user_id
            WHERE r.status = 'open' GROUP BY u.id HAVING reporters >= ? ORDER BY reporters DESC""",
         (FLAG_THRESHOLD,)).fetchall()
@@ -158,6 +156,31 @@ def resolve(report_id, action):
     db = get_db()
     db.execute("UPDATE reports SET status = ?, reviewed_at = ? WHERE id = ?",
                (action, to_db(now_local()) if action != "open" else None, report_id))
+    db.commit()
+    return redirect(url_for("moderation.admin_reports", status=request.args.get("from", "open")))
+
+
+@bp.route("/admin/users/<int:user_id>/<action>", methods=("POST",))
+@admin_required
+def suspend(user_id, action):
+    """Suspend (or restore) an account. Suspended people can't log in, and games they host are canceled
+    so nobody shows up for nothing. Their reports stay for the record."""
+    if action not in ("suspend", "restore"):
+        abort(404)
+    db = get_db()
+    user = db.execute("SELECT id, full_name, email FROM users WHERE id = ?", (user_id,)).fetchone()
+    if user is None:
+        abort(404)
+    if action == "suspend" and (user_id == g.user["id"] or is_admin(user)):
+        flash("Admins can't be suspended here. Remove them from ADMIN_EMAILS first.", "error")
+    elif action == "suspend":
+        db.execute("UPDATE users SET suspended = 1 WHERE id = ?", (user_id,))
+        db.execute("UPDATE events SET cancelled = 1 WHERE host_id = ? AND cancelled = 0 AND ends_at >= ?",
+                   (user_id, to_db(now_local())))
+        flash(f"{user['full_name']} is suspended. Their upcoming games were canceled.", "info")
+    else:
+        db.execute("UPDATE users SET suspended = 0 WHERE id = ?", (user_id,))
+        flash(f"{user['full_name']} can log in again.", "success")
     db.commit()
     return redirect(url_for("moderation.admin_reports", status=request.args.get("from", "open")))
 

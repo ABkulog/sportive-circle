@@ -4,7 +4,7 @@
 {% block content %}
 <div class="card form-card">
   <h1>Join Sportive Circle</h1>
-  <p class="muted">UW students only. We'll email a code to your @uw.edu address.</p>
+  <p class="muted">For UW students. We'll email a 6-digit code to your @uw.edu address.</p>
   <form method="post" class="form">
     {{ csrf_field() }}
     <label class="field"><span>Full name</span>
@@ -24,6 +24,8 @@
         <input name="grad_year" type="number" min="1950" max="{{ current_year + 8 }}" value="{{ form.get('grad_year', '') }}" placeholder="{{ current_year + 3 }}"></label>
     </div>
     {{ sport_checkboxes(form) }}
+    <p class="muted fine-print">By signing up you agree to the <a href="{{ url_for('terms') }}" target="_blank">Terms</a>
+      and <a href="{{ url_for('privacy') }}" target="_blank">Privacy</a> page.</p>
     <button class="btn btn-block">Sign up</button>
   </form>
   <p class="muted center">Already have an account? <a href="{{ url_for('auth.login', next=request.args.get('next')) }}">Log in</a></p>

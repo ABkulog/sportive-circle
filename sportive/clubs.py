@@ -5,6 +5,7 @@ official HuskyLink or UW Recreation page) and an admin approves it before it goe
 The registration form also captures what each club is actually like (tryouts? dues?
 experience? gear?), so students know exactly what they're signing up for.
 """
+import logging
 import re
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
@@ -13,10 +14,13 @@ from werkzeug.datastructures import MultiDict
 from .auth import login_required
 from .constants import LOCATIONS, SPORT_EMOJI, SPORTS
 from .db import get_db
+from .links import public_url
 from .mail import send_email
+from .moderation import is_admin
 from .timeutil import now_local, to_db
 
 bp = Blueprint("clubs", __name__)
+log = logging.getLogger(__name__)
 
 MAX_DESCRIPTION = 1000
 MAX_POST = 1000
@@ -60,13 +64,17 @@ def social_links(club):
     return links
 
 
+# SQL for "how many confirmed members" (members + officers; followers and people waiting don't count).
+MEMBER_COUNT = ("(SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id"
+                " AND m.role IN ('member', 'officer')) AS member_count")
+
 CHOICES = {"club_kind": CLUB_KINDS, "focus": FOCUS, "joining": JOINING, "experience": EXPERIENCE,
            "who_can_join": WHO_CAN_JOIN}
 
 
 def get_club(club_id):
     club = get_db().execute(
-        """SELECT c.*, (SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id AND m.role IN ('member', 'officer')) AS member_count
+        f"""SELECT c.*, {MEMBER_COUNT}
            FROM clubs c WHERE c.id = ?""", (club_id,)).fetchone()
     if club is None:
         abort(404)
@@ -84,7 +92,6 @@ def my_role(club_id):
 
 def can_see(club):
     """Approved clubs are public. Pending/rejected ones: only their officers and admins."""
-    from .moderation import is_admin
     return club["status"] == "approved" or my_role(club["id"]) == "officer" or is_admin()
 
 
@@ -102,7 +109,7 @@ def suggested_clubs(user_id, sports, limit=3):
         return []
     marks = ", ".join("?" for _ in sports)
     return get_db().execute(
-        f"""SELECT c.*, (SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id AND m.role IN ('member', 'officer')) AS member_count
+        f"""SELECT c.*, {MEMBER_COUNT}
             FROM clubs c WHERE c.status = 'approved' AND c.sport IN ({marks})
               AND NOT EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = ?)
             ORDER BY member_count DESC LIMIT ?""", (*sports, user_id, limit)).fetchall()
@@ -111,12 +118,13 @@ def suggested_clubs(user_id, sports, limit=3):
 def featured_clubs(limit=6):
     """Verified clubs for the landing page."""
     return get_db().execute(
-        """SELECT c.*, (SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id AND m.role IN ('member', 'officer')) AS member_count
+        f"""SELECT c.*, {MEMBER_COUNT}
            FROM clubs c WHERE c.status = 'approved' ORDER BY member_count DESC, c.name LIMIT ?""", (limit,)).fetchall()
 
 
 def read_club_form(form, club_id=None):
-    """Validate the registration/edit form. Returns (data, error)."""
+    """Validate the registration/edit form. Returns (data, error, field): `field` is the input
+    with the problem, so the step-by-step form can open right on it."""
     get = lambda key: form.get(key, "").strip()
     data = {key: get(key) for key in ("name", "sport", "description", "meets", "location", "contact_url",
                                       "club_kind", "verification_url", "officer_role", "focus", "joining",
@@ -128,57 +136,62 @@ def read_club_form(form, club_id=None):
     data["competes"] = 1 if form.get("competes") else 0
     members = get("member_estimate")
 
+    def problem(field, message):
+        return None, message, field
+
     if not 3 <= len(data["name"]) <= 60:
-        return None, "Club name must be 3 to 60 characters."
+        return problem("name", "Club name must be 3 to 60 characters.")
     if data["sport"] not in SPORTS:
-        return None, "Please choose the club's main sport (pick Other if it's a mix)."
+        return problem("sport", "Please choose the club's main sport (pick Other if it's a mix).")
     for key, options in CHOICES.items():
         if data[key] not in options:
-            return None, "Please answer every question in the form."
+            return problem(key, "Please answer every question in the form.")
     if not data["verification_url"].startswith(VERIFICATION_PREFIXES) or " " in data["verification_url"] \
             or len(data["verification_url"]) > 200:
-        return None, ("Add your club's official page: its HuskyLink page (https://huskylink.washington.edu/organization/…) "
-                      "or its UW Recreation page. This is how we verify it's a real UW club.")
-    if not 2 <= len(data["officer_role"]) <= 40:
-        return None, "What's your role in the club? (e.g. President, Captain, Treasurer)"
-    if not members.isdigit() or int(members) < MIN_ACTIVE_MEMBERS:
-        return None, f"Sportive Circle is for active clubs with at least {MIN_ACTIVE_MEMBERS} members."
-    data["member_estimate"] = min(int(members), 5000)
+        return problem("verification_url", "Add your club's official page: its HuskyLink page "
+                       "(https://huskylink.washington.edu/organization/…) or its UW Recreation page. "
+                       "This is how we check it's a real UW club.")
     if not 20 <= len(data["description"]) <= MAX_DESCRIPTION:
-        return None, f"Tell people about your club in 20 to {MAX_DESCRIPTION} characters."
+        return problem("description", f"Tell people about your club in 20 to {MAX_DESCRIPTION} characters.")
     # Everything is required: people deciding whether to join need the full picture, and a way to reach you.
     required = {
+        "join_question": "a question for people who want to join",
         "meets": "when you practice", "location": "where you practice",
         "dues": "your dues (type Free if there are none)", "gear": "what gear people need (or None needed)",
-        "how_to_join": "how new members get started", "join_question": "a question for people who want to join",
+        "how_to_join": "how new members get started",
         "club_email": "a club email (so students and our team can reach you)",
     }
     for key, label in required.items():
         if not data[key]:
-            return None, f"Please add {label}. Every field helps people decide to join and reach you."
-    if len(data["meets"]) > 120 or len(data["location"]) > 120:
-        return None, "Keep 'When you practice' and 'Where' under 120 characters."
-    if len(data["dues"]) > 60 or len(data["gear"]) > 120 or len(data["how_to_join"]) > 500:
-        return None, "Some answers are too long. Keep dues under 60, gear under 120 and how to join under 500 characters."
+            return problem(key, f"Please add {label}. Every answer helps people decide to join and reach you.")
     if len(data["join_question"]) > 150:
-        return None, "Keep your question for new members under 150 characters."
-    if data["contact_url"] and (not data["contact_url"].startswith("https://") or " " in data["contact_url"]
-                                or len(data["contact_url"]) > 200):
-        return None, "The website / Discord / GroupMe link must be a full https:// link."
+        return problem("join_question", "Keep your question for new members under 150 characters.")
+    for key, limit, label in (("meets", 120, "When you practice"), ("location", 120, "Where"), ("dues", 60, "Dues"),
+                              ("gear", 120, "Gear"), ("how_to_join", 500, "How to join")):
+        if len(data[key]) > limit:
+            return problem(key, f"Keep '{label}' under {limit} characters.")
+    if not re.fullmatch(r"[^@\s]{1,64}@[^@\s]{1,120}\.[a-z]{2,}", data["club_email"], re.I):
+        return problem("club_email", "Please enter a valid club email.")
     for key, (label, _, rule, _) in SOCIALS.items():
         if data[key] and not re.fullmatch(rule, data[key]):
             example = "a link like https://facebook.com/yourclub" if key == "facebook" else (
                 "a link like https://youtube.com/@yourclub" if key == "youtube" else "just the username, like @uwyourclub")
-            return None, f"That {label} doesn't look right. Use {example}."
-    if not re.fullmatch(r"[^@\s]{1,64}@[^@\s]{1,120}\.[a-z]{2,}", data["club_email"], re.I):
-        return None, "Please enter a valid club email."
+            return problem(key, f"That {label} doesn't look right. Use {example}.")
+    if data["contact_url"] and (not data["contact_url"].startswith("https://") or " " in data["contact_url"]
+                                or len(data["contact_url"]) > 200):
+        return problem("contact_url", "The website / Discord / GroupMe link must be a full https:// link.")
+    if not 2 <= len(data["officer_role"]) <= 40:
+        return problem("officer_role", "What's your role in the club? (e.g. President, Captain, Treasurer)")
+    if not members.isdigit() or int(members) < MIN_ACTIVE_MEMBERS:
+        return problem("member_estimate", f"Sportive Circle is for active clubs with at least {MIN_ACTIVE_MEMBERS} members.")
+    data["member_estimate"] = min(int(members), 5000)
     if not form.get("attest"):
-        return None, "Please confirm you're a current officer and the club is active this quarter."
+        return problem("attest", "Please confirm you're a current officer and the club is active this quarter.")
     taken = get_db().execute("SELECT id FROM clubs WHERE name = ? COLLATE NOCASE AND id != ?",
                              (data["name"], club_id or 0)).fetchone()
     if taken:
-        return None, "A club with that name is already on Sportive Circle. Ask its officers to add you instead!"
-    return data, None
+        return problem("name", "A club with that name is already on Sportive Circle. Ask its officers to add you instead!")
+    return data, None, None
 
 
 FIELDS = ("name", "sport", "description", "meets", "location", "contact_url", "club_kind", "verification_url",
@@ -214,7 +227,7 @@ def directory():
     if "no_tryouts" in easy:
         where.append("c.joining = 'open'")
     clubs = get_db().execute(
-        f"""SELECT c.*, (SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id AND m.role IN ('member', 'officer')) AS member_count,
+        f"""SELECT c.*, {MEMBER_COUNT},
                    (SELECT m.role FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me) AS my_status,
                    (SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id
                                                         AND m.role IN ('requested', 'tryout')) AS waiting,
@@ -273,7 +286,7 @@ def create():
         pending = get_db().execute(
             """SELECT COUNT(*) FROM clubs c JOIN club_members m ON m.club_id = c.id
                WHERE m.user_id = ? AND m.role = 'officer' AND c.status = 'pending'""", (g.user["id"],)).fetchone()[0]
-        data, error = read_club_form(form)
+        data, error, error_field = read_club_form(form)
         if error is None and pending >= MAX_PENDING_PER_PERSON:
             error = "You already have clubs waiting for review. We'll get to them soon!"
         if error is None:
@@ -290,9 +303,13 @@ def create():
                   "within 2 days, and we'll email you when it's live.", "success")
             return redirect(url_for("clubs.view", club_id=cur.lastrowid))
         flash(error, "error")
-    return render_template("clubs/form.html", form=form, club=None, locations=LOCATIONS, kinds=CLUB_KINDS,
+    return _club_form_page(form, None, error_field if request.method == "POST" else None)
+
+
+def _club_form_page(form, club, error_field):
+    return render_template("clubs/form.html", form=form, club=club, locations=LOCATIONS, kinds=CLUB_KINDS,
                            focus=FOCUS, joining=JOINING, experience=EXPERIENCE, who=WHO_CAN_JOIN,
-                           min_members=MIN_ACTIVE_MEMBERS)
+                           min_members=MIN_ACTIVE_MEMBERS, error_field=error_field)
 
 
 @bp.route("/clubs/<int:club_id>/edit", methods=("GET", "POST"))
@@ -301,9 +318,10 @@ def edit(club_id):
     club = get_club(club_id)
     if my_role(club_id) != "officer":
         abort(403)
+    error_field = None
     if request.method == "POST":
         form = request.form
-        data, error = read_club_form(form, club_id)
+        data, error, error_field = read_club_form(form, club_id)
         if error is None:
             # Changing who the club *is* (or fixing a rejected one) sends it back for review.
             identity_changed = any(data[key] != club[key] for key in ("name", "club_kind", "verification_url"))
@@ -321,9 +339,7 @@ def edit(club_id):
     else:
         form = MultiDict({key: club[key] for key in FIELDS})
         form.setlist("competes", ["1"] if club["competes"] else [])
-    return render_template("clubs/form.html", form=form, club=club, locations=LOCATIONS, kinds=CLUB_KINDS,
-                           focus=FOCUS, joining=JOINING, experience=EXPERIENCE, who=WHO_CAN_JOIN,
-                           min_members=MIN_ACTIVE_MEMBERS)
+    return _club_form_page(form, club, error_field)
 
 
 # ------------------------------------------------------------ membership
@@ -340,8 +356,7 @@ def _dm(sender_id, recipient_id, body):
 
 
 def _club_link(club_id):
-    from flask import current_app
-    return f"{current_app.config['PUBLIC_URL'].rstrip('/')}/clubs/{club_id}"
+    return public_url("clubs.view", club_id=club_id)
 
 
 @bp.route("/clubs/<int:club_id>/follow", methods=("POST",))
@@ -394,8 +409,8 @@ def join(club_id):
                        f"{g.user['full_name']} {what} {club['name']}."
                        + (f"\n\nTheir answer: {message}" if message else "")
                        + f"\n\nConfirm or decline them here: {_club_link(club_id)}#requests")
-        except Exception:
-            pass
+        except Exception:  # email trouble shouldn't stop the request
+            log.exception("Couldn't email officer %s about a join request", officer["email"])
     if new_role == "tryout":
         flash(f"You're signed up for {club['name']} tryouts! 🎟️ The officers will mark you as a member if you make "
               "the team. Your first steps are right below. 👇", "celebrate")
@@ -542,7 +557,6 @@ def delete_post(club_id, post_id):
 # --------------------------------------------------------- admin review
 
 def pending_club_count():
-    from .moderation import is_admin
     if not is_admin():
         return 0
     return get_db().execute("SELECT COUNT(*) FROM clubs WHERE status = 'pending'").fetchone()[0]
@@ -555,21 +569,20 @@ def _notify_officers(club, subject, body):
         try:
             send_email(row["email"], subject, body)
         except Exception:  # email trouble shouldn't block the review
-            pass
+            log.exception("Couldn't email officer %s", row["email"])
 
 
 @bp.route("/admin/clubs")
 @login_required
 def review_queue():
-    from .moderation import is_admin
     if not is_admin():
         abort(404)
     status = request.args.get("status", "pending")
     if status not in ("pending", "approved", "rejected"):
         status = "pending"
     clubs = get_db().execute(
-        """SELECT c.*, u.full_name AS applicant, u.email AS applicant_email,
-                  (SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id AND m.role IN ('member', 'officer')) AS member_count
+        f"""SELECT c.*, u.full_name AS applicant, u.email AS applicant_email,
+                  {MEMBER_COUNT}
            FROM clubs c LEFT JOIN users u ON u.id = c.created_by WHERE c.status = ? ORDER BY c.id""",
         (status,)).fetchall()
     club_counts = {row["status"]: row["n"] for row in get_db().execute(
@@ -581,7 +594,6 @@ def review_queue():
 @bp.route("/admin/clubs/<int:club_id>/<decision>", methods=("POST",))
 @login_required
 def review(club_id, decision):
-    from .moderation import is_admin
     if not is_admin() or decision not in ("approve", "reject"):
         abort(404)
     club = get_club(club_id)
@@ -593,8 +605,7 @@ def review(club_id, decision):
     db.execute("UPDATE clubs SET status = ?, review_note = ?, reviewed_at = ? WHERE id = ?",
                ("approved" if decision == "approve" else "rejected", note, to_db(now_local()), club_id))
     db.commit()
-    from flask import current_app
-    link = f"{current_app.config['PUBLIC_URL'].rstrip('/')}/clubs/{club_id}"
+    link = _club_link(club_id)
     if decision == "approve":
         _notify_officers(club, f"✅ {club['name']} is live on Sportive Circle!",
                          f"Your club is verified and now visible to every Husky: {link}\n\n"
