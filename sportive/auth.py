@@ -228,7 +228,7 @@ def verify():
             )
             db.commit()
             destination = log_in(user)
-            flash(f"Welcome to Sportive Circle, {user['full_name'].split()[0]}!", "success")
+            flash(f"Welcome to the pack, {user['full_name'].split()[0]}! 🐺", "celebrate")
             return redirect(destination)
         flash(error, "error")
     return render_template("auth/verify.html", email=email)

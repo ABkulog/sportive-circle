@@ -54,7 +54,7 @@ def test_signup_verify_and_login(accounts, client, app):
         assert user["password_hash"] != "purple-and-gold"  # stored hashed, never plain
     accounts.logout()
     assert accounts.login().status_code == 302
-    assert b"Hey Dubs" in client.get("/").data
+    assert b", Dubs!" in client.get("/").data  # "Morning, Dubs!" / "Evening, Dubs!" ...
 
 
 def test_wrong_code_is_rejected_and_attempts_are_limited(accounts, client):
@@ -724,3 +724,72 @@ def test_this_month_works_in_december(monkeypatch):
     now = datetime(2026, 12, 15, 9, 0)
     next_month = (now.replace(day=28) + timedelta(days=4)).replace(day=1)
     assert next_month.date().isoformat() == "2027-01-01"
+
+
+
+# --------------------------------------------------------------- Husky spirit
+
+def _finish_all_events(app):
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE events SET starts_at = '2026-01-10 07:00', ends_at = '2026-01-10 08:00'")
+        db.commit()
+
+
+def test_greeting_by_time_of_day():
+    from datetime import datetime
+    from sportive.spirit import SPIRIT_LINES, greeting
+    assert greeting("Maya", datetime(2026, 9, 27, 8, 0))[0] == "Morning, Maya!"
+    assert greeting("Maya", datetime(2026, 9, 27, 14, 0))[0] == "Afternoon, Maya!"
+    assert greeting("Maya", datetime(2026, 9, 27, 19, 0))[0] == "Evening, Maya!"
+    assert greeting("Maya", datetime(2026, 9, 27, 1, 0))[0] == "Late night, Maya!"
+    assert greeting("Maya")[1] in SPIRIT_LINES
+
+
+def test_badges(accounts, client, app):
+    from sportive.spirit import earned_badges
+    accounts.signup()
+    client.post("/events/new", data=event_form())
+    _finish_all_events(app)  # a 7 AM game in January
+    with app.app_context():
+        user_id = get_db().execute("SELECT id FROM users").fetchone()[0]
+        assert earned_badges(user_id) == {"first_game", "rain_or_shine", "early_dawg"}
+    page = client.get(f"/u/{user_id}").data
+    assert b"Husky badges" in page and b"3/8" in page and b"Rain or Shine" in page
+    assert b"Host 5 games" in page  # your own locked badges show how to earn them
+
+
+def test_cancelled_games_dont_count_for_badges(accounts, client, app):
+    from sportive.spirit import earned_badges
+    accounts.signup()
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    client.post(f"/events/{event_id}/cancel")
+    _finish_all_events(app)
+    with app.app_context():
+        assert earned_badges(1) == set()
+
+
+def test_top_dawgs(accounts, client, app, monkeypatch):
+    from datetime import datetime
+    from sportive import events, spirit
+    accounts.signup(email="host@uw.edu", name="Hana Host")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu", name="Pat Player")
+    client.post(f"/events/{event_id}/join")
+    _finish_all_events(app)
+    fake_now = lambda: datetime(2026, 1, 20, 12, 0)
+    monkeypatch.setattr(events, "now_local", fake_now)
+    with app.app_context():
+        board = spirit.top_dawgs(now=fake_now())
+        assert [row["full_name"] for row in board] == ["Hana Host", "Pat Player"]
+    feed = client.get("/").data
+    assert b"Top Dawgs this month" in feed and b"Hana Host" in feed
+
+
+def test_celebration_and_footer(accounts, client):
+    accounts.signup()
+    response = client.post("/events/new", data=event_form(), follow_redirects=True).data
+    assert b"flash-celebrate" in response and b"Go Dawgs" in response
+    assert b"Made by Huskies, for Huskies" in response
+    assert b"Not an official University of Washington service" in response

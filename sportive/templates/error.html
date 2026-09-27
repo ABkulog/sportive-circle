@@ -2,6 +2,7 @@
 {% block title %}{{ code }}{% endblock %}
 {% block content %}
 <div class="card form-card empty">
+  <p class="error-paw" aria-hidden="true">🐾</p>
   <p class="error-code">{{ code }}</p>
   <p>{{ message }}</p>
   <a class="btn" href="{{ url_for('index') }}">Back to the feed</a>

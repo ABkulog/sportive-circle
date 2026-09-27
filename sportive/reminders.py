@@ -46,7 +46,7 @@ def reminder_email(row, minutes):
         f"{crew}\n\n"
         f"See the details and who's going: {link}\n\n"
         f"{plans_changed}\n\n"
-        "Have fun out there! 🐺\n"
+        "Have fun out there. Go Dawgs! 🐺💜💛\n"
         "Sportive Circle\n\n"
         "(Don't want these emails? Turn them off in Profile → Edit profile.)"
     )

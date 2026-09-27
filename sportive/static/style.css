@@ -324,3 +324,81 @@ section.card h2 { margin-top: 0; }
 .map-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .map-actions .btn { padding: 8px 14px; font-size: .92rem; }
 .map-status { margin: 0; min-height: 1.5em; }
+
+/* ======================= Husky spirit 🐺💜💛 ======================= */
+:root {
+  --display: "Encode Sans Condensed", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* a faint paw-print pattern for purple backgrounds */
+  --paws: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg fill='%23ffffff' fill-opacity='.07' transform='rotate(-18 32 32)'%3E%3Cellipse cx='32' cy='38' rx='9' ry='7.5'/%3E%3Ccircle cx='21' cy='27' r='3.6'/%3E%3Ccircle cx='28' cy='22' r='3.6'/%3E%3Ccircle cx='36' cy='22' r='3.6'/%3E%3Ccircle cx='43' cy='27' r='3.6'/%3E%3C/g%3E%3C/svg%3E");
+}
+h1, h2, .brand, .step-number, .error-code, .event-title, .rank {
+  font-family: var(--display);
+  letter-spacing: -.005em;
+}
+h1 { font-weight: 900; text-transform: none; }
+h2 { font-weight: 800; }
+.brand { font-weight: 900; font-size: 1.4rem; text-transform: uppercase; letter-spacing: .01em; }
+
+.topbar {
+  background-color: var(--purple);
+  background-image: var(--paws);
+  border-bottom: 4px solid var(--spirit-gold);
+}
+.need-players { background-image: var(--paws), linear-gradient(135deg, var(--purple), var(--purple-strong)); }
+
+.gold { color: var(--purple); }
+@media (prefers-color-scheme: dark) { .gold { color: var(--spirit-gold); } }
+.hero h1 { line-height: 1.02; text-transform: uppercase; }
+
+.feed-hello { margin-bottom: 14px; }
+.feed-hello .page-title { margin-bottom: 2px; }
+.spirit-line { margin: 0; color: var(--purple); font-weight: 700; }
+@media (prefers-color-scheme: dark) { .spirit-line { color: var(--spirit-gold); } }
+.empty-emoji { font-size: 2rem; }
+
+/* celebrate = success + confetti */
+.flash-celebrate { background: var(--spirit-gold); color: var(--purple-strong); font-weight: 700; }
+.confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 50; }
+.confetti span {
+  position: absolute; top: -20px; display: block;
+  animation-name: confetti-fall; animation-timing-function: cubic-bezier(.25, .6, .45, 1); animation-fill-mode: forwards;
+}
+@keyframes confetti-fall {
+  to { transform: translate(var(--drift), 105vh) rotate(var(--spin)); opacity: .9; }
+}
+
+/* Top Dawgs */
+.top-dawgs { margin-top: 18px; }
+.top-dawgs h2 { margin-top: 0; }
+.top-dawgs ol { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 10px; }
+.top-dawgs li { display: flex; align-items: center; gap: 10px; }
+.top-dawgs .person { flex: 1; min-width: 0; }
+.rank { font-size: 1.4rem; width: 28px; text-align: center; }
+
+/* Husky badges */
+.badge-count { font-family: system-ui, sans-serif; font-size: .9rem; font-weight: 600; }
+.husky-badges { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.husky-badge {
+  display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px;
+  background: var(--purple-soft); border: 1.5px solid var(--spirit-gold);
+}
+.husky-badge strong { display: block; font-size: .95rem; }
+.husky-badge small { display: block; color: var(--muted); font-size: .8rem; }
+.husky-badge-emoji { font-size: 1.6rem; }
+.husky-badge.is-locked { background: transparent; border: 1.5px dashed var(--border); opacity: .7; }
+.husky-badge.is-locked .husky-badge-emoji { filter: grayscale(1); opacity: .6; }
+
+/* errors & footer */
+.error-paw { font-size: 2.4rem; margin: 0; }
+.site-footer {
+  max-width: 760px; margin: 12px auto 0; padding: 18px 16px 8px; text-align: center;
+  border-top: 1px solid var(--border);
+}
+.footer-spirit { margin: 0; font-weight: 700; }
+.footer-spirit span { color: var(--purple); font-family: var(--display); font-weight: 900; margin-left: 4px; }
+@media (prefers-color-scheme: dark) { .footer-spirit span { color: var(--spirit-gold); } }
+.footer-fine { margin: 4px 0 0; color: var(--muted); font-size: .8rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .event-card { transition: none; }
+}

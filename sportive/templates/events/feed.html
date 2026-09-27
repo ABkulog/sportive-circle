@@ -1,8 +1,11 @@
 {% extends "base.html" %}
-{% from "_macros.html" import event_card %}
+{% from "_macros.html" import event_card, avatar %}
 {% block title %}Feed{% endblock %}
 {% block content %}
-<h1 class="page-title">Hey {{ g.user.full_name.split()[0] }} 👋</h1>
+<header class="feed-hello">
+  <h1 class="page-title">{{ hello }}</h1>
+  <p class="spirit-line">{{ spirit_line }}</p>
+</header>
 
 {% if up_next %}
   <a class="up-next" href="{{ url_for('events.detail', event_id=up_next.id) }}">
@@ -60,10 +63,27 @@
     {{ event_card(e) }}
   {% else %}
     <div class="card empty">
-      <p><strong>Nothing here yet.</strong></p>
-      <p class="muted">Be the one who starts it. Most pickup games just need someone to post first.</p>
+      <p class="empty-emoji" aria-hidden="true">🐾</p>
+      <p><strong>No games here yet.</strong></p>
+      <p class="muted">Be the Dawg who starts it. Most pickup games just need someone to post first.</p>
       <a class="btn" href="{{ url_for('events.create', sport=filters.sport) }}">+ Create an event</a>
     </div>
   {% endfor %}
 </div>
+
+{% if top_dawgs %}
+  <section class="card top-dawgs">
+    <h2>🏆 Top Dawgs this month</h2>
+    <ol>
+      {% for dawg in top_dawgs %}
+        <li>
+          <span class="rank" aria-hidden="true">{{ ['🥇', '🥈', '🥉'][loop.index0] }}</span>
+          <a class="person" href="{{ url_for('profile.view', user_id=dawg.id) }}">{{ avatar(dawg.id, dawg.full_name, dawg.avatar_updated, 32) }}{{ dawg.full_name }}</a>
+          <span class="muted">{{ dawg.games }} game{{ 's' if dawg.games != 1 }}</span>
+        </li>
+      {% endfor %}
+    </ol>
+    <p class="muted">Play games this month to climb the board. Go Dawgs! 🐺</p>
+  </section>
+{% endif %}
 {% endblock %}

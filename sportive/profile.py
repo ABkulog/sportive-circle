@@ -11,6 +11,7 @@ from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
 from .events import query_events
 from .photos import make_avatar
+from .spirit import BADGES, earned_badges
 from .timeutil import now_local, to_db
 
 bp = Blueprint("profile", __name__)
@@ -54,9 +55,9 @@ def photo_upload():
                 if first_time:
                     destination = session.pop("after_photo", None)
                     if destination:
-                        flash("Looking good! You're all set.", "success")
+                        flash("Looking good, Husky! You're all set.", "celebrate")
                         return redirect(safe_next(destination))
-                    flash("Looking good! You're all set. Here's how Sportive Circle works.", "success")
+                    flash("Looking good, Husky! You're all set. Here's how Sportive Circle works.", "celebrate")
                     return redirect(url_for("how_it_works"))
                 flash("Profile picture updated.", "success")
                 return redirect(url_for("profile.view", user_id=g.user["id"]))
@@ -105,7 +106,7 @@ def view(user_id):
         (g.user["id"], user_id),
     ).fetchone() is not None
     return render_template("profile/view.html", user=user, sports=user_sports(user_id), hosting=hosting,
-                           show_email=show_email)
+                           show_email=show_email, badges=BADGES, earned=earned_badges(user_id))
 
 
 @bp.route("/profile/edit", methods=("GET", "POST"))
@@ -156,5 +157,5 @@ def delete_account():
     db.execute("DELETE FROM users WHERE id = ?", (g.user["id"],))
     db.commit()
     session.clear()
-    flash("Your account and everything in it was deleted. Hope to see you back!", "info")
+    flash("Your account and everything in it was deleted. Once a Husky, always a Husky 💜", "info")
     return redirect(url_for("index"))

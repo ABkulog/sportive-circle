@@ -74,7 +74,7 @@ def create_app(test_config=None):
 ERRORS = {
     400: "Something was wrong with that request. Go back, refresh the page and try again.",
     403: "That's not yours to change. Only the host can do that.",
-    404: "We couldn't find that page. The link might be broken, or the event was removed.",
+    404: "This Dawg got lost. 🐾 The link might be broken, or the event was removed.",
     413: f"That photo is too big. Pick one under {MAX_UPLOAD_MB} MB.",
 }
 
