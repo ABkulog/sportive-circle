@@ -46,25 +46,67 @@
       button.hidden = true;
       return;
     }
-    button.addEventListener("click", () => {
-      status.textContent = "Finding you…";
+    // Where to turn location on, in words that match the user's device.
+    function howToAllow() {
+      const ua = navigator.userAgent;
+      const iOS = /iPhone|iPad|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
+      if (iOS) return "To turn it on: Settings → Privacy & Security → Location Services → Safari Websites → While Using the App. Then reload this page.";
+      if (/Android/.test(ua)) return "To turn it on: tap the icon left of the web address → Permissions → Location → Allow. Then reload this page.";
+      if (/Macintosh/.test(ua)) {
+        const safari = /Safari/.test(ua) && !/Chrome|Chromium|Edg|Firefox/.test(ua);
+        return safari
+          ? "To turn it on: System Settings → Privacy & Security → Location Services → turn on Safari, then Safari → Settings → Websites → Location → Allow. Then reload this page."
+          : "To turn it on: System Settings → Privacy & Security → Location Services → turn on your browser, then click the icon left of the web address and allow Location. Then reload this page.";
+      }
+      return "To turn it on: click the icon left of the web address and allow Location. Then reload this page.";
+    }
+
+    function showMe(position) {
+      const here = [position.coords.latitude, position.coords.longitude];
+      if (me) me.setLatLng(here);
+      else me = L.circleMarker(here, {
+        radius: 8, color: "#fff", weight: 3, fillColor: "#1a73e8", fillOpacity: 1,
+      }).addTo(map).bindTooltip("You");
+      map.fitBounds(L.latLngBounds([here, place]), { padding: [40, 40], maxZoom: 17 });
+      status.textContent = describe(metersBetween(here, place));
+    }
+
+    function done() {
+      button.disabled = false;
+      button.removeAttribute("aria-busy");
+    }
+
+    function locate(precise) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const here = [position.coords.latitude, position.coords.longitude];
-          if (me) me.setLatLng(here);
-          else me = L.circleMarker(here, {
-            radius: 8, color: "#fff", weight: 3, fillColor: "#1a73e8", fillOpacity: 1,
-          }).addTo(map).bindTooltip("You");
-          map.fitBounds(L.latLngBounds([here, place]), { padding: [40, 40], maxZoom: 17 });
-          status.textContent = describe(metersBetween(here, place));
-        },
+        (position) => { done(); showMe(position); },
         (error) => {
-          status.textContent = error.code === error.PERMISSION_DENIED
-            ? "Location is off for this site. You can still tap Directions."
-            : "Couldn't find your location right now. Try Directions instead.";
+          if (error.code === error.PERMISSION_DENIED) {
+            done();
+            status.textContent = `Your browser is blocking location for this site. ${howToAllow()} Or just tap Directions.`;
+          } else if (precise) {
+            // GPS can time out indoors or on laptops; Wi-Fi location is rougher but usually answers.
+            status.textContent = "Still looking…";
+            locate(false);
+          } else {
+            done();
+            status.textContent = "Couldn't find your location right now. Try again outside, or tap Directions.";
+          }
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+        precise
+          ? { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+          : { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 },
       );
+    }
+
+    button.addEventListener("click", () => {
+      if (!window.isSecureContext) {
+        status.textContent = "Location only works on a secure (https) page. Tap Directions instead.";
+        return;
+      }
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+      status.textContent = "Finding you…";
+      locate(true);
     });
   }
 })();
