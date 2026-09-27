@@ -54,6 +54,8 @@
         <span class="going-pill">⭐ You're hosting</span>
       {% elif event.i_am_going %}
         <span class="going-pill">✅ You're going</span>
+      {% elif blocked %}
+        <p class="muted">You can't join this game.</p>
       {% elif left == 0 %}
         <button class="btn btn-large btn-block" disabled>Full</button>
       {% elif my_invite %}

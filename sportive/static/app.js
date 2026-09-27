@@ -4,8 +4,23 @@
   // <form data-confirm="Leave the club?">: ask first. The text is plain data, so an apostrophe
   // in a name ("O'Brien") can't break it.
   document.addEventListener("submit", (event) => {
-    const message = event.target.dataset && event.target.dataset.confirm;
-    if (message && !window.confirm(message)) event.preventDefault();
+    const form = event.target;
+    const message = form.dataset && form.dataset.confirm;
+    if (message && !window.confirm(message)) { event.preventDefault(); return; }
+    // A double tap shouldn't post twice: lock the buttons of a form that's already sending
+    // (GET forms like search and filters are harmless, so they stay free).
+    if (form.method === "post") {
+      if (form.dataset.sending) { event.preventDefault(); return; }
+      form.dataset.sending = "1";
+      setTimeout(() => form.querySelectorAll("button").forEach((button) => { button.disabled = true; }));
+    }
+  });
+  // Coming back with the Back button shows the page from memory: unlock its forms again.
+  window.addEventListener("pageshow", () => {
+    document.querySelectorAll("form[data-sending]").forEach((form) => {
+      delete form.dataset.sending;
+      form.querySelectorAll("button").forEach((button) => { button.disabled = false; });
+    });
   });
 
   // <select data-autosubmit>: filters apply as soon as you pick something.

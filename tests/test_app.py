@@ -1954,3 +1954,112 @@ def test_hidden_always_hides():
     even when their class sets display: grid or flex."""
     import pathlib
     assert "[hidden] { display: none !important; }" in pathlib.Path("sportive/static/style.css").read_text()
+
+
+# ------------------------------------------------------------ bug hunt (Sept 27, 2026)
+
+def test_huge_numbers_in_links_are_a_404_not_a_crash(accounts, client):
+    accounts.signup()
+    big = "99999999999999999999"
+    assert client.get(f"/events/{big}").status_code == 404
+    assert client.get(f"/messages/2/poll?after={big}").status_code in (200, 404)
+    assert client.get(f"/events/new?club={big}").status_code in (403, 404)
+
+
+def test_very_long_searches_dont_crash(accounts, client):
+    accounts.signup()
+    assert client.get("/friends?q=" + "x" * 100_000).status_code == 200
+    assert client.get("/clubs?q=" + "x" * 100_000).status_code == 200
+
+
+def test_names_have_a_length_limit_and_one_line(accounts, client, app):
+    page = client.post("/signup", data={"full_name": "x" * 61, "email": "long@uw.edu", "password": "purple-and-gold",
+                                        "password2": "purple-and-gold", "birth_date": "2005-01-15"}).data
+    assert b"under 60 characters" in page
+    accounts.signup(name="Dubs\r\n  Husky")
+    with app.app_context():
+        assert get_db().execute("SELECT full_name FROM users WHERE email = 'dubs@uw.edu'").fetchone()[0] == "Dubs Husky"
+    client.post("/events/new", data=event_form(title="Hoops\r\nBcc: spam"))
+    with app.app_context():
+        assert get_db().execute("SELECT title FROM events").fetchone()[0] == "Hoops Bcc: spam"
+
+
+def test_one_failed_reminder_doesnt_stop_the_others(accounts, client, app, monkeypatch):
+    from sportive import reminders
+    accounts.signup(email="host@uw.edu")
+    host = _user_id(app, "host@uw.edu")
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    player = _user_id(app, "player@uw.edu")
+    with app.app_context():
+        db = get_db()
+        soon = now_local() + timedelta(minutes=45)
+        cur = db.execute("INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level)"
+                         " VALUES (?, 'Game', 'basketball', 'IMA (Intramural Activities Building)', ?, ?, 'Casual')",
+                         (host, soon.strftime("%Y-%m-%d %H:%M"), (soon + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M")))
+        for user in (host, player):
+            db.execute("INSERT INTO rsvps (event_id, user_id, created_at) VALUES (?, ?, '2026-01-01 10:00')",
+                       (cur.lastrowid, user))
+        db.commit()
+        calls = []
+
+        def flaky(to, subject, body):
+            calls.append(to)
+            if to == "host@uw.edu":
+                raise OSError("mailbox full")
+        monkeypatch.setattr(reminders, "send_email", flaky)
+        assert reminders.send_due_reminders() == 1
+        assert sorted(calls) == ["host@uw.edu", "player@uw.edu"]
+
+
+def test_blocked_people_cant_join_each_others_games(accounts, client, app):
+    accounts.signup(email="host@uw.edu", name="Host Husky")
+    event_id = event_id_from(client.post("/events/new", data=event_form(title="Private-ish game")))
+    accounts.logout()
+    accounts.signup(email="pest@uw.edu", name="Pest Husky")
+    pest = _user_id(app, "pest@uw.edu")
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post(f"/block/{pest}")
+    accounts.logout()
+    accounts.login(email="pest@uw.edu")
+    assert b"Private-ish game" not in client.get("/?scope=all").data
+    assert b"You can&#39;t join this game" in client.post(f"/events/{event_id}/join", follow_redirects=True).data
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rsvps WHERE user_id = ?", (pest,)).fetchone()[0] == 0
+
+
+def test_suspended_profiles_are_hidden_from_students(accounts, client, app):
+    accounts.signup(email="bad@uw.edu")
+    bad = _user_id(app, "bad@uw.edu")
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    client.post(f"/admin/users/{bad}/suspend")
+    assert client.get(f"/u/{bad}").status_code == 200        # admins can still look
+    accounts.logout()
+    accounts.signup(email="student@uw.edu")
+    assert client.get(f"/u/{bad}").status_code == 404
+
+
+def test_chat_title_uses_the_live_need_players_title(accounts, client):
+    accounts.signup()
+    response = client.post("/need-players", data={"sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
+                                                  "starts_in": "15", "duration": "60", "have": "5", "needed": "3"})
+    page = client.get(f"/events/{event_id_from(response)}/chat").data.decode()
+    assert "<title>Chat · Need 3 more for Soccer" in page
+
+
+def test_hidden_pill_inputs_cant_widen_the_page():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text()
+    assert ".segmented input, .chip-check input, .choice-pill input {" in css and "width: 1px; height: 1px" in css
+
+
+def test_leap_day_birthdays():
+    from datetime import date
+    from sportive.auth import is_birthday
+    leap_baby = date(2004, 2, 29)
+    assert is_birthday(leap_baby, date(2027, 2, 28)) and not is_birthday(leap_baby, date(2028, 2, 28))
+    assert is_birthday(leap_baby, date(2028, 2, 29))
+    assert is_birthday(date(2005, 1, 15), date(2027, 1, 15)) and not is_birthday(date(2005, 1, 15), date(2027, 1, 16))

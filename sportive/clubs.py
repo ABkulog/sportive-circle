@@ -17,6 +17,7 @@ from .db import get_db
 from .links import public_url
 from .mail import send_email
 from .moderation import is_admin
+from .textutil import one_line
 from .timeutil import now_local, to_db
 
 bp = Blueprint("clubs", __name__)
@@ -126,10 +127,11 @@ def read_club_form(form, club_id=None):
     """Validate the registration/edit form. Returns (data, error, field): `field` is the input
     with the problem, so the step-by-step form can open right on it."""
     get = lambda key: form.get(key, "").strip()
-    data = {key: get(key) for key in ("name", "sport", "description", "meets", "location", "contact_url",
-                                      "club_kind", "verification_url", "officer_role", "focus", "joining",
-                                      "experience", "who_can_join", "dues", "gear", "how_to_join", "club_email",
-                                      "join_question")}
+    single = lambda key: one_line(form.get(key))  # names, emails, links: no line breaks
+    data = {key: single(key) for key in ("name", "sport", "meets", "location", "contact_url", "club_kind",
+                                         "verification_url", "officer_role", "focus", "joining", "experience",
+                                         "who_can_join", "dues", "gear", "club_email", "join_question")}
+    data.update({key: get(key) for key in ("description", "how_to_join")})
     for key in SOCIALS:
         value = get(key)
         data[key] = value if value.startswith("https://") else value.lstrip("@")
@@ -205,7 +207,7 @@ FIELDS = ("name", "sport", "description", "meets", "location", "contact_url", "c
 @bp.route("/clubs")
 def directory():
     """Open to everyone, even people without an account. Only verified clubs are listed."""
-    q = request.args.get("q", "").strip()
+    q = request.args.get("q", "").strip()[:100]
     sport = request.args.get("sport", "")
     mine = request.args.get("mine") == "1" and g.get("user") is not None
     easy = request.args.getlist("easy")  # quick filters: beginner / free / no_tryouts

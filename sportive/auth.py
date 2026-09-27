@@ -1,4 +1,5 @@
 """Sign up (UW emails only), email verification, log in / out, and CSRF protection."""
+import calendar
 import functools
 import logging
 import secrets
@@ -13,6 +14,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from .constants import SPORTS
 from .db import get_db, set_user_sports
 from .mail import send_email
+from .textutil import one_line
 from .timeutil import from_db, now_local, to_db
 
 bp = Blueprint("auth", __name__)
@@ -25,6 +27,9 @@ MAX_FAILED_LOGINS = 10
 LOCKOUT = timedelta(minutes=15)
 MIN_AGE, MAX_AGE = 15, 123  # same age range as the original desktop app
 MIN_PASSWORD_LENGTH = 8
+MAX_PASSWORD_LENGTH = 128
+MAX_NAME_LENGTH = 60
+MAX_EMAIL_LENGTH = 254   # the longest an email address can be
 
 
 # ---------------------------------------------------------------- helpers
@@ -73,6 +78,13 @@ def age_on(born, today):
     return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
 
+def is_birthday(born, today):
+    """Leap-day babies celebrate on Feb 28 in years without a Feb 29."""
+    if (born.month, born.day) == (2, 29) and not calendar.isleap(today.year):
+        return (today.month, today.day) == (2, 28)
+    return (born.month, born.day) == (today.month, today.day)
+
+
 def safe_next(target):
     """Only allow redirects back into this site (blocks //evil.com tricks)."""
     if target and target.startswith("/") and not target.startswith("//"):
@@ -90,7 +102,7 @@ def log_in(user):
     if user["birth_date"]:
         born = date.fromisoformat(user["birth_date"])
         today = now_local().date()
-        if (born.month, born.day) == (today.month, today.day):
+        if is_birthday(born, today):
             flash(f"🎂 Happy birthday, {user['full_name'].split()[0]}! Go Dawgs!", "birthday")
     return safe_next(after)
 
@@ -139,8 +151,12 @@ def validate_signup(full_name, email, password, password2, grad_year, birth_date
     domains = current_app.config["ALLOWED_EMAIL_DOMAINS"]
     if not full_name:
         return "Full name cannot be empty."
+    if len(full_name) > MAX_NAME_LENGTH:
+        return f"Please keep your name under {MAX_NAME_LENGTH} characters."
     if not email:
         return "Email cannot be empty."
+    if len(email) > MAX_EMAIL_LENGTH:
+        return "Please use your UW email address (ending in @uw.edu)."
     if email.count("@") != 1 or email.startswith("@") or email.split("@")[1] not in domains:
         return "Please use your UW email address (ending in @uw.edu)."
     problem = password_problem(password, password2)
@@ -168,7 +184,7 @@ def signup():
     if request.args.get("next"):
         session["after_login"] = safe_next(request.args["next"])
     if request.method == "POST":
-        full_name = form.get("full_name", "").strip()
+        full_name = one_line(form.get("full_name"))
         email = form.get("email", "").strip().lower()
         password = form.get("password", "")
         password2 = form.get("password2", "")
@@ -356,6 +372,8 @@ def password_problem(password, password2):
     """The error message for a new password, or None if it's fine."""
     if len(password) < MIN_PASSWORD_LENGTH:
         return f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
+    if len(password) > MAX_PASSWORD_LENGTH:
+        return f"Password can be at most {MAX_PASSWORD_LENGTH} characters."
     if password != password2:
         return "Passwords do not match."
     return None

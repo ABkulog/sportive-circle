@@ -204,12 +204,13 @@ def friends():
              AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = ?)
            GROUP BY u.id ORDER BY games DESC, u.full_name LIMIT 10""",
         (to_db(now_local()), me, me, me, me, me)).fetchall()
-    q = request.args.get("q", "").strip()
+    q = request.args.get("q", "").strip()[:MAX_SEARCH_LENGTH]
     return render_template("social/friends.html", incoming=incoming, outgoing=outgoing,
                            friends=friend_list, suggestions=suggestions, q=q, results=search_people(me, q))
 
 
 MIN_SEARCH_LENGTH = 2
+MAX_SEARCH_LENGTH = 60
 MAX_SEARCH_RESULTS = 20
 
 

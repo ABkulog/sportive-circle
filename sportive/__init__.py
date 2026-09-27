@@ -81,6 +81,8 @@ def create_app(test_config=None):
     _add_template_helpers(app)
     for code, message in ERRORS.items():
         app.register_error_handler(code, _error_page(code, message))
+    # A number too big for the database (e.g. /events/99999999999999999999) can't be a real page.
+    app.register_error_handler(OverflowError, _error_page(404, ERRORS[404]))
     app.after_request(_security_headers)
     return app
 

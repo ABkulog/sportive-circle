@@ -16,7 +16,9 @@ from .links import public_url
 from .mail import send_email
 from .ranks import (LEVEL_REQUIREMENT, check_rank_ups, compute_rank, level_allowed, my_ranks, played_together,
                     props_open, sport_rep, vouch_counts)
+from .social import is_blocked_between
 from .spirit import greeting, top_dawgs
+from .textutil import one_line
 from .timeutil import fmt_clock, fmt_when, from_db, now_local, parse_form, to_db, to_form
 
 bp = Blueprint("events", __name__)
@@ -197,6 +199,10 @@ def insert_event(data):
 
 # -------------------------------------------------------------------- feed
 
+# Games from someone I blocked (or who blocked me) never show up in my feed.
+NOT_BLOCKED = """NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :me AND b.blocked_id = e.host_id)
+                                              OR (b.blocker_id = e.host_id AND b.blocked_id = :me))"""
+
 def celebrate_progress(user_id):
     """Unlock new badges and celebrate rank-ups (with confetti)."""
     new = sync_badges(user_id)
@@ -223,7 +229,7 @@ def feed():
         filters["scope"] = "interests" if my_sports else "all"
 
     now = now_local()
-    where = ["e.cancelled = 0", "e.ends_at >= :now"]
+    where = ["e.cancelled = 0", "e.ends_at >= :now", NOT_BLOCKED]
     params = {"now": to_db(now)}
 
     if filters["sport"] in SPORTS:
@@ -255,7 +261,7 @@ def feed():
     # "Need players" posts starting soon (any sport) go in their own strip at the top.
     need_players = [
         e for e in query_events(
-            ["e.cancelled = 0", "e.is_quick = 1", "e.ends_at >= :now", "e.starts_at <= :soon"],
+            ["e.cancelled = 0", "e.is_quick = 1", "e.ends_at >= :now", "e.starts_at <= :soon", NOT_BLOCKED],
             {"now": to_db(now), "soon": to_db(now + QUICK_WINDOW)},
             limit=10,
         )
@@ -281,7 +287,7 @@ def feed():
 
 def read_event_form(form, event=None):
     """Validate the create/edit form. Returns (data, error)."""
-    title = form.get("title", "").strip()
+    title = one_line(form.get("title"))
     sport = form.get("sport", "")
     location = form.get("location", "")
     skill_level = form.get("skill_level", "")
@@ -569,6 +575,7 @@ def detail(event_id):
                            plus_one=plus_one_state(event),
                            names={person["id"]: person["full_name"].split()[0] for person in attendees},
                            share_url=public_url("events.detail", event_id=event_id),
+                           blocked=is_blocked_between(g.user["id"], event["host_id"]),
                            ranked_game=event["skill_level"] in LEVEL_REQUIREMENT)
 
 
@@ -665,6 +672,9 @@ def join(event_id):
         flash("This event already ended.", "error")
     elif event["i_am_going"]:
         flash("You're already going.", "info")
+    elif is_blocked_between(g.user["id"], event["host_id"]):
+        # Blocking means no contact at all, and that includes showing up to each other's games.
+        flash("You can't join this game.", "error")
     elif (not level_allowed(my_ranks(), event["sport"], event["skill_level"])[0]
           and not tryout_open(event) and not my_plus_one_invite(event_id)):
         flash(level_allowed(my_ranks(), event["sport"], event["skill_level"])[1], "error")

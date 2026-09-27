@@ -92,14 +92,14 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-SOC-1 | Search for people by name and send a friend request. | Must | ✅ |
 | FR-SOC-2 | Accept, decline, cancel requests and unfriend. People you've played with are suggested. | Must | ✅ |
 | FR-SOC-3 | Direct messages are allowed only between friends, people who played together, a student and a club officer, or when replying to someone who wrote first. | Must | ✅ |
-| FR-SOC-4 | Blocking stops messages and friend requests both ways and hides you from their search. | Must | ✅ |
+| FR-SOC-4 | Blocking stops messages, friend requests and joining each other's games, both ways, and hides you from their search and feed. | Must | ✅ |
 
 ### Safety and admin (SAFE)
 
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
 | FR-SAFE-1 | Report a profile, a direct message or a chat message (a copy is saved); optionally block at the same time. The reported person isn't told who reported them. | Must | ✅ |
-| FR-SAFE-2 | Admins (set by `ADMIN_EMAILS`) review reports, see people reported by 3+ others, and can suspend or restore accounts. Suspending cancels games they host. | Must | ✅ |
+| FR-SAFE-2 | Admins (set by `ADMIN_EMAILS`) review reports, see people reported by 3+ others, and can suspend or restore accounts. Suspending cancels games they host and hides their profile from students. | Must | ✅ |
 | FR-SAFE-3 | Admins review club registrations. | Must | ✅ |
 
 ### Info pages (INFO)
@@ -123,7 +123,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | NFR-SEC-3 | Text people type can never run as code (XSS). | Jinja escapes everything; no inline JavaScript at all; Content-Security-Policy allows scripts only from our files and cdnjs. | ✅ |
 | NFR-SEC-4 | No SQL injection. | Every user value goes through query parameters, never string building. | ✅ |
 | NFR-SEC-5 | Login cookies are HttpOnly, SameSite=Lax, and HTTPS-only when the site uses HTTPS. The app refuses to start publicly without a real `SECRET_KEY`. | Config in `create_app`. | ✅ |
-| NFR-SEC-6 | Limits against abuse: code attempts, resend cooldown, login lockout, 20 messages/minute, 10 reports/hour, 3 pending clubs per person. | Checked on the server. | ✅ |
+| NFR-SEC-6 | Limits against abuse: code attempts, resend cooldown, login lockout, 20 messages/minute, 10 reports/hour, 3 pending clubs per person, length limits on every text field and search, and double-tap protection on forms. | Checked on the server (and in the browser for double taps). | ✅ |
 | NFR-SEC-7 | Security headers on every response. | CSP, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors 'none'`. | ✅ |
 | NFR-SEC-8 | Redirects after login only go to pages on this site. | `safe_next()` blocks `//evil.com`. | ✅ |
 
@@ -143,7 +143,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 |---|---|---|
 | NFR-UX-1 | Works on phones (bottom tabs), tablets and laptops (sidebar), with the same 5 sections everywhere. | ✅ |
 | NFR-UX-2 | Plain words: short sentences, no unexplained jargon (glossary on How it works). | ✅ |
-| NFR-UX-3 | Keyboard and screen-reader friendly: labels on every field, skip link, visible focus, `aria-current` on tabs, alt text rules. | ✅ |
+| NFR-UX-3 | Keyboard and screen-reader friendly: labels on every field, skip link, visible focus, `aria-current` on tabs, alt text rules, and text contrast of at least 4.5:1 (WCAG AA). | ✅ |
 | NFR-UX-4 | Light and dark mode; animations are skipped for "reduce motion". | ✅ |
 | NFR-UX-5 | Error messages say what went wrong and how to fix it. Friendly pages for 400/403/404/405/413/500. | ✅ |
 | NFR-UX-6 | Husky look and feel: UW purple and gold, paw logo, Husky wording, without using UW's trademarked logos. | ✅ |
@@ -155,7 +155,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | NFR-PERF-1 | Pages load fast on campus Wi-Fi: no frontend framework, one small stylesheet; the map library loads only on event pages that have a map. | ✅ |
 | NFR-PERF-2 | Database indexes on the common lookups (events by time, RSVPs by person, messages, club members, friendships, vouches). | ✅ |
 | NFR-PERF-3 | GoHuskies news is cached for 30 minutes and the page still works if their site is down. | ✅ |
-| NFR-PERF-4 | One failed email never blocks an action (errors are logged). | ✅ |
+| NFR-PERF-4 | One failed email never blocks an action or anyone else's reminder (errors are logged). Bad input never crashes the server: 1,000+ junk requests return friendly errors. | ✅ |
 | NFR-PERF-5 | SQLite is fine for thousands of students; move to PostgreSQL if the app grows well beyond one UW campus. | 🟡 |
 
 ### Maintainability (NFR-MAINT)

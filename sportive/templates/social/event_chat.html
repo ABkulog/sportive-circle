@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% from "social/_chat.html" import chat_box %}
-{% block title %}Chat · {{ event.title }}{% endblock %}
+{% block title %}Chat · {{ event_title(event) }}{% endblock %}
 {% block content %}
 <a class="back-link" href="{{ url_for('events.detail', event_id=event.id) }}">← Back to the event</a>
 <header class="chat-header">
   <span class="event-emoji" aria-hidden="true">{{ SPORT_EMOJI[event.sport] }}</span>
   <div>
-    <h1>{{ event_title(event) if event.is_quick else event.title }}</h1>
+    <h1>{{ event_title(event) }}</h1>
     <p class="muted">{{ when }} · 📍 {{ event.location }} · {{ people }} going</p>
   </div>
 </header>

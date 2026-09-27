@@ -5,6 +5,7 @@ Run every ~10 minutes (a cron job on the server):
 Locally:
     .venv/bin/flask --app main send-reminders
 """
+import logging
 from datetime import timedelta
 
 import click
@@ -15,6 +16,8 @@ from .constants import SPORT_EMOJI, SPORTS
 from .db import get_db
 from .mail import send_email
 from .timeutil import fmt_clock, from_db, now_local, to_db
+
+log = logging.getLogger(__name__)
 
 REMIND_BEFORE = timedelta(minutes=60)
 # Someone who joined 5 minutes before a game doesn't need a reminder about it.
@@ -75,8 +78,11 @@ def send_due_reminders():
         joined = from_db(row["joined_at"][:16])
         if starts - joined >= MIN_NOTICE:
             subject, body = reminder_email(row, minutes=int((starts - now).total_seconds() // 60))
-            send_email(row["email"], subject, body)
-            sent += 1
+            try:
+                send_email(row["email"], subject, body)
+                sent += 1
+            except Exception:  # one bad address or email hiccup must not stop everyone else's reminders
+                log.exception("Couldn't send a reminder to %s", row["email"])
         # Mark it either way, so nobody gets the same reminder twice.
         db.execute("UPDATE rsvps SET reminder_sent = 1 WHERE event_id = ? AND user_id = ?",
                    (row["event_id"], row["user_id"]))

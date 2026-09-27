@@ -6,7 +6,7 @@ from flask import (Blueprint, Response, abort, flash, g, redirect, render_templa
 from werkzeug.datastructures import MultiDict
 from werkzeug.security import check_password_hash
 
-from .auth import hash_password, login_required, password_problem, safe_next
+from .auth import MAX_NAME_LENGTH, hash_password, login_required, password_problem, safe_next
 from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
 from .events import celebrate_progress, query_events
@@ -14,6 +14,8 @@ from .photos import make_avatar
 from .badges import (SHOWCASE_SLOTS, catalog, earned_badges, is_retired, rarity, set_showcase, showcase,
                      sync_badges)
 from .ranks import LEVELS, user_ranks
+from .moderation import is_admin
+from .textutil import one_line
 from .social import can_message, friendship_status, i_blocked, is_blocked_between
 from .timeutil import now_local, to_db
 
@@ -94,11 +96,11 @@ def photo(user_id):
 @login_required
 def view(user_id):
     user = get_db().execute(
-        "SELECT id, full_name, email, grad_year, bio, avatar_updated, show_ranks, created_at FROM users"
+        "SELECT id, full_name, email, grad_year, bio, avatar_updated, show_ranks, suspended, created_at FROM users"
         " WHERE id = ? AND verified = 1",
         (user_id,),
     ).fetchone()
-    if user is None:
+    if user is None or (user["suspended"] and user_id != g.user["id"] and not is_admin()):
         abort(404)
     hosting = query_events(["e.host_id = :uid", "e.cancelled = 0", "e.ends_at >= :now"],
                            {"uid": user_id, "now": to_db(now_local())}, limit=10)
@@ -149,7 +151,7 @@ def edit():
     me = g.user
     if request.method == "POST":
         form = request.form
-        full_name = form.get("full_name", "").strip()
+        full_name = one_line(form.get("full_name"))
         grad_year = form.get("grad_year", "").strip()
         bio = form.get("bio", "").strip()
         sports = [s for s in form.getlist("sports") if s in SPORTS]
@@ -159,6 +161,8 @@ def edit():
         error = None
         if not full_name:
             error = "Full name cannot be empty."
+        elif len(full_name) > MAX_NAME_LENGTH:
+            error = f"Please keep your name under {MAX_NAME_LENGTH} characters."
         elif grad_year and (not grad_year.isdigit() or not 1950 <= int(grad_year) <= now_local().year + 8):
             error = "Please enter a valid graduation year."
         elif len(bio) > 300:
