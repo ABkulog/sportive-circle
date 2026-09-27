@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
     email_reminders INTEGER NOT NULL DEFAULT 1,    -- 0 = don't email me before events
     avatar_updated  TEXT,                          -- when the profile picture changed (NULL = none yet)
     showcase        TEXT,                          -- up to 3 badge keys shown on the profile, comma-separated
+    show_ranks      INTEGER NOT NULL DEFAULT 1,    -- 0 = chill mode (ranks hidden from others)
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -50,6 +51,8 @@ CREATE TABLE IF NOT EXISTS events (
     extra_players INTEGER NOT NULL DEFAULT 0,      -- people already playing who aren't on the app
     note          TEXT NOT NULL DEFAULT '',
     is_quick      INTEGER NOT NULL DEFAULT 0,      -- 1 = "Need players" quick post
+    tryout_spots  INTEGER NOT NULL DEFAULT 0,      -- spots lower-ranked players can take to prove themselves
+    allow_plus_ones INTEGER NOT NULL DEFAULT 1,    -- ranked players may bring one friend (+1)
     cancelled     INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -61,6 +64,8 @@ CREATE TABLE IF NOT EXISTS rsvps (
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),  -- the app always passes Seattle time
     reminder_sent INTEGER NOT NULL DEFAULT 0,
+    is_tryout     INTEGER NOT NULL DEFAULT 0,      -- joined through a tryout spot
+    plus_one_of   INTEGER REFERENCES users(id) ON DELETE SET NULL,  -- joined as this friend's +1
     PRIMARY KEY (event_id, user_id)
 );
 
@@ -145,4 +150,13 @@ CREATE TABLE IF NOT EXISTS event_chat_seen (
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     last_id  INTEGER NOT NULL,
     PRIMARY KEY (event_id, user_id)
+);
+
+-- "Bring a friend": a ranked player invites one friend (+1) into a ranked game.
+CREATE TABLE IF NOT EXISTS plus_one_invites (
+    event_id   INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    sponsor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    guest_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (event_id, guest_id)
 );

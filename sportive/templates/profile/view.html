@@ -67,7 +67,10 @@
 
 <section class="card">
   <h2>🏀 Ranks</h2>
-  {% if ranks %}
+  {% if not user.show_ranks and user.id != g.user.id %}
+    <p class="muted">🧘 {{ user.full_name.split()[0] }} is in chill mode, so their ranks are hidden. Just here to play!</p>
+  {% elif ranks %}
+    {% if not user.show_ranks %}<p class="muted">🧘 Chill mode is on: only you can see your ranks.</p>{% endif %}
     <div class="rank-cards">
       {% for sport, r in ranks.items() %}
         <div class="rank-card tier-{{ r.tier|lower }}">

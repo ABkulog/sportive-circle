@@ -75,3 +75,14 @@
   sport.addEventListener("change", update);
   update();
 })();
+
+// Tryout spots only make sense for Intermediate / Competitive games.
+(function () {
+  const fields = document.querySelectorAll("[data-tryout-field]");
+  const level = document.querySelector('form[data-sport-form] select[name="skill_level"]');
+  if (!fields.length || !level) return;
+  const update = () => fields.forEach((field) => { field.hidden = !["Intermediate", "Competitive"].includes(level.value); });
+  level.addEventListener("change", update);
+  document.querySelector('form[data-sport-form] select[name="sport"]').addEventListener("change", update);
+  update();
+})();

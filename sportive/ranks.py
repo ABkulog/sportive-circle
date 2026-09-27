@@ -27,6 +27,11 @@ FIRST_LEVEL_OF = {tier: next(i for i, level in enumerate(LEVELS) if level[0] == 
 # Intermediate or higher in that sport count.
 VOUCHES_NEEDED = {"Intermediate": 3, "Competitive": 5}
 
+# Placement (the fast track for players who are already good): this many vouches from
+# players at a tier puts you straight into that tier, no matter how little rep you have.
+# One or two games with good players is enough; no grinding through Casual.
+PLACEMENT_VOUCHES = 3
+
 REP_PLAY = 10                                            # every game you play
 REP_LEVEL_BONUS = {"Intermediate": 5, "Competitive": 10}  # harder games are worth more
 REP_HOST = 10                                            # hosting a game that actually happened
@@ -78,15 +83,31 @@ def _is_intermediate_or_higher(user_id, sport):
             and _raw_vouches(user_id, sport) >= VOUCHES_NEEDED["Intermediate"])
 
 
+def _last_seen_level(user_id, sport):
+    row = get_db().execute("SELECT level FROM ranks_seen WHERE user_id = ? AND sport = ?",
+                           (user_id, sport)).fetchone()
+    return row["level"] if row else 0
+
+
 def vouch_counts(user_id, sport):
-    """(all vouches, vouches from Intermediate-or-higher players) in a sport."""
+    """(all vouches, from Intermediate-or-higher players, from Competitive-or-higher players).
+
+    A voucher's tier is the rank they last had in the app (saved every time they visit),
+    or, for Intermediate, their rep + vouches. This avoids endless "who vouched for whom" loops.
+    """
     givers = [row["giver_id"] for row in get_db().execute(
         "SELECT giver_id FROM vouches WHERE receiver_id = ? AND sport = ?", (user_id, sport))]
-    strong = sum(1 for giver in givers if _is_intermediate_or_higher(giver, sport))
-    return len(givers), strong
+    strong = elite = 0
+    for giver in givers:
+        seen = _last_seen_level(giver, sport)
+        if seen >= FIRST_LEVEL_OF["Intermediate"] or _is_intermediate_or_higher(giver, sport):
+            strong += 1
+        if seen >= FIRST_LEVEL_OF["Competitive"]:
+            elite += 1
+    return len(givers), strong, elite
 
 
-def compute_rank(sport, rep, vouches_any, vouches_strong):
+def compute_rank(sport, rep, vouches_any, vouches_strong, vouches_elite=0):
     level = max(i for i, (_, _, need) in enumerate(LEVELS) if rep >= need)
     blocked_by, have, needed = None, 0, 0
     if level >= FIRST_LEVEL_OF["Intermediate"] and vouches_any < VOUCHES_NEEDED["Intermediate"]:
@@ -96,11 +117,21 @@ def compute_rank(sport, rep, vouches_any, vouches_strong):
         level = FIRST_LEVEL_OF["Competitive"] - 1
         blocked_by, have, needed = "Competitive", vouches_strong, VOUCHES_NEEDED["Competitive"]
 
+    # Placement: good players vouched in by good players skip the grind.
+    placed = None
+    if vouches_elite >= PLACEMENT_VOUCHES and level < FIRST_LEVEL_OF["Competitive"]:
+        placed = FIRST_LEVEL_OF["Competitive"]
+    elif vouches_strong >= PLACEMENT_VOUCHES and level < FIRST_LEVEL_OF["Intermediate"]:
+        placed = FIRST_LEVEL_OF["Intermediate"]
+    if placed is not None:
+        level = placed
+        blocked_by, have, needed = None, 0, 0
+
     tier = LEVELS[level][0]
     if level + 1 < len(LEVELS):
         next_name, next_rep = level_name(level + 1), LEVELS[level + 1][2]
         start = LEVELS[level][2]
-        progress = min(100, int((rep - start) * 100 / (next_rep - start))) if not blocked_by else 100
+        progress = max(0, min(100, int((rep - start) * 100 / (next_rep - start)))) if not blocked_by else 100
     else:
         next_name, next_rep, progress = None, None, 100
     return Rank(sport, level, tier, level_name(level), rep, next_name, next_rep, progress,

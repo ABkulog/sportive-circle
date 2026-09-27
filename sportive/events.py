@@ -9,12 +9,12 @@ from .auth import login_required, safe_next
 from .constants import (LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS, SKILL_LEVELS,
                         SPORT_LOCATIONS, SPORT_MAX_PLAYERS, SPORTS)
 from .db import get_db, user_sports
-from .ranks import (compute_rank, level_allowed, my_ranks, played_together, props_open, sport_rep,
-                    vouch_counts)
+from .ranks import (LEVEL_REQUIREMENT, compute_rank, level_allowed, my_ranks, played_together, props_open,
+                    sport_rep, vouch_counts)
 from .badges import sync_badges
 from .ranks import check_rank_ups
 from .spirit import greeting, top_dawgs
-from .timeutil import fmt_clock, from_db, now_local, parse_form, to_db, to_form
+from .timeutil import fmt_clock, fmt_when, from_db, now_local, parse_form, to_db, to_form
 
 bp = Blueprint("events", __name__)
 
@@ -36,7 +36,8 @@ def query_events(where, params=None, order="e.starts_at", limit=100):
     sql = f"""
         SELECT e.*, u.full_name AS host_name, u.avatar_updated AS host_avatar,
                (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id) AS going_count,
-               EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me) AS i_am_going
+               EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me) AS i_am_going,
+               (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id AND r.is_tryout = 1) AS tryouts_used
         FROM events e JOIN users u ON u.id = e.host_id
         WHERE {" AND ".join(where)}
         ORDER BY {order}
@@ -91,6 +92,68 @@ def place_map(location):
     }
 
 
+MAX_TRYOUT_SPOTS = 3
+
+
+def tryout_open(event):
+    """Is there a free tryout spot for someone below this game's level?"""
+    return event["tryout_spots"] > event["tryouts_used"]
+
+
+MAX_PLUS_ONES_PER_GAME = 2
+
+
+def my_plus_one_invites():
+    """{event_id: invite row with the sponsor's name} for invites sent to me (once per request)."""
+    if "plus_one_invites" not in g:
+        g.plus_one_invites = {row["event_id"]: row for row in get_db().execute(
+            """SELECT i.event_id, i.sponsor_id, u.full_name FROM plus_one_invites i JOIN users u ON u.id = i.sponsor_id
+               WHERE i.guest_id = ?""", (g.user["id"],))} if g.get("user") is not None else {}
+    return g.plus_one_invites
+
+
+def my_plus_one_invite(event_id):
+    return my_plus_one_invites().get(event_id)
+
+
+def can_join_or_tryout(event):
+    """For templates: 'join', 'plus_one', 'tryout', or None (locked)."""
+    if level_allowed(my_ranks(), event["sport"], event["skill_level"])[0]:
+        return "join"
+    if my_plus_one_invite(event["id"]):
+        return "plus_one"
+    return "tryout" if tryout_open(event) else None
+
+
+def plus_one_state(event):
+    """What the 'Bring a friend' box on the event page should show for me."""
+    db = get_db()
+    me = g.user["id"]
+    my_rsvp = db.execute("SELECT is_tryout, plus_one_of FROM rsvps WHERE event_id = ? AND user_id = ?",
+                         (event["id"], me)).fetchone()
+    sent = db.execute(
+        """SELECT i.guest_id, u.full_name,
+                  EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = i.event_id AND r.user_id = i.guest_id) AS joined
+           FROM plus_one_invites i JOIN users u ON u.id = i.guest_id WHERE i.event_id = ? AND i.sponsor_id = ?""",
+        (event["id"], me)).fetchone()
+    used = db.execute("SELECT COUNT(*) FROM plus_one_invites WHERE event_id = ?", (event["id"],)).fetchone()[0]
+    eligible = (event["skill_level"] in LEVEL_REQUIREMENT and event["allow_plus_ones"] and not event["cancelled"]
+                and from_db(event["ends_at"]) >= now_local() and my_rsvp is not None
+                and not my_rsvp["is_tryout"] and my_rsvp["plus_one_of"] is None
+                and level_allowed(my_ranks(), event["sport"], event["skill_level"])[0])
+    friends = []
+    if eligible and sent is None and used < MAX_PLUS_ONES_PER_GAME:
+        friends = db.execute(
+            """SELECT u.id, u.full_name, u.avatar_updated FROM friendships f
+               JOIN users u ON u.id = CASE WHEN f.requester_id = :me THEN f.addressee_id ELSE f.requester_id END
+               WHERE (f.requester_id = :me OR f.addressee_id = :me) AND f.status = 'accepted'
+                 AND u.id NOT IN (SELECT user_id FROM rsvps WHERE event_id = :event)
+                 AND u.id NOT IN (SELECT guest_id FROM plus_one_invites WHERE event_id = :event)
+               ORDER BY u.full_name""", {"me": me, "event": event["id"]}).fetchall()
+    return {"eligible": eligible, "sent": sent, "friends": friends,
+            "full": used >= MAX_PLUS_ONES_PER_GAME and sent is None}
+
+
 def round_up_5(dt):
     return dt + timedelta(minutes=-dt.minute % 5)
 
@@ -99,10 +162,10 @@ def insert_event(data):
     db = get_db()
     cur = db.execute(
         """INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level,
-                               max_players, extra_players, note, is_quick)
+                               max_players, extra_players, note, is_quick, tryout_spots, allow_plus_ones)
            VALUES (:host_id, :title, :sport, :location, :starts_at, :ends_at, :skill_level,
-                   :max_players, :extra_players, :note, :is_quick)""",
-        {"host_id": g.user["id"], "extra_players": 0, "is_quick": 0, **data},
+                   :max_players, :extra_players, :note, :is_quick, :tryout_spots, :allow_plus_ones)""",
+        {"host_id": g.user["id"], "extra_players": 0, "is_quick": 0, "tryout_spots": 0, "allow_plus_ones": 1, **data},
     )
     # The host is automatically going to their own event.
     db.execute("INSERT INTO rsvps (event_id, user_id, created_at) VALUES (?, ?, ?)",
@@ -247,10 +310,16 @@ def read_event_form(form, event=None):
             return None, f"{taken} people are already in, so max players can't be lower than that."
     if len(note) > 500:
         return None, "Note is too long (500 characters max)."
+    tryout_raw = form.get("tryout_spots", "0").strip() or "0"
+    if not tryout_raw.isdigit() or int(tryout_raw) > MAX_TRYOUT_SPOTS:
+        return None, f"Tryout spots can be 0 to {MAX_TRYOUT_SPOTS}."
+    tryout_spots = int(tryout_raw) if skill_level in LEVEL_REQUIREMENT else 0  # only ranked games have tryouts
 
     return {
         "title": title, "sport": sport, "location": location, "skill_level": skill_level,
         "starts_at": to_db(starts), "ends_at": to_db(ends), "max_players": max_players, "note": note,
+        "tryout_spots": tryout_spots,
+        "allow_plus_ones": 1 if form.get("allow_plus_ones") else 0,
     }, None
 
 
@@ -281,7 +350,7 @@ def create():
         flash(error, "error")
     else:
         starts, ends = default_times()
-        form = MultiDict({"starts_at": starts, "ends_at": ends, "skill_level": "All levels",
+        form = MultiDict({"starts_at": starts, "ends_at": ends, "skill_level": "All levels", "allow_plus_ones": "1",
                           "sport": request.args.get("sport", "")})
     return render_template("events/form.html", form=form, event=None, min_start=now_local().strftime("%Y-%m-%dT%H:%M"))
 
@@ -303,7 +372,8 @@ def edit(event_id):
             db.execute(
                 """UPDATE events SET title = :title, sport = :sport, location = :location,
                        starts_at = :starts_at, ends_at = :ends_at, skill_level = :skill_level,
-                       max_players = :max_players, note = :note
+                       max_players = :max_players, note = :note, tryout_spots = :tryout_spots,
+                       allow_plus_ones = :allow_plus_ones
                    WHERE id = :id""",
                 {**data, "id": event_id},
             )
@@ -316,7 +386,8 @@ def edit(event_id):
             "title": event["title"], "sport": event["sport"], "location": event["location"],
             "skill_level": event["skill_level"], "starts_at": to_form(event["starts_at"]),
             "ends_at": to_form(event["ends_at"]), "note": event["note"],
-            "max_players": event["max_players"] or "",
+            "max_players": event["max_players"] or "", "tryout_spots": event["tryout_spots"],
+            "allow_plus_ones": "1" if event["allow_plus_ones"] else "",
         })
     return render_template("events/form.html", form=form, event=event, min_start="")
 
@@ -402,7 +473,8 @@ def _int(value):
 def detail(event_id):
     event = get_event(event_id)
     attendees = get_db().execute(
-        """SELECT u.id, u.full_name, u.grad_year, u.avatar_updated FROM rsvps r JOIN users u ON u.id = r.user_id
+        """SELECT u.id, u.full_name, u.grad_year, u.avatar_updated, u.show_ranks, r.is_tryout, r.plus_one_of
+           FROM rsvps r JOIN users u ON u.id = r.user_id
            WHERE r.event_id = ? ORDER BY r.created_at""",
         (event_id,),
     ).fetchall()
@@ -420,7 +492,12 @@ def detail(event_id):
     return render_template("events/detail.html", event=event, attendees=attendees, ended=ended,
                            ranks=ranks, props_given=props_given, vouched=vouched,
                            post_game=event["i_am_going"] and props_open(event),
-                           level_ok=level_ok, level_reason=level_reason)
+                           level_ok=level_ok, level_reason=level_reason,
+                           tryout=not level_ok and tryout_open(event) and not my_plus_one_invite(event_id),
+                           my_invite=None if level_ok or event["i_am_going"] else my_plus_one_invite(event_id),
+                           plus_one=plus_one_state(event),
+                           names={person["id"]: person["full_name"].split()[0] for person in attendees},
+                           ranked_game=event["skill_level"] in LEVEL_REQUIREMENT)
 
 
 @bp.route("/events/<int:event_id>/props/<int:user_id>", methods=("POST",))
@@ -442,6 +519,47 @@ def give_props(event_id, user_id):
         if cur.rowcount:
             flash("Props sent! 🤝 That's how Huskies do it.", "success")
     return redirect(url_for("events.detail", event_id=event_id) + "#post-game")
+
+
+@bp.route("/events/<int:event_id>/plus-one/<int:friend_id>", methods=("POST",))
+@login_required
+def invite_plus_one(event_id, friend_id):
+    """Bring a friend: invite one friend into a ranked game you're playing in."""
+    event = get_event(event_id)
+    state = plus_one_state(event)
+    if not state["eligible"]:
+        flash("Only ranked players going to this game can bring a +1, and only if the host allows it.", "error")
+    elif state["sent"] is not None:
+        flash("You already invited a friend to this game. One +1 per player!", "error")
+    elif state["full"]:
+        flash(f"This game already has {MAX_PLUS_ONES_PER_GAME} +1 invites, which is the max.", "error")
+    elif friend_id not in {friend["id"] for friend in state["friends"]}:
+        flash("You can only bring a friend (someone who accepted your friend request).", "error")
+    else:
+        db = get_db()
+        now = to_db(now_local())
+        db.execute("INSERT INTO plus_one_invites (event_id, sponsor_id, guest_id, created_at) VALUES (?, ?, ?, ?)",
+                   (event_id, g.user["id"], friend_id, now))
+        link = url_for("events.detail", event_id=event_id, _external=True)
+        db.execute("INSERT INTO direct_messages (sender_id, recipient_id, body, created_at) VALUES (?, ?, ?, ?)",
+                   (g.user["id"], friend_id,
+                    f"🤝 I invited you as my +1 to {event_title(event)} ({fmt_when(event['starts_at'])}). "
+                    f"It's a {event['skill_level']} game, but you can come with me! Join here: {link}", now))
+        db.commit()
+        flash("Invite sent! 🤝 They'll get a message and can join as your +1.", "success")
+    return redirect(url_for("events.detail", event_id=event_id) + "#plus-one")
+
+
+@bp.route("/events/<int:event_id>/plus-one/cancel", methods=("POST",))
+@login_required
+def cancel_plus_one(event_id):
+    db = get_db()
+    db.execute("""DELETE FROM plus_one_invites WHERE event_id = ? AND sponsor_id = ?
+                  AND guest_id NOT IN (SELECT user_id FROM rsvps WHERE event_id = ?)""",
+               (event_id, g.user["id"], event_id))
+    db.commit()
+    flash("+1 invite cancelled.", "info")
+    return redirect(url_for("events.detail", event_id=event_id) + "#plus-one")
 
 
 @bp.route("/events/<int:event_id>/vouch/<int:user_id>", methods=("POST",))
@@ -475,21 +593,32 @@ def join(event_id):
         flash("This event already ended.", "error")
     elif event["i_am_going"]:
         flash("You're already going.", "info")
-    elif not level_allowed(my_ranks(), event["sport"], event["skill_level"])[0]:
+    elif (not level_allowed(my_ranks(), event["sport"], event["skill_level"])[0]
+          and not tryout_open(event) and not my_plus_one_invite(event_id)):
         flash(level_allowed(my_ranks(), event["sport"], event["skill_level"])[1], "error")
     else:
+        below_level = not level_allowed(my_ranks(), event["sport"], event["skill_level"])[0]
+        sponsor = my_plus_one_invite(event_id) if below_level else None
+        tryout = below_level and sponsor is None
         db = get_db()
         # The capacity check and the insert happen in one statement, so two people
         # clicking "Join" at the same moment can't both take the last spot.
         cur = db.execute(
-            """INSERT INTO rsvps (event_id, user_id, created_at)
-               SELECT e.id, :me, :now FROM events e
+            """INSERT INTO rsvps (event_id, user_id, created_at, is_tryout, plus_one_of)
+               SELECT e.id, :me, :now, :tryout, :sponsor FROM events e
                WHERE e.id = :id AND (e.max_players IS NULL OR
-                     e.extra_players + (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id) < e.max_players)""",
-            {"me": g.user["id"], "id": event_id, "now": to_db(now_local())},
+                     e.extra_players + (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id) < e.max_players)
+                 AND (:tryout = 0 OR
+                      (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id AND r.is_tryout = 1) < e.tryout_spots)""",
+            {"me": g.user["id"], "id": event_id, "now": to_db(now_local()), "tryout": int(tryout),
+             "sponsor": sponsor["sponsor_id"] if sponsor else None},
         )
         db.commit()
-        if cur.rowcount:
+        if cur.rowcount and sponsor:
+            flash(f"You're in as {sponsor['full_name'].split()[0]}'s +1 🤝 Have a great game together!", "celebrate")
+        elif cur.rowcount and tryout:
+            flash("You're in as a tryout 🎟️ Show what you've got, then ask for vouches after the game!", "celebrate")
+        elif cur.rowcount:
             flash("You're in! See you there, Dawg 🐺", "celebrate")
             clash = overlapping_event(event)
             if clash:

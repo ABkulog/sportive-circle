@@ -94,7 +94,7 @@ def photo(user_id):
 @login_required
 def view(user_id):
     user = get_db().execute(
-        "SELECT id, full_name, email, grad_year, bio, avatar_updated, created_at FROM users"
+        "SELECT id, full_name, email, grad_year, bio, avatar_updated, show_ranks, created_at FROM users"
         " WHERE id = ? AND verified = 1",
         (user_id,),
     ).fetchone()
@@ -154,6 +154,7 @@ def edit():
         bio = form.get("bio", "").strip()
         sports = [s for s in form.getlist("sports") if s in SPORTS]
         email_reminders = 1 if form.get("email_reminders") else 0
+        show_ranks = 1 if form.get("show_ranks") else 0
 
         error = None
         if not full_name:
@@ -165,8 +166,9 @@ def edit():
 
         if error is None:
             db = get_db()
-            db.execute("UPDATE users SET full_name = ?, grad_year = ?, bio = ?, email_reminders = ? WHERE id = ?",
-                       (full_name, int(grad_year) if grad_year else None, bio, email_reminders, me["id"]))
+            db.execute("UPDATE users SET full_name = ?, grad_year = ?, bio = ?, email_reminders = ?, show_ranks = ?"
+                       " WHERE id = ?",
+                       (full_name, int(grad_year) if grad_year else None, bio, email_reminders, show_ranks, me["id"]))
             set_user_sports(me["id"], sports)
             db.commit()
             flash("Profile saved.", "success")
@@ -175,17 +177,44 @@ def edit():
     else:
         form = MultiDict([("full_name", me["full_name"]), ("grad_year", me["grad_year"] or ""), ("bio", me["bio"])]
                          + [("sports", s) for s in user_sports(me["id"])]
-                         + ([("email_reminders", "1")] if me["email_reminders"] else []))
+                         + ([("email_reminders", "1")] if me["email_reminders"] else [])
+                         + ([("show_ranks", "1")] if me["show_ranks"] else []))
     return render_template("profile/edit.html", form=form)
 
 
-@bp.route("/profile/delete", methods=("POST",))
+CONFIRM_WORD = "DELETE"
+
+
+def what_you_would_lose(user_id):
+    db = get_db()
+    now = to_db(now_local())
+    one = lambda sql, *args: db.execute(sql, args).fetchone()[0]
+    return {
+        "badges": one("SELECT COUNT(*) FROM user_badges WHERE user_id = ?", user_id),
+        "og_badges": sum(1 for badge in catalog() if badge.until and badge.key in earned_badges(user_id)),
+        "ranks": user_ranks(user_id),
+        "games": one("SELECT COUNT(*) FROM rsvps r JOIN events e ON e.id = r.event_id"
+                     " WHERE r.user_id = ? AND e.cancelled = 0 AND e.ends_at < ?", user_id, now),
+        "hosting": one("SELECT COUNT(*) FROM events WHERE host_id = ? AND cancelled = 0 AND ends_at >= ?", user_id, now),
+        "friends": one("SELECT COUNT(*) FROM friendships WHERE (requester_id = ? OR addressee_id = ?)"
+                       " AND status = 'accepted'", user_id, user_id),
+        "messages": one("SELECT COUNT(*) FROM direct_messages WHERE sender_id = ? OR recipient_id = ?", user_id, user_id),
+    }
+
+
+@bp.route("/profile/delete", methods=("GET", "POST"))
 @login_required
 def delete_account():
-    """Permanently delete your account, your RSVPs and the events you host."""
+    """Step 1 (GET): an "Are you sure?" page showing what you'd lose.
+    Step 2 (POST): delete, only with your password AND the word DELETE typed in."""
+    if request.method == "GET":
+        return render_template("profile/delete.html", lose=what_you_would_lose(g.user["id"]), word=CONFIRM_WORD)
+    if request.form.get("confirm", "").strip().upper() != CONFIRM_WORD:
+        flash(f"Type {CONFIRM_WORD} in the box to confirm. Your account was not deleted.", "error")
+        return redirect(url_for("profile.delete_account"))
     if not check_password_hash(g.user["password_hash"], request.form.get("password", "")):
         flash("That password isn't right, so your account was not deleted.", "error")
-        return redirect(url_for("profile.edit"))
+        return redirect(url_for("profile.delete_account"))
     db = get_db()
     # ON DELETE CASCADE (schema.sql) also removes your sports, RSVPs and hosted events.
     db.execute("DELETE FROM users WHERE id = ?", (g.user["id"],))

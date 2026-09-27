@@ -528,3 +528,12 @@ h2 { font-weight: 800; }
 .more-menu-panel form { margin: 0; }
 .danger-link { color: var(--danger); }
 .footer-links { margin: 6px 0 0; }
+.tryout-box { border-color: var(--spirit-gold); border-style: solid; }
+.tryout-box form { margin-top: 10px; }
+[data-tryout-field][hidden] { display: none; }
+.delete-card h1 { font-size: 1.5rem; }
+.lose-list { display: grid; gap: 8px; padding-left: 0; list-style: none; margin: 14px 0 18px; }
+.lose-list li { background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+.delete-confirm { margin-top: 16px; }
+.delete-confirm summary { cursor: pointer; color: var(--danger); font-weight: 600; text-align: center; }
+@media (prefers-color-scheme: dark) { .delete-confirm summary { color: #f2a097; } }

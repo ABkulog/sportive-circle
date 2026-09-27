@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Delete account{% endblock %}
+{% block content %}
+<div class="card form-card delete-card">
+  <p class="error-paw" aria-hidden="true">🐾</p>
+  <h1>Are you sure you want to delete your account?</h1>
+  <p>This <strong>can't be undone</strong>. Here's what you'd lose forever:</p>
+  <ul class="lose-list">
+    <li>🏅 <strong>{{ lose.badges }}</strong> badge{{ 's' if lose.badges != 1 }}{% if lose.og_badges %},
+      including <strong>{{ lose.og_badges }}</strong> limited/OG badge{{ 's' if lose.og_badges != 1 }} you can never earn again{% endif %}</li>
+    {% if lose.ranks %}
+      <li>🔥 Your ranks:
+        {% for sport, r in lose.ranks.items() %}{{ SPORT_EMOJI[sport] }} {{ r.name }}{% if not loop.last %}, {% endif %}{% endfor %}</li>
+    {% endif %}
+    <li>🐾 Your history of <strong>{{ lose.games }}</strong> game{{ 's' if lose.games != 1 }}</li>
+    <li>👥 <strong>{{ lose.friends }}</strong> friend{{ 's' if lose.friends != 1 }} and <strong>{{ lose.messages }}</strong> message{{ 's' if lose.messages != 1 }}</li>
+    {% if lose.hosting %}
+      <li>📅 <strong>{{ lose.hosting }}</strong> upcoming event{{ 's' if lose.hosting != 1 }} you host. They'll be deleted,
+        and everyone who joined will lose them too.</li>
+    {% endif %}
+  </ul>
+
+  <a class="btn btn-large btn-block" href="{{ url_for('profile.view', user_id=g.user.id) }}">No, keep my account 💜</a>
+
+  <details class="delete-confirm">
+    <summary>I understand, continue to delete</summary>
+    <form method="post" class="form" autocomplete="off">
+      {{ csrf_field() }}
+      <label class="field"><span>Type <strong>{{ word }}</strong> to confirm</span>
+        <input name="confirm" required autocapitalize="characters" spellcheck="false" placeholder="{{ word }}"></label>
+      <label class="field"><span>Your password</span>
+        <input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="btn btn-danger-ghost btn-block">Yes, delete my account forever</button>
+    </form>
+  </details>
+</div>
+{% endblock %}
+
+{% block actionbar %}{% endblock %}

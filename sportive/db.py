@@ -29,6 +29,11 @@ ADDED_COLUMNS = [
     ("rsvps", "reminder_sent", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "avatar_updated", "TEXT"),
     ("users", "showcase", "TEXT"),
+    ("users", "show_ranks", "INTEGER NOT NULL DEFAULT 1"),
+    ("events", "tryout_spots", "INTEGER NOT NULL DEFAULT 0"),
+    ("rsvps", "is_tryout", "INTEGER NOT NULL DEFAULT 0"),
+    ("events", "allow_plus_ones", "INTEGER NOT NULL DEFAULT 1"),
+    ("rsvps", "plus_one_of", "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
 ]
 
 

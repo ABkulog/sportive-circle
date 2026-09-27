@@ -430,8 +430,10 @@ def test_reminders_command_runs(app):
 def test_delete_account(accounts, client, app):
     accounts.signup(email="host@uw.edu")
     client.post("/events/new", data=event_form())
-    assert b"not deleted" in client.post("/profile/delete", data={"password": "wrong"}, follow_redirects=True).data
-    response = client.post("/profile/delete", data={"password": "purple-and-gold"}, follow_redirects=True)
+    assert b"not deleted" in client.post("/profile/delete", data={"password": "wrong", "confirm": "DELETE"},
+                                         follow_redirects=True).data
+    response = client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"},
+                           follow_redirects=True)
     assert b"was deleted" in response.data and b"Find people to play with" in response.data
     with app.app_context():
         db = get_db()
@@ -569,7 +571,7 @@ def test_shared_link_survives_photo_step(accounts, client):
 
 def test_deleting_account_removes_photo(accounts, client, app):
     accounts.signup()
-    client.post("/profile/delete", data={"password": "purple-and-gold"})
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
     with app.app_context():
         assert get_db().execute("SELECT COUNT(*) FROM avatars").fetchone()[0] == 0
 
@@ -1148,3 +1150,188 @@ def test_news_survives_gohuskies_being_down(monkeypatch):
         raise OSError("down")
     monkeypatch.setattr(news, "_download", broken)
     assert news.fetch_all() == []
+
+
+# ------------------------------------------ placement, tryouts, chill mode, delete
+
+def _set_seen_level(app, user_id, sport, level):
+    with app.app_context():
+        db = get_db()
+        db.execute("INSERT OR REPLACE INTO ranks_seen (user_id, sport, level) VALUES (?, ?, ?)", (user_id, sport, level))
+        db.commit()
+
+
+def test_good_new_player_gets_placed_by_good_players(accounts, client, app):
+    from sportive.ranks import FIRST_LEVEL_OF, compute_rank, sport_rep, vouch_counts
+    accounts.signup(email="star@uw.edu")
+    star = _user_id(app, "star@uw.edu")
+    vets = []
+    for n in range(3):
+        accounts.logout()
+        accounts.signup(email=f"vet{n}@uw.edu")
+        vets.append(_user_id(app, f"vet{n}@uw.edu"))
+        _set_seen_level(app, vets[-1], "basketball", FIRST_LEVEL_OF["Competitive"])  # they're Competitive
+    _played_games(app, "basketball", [vets[0], star] + vets[1:])  # ONE game together
+    with app.app_context():
+        db = get_db()
+        for vet in vets:
+            db.execute("INSERT INTO vouches VALUES ('basketball', ?, ?, '2026-09-23 10:00')", (vet, star))
+        db.commit()
+        rank = compute_rank("basketball", sport_rep(star)["basketball"], *vouch_counts(star, "basketball"))
+    assert rank.name == "Competitive 1"      # one game, 10 rep, straight to Competitive
+
+
+def test_tryout_spots(accounts, client, app):
+    from sportive.ranks import FIRST_LEVEL_OF
+    accounts.signup(email="host@uw.edu")
+    host = _user_id(app, "host@uw.edu")
+    _set_seen_level(app, host, "basketball", FIRST_LEVEL_OF["Competitive"])
+    with app.app_context():  # give the host a real Competitive rank
+        db = get_db()
+        for n in range(5):
+            db.execute("INSERT INTO users (email, password_hash, full_name, verified) VALUES (?, 'x', 'Vet', 1)",
+                       (f"v{n}@uw.edu",))
+        db.commit()
+    vets = [_user_id(app, f"v{n}@uw.edu") for n in range(5)]
+    for vet in vets:
+        _set_seen_level(app, vet, "basketball", FIRST_LEVEL_OF["Competitive"])
+    _played_games(app, "basketball", [host] + vets, count=25)
+    with app.app_context():
+        db = get_db()
+        for vet in vets:
+            db.execute("INSERT INTO vouches VALUES ('basketball', ?, ?, '2026-09-23 10:00')", (vet, host))
+        db.commit()
+    event_id = event_id_from(client.post("/events/new", data=event_form(skill_level="Competitive", tryout_spots="1")))
+    accounts.logout()
+    accounts.signup(email="newbie@uw.edu")
+    feed = client.get("/?scope=all").data.decode()
+    assert "🎟️ 1 tryout spot" in feed and "🎟️ Try out" in feed
+    page = client.post(f"/events/{event_id}/join", follow_redirects=True).data.decode()
+    assert "You&#39;re in as a tryout" in page and "🎟️ Tryout</span>" in page
+    accounts.logout()
+    accounts.signup(email="newbie2@uw.edu")
+    assert b"reached Competitive" in client.post(f"/events/{event_id}/join", follow_redirects=True).data
+
+
+def test_tryout_spots_only_for_ranked_games(accounts, client, app):
+    accounts.signup()
+    event_id = event_id_from(client.post("/events/new", data=event_form(skill_level="Casual", tryout_spots="2")))
+    with app.app_context():
+        assert get_db().execute("SELECT tryout_spots FROM events WHERE id = ?", (event_id,)).fetchone()[0] == 0
+
+
+def test_no_rank_chips_in_casual_games(accounts, client):
+    accounts.signup()
+    event_id = event_id_from(client.post("/events/new", data=event_form(skill_level="Casual")))
+    assert b"rank-chip" not in client.get(f"/events/{event_id}").data
+
+
+def test_chill_mode_hides_ranks(accounts, client, app):
+    accounts.signup(email="chill@uw.edu", sports=("soccer",))
+    chill = _user_id(app, "chill@uw.edu")
+    _played_games(app, "soccer", [chill])
+    client.post("/profile/edit", data={"full_name": "Chill Dawg", "sports": ["soccer"]})  # show_ranks unchecked
+    own = client.get(f"/u/{chill}").data.decode()
+    assert "only you can see your ranks" in own and "Casual 1" in own
+    accounts.logout()
+    accounts.signup(email="other@uw.edu")
+    other = client.get(f"/u/{chill}").data.decode()
+    assert "chill mode" in other and "Casual 1" not in other
+
+
+def test_delete_account_needs_are_you_sure(accounts, client, app):
+    accounts.signup()
+    client.post("/events/new", data=event_form())
+    page = client.get("/profile/delete").data.decode()
+    assert "Are you sure" in page and "No, keep my account" in page and "can't be undone" in page
+    assert "upcoming event you host" in page
+    wrong = client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "yes"},
+                        follow_redirects=True).data
+    assert b"Type DELETE" in wrong
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM users").fetchone()[0] == 1   # still here
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "delete"})
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0
+
+
+# ------------------------------------------------------------ bring a friend (+1)
+
+def _make_competitive(app, user_id, sport="basketball"):
+    """Give someone a real Competitive rank in a sport (5 Competitive vouchers + lots of games)."""
+    from sportive.ranks import FIRST_LEVEL_OF
+    with app.app_context():
+        db = get_db()
+        vets = []
+        for n in range(5):
+            cur = db.execute("INSERT INTO users (email, password_hash, full_name, verified) VALUES (?, 'x', 'Vet', 1)",
+                             (f"vet{user_id}-{n}@uw.edu",))
+            vets.append(cur.lastrowid)
+            db.execute("INSERT INTO ranks_seen VALUES (?, ?, ?)", (cur.lastrowid, sport, FIRST_LEVEL_OF["Competitive"]))
+        db.commit()
+    _played_games(app, sport, [user_id] + vets, count=25)
+    with app.app_context():
+        db = get_db()
+        for vet in vets:
+            db.execute("INSERT INTO vouches VALUES (?, ?, ?, '2026-09-23 10:00')", (sport, vet, user_id))
+        db.commit()
+
+
+def _befriend(client, accounts, a_email, b_email, app):
+    accounts.login(email=a_email)
+    client.post(f"/friends/request/{_user_id(app, b_email)}")
+    accounts.logout()
+    accounts.login(email=b_email)
+    client.post(f"/friends/accept/{_user_id(app, a_email)}")
+    accounts.logout()
+
+
+def test_bring_a_friend_to_a_competitive_game(accounts, client, app):
+    accounts.signup(email="pro@uw.edu", name="Pat Pro")
+    accounts.logout()
+    accounts.signup(email="buddy@uw.edu", name="Bo Buddy")
+    accounts.logout()
+    pro, buddy = _user_id(app, "pro@uw.edu"), _user_id(app, "buddy@uw.edu")
+    _make_competitive(app, pro)
+    _befriend(client, accounts, "pro@uw.edu", "buddy@uw.edu", app)
+    accounts.login(email="pro@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form(skill_level="Competitive", allow_plus_ones="1")))
+    page = client.get(f"/events/{event_id}").data.decode()
+    assert "Bring a friend" in page and "Bo Buddy" in page
+    client.post(f"/events/{event_id}/plus-one/{buddy}")
+    assert "One +1 per player" in client.post(f"/events/{event_id}/plus-one/{buddy}", follow_redirects=True).data.decode()
+    accounts.logout()
+    accounts.login(email="buddy@uw.edu")
+    assert "invited you as my +1" in client.get(f"/messages/{pro}").data.decode()      # got a DM
+    assert "🤝 Join as +1" in client.get("/?scope=all").data.decode()                   # card shows the way in
+    joined = client.post(f"/events/{event_id}/join", follow_redirects=True).data.decode()
+    assert "You&#39;re in as Pat&#39;s +1" in joined and "🤝 Pat's +1" in joined
+    with app.app_context():
+        row = get_db().execute("SELECT plus_one_of, is_tryout FROM rsvps WHERE user_id = ? AND event_id = ?",
+                               (buddy, event_id)).fetchone()
+        assert (row["plus_one_of"], row["is_tryout"]) == (pro, 0)
+
+
+def test_plus_one_rules(accounts, client, app):
+    for email in ("pro@uw.edu", "buddy@uw.edu", "stranger@uw.edu", "buddy2@uw.edu"):
+        accounts.signup(email=email)
+        accounts.logout()
+    pro, stranger = _user_id(app, "pro@uw.edu"), _user_id(app, "stranger@uw.edu")
+    _make_competitive(app, pro)
+    _befriend(client, accounts, "pro@uw.edu", "buddy@uw.edu", app)
+    _befriend(client, accounts, "buddy@uw.edu", "buddy2@uw.edu", app)
+    accounts.login(email="pro@uw.edu")
+    closed = event_id_from(client.post("/events/new", data=event_form(title="No plus ones", skill_level="Competitive")))
+    assert "Bring a friend" not in client.get(f"/events/{closed}").data.decode()   # host turned +1s off
+    event_id = event_id_from(client.post("/events/new", data=event_form(skill_level="Competitive", allow_plus_ones="1")))
+    assert "only bring a friend" in client.post(f"/events/{event_id}/plus-one/{stranger}",
+                                                follow_redirects=True).data.decode()
+    client.post(f"/events/{event_id}/plus-one/{_user_id(app, 'buddy@uw.edu')}")
+    accounts.logout()
+    accounts.login(email="buddy@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    # A +1 can't bring their own +1 (no chains).
+    assert "Bring a friend" not in client.get(f"/events/{event_id}").data.decode()
+    accounts.logout()
+    accounts.login(email="buddy2@uw.edu")
+    assert b"reached Competitive" in client.post(f"/events/{event_id}/join", follow_redirects=True).data

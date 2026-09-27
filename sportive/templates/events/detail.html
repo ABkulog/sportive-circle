@@ -86,6 +86,25 @@
         </form>
       {% elif left == 0 %}
         <button class="btn" disabled>Full</button>
+      {% elif my_invite %}
+        <div class="locked-level tryout-box">
+          <strong>🤝 {{ my_invite.full_name.split()[0] }} invited you as their +1!</strong>
+          <p class="muted">This is a {{ event.skill_level }} game, but you can play because your friend is bringing you.
+            Have fun, and don't be shy asking for ⬆️ vouches after!</p>
+          <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
+            {{ csrf_field() }}<button class="btn btn-gold">🤝 Join as {{ my_invite.full_name.split()[0] }}'s +1</button>
+          </form>
+        </div>
+      {% elif tryout %}
+        <div class="locked-level tryout-box">
+          <strong>🎟️ Tryout spot open!</strong>
+          <p class="muted">This is a {{ event.skill_level }} game. The host saved {{ event.tryout_spots }} tryout
+            spot{{ 's' if event.tryout_spots != 1 }} for players who haven't ranked up yet. Play well and ask for
+            ⬆️ vouches after: 3 vouches from good players can place you straight into a higher rank.</p>
+          <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
+            {{ csrf_field() }}<button class="btn btn-gold">🎟️ Try out</button>
+          </form>
+        </div>
       {% elif not level_ok %}
         <div class="locked-level">
           <strong>🔒 {{ event.skill_level }}+ only</strong>
@@ -108,8 +127,13 @@
         <a class="person" href="{{ url_for('profile.view', user_id=person.id) }}">{{ avatar(person.id, person.full_name, person.avatar_updated, 36) }}{{ person.full_name }}</a>
         {% if person.grad_year %}<span class="muted">’{{ (person.grad_year|string)[-2:] }}</span>{% endif %}
         {% if person.id == event.host_id %}<span class="badge badge-purple">Host</span>{% endif %}
-        {% set r = ranks[person.id] %}
-        <span class="rank-chip tier-{{ r.tier|lower }}" title="{{ SPORTS[event.sport] }} rank">{{ r.name }}</span>
+        {% if person.is_tryout %}<span class="badge badge-gold">🎟️ Tryout</span>{% endif %}
+        {% if person.plus_one_of %}<span class="badge badge-gold">🤝 {{ names.get(person.plus_one_of, 'A friend') }}'s +1</span>{% endif %}
+        {# Ranks only show in ranked games, and never for people in chill mode. #}
+        {% if ranked_game and person.show_ranks %}
+          {% set r = ranks[person.id] %}
+          <span class="rank-chip tier-{{ r.tier|lower }}" title="{{ SPORTS[event.sport] }} rank">{{ r.name }}</span>
+        {% endif %}
       </li>
     {% endfor %}
     {% if event.extra_players %}
@@ -117,6 +141,38 @@
     {% endif %}
   </ul>
 </section>
+{% if plus_one.eligible %}
+  <section class="card" id="plus-one">
+    <h2>🤝 Bring a friend</h2>
+    {% if plus_one.sent %}
+      <p>You invited <strong>{{ plus_one.sent.full_name }}</strong> as your +1.
+        {% if plus_one.sent.joined %}They're in! ✅{% else %}Waiting for them to join.{% endif %}</p>
+      {% if not plus_one.sent.joined %}
+        <form method="post" action="{{ url_for('events.cancel_plus_one', event_id=event.id) }}">
+          {{ csrf_field() }}<button class="btn btn-small btn-ghost">Cancel invite</button>
+        </form>
+      {% endif %}
+    {% elif plus_one.full %}
+      <p class="muted">This game already has the max number of +1s.</p>
+    {% else %}
+      <p class="muted">Want to play with a friend who hasn't ranked up yet? You can bring <strong>one friend</strong>
+        as your +1, even if they're not {{ event.skill_level }}.</p>
+      <ul class="people">
+        {% for f in plus_one.friends %}
+          <li class="post-game-row">
+            <span class="person">{{ avatar(f.id, f.full_name, f.avatar_updated, 32) }}{{ f.full_name }}</span>
+            <form method="post" action="{{ url_for('events.invite_plus_one', event_id=event.id, friend_id=f.id) }}">
+              {{ csrf_field() }}<button class="btn btn-small">🤝 Invite as +1</button>
+            </form>
+          </li>
+        {% else %}
+          <li class="muted">Add <a href="{{ url_for('social.friends') }}">friends</a> first. Then you can bring one as your +1.</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+{% endif %}
+
 {% if post_game %}
   <section class="card post-game" id="post-game">
     <h2>🏁 GG! How was the game?</h2>

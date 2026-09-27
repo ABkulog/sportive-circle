@@ -32,6 +32,17 @@
     <label class="field"><span>Max players, including you <em>(optional)</em></span>
       <input name="max_players" type="number" min="2" value="{{ form.get('max_players', '') }}" placeholder="Pick a sport first">
       <small class="muted" data-max-hint></small></label>
+    <label class="field" data-tryout-field>
+      <span>🎟️ Tryout spots <em>(for players who haven't ranked up yet)</em></span>
+      <select name="tryout_spots">
+        {% for n in range(0, 4) %}<option value="{{ n }}" {% if form.get('tryout_spots', '0')|string == n|string %}selected{% endif %}>{{ n if n else 'None' }}</option>{% endfor %}
+      </select>
+      <small class="muted">Let a few newer players prove themselves in your game. Great for finding hidden talent!</small>
+    </label>
+    <label class="toggle" data-tryout-field>
+      <input type="checkbox" name="allow_plus_ones" value="1" {% if form.get('allow_plus_ones') %}checked{% endif %}>
+      <span>🤝 Let players bring one friend as a +1 <em>(max 2 per game)</em></span>
+    </label>
     <label class="field"><span>Note <em>(optional)</em></span>
       <textarea name="note" maxlength="500" rows="3" placeholder="Court 3, bring a light and a dark shirt">{{ form.get('note', '') }}</textarea></label>
     <button class="btn btn-block">{{ 'Save changes' if event else 'Create event' }}</button>

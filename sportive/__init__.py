@@ -64,7 +64,7 @@ def create_app(test_config=None):
         csrf_field=auth.csrf_field, SPORTS=SPORTS, SPORT_EMOJI=SPORT_EMOJI,
         LOCATIONS=LOCATIONS, SKILL_LEVELS=SKILL_LEVELS,
         SPORT_RULES={key: {"label": label, "locations": SPORT_LOCATIONS[key], "max": SPORT_MAX_PLAYERS[key]}
-                     for key, label in SPORTS.items()}, spots_left=events.spots_left, event_title=events.event_title, can_join_level=ranks.can_join_level, my_tier_map=ranks.my_tier_map, social_counts=social.counts, chat_unread=social.event_chat_unread,
+                     for key, label in SPORTS.items()}, spots_left=events.spots_left, event_title=events.event_title, can_join_level=ranks.can_join_level, can_join_or_tryout=events.can_join_or_tryout, my_tier_map=ranks.my_tier_map, social_counts=social.counts, chat_unread=social.event_chat_unread,
         LEVEL_TIERS={level: ranks.TIERS.index(tier) for level, tier in ranks.LEVEL_REQUIREMENT.items()}, place_map=events.place_map, same_day=same_day,
     )
     for code, message in ERRORS.items():

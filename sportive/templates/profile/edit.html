@@ -19,6 +19,10 @@
       <textarea name="bio" maxlength="300" rows="3" placeholder="CSE '28. Always down for pickup hoops.">{{ form.get('bio', '') }}</textarea></label>
     {{ sport_checkboxes(form) }}
     <label class="toggle">
+      <input type="checkbox" name="show_ranks" value="1" {% if form.get('show_ranks') %}checked{% endif %}>
+      <span>Show my ranks to other people <em>(turn off for 🧘 chill mode)</em></span>
+    </label>
+    <label class="toggle">
       <input type="checkbox" name="email_reminders" value="1" {% if form.get('email_reminders') %}checked{% endif %}>
       <span>Email me an hour before events I'm going to</span>
     </label>
@@ -26,16 +30,9 @@
   </form>
 </div>
 
-<details class="card form-card danger-zone">
-  <summary>Delete my account</summary>
-  <p>This permanently deletes your profile, your RSVPs and <strong>every event you host</strong>
-    (people who joined them will lose them too). It can't be undone.</p>
-  <form method="post" action="{{ url_for('profile.delete_account') }}" class="form"
-        onsubmit="return confirm('Delete your account forever?')">
-    {{ csrf_field() }}
-    <label class="field"><span>Type your password to confirm</span>
-      <input name="password" type="password" autocomplete="current-password" required></label>
-    <button class="btn btn-danger-ghost">Delete my account forever</button>
-  </form>
-</details>
+<div class="card form-card danger-zone">
+  <h2>Delete my account</h2>
+  <p class="muted">Leaving Sportive Circle? You'll see exactly what gets deleted and confirm before anything happens.</p>
+  <a class="btn btn-danger-ghost" href="{{ url_for('profile.delete_account') }}">Delete my account…</a>
+</div>
 {% endblock %}
