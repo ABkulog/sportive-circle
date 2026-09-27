@@ -28,6 +28,8 @@
 
 {# "Now" row, like Instagram Stories: what's happening soon, one swipe away. #}
 {% if up_next or need_players %}
+<section class="band home-section" aria-labelledby="soon-title">
+  <h2 class="home-section-title" id="soon-title">⚡ Happening soon</h2>
   <nav class="now-row" id="now" aria-label="Happening soon">
     {% if up_next %}
       <a class="now-tile is-mine" href="{{ url_for('events.detail', event_id=up_next.id) }}" aria-label="Up next: {{ event_title(up_next) }}, {{ up_next.starts_at|relative }}">
@@ -44,8 +46,11 @@
       </a>
     {% endfor %}
   </nav>
+</section>
 {% endif %}
 
+<section class="band home-section" aria-labelledby="games-title">
+<h2 class="home-section-title" id="games-title">{{ '🏅 Games for you' if filters.scope == 'interests' else '🏅 All games' }}</h2>
 {% set active_filters = [filters.sport, filters.when, filters.location, filters.skill]|select|list|length %}
 <form method="get" class="filter-bar" aria-label="Filter games">
   <div class="segmented small" role="radiogroup" aria-label="Which sports">
@@ -94,10 +99,11 @@
     </div>
   {% endfor %}
 </div>
+</section>
 
 {% if club_picks %}
   <section class="club-picks band">
-    <h2 class="section-title">Clubs for you</h2>
+    <h2 class="home-section-title">🏛️ Clubs for you</h2>
     <div class="club-strip">
       {% for c in club_picks %}
         <a class="card club-card mini" href="{{ url_for('clubs.view', club_id=c.id) }}">
@@ -112,7 +118,7 @@
 
 {% if top_dawgs %}
   <section class="top-dawgs band">
-    <h2 class="section-title">Top Dawgs this month</h2>
+    <h2 class="home-section-title">🐺 Top Dawgs this month</h2>
     <ol>
       {% for dawg in top_dawgs %}
         <li>

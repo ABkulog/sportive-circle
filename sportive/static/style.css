@@ -14,6 +14,8 @@
   --bg: #ffffff;
   --surface: #f7f7f9;          /* inputs, quiet panels */
   --line: #e9e8ee;             /* hairlines */
+  --band: #eceaf1;             /* thick dividers between sections */
+  --tile: #f6f5f9;             /* one game in a list */
   --text: #16141c;
   --muted: #6e6a78;
   --faint: #a09cab;
@@ -32,6 +34,8 @@
     --bg: #0f0e13;
     --surface: #1a1820;
     --line: #2a2733;
+    --band: #1f1c27;
+    --tile: #17151d;
     --text: #efedf4;
     --muted: #a19cad;
     --faint: #6d6878;
@@ -77,9 +81,16 @@ small { font-size: .82rem; }
 .section-title { font-size: 1rem; font-weight: 700; margin: 26px 0 8px; }
 /* Dividers. Big sections of a page start with a soft full-width band (like Instagram/Facebook), so a
    long page reads as separate chunks instead of one block. Items inside a section keep thin lines. */
-.page .band { margin: 22px -16px 0; padding: 18px 16px 6px; border: 0; border-top: 8px solid var(--surface);
+.page .band { margin: 22px -16px 0; padding: 18px 16px 6px; border: 0; border-top: 10px solid var(--band);
   border-radius: 0; background: none; }
-.page .band-title { margin: 22px -16px 10px; padding: 18px 16px 0; border-top: 8px solid var(--surface); }
+.page .band-title { margin: 22px -16px 10px; padding: 18px 16px 0; border-top: 10px solid var(--band); }
+/* Home: every section has a clear title. */
+.home-section-title { margin: 0 0 12px; font-size: 1.05rem; font-weight: 750; }
+/* Each game in a list is its own tile, with space around it, so games never blur together. */
+.stack:has(> .event-card) { gap: 10px; }
+.stack > .event-card { padding: 14px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--tile); }
+.stack > .event-card:hover { border-color: var(--faint); }
 .band > h2:first-child, .band > .section-head:first-child { margin-top: 0; }
 .band > h2:first-child { font-size: 1.05rem; }
 section.band > .section-title:first-child { margin-top: 0; }
@@ -721,3 +732,4 @@ details.card.fold { border: 0; border-top: 1px solid var(--line); border-bottom:
 .quiet-leave .link-button { padding: 10px 0; }
 .photo-extra { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .photo-extra form { margin: 0; }
+.event-meta .rel { white-space: nowrap; }  /* keep "in 2 days" together when the date line wraps */
