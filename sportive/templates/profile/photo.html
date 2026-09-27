@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Profile picture{% endblock %}
+{% block content %}
+<div class="card form-card center">
+  {% if first_time %}
+    <p class="eyebrow">Last step</p>
+    <h1>Add a profile picture</h1>
+    <p class="muted">Use a clear photo of your face, so people can find you at the court or the trailhead.</p>
+  {% else %}
+    <h1>Change your profile picture</h1>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="form photo-form">
+    {{ csrf_field() }}
+    <label class="photo-picker">
+      <span class="photo-preview" id="photo-preview">
+        {% if g.user.avatar_updated %}{{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 160) }}{% else %}📷{% endif %}
+      </span>
+      <span class="btn btn-ghost">Choose a photo</span>
+      <input type="file" name="photo" id="photo-input" accept="image/*" required class="file-input">
+    </label>
+    <button class="btn btn-block">Save photo</button>
+  </form>
+
+  {% if first_time %}
+    <form method="post" action="{{ url_for('profile.photo_skip') }}">
+      {{ csrf_field() }}<button class="btn btn-ghost">Add later</button>
+    </form>
+  {% else %}
+    <a href="{{ url_for('profile.edit') }}">Back to profile settings</a>
+  {% endif %}
+</div>
+<script>
+  // Show the chosen photo right away (the server crops it to a square when you save).
+  document.getElementById("photo-input").addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const preview = document.getElementById("photo-preview");
+    const image = new Image();
+    image.src = URL.createObjectURL(file);
+    image.alt = "";
+    image.className = "avatar-img";
+    image.style.setProperty("--size", "160px");
+    preview.replaceChildren(image);
+  });
+</script>
+{% endblock %}

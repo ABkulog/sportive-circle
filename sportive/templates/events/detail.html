@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}{{ event_title(event) }}{% endblock %}
+{% set place = place_map(event.location) %}
+{% block head %}
+  {% if place and place.lat %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
+          integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3w=="
+          crossorigin="anonymous" referrerpolicy="no-referrer">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"
+            integrity="sha512-BwHfrr4c9kmRkLw6iXFdzcdWV/PGkVgiIyIWLLlTSXzWQzxuSg4DiQUCpauz/EWjgk5TYQqX/kvn9pG1NpYfqg=="
+            crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+    <script src="{{ url_for('static', filename='map.js') }}" defer></script>
+  {% endif %}
+{% endblock %}
+{% block content %}
+{% set left = spots_left(event) %}
+{% set is_host = event.host_id == g.user.id %}
+<article class="card detail">
+  <div class="detail-head">
+    <div class="event-emoji big" aria-hidden="true">{{ SPORT_EMOJI[event.sport] }}</div>
+    <div>
+      <h1>{{ event_title(event) }}</h1>
+      <div class="badges">
+        <span class="badge">{{ SPORTS[event.sport] }}</span>
+        <span class="badge">{{ event.skill_level }}</span>
+        {% if event.is_quick %}<span class="badge badge-gold">Need players</span>{% endif %}
+        {% if event.cancelled %}<span class="badge badge-danger">Cancelled</span>{% elif ended %}<span class="badge badge-muted">Ended</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <dl class="facts">
+    <div><dt>When</dt><dd>
+      {{ event.starts_at|when }} – {% if same_day(event.starts_at, event.ends_at) %}{{ event.ends_at|clock }}{% else %}{{ event.ends_at|when }}{% endif %}
+      {% if not ended and not event.cancelled %}<span class="rel">({{ event.starts_at|relative }})</span>{% endif %}
+    </dd></div>
+    <div><dt>Where</dt><dd>📍 {{ event.location }}</dd></div>
+    <div><dt>Host</dt><dd><a class="person" href="{{ url_for('profile.view', user_id=event.host_id) }}">{{ avatar(event.host_id, event.host_name, event.host_avatar, 28) }}{{ event.host_name }}</a></dd></div>
+    <div><dt>Players</dt><dd>
+      {{ event.going_count + event.extra_players }} going{% if event.max_players %} of {{ event.max_players }}
+        · {% if left == 0 %}<strong>full</strong>{% else %}<strong>{{ left }} spot{{ 's' if left != 1 }} left</strong>{% endif %}{% endif %}
+    </dd></div>
+  </dl>
+
+  {% if event.note %}<p class="note">{{ event.note }}</p>{% endif %}
+
+  {% if place and not event.cancelled and not ended %}
+    <div class="map-card">
+      {% if place.lat %}
+        <div id="event-map" class="event-map" role="img" aria-label="Map showing {{ place.name }}"
+             data-lat="{{ place.lat }}" data-lng="{{ place.lng }}" data-name="{{ place.name }}"></div>
+      {% endif %}
+      <div class="map-actions">
+        <a class="btn" href="{{ place.google }}" target="_blank" rel="noopener">🧭 Directions</a>
+        <a class="btn btn-ghost" href="{{ place.apple }}" target="_blank" rel="noopener">Apple Maps</a>
+        {% if place.lat %}<button type="button" class="btn btn-ghost" id="locate-me">📍 Where am I?</button>{% endif %}
+      </div>
+      <p class="muted map-status" id="map-status" aria-live="polite"></p>
+    </div>
+  {% elif event.location.startswith('Off campus') and not event.cancelled and not ended %}
+    <p class="muted">📍 Off campus: check the note above for the exact address.</p>
+  {% endif %}
+
+  {% if not event.cancelled and not ended %}
+    <div class="detail-actions secondary-actions">
+      <button type="button" class="btn btn-ghost" id="share-button"
+              data-title="{{ event_title(event) }}" data-url="{{ url_for('events.detail', event_id=event.id, _external=True) }}">🔗 Share</button>
+      <a class="btn btn-ghost" href="{{ url_for('events.calendar_file', event_id=event.id) }}">📅 Add to calendar</a>
+    </div>
+    <div class="detail-actions">
+      {% if is_host %}
+        <a class="btn" href="{{ url_for('events.edit', event_id=event.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('events.cancel', event_id=event.id) }}"
+              onsubmit="return confirm('Cancel this event for everyone?')">
+          {{ csrf_field() }}<button class="btn btn-danger-ghost">Cancel event</button>
+        </form>
+      {% elif event.i_am_going %}
+        <span class="going-pill">✅ You're going</span>
+        <form method="post" action="{{ url_for('events.leave', event_id=event.id) }}">
+          {{ csrf_field() }}<button class="btn btn-ghost">Leave</button>
+        </form>
+      {% elif left == 0 %}
+        <button class="btn" disabled>Full</button>
+      {% else %}
+        <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
+          {{ csrf_field() }}<button class="btn btn-large">Join</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}
+</article>
+
+<section class="card">
+  <h2>Who's going</h2>
+  <ul class="people">
+    {% for person in attendees %}
+      <li>
+        <a class="person" href="{{ url_for('profile.view', user_id=person.id) }}">{{ avatar(person.id, person.full_name, person.avatar_updated, 36) }}{{ person.full_name }}</a>
+        {% if person.grad_year %}<span class="muted">’{{ (person.grad_year|string)[-2:] }}</span>{% endif %}
+        {% if person.id == event.host_id %}<span class="badge badge-purple">Host</span>{% endif %}
+      </li>
+    {% endfor %}
+    {% if event.extra_players %}
+      <li class="muted">+ {{ event.extra_players }} already playing (not on the app)</li>
+    {% endif %}
+  </ul>
+</section>
+<script>
+  // Share: the phone's share sheet (GroupMe, iMessage, Instagram...), or copy the link on desktop.
+  const shareButton = document.getElementById("share-button");
+  if (shareButton) {
+    shareButton.addEventListener("click", async () => {
+      const { title, url } = shareButton.dataset;
+      if (navigator.share) {
+        try { await navigator.share({ title, text: title + " on Sportive Circle", url }); } catch (e) {}
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        shareButton.textContent = "✅ Link copied";
+      } catch (e) {
+        prompt("Copy this link:", url);
+      }
+    });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Sportive Circle{% endblock %} · UW</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml">
+  <meta name="theme-color" content="#4b2e83">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <meta name="apple-mobile-web-app-title" content="Sportive Circle">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="{{ url_for('index') }}">Sportive<span>Circle</span></a>
+      {% if g.user and not g.user.avatar_updated and not session.get('photo_skipped') %}
+        {# Still setting up (no profile picture yet): the other pages aren't open yet. #}
+        <nav class="nav">
+          <a href="{{ url_for('how_it_works') }}">How it works</a>
+          <form method="post" action="{{ url_for('auth.logout') }}">
+            {{ csrf_field() }}<button class="link-button">Log out</button>
+          </form>
+        </nav>
+      {% elif g.user %}
+        <nav class="nav">
+          <a href="{{ url_for('events.feed') }}">Feed</a>
+          <a href="{{ url_for('events.my_events') }}">My events</a>
+          <a href="{{ url_for('how_it_works') }}">How it works</a>
+          <a class="nav-avatar" href="{{ url_for('profile.view', user_id=g.user.id) }}">
+            {%- if g.user.avatar_updated -%}
+              <img class="avatar-img" src="{{ url_for('profile.photo', user_id=g.user.id, v=g.user.avatar_updated) }}" alt="" style="--size: 26px">
+            {%- endif -%}Profile</a>
+          <form method="post" action="{{ url_for('auth.logout') }}">
+            {{ csrf_field() }}<button class="link-button">Log out</button>
+          </form>
+        </nav>
+      {% else %}
+        <nav class="nav">
+          <a href="{{ url_for('how_it_works') }}">How it works</a>
+          <a href="{{ url_for('auth.login') }}">Log in</a>
+          <a class="nav-cta" href="{{ url_for('auth.signup') }}">Sign up</a>
+        </nav>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="page">
+    {% if g.user and not g.user.avatar_updated and session.get('photo_skipped') and request.endpoint != 'profile.photo_upload' %}
+      <a class="photo-nudge" href="{{ url_for('profile.photo_upload') }}">
+        <span>📷 Add a profile picture so people know who they're playing with.</span>
+        <strong>Add photo →</strong>
+      </a>
+    {% endif %}
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+      <div class="flash flash-{{ category }}" role="status">{{ message }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+
+  {% if g.user and (g.user.avatar_updated or session.get('photo_skipped')) %}
+    <nav class="actionbar" aria-label="Create">
+      <a class="btn btn-gold" href="{{ url_for('events.quick') }}">⚡ Need players</a>
+      <a class="btn" href="{{ url_for('events.create') }}">+ New event</a>
+    </nav>
+  {% endif %}
+</body>
+</html>

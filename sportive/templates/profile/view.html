@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_macros.html" import event_card, avatar %}
+{% block title %}{{ user.full_name }}{% endblock %}
+{% block content %}
+<section class="card profile">
+  {{ avatar(user.id, user.full_name, user.avatar_updated, 88) }}
+  <div class="profile-info">
+    <h1>{{ user.full_name }}</h1>
+    <p class="muted">{% if user.grad_year %}Class of {{ user.grad_year }}{% endif %}{% if user.grad_year and show_email %} · {% endif %}{% if show_email %}<a href="mailto:{{ user.email }}">{{ user.email }}</a>{% endif %}</p>
+    {% if user.bio %}<p>{{ user.bio }}</p>{% endif %}
+    <div class="badges">
+      {% for s in sports %}<span class="chip">{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</span>{% else %}<span class="muted">No sports picked yet.</span>{% endfor %}
+    </div>
+    {% if user.id == g.user.id %}
+      <a class="btn btn-ghost" href="{{ url_for('profile.edit') }}">Edit profile</a>
+    {% endif %}
+  </div>
+</section>
+
+<section>
+  <h2>Upcoming events hosted</h2>
+  <div class="stack">
+    {% for e in hosting %}{{ event_card(e) }}{% else %}<p class="muted">Nothing coming up.</p>{% endfor %}
+  </div>
+</section>
+{% endblock %}

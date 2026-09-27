@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "_macros.html" import event_card %}
+{% block title %}Feed{% endblock %}
+{% block content %}
+<h1 class="page-title">Hey {{ g.user.full_name.split()[0] }} 👋</h1>
+
+{% if up_next %}
+  <a class="up-next" href="{{ url_for('events.detail', event_id=up_next.id) }}">
+    <span class="up-next-label">⏰ Up next</span>
+    <span><strong>{{ event_title(up_next) }}</strong> · {{ up_next.starts_at|relative }} · {{ up_next.location }}</span>
+  </a>
+{% endif %}
+
+{% if need_players %}
+  <section class="need-players">
+    <h2>⚡ Need players now</h2>
+    <div class="stack">
+      {% for e in need_players %}{{ event_card(e) }}{% endfor %}
+    </div>
+  </section>
+{% endif %}
+
+<form method="get" class="filters card" aria-label="Filter events">
+  <div class="segmented" role="radiogroup" aria-label="Which sports">
+    <label><input type="radio" name="scope" value="interests" {% if filters.scope == 'interests' %}checked{% endif %} onchange="this.form.submit()"><span>My sports</span></label>
+    <label><input type="radio" name="scope" value="all" {% if filters.scope == 'all' %}checked{% endif %} onchange="this.form.submit()"><span>All sports</span></label>
+  </div>
+  <div class="filter-row">
+    <select name="sport" aria-label="Sport" onchange="this.form.submit()">
+      <option value="">Any sport</option>
+      {% for key, label in SPORTS.items() %}<option value="{{ key }}" {% if filters.sport == key %}selected{% endif %}>{{ SPORT_EMOJI[key] }} {{ label }}</option>{% endfor %}
+    </select>
+    <select name="when" aria-label="When" onchange="this.form.submit()">
+      <option value="">Upcoming</option>
+      <option value="today" {% if filters.when == 'today' %}selected{% endif %}>Today</option>
+      <option value="week" {% if filters.when == 'week' %}selected{% endif %}>This week</option>
+      <option value="month" {% if filters.when == 'month' %}selected{% endif %}>This month</option>
+    </select>
+    <select name="location" aria-label="Location" onchange="this.form.submit()">
+      <option value="">Anywhere</option>
+      {% for loc in LOCATIONS %}<option {% if filters.location == loc %}selected{% endif %}>{{ loc }}</option>{% endfor %}
+    </select>
+    <select name="skill" aria-label="Skill level" onchange="this.form.submit()">
+      <option value="">Any level</option>
+      {% for level in SKILL_LEVELS %}<option {% if filters.skill == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
+    </select>
+  </div>
+  <noscript><button class="btn">Apply</button></noscript>
+  {% if filters.sport or filters.when or filters.location or filters.skill %}
+    <a class="clear-filters" href="{{ url_for('events.feed', scope=filters.scope) }}">Clear filters</a>
+  {% endif %}
+</form>
+
+{% if filters.scope == 'interests' and not my_sports %}
+  <p class="muted">Tip: <a href="{{ url_for('profile.edit') }}">pick your sports</a> to get a feed made for you.</p>
+{% endif %}
+
+<div class="stack">
+  {% for e in events %}
+    {{ event_card(e) }}
+  {% else %}
+    <div class="card empty">
+      <p><strong>Nothing here yet.</strong></p>
+      <p class="muted">Be the one who starts it. Most pickup games just need someone to post first.</p>
+      <a class="btn" href="{{ url_for('events.create', sport=filters.sport) }}">+ Create an event</a>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

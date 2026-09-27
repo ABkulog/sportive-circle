@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_macros.html" import sport_checkboxes %}
+{% block title %}Sign up{% endblock %}
+{% block content %}
+<div class="card form-card">
+  <h1>Join Sportive Circle</h1>
+  <p class="muted">UW students only. We'll email a code to your @uw.edu address.</p>
+  <form method="post" class="form">
+    {{ csrf_field() }}
+    <label class="field"><span>Full name</span>
+      <input name="full_name" value="{{ form.get('full_name', '') }}" autocomplete="name" required></label>
+    <label class="field"><span>UW email</span>
+      <input name="email" type="email" value="{{ form.get('email', '') }}" placeholder="netid@uw.edu" autocomplete="email" required></label>
+    <div class="row">
+      <label class="field"><span>Password</span>
+        <input name="password" type="password" minlength="8" autocomplete="new-password" required></label>
+      <label class="field"><span>Password (again)</span>
+        <input name="password2" type="password" minlength="8" autocomplete="new-password" required></label>
+    </div>
+    <div class="row">
+      <label class="field"><span>Date of birth</span>
+        <input name="birth_date" type="date" max="{{ latest_birth_date }}" value="{{ form.get('birth_date', '') }}" required></label>
+      <label class="field"><span>Graduation year <em>(optional)</em></span>
+        <input name="grad_year" type="number" min="1950" max="{{ current_year + 8 }}" value="{{ form.get('grad_year', '') }}" placeholder="{{ current_year + 3 }}"></label>
+    </div>
+    {{ sport_checkboxes(form) }}
+    <button class="btn btn-block">Sign up</button>
+  </form>
+  <p class="muted center">Already have an account? <a href="{{ url_for('auth.login', next=request.args.get('next')) }}">Log in</a></p>
+</div>
+{% endblock %}

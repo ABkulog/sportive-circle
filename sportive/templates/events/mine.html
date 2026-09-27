@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_macros.html" import event_card %}
+{% block title %}My events{% endblock %}
+{% block content %}
+<h1 class="page-title">My events</h1>
+
+<section>
+  <h2>Hosting</h2>
+  <div class="stack">
+    {% for e in hosting %}{{ event_card(e) }}{% else %}
+      <p class="muted">You're not hosting anything. <a href="{{ url_for('events.create') }}">Create an event</a></p>
+    {% endfor %}
+  </div>
+</section>
+
+<section>
+  <h2>Going</h2>
+  <div class="stack">
+    {% for e in going %}{{ event_card(e) }}{% else %}
+      <p class="muted">You haven't joined anything yet. <a href="{{ url_for('events.feed') }}">Browse the feed</a></p>
+    {% endfor %}
+  </div>
+</section>
+
+{% if past %}
+<section>
+  <h2>Past</h2>
+  <ul class="past-list card">
+    {% for e in past %}
+      <li><a href="{{ url_for('events.detail', event_id=e.id) }}">{{ SPORT_EMOJI[e.sport] }} {{ event_title(e) }}</a>
+        <span class="muted">{{ e.starts_at|when }}</span></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,70 @@
+{% macro sport_checkboxes(form) %}
+  <fieldset class="field">
+    <legend>Sports you're interested in</legend>
+    <div class="chip-grid">
+      {% for key, label in SPORTS.items() %}
+        <label class="chip-check">
+          <input type="checkbox" name="sports" value="{{ key }}" {% if key in form.getlist('sports') %}checked{% endif %}>
+          <span>{{ SPORT_EMOJI[key] }} {{ label }}</span>
+        </label>
+      {% endfor %}
+    </div>
+  </fieldset>
+{% endmacro %}
+
+{% macro select(name, label, options, current, placeholder=None) %}
+  <label class="field">
+    <span>{{ label }}</span>
+    <select name="{{ name }}">
+      {% if placeholder %}<option value="">{{ placeholder }}</option>{% endif %}
+      {% for value, text in options %}
+        <option value="{{ value }}" {% if value|string == current|string %}selected{% endif %}>{{ text }}</option>
+      {% endfor %}
+    </select>
+  </label>
+{% endmacro %}
+
+{% macro event_card(e) %}
+  {% set left = spots_left(e) %}
+  {# The title link is stretched over the whole card (CSS), so the Join button can sit on top of it. #}
+  <div class="card event-card {% if e.cancelled %}is-cancelled{% endif %}">
+    <div class="event-emoji" aria-hidden="true">{{ SPORT_EMOJI[e.sport] }}</div>
+    <div class="event-body">
+      <a class="event-title event-link" href="{{ url_for('events.detail', event_id=e.id) }}">{{ event_title(e) }}</a>
+      <div class="event-meta">
+        {{ e.starts_at|when }} <span class="dot">·</span> <span class="rel">{{ e.starts_at|relative }}</span>
+      </div>
+      <div class="event-meta">📍 {{ e.location }}</div>
+      <div class="badges">
+        <span class="badge">{{ SPORTS[e.sport] }}</span>
+        <span class="badge">{{ e.skill_level }}</span>
+        {% if e.cancelled %}<span class="badge badge-danger">Cancelled</span>
+        {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Hosting</span>
+        {% elif e.i_am_going %}<span class="badge badge-success">You're going</span>
+        {% elif left == 0 %}<span class="badge badge-muted">Full</span>{% endif %}
+      </div>
+    </div>
+    <div class="event-side">
+      <div class="event-count">
+        <strong>{{ e.going_count + e.extra_players }}</strong>{% if e.max_players %}/{{ e.max_players }}{% endif %}
+        <small>going</small>
+      </div>
+      {% if not e.cancelled and not e.i_am_going and left != 0 %}
+        <form method="post" action="{{ url_for('events.join', event_id=e.id) }}" class="card-join">
+          {{ csrf_field() }}
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <button class="btn btn-small" aria-label="Join {{ event_title(e) }}">Join</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro avatar(user_id, name, version, size=40) %}
+  {%- if version -%}
+    <img class="avatar-img" src="{{ url_for('profile.photo', user_id=user_id, v=version) }}"
+         alt="" width="{{ size }}" height="{{ size }}" style="--size: {{ size }}px" loading="lazy">
+  {%- else -%}
+    <span class="avatar-img avatar-initial" style="--size: {{ size }}px" aria-hidden="true">{{ name[:1]|upper }}</span>
+  {%- endif -%}
+{% endmacro %}

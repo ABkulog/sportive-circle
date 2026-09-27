@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "_macros.html" import select %}
+{% block title %}Need players{% endblock %}
+{% block content %}
+<div class="card form-card">
+  <h1>⚡ Need players</h1>
+  <p class="muted">Short a few people? This goes to the top of everyone's feed.</p>
+  <form method="post" class="form" data-sport-form>
+    {{ csrf_field() }}
+    <div class="row">
+      {{ select('sport', 'Sport', SPORTS.items(), form.get('sport', ''), 'Choose a sport') }}
+      <label class="field"><span>Where</span>
+        <select name="location" required>
+          <option value="">Choose a place</option>
+          {% for loc in LOCATIONS %}<option {% if form.get('location') == loc %}selected{% endif %}>{{ loc }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label class="field"><span>We have (including you)</span>
+        <input name="have" type="number" min="1" max="50" value="{{ form.get('have', '1') }}" required></label>
+      <label class="field"><span>We need</span>
+        <input name="needed" type="number" min="1" max="30" value="{{ form.get('needed', '2') }}" required></label>
+    </div>
+    <small class="muted" data-max-hint></small>
+    <div class="row">
+      {{ select('starts_in', 'Starting', start_options, form.get('starts_in', '30')) }}
+      {{ select('duration', 'For', durations, form.get('duration', '60')) }}
+    </div>
+    <label class="field"><span>Skill level</span>
+      <select name="skill_level">
+        {% for level in SKILL_LEVELS %}<option {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Note <em>(optional)</em></span>
+      <textarea name="note" maxlength="500" rows="2" placeholder="Court 2, look for the blue shirts">{{ form.get('note', '') }}</textarea></label>
+    <button class="btn btn-gold btn-block">Post it</button>
+  </form>
+</div>
+<script type="application/json" id="sport-rules">{{ SPORT_RULES|tojson }}</script>
+<script src="{{ url_for('static', filename='forms.js') }}" defer></script>
+{% endblock %}

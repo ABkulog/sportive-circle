@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_macros.html" import sport_checkboxes %}
+{% block title %}Edit profile{% endblock %}
+{% block content %}
+<div class="card form-card">
+  <h1>Edit profile</h1>
+  <a class="person" href="{{ url_for('profile.photo_upload') }}">
+    {%- if g.user.avatar_updated -%}
+      <img class="avatar-img" src="{{ url_for('profile.photo', user_id=g.user.id, v=g.user.avatar_updated) }}" alt="" style="--size: 56px">
+    {%- endif -%}
+    Change profile picture</a>
+  <form method="post" class="form">
+    {{ csrf_field() }}
+    <label class="field"><span>Full name</span>
+      <input name="full_name" value="{{ form.get('full_name', '') }}" required></label>
+    <label class="field"><span>Graduation year <em>(optional)</em></span>
+      <input name="grad_year" type="number" min="1950" value="{{ form.get('grad_year', '') }}"></label>
+    <label class="field"><span>Bio <em>(optional)</em></span>
+      <textarea name="bio" maxlength="300" rows="3" placeholder="CSE '28. Always down for pickup hoops.">{{ form.get('bio', '') }}</textarea></label>
+    {{ sport_checkboxes(form) }}
+    <label class="toggle">
+      <input type="checkbox" name="email_reminders" value="1" {% if form.get('email_reminders') %}checked{% endif %}>
+      <span>Email me an hour before events I'm going to</span>
+    </label>
+    <button class="btn btn-block">Save</button>
+  </form>
+</div>
+
+<details class="card form-card danger-zone">
+  <summary>Delete my account</summary>
+  <p>This permanently deletes your profile, your RSVPs and <strong>every event you host</strong>
+    (people who joined them will lose them too). It can't be undone.</p>
+  <form method="post" action="{{ url_for('profile.delete_account') }}" class="form"
+        onsubmit="return confirm('Delete your account forever?')">
+    {{ csrf_field() }}
+    <label class="field"><span>Type your password to confirm</span>
+      <input name="password" type="password" autocomplete="current-password" required></label>
+    <button class="btn btn-danger-ghost">Delete my account forever</button>
+  </form>
+</details>
+{% endblock %}

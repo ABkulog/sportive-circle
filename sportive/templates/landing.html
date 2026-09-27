@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">For UW students</p>
+  <h1>Find people to play with, today.</h1>
+  <p class="lead">Pickup basketball at the IMA, a run on the Burke-Gilman, climbing partners, ski trips.
+    Sportive Circle connects Huskies who want to play.</p>
+  <div class="hero-actions">
+    <a class="btn btn-large" href="{{ url_for('auth.signup') }}">Sign up with your UW email</a>
+    <a class="btn btn-ghost btn-large" href="{{ url_for('auth.login') }}">Log in</a>
+  </div>
+  <p class="muted"><a href="{{ url_for('how_it_works') }}">New here? See how it works in 1 minute →</a></p>
+</section>
+
+<section class="features">
+  <div class="feature">
+    <h3>⚡ Need players?</h3>
+    <p>Short 2 for a 5v5? Post it in seconds and it goes to the top of everyone's feed.</p>
+  </div>
+  <div class="feature">
+    <h3>🎯 Your sports, your level</h3>
+    <p>See events for the sports you care about, filtered by place, day and skill level.</p>
+  </div>
+  <div class="feature">
+    <h3>🐺 Only Huskies</h3>
+    <p>Every account is a verified @uw.edu email, so you know who you're playing with.</p>
+  </div>
+</section>
+
+<section class="sport-cloud" aria-label="Sports">
+  {% for key, label in SPORTS.items() %}<span class="chip">{{ SPORT_EMOJI[key] }} {{ label }}</span>{% endfor %}
+</section>
+{% endblock %}

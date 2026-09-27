@@ -1,0 +1,4 @@
+Flask>=3.0
+Pillow  # profile pictures
+tzdata  # timezone data on Windows
+pytest  # for running tests

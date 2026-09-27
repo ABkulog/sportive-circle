@@ -1,0 +1,12 @@
+# Python / tools
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+.claude/
+
+# Local data: databases hold real people's info and must never be uploaded
+instance/
+*.db
+*.sqlite
