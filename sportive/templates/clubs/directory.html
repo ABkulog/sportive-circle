@@ -3,7 +3,7 @@
 {% block content %}
 <header class="feed-hello">
   <h1 class="page-title">🏛️ Clubs</h1>
-  <p class="spirit-line">Find your people. Every club is open to everyone, all skill levels welcome.</p>
+  <p class="spirit-line">Verified, active UW clubs. Find your people. 🐺</p>
 </header>
 
 <form method="get" class="card filters" role="search" aria-label="Find a club">
@@ -20,6 +20,12 @@
       {% for key, label in SPORTS.items() %}<option value="{{ key }}" {% if sport == key %}selected{% endif %}>{{ SPORT_EMOJI[key] }} {{ label }}</option>{% endfor %}
     </select>
   </div>
+  <div class="choice-pills" role="group" aria-label="Quick filters">
+    {% for key, text in [('beginner', '🌱 No experience needed'), ('free', '💵 Free'), ('no_tryouts', '🚪 No tryouts')] %}
+      <label class="choice-pill"><input type="checkbox" name="easy" value="{{ key }}" {% if key in easy %}checked{% endif %}
+             onchange="this.form.submit()"><span>{{ text }}</span></label>
+    {% endfor %}
+  </div>
   {% if mine %}<input type="hidden" name="mine" value="1">{% endif %}
   <noscript><button class="btn">Search</button></noscript>
 </form>
@@ -33,20 +39,24 @@
       <span class="badges">
         <span class="badge">👥 {{ c.member_count }} member{{ 's' if c.member_count != 1 }}</span>
         {% if c.upcoming %}<span class="badge">📅 {{ c.upcoming }} upcoming</span>{% endif %}
-        {% if c.i_am_in %}<span class="badge badge-success">✅ Joined</span>{% endif %}
+        {% if c.status == 'approved' %}<span class="badge badge-verified">✅ Verified</span>
+        {% elif c.status == 'pending' %}<span class="badge badge-gold">⏳ In review</span>
+        {% else %}<span class="badge badge-danger">Needs changes</span>{% endif %}
+        {% if c.i_am_in %}<span class="badge badge-success">Joined</span>{% endif %}
+        {% if c.experience == 'none' %}<span class="badge">🌱 Beginners welcome</span>{% endif %}
       </span>
     </a>
   {% else %}
     <div class="card empty">
       <p class="empty-emoji" aria-hidden="true">🏛️</p>
       <p><strong>{% if q or sport or mine %}No clubs match that.{% else %}No clubs yet.{% endif %}</strong></p>
-      <p class="muted">Run a club or a regular group? Put it on the map so other Huskies can find you.</p>
-      {% if g.user %}<a class="btn" href="{{ url_for('clubs.create') }}">🏛️ Start a club</a>
-      {% else %}<a class="btn" href="{{ url_for('auth.signup', next=url_for('clubs.create')) }}">Sign up to start a club</a>{% endif %}
+      <p class="muted">Are you an officer of an active UW club? Register it so other Huskies can find you.</p>
+      {% if g.user %}<a class="btn" href="{{ url_for('clubs.create') }}">🏛️ Register your club</a>
+      {% else %}<a class="btn" href="{{ url_for('auth.signup', next=url_for('clubs.create')) }}">Sign up to register your club</a>{% endif %}
     </div>
   {% endfor %}
 </div>
 {% if clubs and g.user %}
-  <p class="center"><a class="btn btn-ghost" href="{{ url_for('clubs.create') }}">🏛️ Start a club</a></p>
+  <p class="center muted">Run a UW club that's not here yet? <a href="{{ url_for('clubs.create') }}">Register it →</a></p>
 {% endif %}
 {% endblock %}

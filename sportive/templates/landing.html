@@ -7,9 +7,31 @@
     Sportive Circle connects Huskies who want to play. Find people to play with, today.</p>
   <div class="hero-actions">
     <a class="btn btn-large" href="{{ url_for('auth.signup') }}">Sign up with your UW email</a>
-    <a class="btn btn-ghost btn-large" href="{{ url_for('auth.login') }}">Log in</a>
+    <a class="btn btn-ghost btn-large" href="{{ url_for('clubs.directory') }}">🏛️ Browse UW clubs</a>
   </div>
+  <p class="muted">Already have an account? <a href="{{ url_for('auth.login') }}">Log in</a></p>
   <p class="muted"><a href="{{ url_for('how_it_works') }}">New here? See how it works in 1 minute →</a></p>
+</section>
+
+<section class="landing-clubs">
+  <h2>🏛️ Verified UW clubs</h2>
+  <p class="muted">Every club on Sportive Circle is a real, active UW club, checked by us.</p>
+  {% if clubs %}
+    <div class="club-grid">
+      {% for c in clubs %}
+        <a class="card club-card" href="{{ url_for('clubs.view', club_id=c.id) }}">
+          <span class="club-emoji" aria-hidden="true">{{ SPORT_EMOJI[c.sport] }}</span>
+          <strong class="club-name">{{ c.name }}</strong>
+          <span class="club-desc muted">{{ c.description|truncate(90) }}</span>
+          <span class="badges"><span class="badge badge-verified">✅ Verified</span>
+            {% if c.experience == 'none' %}<span class="badge">🌱 Beginners welcome</span>{% endif %}</span>
+        </a>
+      {% endfor %}
+    </div>
+    <p><a class="btn btn-ghost" href="{{ url_for('clubs.directory') }}">See all clubs →</a></p>
+  {% else %}
+    <p class="card muted">Clubs are joining now. Officer of a UW club? <a href="{{ url_for('auth.signup', next=url_for('clubs.create')) }}">Register it</a>.</p>
+  {% endif %}
 </section>
 
 <section class="features">

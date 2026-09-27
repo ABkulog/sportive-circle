@@ -43,6 +43,13 @@
     const time = document.createElement("time");
     time.textContent = message.time;
     bubble.append(text, time);
+    if (message.report) {
+      const report = document.createElement("a");
+      report.className = "chat-report";
+      report.href = message.report;
+      report.textContent = "🚩 Report";
+      bubble.appendChild(report);
+    }
     item.appendChild(bubble);
     list.appendChild(item);
   }

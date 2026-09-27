@@ -192,7 +192,8 @@ def celebrate_progress(user_id):
 @bp.route("/")
 def feed():
     if g.user is None:
-        return render_template("landing.html")
+        from .clubs import featured_clubs
+        return render_template("landing.html", clubs=featured_clubs())
 
     my_sports = user_sports(g.user["id"])
     filters = {key: request.args.get(key, "") for key in ("scope", "sport", "location", "skill", "when")}
@@ -247,10 +248,12 @@ def feed():
         {"now": to_db(now), "soon": to_db(now + UP_NEXT_WINDOW)}, limit=1)
 
     celebrate_progress(g.user["id"])
+    from .clubs import suggested_clubs
     hello, spirit_line = greeting(g.user["full_name"].split()[0], now)
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
-                           hello=hello, spirit_line=spirit_line, top_dawgs=top_dawgs(now=now))
+                           hello=hello, spirit_line=spirit_line, top_dawgs=top_dawgs(now=now),
+                           club_picks=suggested_clubs(g.user["id"], my_sports))
 
 
 # ---------------------------------------------------------- create / edit
@@ -367,7 +370,8 @@ def club_for_new_event(club_id):
         return None
     club = get_db().execute(
         """SELECT c.* FROM clubs c JOIN club_members m ON m.club_id = c.id
-           WHERE c.id = ? AND m.user_id = ? AND m.role = 'officer'""", (club_id, g.user["id"])).fetchone()
+           WHERE c.id = ? AND m.user_id = ? AND m.role = 'officer' AND c.status = 'approved'""",
+        (club_id, g.user["id"])).fetchone()
     if club is None:
         abort(403)
     return club

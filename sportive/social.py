@@ -125,7 +125,8 @@ def event_chat_unread():
     return g.chat_unread
 
 
-def message_json(row, me):
+def message_json(row, me, kind):
+    """kind: 'dm' or 'event_message' (for the report link)."""
     return {
         "id": row["id"],
         "mine": row["sender_id"] == me,
@@ -136,6 +137,7 @@ def message_json(row, me):
         "body": row["body"],
         "time": fmt_clock(row["created_at"]),
         "profile": url_for("profile.view", user_id=row["sender_id"]),
+        "report": None if row["sender_id"] == me else url_for("moderation.report", target_type=kind, target_id=row["id"]),
     }
 
 
@@ -308,7 +310,7 @@ def thread(user_id):
         return redirect(url_for("social.thread", user_id=user_id) + "#composer")
     _mark_read(me, user_id)
     rows = _thread_rows(me, user_id) if not is_blocked_between(me, user_id) else []
-    return render_template("social/thread.html", other=other, messages=[message_json(r, me) for r in rows],
+    return render_template("social/thread.html", other=other, messages=[message_json(r, me, 'dm') for r in rows],
                            allowed=allowed, poll_url=url_for("social.thread_poll", user_id=user_id),
                            blocked=i_blocked(me, user_id))
 
@@ -322,7 +324,7 @@ def thread_poll(user_id):
         return jsonify(messages=[])
     rows = _thread_rows(me, user_id, request.args.get("after", 0, type=int))
     _mark_read(me, user_id)
-    return jsonify(messages=[message_json(r, me) for r in rows])
+    return jsonify(messages=[message_json(r, me, 'dm') for r in rows])
 
 
 # -------------------------------------------------------------- event chat
@@ -376,7 +378,7 @@ def event_chat(event_id):
     _mark_chat_seen(event_id, rows)
     people = get_db().execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (event_id,)).fetchone()[0]
     return render_template("social/event_chat.html", event=event, people=people,
-                           messages=[message_json(r, g.user["id"]) for r in rows],
+                           messages=[message_json(r, g.user["id"], 'event_message') for r in rows],
                            poll_url=url_for("social.event_chat_poll", event_id=event_id),
                            when=fmt_when(event["starts_at"]))
 
@@ -389,4 +391,4 @@ def event_chat_poll(event_id):
         abort(403)
     rows = _chat_rows(event_id, request.args.get("after", 0, type=int))
     _mark_chat_seen(event_id, rows)
-    return jsonify(messages=[message_json(r, g.user["id"]) for r in rows])
+    return jsonify(messages=[message_json(r, g.user["id"], 'event_message') for r in rows])

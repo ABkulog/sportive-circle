@@ -16,7 +16,7 @@
 </head>
 {% set app_nav = g.user and (g.user.avatar_updated or session.get('photo_skipped')) %}
 {% set ep = request.endpoint or '' %}
-{% set counts = social_counts() if app_nav else {} %}
+{% set nav_counts = social_counts() if app_nav else {} %}
 {% macro tab(url, icon, label, active, badge=0, extra_class='') %}
   <a class="tab {{ extra_class }} {% if active %}is-active{% endif %}" href="{{ url }}" {% if active %}aria-current="page"{% endif %}>
     <span class="tab-icon" aria-hidden="true">{{ icon }}{% if badge %}<span class="count-dot">{{ badge }}</span>{% endif %}</span>
@@ -32,9 +32,10 @@
       <a class="brand" href="{{ url_for('index') }}">Sportive<span>Circle</span></a>
       {% if app_nav %}
         <nav class="top-icons" aria-label="Shortcuts">
+          {% if is_admin() %}{% set open_reports = open_report_count() %}<a href="{{ url_for('moderation.admin_reports') }}" aria-label="Reports{% if open_reports %}, {{ open_reports }} open{% endif %}" title="Reports">🛡️{% if open_reports %}<span class="count-dot">{{ open_reports }}</span>{% endif %}</a>{% endif %}
           <a href="{{ url_for('how_it_works') }}" aria-label="How it works" title="How it works">❔</a>
-          <a href="{{ url_for('social.friends') }}" aria-label="Friends{% if counts.requests %}, {{ counts.requests }} requests{% endif %}" title="Friends">👥{% if counts.requests %}<span class="count-dot">{{ counts.requests }}</span>{% endif %}</a>
-          <a href="{{ url_for('social.inbox') }}" aria-label="Messages{% if counts.messages %}, {{ counts.messages }} unread{% endif %}" title="Messages">✉️{% if counts.messages %}<span class="count-dot">{{ counts.messages }}</span>{% endif %}</a>
+          <a href="{{ url_for('social.friends') }}" aria-label="Friends{% if nav_counts.requests %}, {{ nav_counts.requests }} requests{% endif %}" title="Friends">👥{% if nav_counts.requests %}<span class="count-dot">{{ nav_counts.requests }}</span>{% endif %}</a>
+          <a href="{{ url_for('social.inbox') }}" aria-label="Messages{% if nav_counts.messages %}, {{ nav_counts.messages }} unread{% endif %}" title="Messages">✉️{% if nav_counts.messages %}<span class="count-dot">{{ nav_counts.messages }}</span>{% endif %}</a>
         </nav>
       {% elif g.user %}
         {# Still setting up (no profile picture yet). #}
@@ -60,14 +61,18 @@
     <nav class="appnav" aria-label="Main">
       <a class="brand side-only" href="{{ url_for('index') }}">Sportive<span>Circle</span></a>
       {{ tab(url_for('events.feed'), '🏠', 'Home', ep in ('events.feed', 'index', 'events.my_events', 'events.detail')) }}
-      {{ tab(url_for('clubs.directory'), '🏛️', 'Clubs', ep.startswith('clubs.') and ep != 'clubs.create') }}
+      {{ tab(url_for('clubs.directory'), '🏛️', 'Clubs', ep.startswith('clubs.') and ep not in ('clubs.create', 'clubs.review_queue')) }}
       {{ tab(url_for('create_menu'), '+', 'Create', ep in ('create_menu', 'events.create', 'events.quick', 'clubs.create'), extra_class='tab-create') }}
       {{ tab(url_for('news.news'), '📰', 'News', ep == 'news.news') }}
       {{ tab(url_for('profile.view', user_id=g.user.id), '👤', 'Me', ep.startswith('profile.') and (ep != 'profile.view' or request.view_args.get('user_id') == g.user.id)) }}
       <div class="side-only side-extra">
-        {{ tab(url_for('social.inbox'), '✉️', 'Messages', ep == 'social.inbox' or ep == 'social.thread', counts.messages) }}
-        {{ tab(url_for('social.friends'), '👥', 'Friends', ep == 'social.friends', counts.requests) }}
+        {{ tab(url_for('social.inbox'), '✉️', 'Messages', ep == 'social.inbox' or ep == 'social.thread', nav_counts.messages) }}
+        {{ tab(url_for('social.friends'), '👥', 'Friends', ep == 'social.friends', nav_counts.requests) }}
         {{ tab(url_for('how_it_works'), '❔', 'How it works', ep == 'how_it_works') }}
+        {% if is_admin() %}
+          {{ tab(url_for('moderation.admin_reports'), '🛡️', 'Reports', ep.startswith('moderation.admin'), open_report_count()) }}
+          {{ tab(url_for('clubs.review_queue'), '🏛️', 'Club requests', ep == 'clubs.review_queue', pending_club_count()) }}
+        {% endif %}
         <form method="post" action="{{ url_for('auth.logout') }}" class="side-logout">
           {{ csrf_field() }}<button class="tab"><span class="tab-icon" aria-hidden="true">🚪</span><span class="tab-label">Log out</span></button>
         </form>

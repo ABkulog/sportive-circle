@@ -41,6 +41,22 @@
   </section>
 {% endif %}
 
+{% if club_picks %}
+  <section class="club-picks">
+    <h2>🏛️ Clubs for you</h2>
+    <div class="club-strip">
+      {% for c in club_picks %}
+        <a class="card club-card" href="{{ url_for('clubs.view', club_id=c.id) }}">
+          <span class="club-emoji" aria-hidden="true">{{ SPORT_EMOJI[c.sport] }}</span>
+          <strong class="club-name">{{ c.name }}</strong>
+          <span class="badges"><span class="badge badge-verified">✅ Verified</span>
+            <span class="badge">👥 {{ c.member_count }}</span></span>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
 <form method="get" class="filters card" aria-label="Filter events">
   <div class="segmented" role="radiogroup" aria-label="Which sports">
     <label><input type="radio" name="scope" value="interests" {% if filters.scope == 'interests' %}checked{% endif %} onchange="this.form.submit()"><span>My sports</span></label>

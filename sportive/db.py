@@ -35,6 +35,23 @@ ADDED_COLUMNS = [
     ("events", "allow_plus_ones", "INTEGER NOT NULL DEFAULT 1"),
     ("rsvps", "plus_one_of", "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
     ("events", "club_id", "INTEGER REFERENCES clubs(id) ON DELETE SET NULL"),
+    ("clubs", "status", "TEXT NOT NULL DEFAULT 'pending'"),
+    ("clubs", "club_kind", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "verification_url", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "officer_role", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "member_estimate", "INTEGER NOT NULL DEFAULT 0"),
+    ("clubs", "focus", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "joining", "TEXT NOT NULL DEFAULT 'open'"),
+    ("clubs", "experience", "TEXT NOT NULL DEFAULT 'none'"),
+    ("clubs", "who_can_join", "TEXT NOT NULL DEFAULT 'everyone'"),
+    ("clubs", "dues", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "gear", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "competes", "INTEGER NOT NULL DEFAULT 0"),
+    ("clubs", "how_to_join", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "club_email", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "instagram", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "review_note", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "reviewed_at", "TEXT"),
 ]
 
 

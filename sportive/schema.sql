@@ -171,7 +171,24 @@ CREATE TABLE IF NOT EXISTS clubs (
     description TEXT NOT NULL,
     meets       TEXT NOT NULL DEFAULT '',      -- e.g. "Tuesdays & Thursdays, 7-9 PM"
     location    TEXT NOT NULL DEFAULT '',
-    contact_url TEXT NOT NULL DEFAULT '',      -- Instagram, website, Discord... (https only)
+    contact_url TEXT NOT NULL DEFAULT '',      -- website, Discord... (https only)
+    status           TEXT NOT NULL DEFAULT 'pending',  -- 'pending' until an admin approves it, then 'approved' (or 'rejected')
+    club_kind        TEXT NOT NULL DEFAULT '',  -- 'rec_club' (UW Recreation Rec Club) or 'rso' (Registered Student Organization)
+    verification_url TEXT NOT NULL DEFAULT '',  -- official HuskyLink or UW Recreation page, checked by an admin
+    officer_role     TEXT NOT NULL DEFAULT '',  -- the applicant's role, e.g. President
+    member_estimate  INTEGER NOT NULL DEFAULT 0,  -- roughly how many active members
+    focus            TEXT NOT NULL DEFAULT '',  -- competitive / recreational / instructional / mixed (UW Rec's categories)
+    joining          TEXT NOT NULL DEFAULT 'open',  -- open / tryouts / application
+    experience       TEXT NOT NULL DEFAULT 'none',  -- none / some / experienced
+    who_can_join     TEXT NOT NULL DEFAULT 'everyone',  -- everyone / women / men / women_nb
+    dues             TEXT NOT NULL DEFAULT '',  -- 'Free' or e.g. '$40/quarter'
+    gear             TEXT NOT NULL DEFAULT '',  -- e.g. 'Provided' or 'Bring cleats'
+    competes         INTEGER NOT NULL DEFAULT 0,  -- 1 = plays other schools
+    how_to_join      TEXT NOT NULL DEFAULT '',  -- first steps for new members
+    club_email       TEXT NOT NULL DEFAULT '',
+    instagram        TEXT NOT NULL DEFAULT '',  -- handle without the @
+    review_note      TEXT NOT NULL DEFAULT '',  -- admin's note (e.g. why it was rejected)
+    reviewed_at      TEXT,
     created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at  TEXT NOT NULL
 );
@@ -194,3 +211,21 @@ CREATE TABLE IF NOT EXISTS club_posts (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_club_posts ON club_posts(club_id, id);
+
+-- ---------------------------------------------------------------- reports
+-- Reports from students about people or messages. Only admins can see these.
+-- `snapshot` keeps a copy of the reported message, so the evidence stays even if it's deleted.
+CREATE TABLE IF NOT EXISTS reports (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter_id      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    reported_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    target_type      TEXT NOT NULL,             -- 'user', 'dm' or 'event_message'
+    target_id        INTEGER NOT NULL,
+    reason           TEXT NOT NULL,
+    details          TEXT NOT NULL DEFAULT '',
+    snapshot         TEXT NOT NULL DEFAULT '',
+    status           TEXT NOT NULL DEFAULT 'open',   -- 'open', 'reviewed' or 'dismissed'
+    created_at       TEXT NOT NULL,
+    reviewed_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, id);

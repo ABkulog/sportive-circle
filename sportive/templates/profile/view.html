@@ -27,9 +27,12 @@
         </form>
       </div>
     {% elif relation.i_blocked %}
-      <form method="post" action="{{ url_for('social.unblock', user_id=user.id) }}">
-        {{ csrf_field() }}<button class="btn btn-ghost">Unblock</button>
-      </form>
+      <div class="profile-actions">
+        <form method="post" action="{{ url_for('social.unblock', user_id=user.id) }}">
+          {{ csrf_field() }}<button class="btn btn-ghost">Unblock</button>
+        </form>
+        <a class="btn btn-ghost danger-link" href="{{ url_for('moderation.report', target_type='user', target_id=user.id) }}">🚩 Report</a>
+      </div>
     {% elif not relation.blocked_me %}
       <div class="profile-actions">
         {% if relation.friend == 'friends' %}
@@ -63,6 +66,7 @@
                 onsubmit="return confirm('Block {{ user.full_name.split()[0] }}? They won\'t be able to message you or add you.')">
             {{ csrf_field() }}<button class="link-button danger-link">Block</button>
           </form>
+          <a class="danger-link" href="{{ url_for('moderation.report', target_type='user', target_id=user.id) }}">🚩 Report</a>
           </div>
         </details>
       </div>

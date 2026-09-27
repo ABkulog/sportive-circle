@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from flask import Flask, g, redirect, render_template, url_for
 
-from . import auth, clubs, db, events, news, profile, ranks, reminders, social, stats
+from . import auth, clubs, db, events, moderation, news, profile, ranks, reminders, social, stats
 from .photos import MAX_UPLOAD_MB
 from .constants import LOCATIONS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS, SPORT_MAX_PLAYERS, SPORTS
 from .timeutil import fmt_clock, fmt_relative, fmt_when, same_day
@@ -32,6 +32,8 @@ def create_app(test_config=None):
         MAIL_PASSWORD=os.environ.get("MAIL_PASSWORD"),
         # The site's public address, used for links in emails.
         PUBLIC_URL=os.environ.get("PUBLIC_URL", "http://localhost:5050"),
+        # Who can see and handle reports (comma-separated emails), e.g. "you@uw.edu".
+        ADMIN_EMAILS=os.environ.get("ADMIN_EMAILS", ""),
         MAIL_FROM=os.environ.get("MAIL_FROM", "Sportive Circle <no-reply@sportivecircle.app>"),
     )
     if test_config:
@@ -48,6 +50,7 @@ def create_app(test_config=None):
     app.register_blueprint(social.bp)
     app.register_blueprint(news.bp)
     app.register_blueprint(clubs.bp)
+    app.register_blueprint(moderation.bp)
     app.cli.add_command(reminders.send_reminders_command)
     app.cli.add_command(stats.sport_stats_command)
     app.add_url_rule("/", endpoint="index", view_func=events.feed)
@@ -67,7 +70,7 @@ def create_app(test_config=None):
         csrf_field=auth.csrf_field, SPORTS=SPORTS, SPORT_EMOJI=SPORT_EMOJI,
         LOCATIONS=LOCATIONS, SKILL_LEVELS=SKILL_LEVELS,
         SPORT_RULES={key: {"label": label, "locations": SPORT_LOCATIONS[key], "max": SPORT_MAX_PLAYERS[key]}
-                     for key, label in SPORTS.items()}, spots_left=events.spots_left, event_title=events.event_title, can_join_level=ranks.can_join_level, can_join_or_tryout=events.can_join_or_tryout, my_tier_map=ranks.my_tier_map, social_counts=social.counts, chat_unread=social.event_chat_unread,
+                     for key, label in SPORTS.items()}, spots_left=events.spots_left, event_title=events.event_title, can_join_level=ranks.can_join_level, can_join_or_tryout=events.can_join_or_tryout, my_tier_map=ranks.my_tier_map, social_counts=social.counts, is_admin=moderation.is_admin, open_report_count=moderation.open_report_count, pending_club_count=clubs.pending_club_count, chat_unread=social.event_chat_unread,
         LEVEL_TIERS={level: ranks.TIERS.index(tier) for level, tier in ranks.LEVEL_REQUIREMENT.items()}, place_map=events.place_map, same_day=same_day,
     )
     for code, message in ERRORS.items():

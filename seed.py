@@ -67,6 +67,40 @@ HISTORY = [
 ]
 
 
+# Demo clubs (clearly marked as demos, never pretending to be a real UW club).
+DEMO_CLUBS = [
+    dict(name="Demo Spikeball Club", sport="spikeball", focus="recreational", joining="open", experience="none",
+         who_can_join="everyone", dues="", gear="Nets provided", competes=0, member_estimate=35,
+         meets="Tuesdays 5-7 PM", location="The Quad", officer=0,
+         description="A demo club for trying out Sportive Circle: casual roundnet on the Quad, all levels welcome.",
+         how_to_join="Just show up to any Tuesday session!"),
+    dict(name="Demo Club Ultimate", sport="ultimate", focus="competitive", joining="tryouts", experience="some",
+         who_can_join="everyone", dues="$60/quarter", gear="Cleats", competes=1, member_estimate=28,
+         meets="Mon, Wed & Fri 6-8 PM", location="Recreation Field 1 (by the IMA)", officer=1,
+         description="A demo competitive team: we travel to college tournaments. Tryouts happen in fall quarter.",
+         how_to_join="Come to our open tryout practices during the first two weeks of the quarter."),
+    dict(name="Demo Climbing Crew", sport="climbing", focus="instructional", joining="open", experience="none",
+         who_can_join="everyone", dues="$15/quarter", gear="Shoes available to borrow", competes=0, member_estimate=50,
+         meets="Thursdays 7-9 PM", location="IMA (Intramural Activities Building)", officer=2,
+         description="A demo club that teaches bouldering and top-roping from zero. Beginners are our favorite people.",
+         how_to_join="Sign up for a Thursday intro session."),
+]
+
+
+def add_clubs(db, ids, now):
+    for club in DEMO_CLUBS:
+        officer = ids[club.pop("officer")]
+        cur = db.execute(
+            f"""INSERT INTO clubs ({", ".join(club)}, club_kind, verification_url, officer_role, status,
+                                   created_by, created_at)
+                VALUES ({", ".join("?" for _ in club)}, 'rso', 'https://huskylink.washington.edu/organization/demo',
+                        'President', 'approved', ?, ?)""",
+            (*club.values(), officer, to_db(now)))
+        for user_id in ids:
+            db.execute("INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)",
+                       (cur.lastrowid, user_id, "officer" if user_id == officer else "member", to_db(now)))
+
+
 def add_history(db, ids, now):
     for host, sport, place, games in HISTORY:
         for n in range(games):
@@ -124,6 +158,7 @@ def main():
                 if other != ids[host] and (cur.lastrowid + other) % 3 == 0:
                     db.execute("INSERT INTO rsvps (event_id, user_id, created_at) VALUES (?, ?, ?)", (cur.lastrowid, other, joined))
         add_history(db, ids, now)
+        add_clubs(db, ids, now)
         db.commit()
         print(f"Added {len(USERS)} demo users and {len(EVENTS)} events, with past games and ranks.")
         print(f"Log in as {USERS[0][0]} with password {DEMO_PASSWORD}")

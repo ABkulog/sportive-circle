@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<h1 class="page-title">🛡️ Reports</h1>
+<nav class="home-tabs" aria-label="Report status">
+  {% for key, label in [('open', 'Open'), ('reviewed', 'Reviewed'), ('dismissed', 'Dismissed')] %}
+    <a href="{{ url_for('moderation.admin_reports', status=key) }}" {% if status == key %}class="is-on" aria-current="page"{% endif %}>
+      {{ label }} ({{ report_counts.get(key, 0) }})</a>
+  {% endfor %}
+</nav>
+
+{% if flagged and status == 'open' %}
+  <section class="card flagged">
+    <h2>⚠️ Reported by several people</h2>
+    <ul class="people">
+      {% for u in flagged %}
+        <li class="post-game-row"><a href="{{ url_for('profile.view', user_id=u.id) }}"><strong>{{ u.full_name }}</strong></a>
+          <span class="muted">{{ u.email }} · {{ u.reporters }} different people</span></li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
+
+<div class="stack">
+  {% for r in reports %}
+    <article class="card report-card">
+      <div class="report-head">
+        <span class="badge badge-danger">{{ reasons.get(r.reason, r.reason) }}</span>
+        <span class="muted">{{ {'user': 'Profile', 'dm': 'Direct message', 'event_message': 'Event chat'}[r.target_type] }} · {{ r.created_at|when }}</span>
+      </div>
+      <p><strong>Reported:</strong>
+        {% if r.reported_user_id %}<a href="{{ url_for('profile.view', user_id=r.reported_user_id) }}">{{ r.reported_name }}</a>
+          <span class="muted">({{ r.reported_email }})</span>{% else %}<span class="muted">deleted account</span>{% endif %}
+        · <strong>By:</strong> {{ r.reporter_name or 'deleted account' }}</p>
+      {% if r.snapshot %}<blockquote class="report-quote">{{ r.snapshot }}</blockquote>{% endif %}
+      {% if r.details %}<p class="report-details">“{{ r.details }}”</p>{% endif %}
+      <div class="detail-actions">
+        {% if status == 'open' %}
+          <form method="post" action="{{ url_for('moderation.resolve', report_id=r.id, action='reviewed', **{'from': status}) }}">
+            {{ csrf_field() }}<button class="btn btn-small">✅ Mark reviewed</button></form>
+          <form method="post" action="{{ url_for('moderation.resolve', report_id=r.id, action='dismissed', **{'from': status}) }}">
+            {{ csrf_field() }}<button class="btn btn-small btn-ghost">Dismiss</button></form>
+        {% else %}
+          <form method="post" action="{{ url_for('moderation.resolve', report_id=r.id, action='open', **{'from': status}) }}">
+            {{ csrf_field() }}<button class="btn btn-small btn-ghost">Reopen</button></form>
+        {% endif %}
+      </div>
+    </article>
+  {% else %}
+    <div class="card empty"><p class="empty-emoji" aria-hidden="true">🛡️</p><p><strong>No {{ status }} reports.</strong></p></div>
+  {% endfor %}
+</div>
+{% endblock %}

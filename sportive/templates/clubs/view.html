@@ -3,28 +3,56 @@
 {% block title %}{{ club.name }}{% endblock %}
 {% block content %}
 <a class="back-link" href="{{ url_for('clubs.directory') }}">← All clubs</a>
+{% if club.status == 'pending' %}
+  <div class="flash flash-info club-status">⏳ <strong>Waiting for verification.</strong> We're checking that this is an active
+    UW club, usually within 2 days. Only you (and other officers) can see this page until then.</div>
+{% elif club.status == 'rejected' %}
+  <div class="flash flash-error club-status">We couldn't verify this club yet.
+    {% if club.review_note %}<br><strong>What to fix:</strong> {{ club.review_note }}{% endif %}
+    {% if role == 'officer' %}<br><a href="{{ url_for('clubs.edit', club_id=club.id) }}">Update and resubmit →</a>{% endif %}</div>
+{% endif %}
 <article class="card club-hero">
   <div class="detail-head">
     <div class="event-emoji big" aria-hidden="true">{{ SPORT_EMOJI[club.sport] }}</div>
     <div>
       <h1>{{ club.name }}</h1>
       <div class="badges">
+        {% if club.status == 'approved' %}<span class="badge badge-verified">✅ Verified UW club</span>{% endif %}
         <span class="badge">{{ SPORTS[club.sport] }}</span>
-        <span class="badge badge-success">All levels welcome</span>
-        <span class="badge">👥 {{ club.member_count }} member{{ 's' if club.member_count != 1 }}</span>
+        <span class="badge">👥 {{ club.member_count }} on Sportive Circle</span>
       </div>
     </div>
   </div>
   <p class="club-about">{{ club.description }}</p>
+  {% if club.focus %}
+    <ul class="quick-facts" aria-label="Quick facts">
+      <li><span aria-hidden="true">🎯</span><small>Focus</small><strong>{{ focus[club.focus] }}</strong></li>
+      <li><span aria-hidden="true">🚪</span><small>Joining</small><strong>{{ joining[club.joining] }}</strong></li>
+      <li><span aria-hidden="true">📈</span><small>Experience</small><strong>{{ experience[club.experience] }}</strong></li>
+      <li><span aria-hidden="true">🙋</span><small>Who can join</small><strong>{{ who[club.who_can_join] }}</strong></li>
+      <li><span aria-hidden="true">💵</span><small>Dues</small><strong>{{ club.dues or 'Free' }}</strong></li>
+      <li><span aria-hidden="true">🏆</span><small>Competes</small><strong>{{ 'Against other schools' if club.competes else 'No' }}</strong></li>
+      {% if club.gear %}<li><span aria-hidden="true">🎒</span><small>Gear</small><strong>{{ club.gear }}</strong></li>{% endif %}
+      {% if club.member_estimate %}<li><span aria-hidden="true">👥</span><small>Club size</small><strong>~{{ club.member_estimate }} members</strong></li>{% endif %}
+    </ul>
+  {% endif %}
   <dl class="facts">
     {% if club.meets %}<div><dt>When</dt><dd>🗓️ {{ club.meets }}</dd></div>{% endif %}
     {% if club.location %}<div><dt>Where</dt><dd>📍 {{ club.location }}</dd></div>{% endif %}
-    {% if club.contact_url %}<div><dt>Contact</dt><dd><a href="{{ club.contact_url }}" target="_blank" rel="noopener nofollow">{{ club.contact_url|replace('https://', '')|truncate(40) }} ↗</a></dd></div>{% endif %}
+    {% if club.club_kind %}<div><dt>Official</dt><dd><a href="{{ club.verification_url }}" target="_blank" rel="noopener nofollow">{{ kinds[club.club_kind] }} ↗</a></dd></div>{% endif %}
+    {% if club.club_email %}<div><dt>Email</dt><dd><a href="mailto:{{ club.club_email }}">{{ club.club_email }}</a></dd></div>{% endif %}
+    {% if club.instagram %}<div><dt>Instagram</dt><dd><a href="https://instagram.com/{{ club.instagram }}" target="_blank" rel="noopener nofollow">@{{ club.instagram }} ↗</a></dd></div>{% endif %}
+    {% if club.contact_url %}<div><dt>Website</dt><dd><a href="{{ club.contact_url }}" target="_blank" rel="noopener nofollow">{{ club.contact_url|replace('https://', '')|truncate(40) }} ↗</a></dd></div>{% endif %}
   </dl>
+  {% if club.how_to_join %}
+    <div class="how-to-join"><strong>🚀 How to join</strong><p>{{ club.how_to_join }}</p></div>
+  {% endif %}
   <div class="detail-actions">
     {% if not g.user %}
       <a class="btn btn-large" href="{{ url_for('auth.signup', next=request.path) }}">Sign up to join</a>
       <a class="btn btn-ghost" href="{{ url_for('auth.login', next=request.path) }}">Log in</a>
+    {% elif club.status != 'approved' %}
+      {% if role == 'officer' %}<a class="btn btn-ghost" href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit application</a>{% endif %}
     {% elif role %}
       <span class="going-pill">✅ You're {{ 'an officer' if role == 'officer' else 'a member' }}</span>
       {% if role == 'officer' %}

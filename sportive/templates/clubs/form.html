@@ -1,32 +1,93 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Edit club' if club else 'Start a club' }}{% endblock %}
+{% block title %}{{ 'Edit club' if club else 'Register your club' }}{% endblock %}
+{% macro choice(name, options, label) %}
+  <fieldset class="field">
+    <legend>{{ label }}</legend>
+    <div class="choice-pills">
+      {% for key, text in options.items() %}
+        <label class="choice-pill"><input type="radio" name="{{ name }}" value="{{ key }}" required
+               {% if form.get(name) == key %}checked{% endif %}><span>{{ text }}</span></label>
+      {% endfor %}
+    </div>
+  </fieldset>
+{% endmacro %}
 {% block content %}
-<div class="card form-card">
-  <h1>{{ 'Edit club' if club else '🏛️ Start a club' }}</h1>
-  {% if not club %}<p class="muted">Clubs are open to every Husky, and there are no ranks here. You'll be the club's first officer.</p>{% endif %}
+<div class="card form-card club-form">
+  <h1>{{ 'Edit club' if club else '🏛️ Register your club' }}</h1>
+  {% if not club %}
+    <p class="muted">Sportive Circle lists <strong>active UW clubs</strong>. Tell us about yours and share its official
+      page. We'll verify it (usually within 2 days) and email you when it's live. You'll be its first officer here.</p>
+  {% endif %}
   <form method="post" class="form">
     {{ csrf_field() }}
+
+    <h2 class="form-step"><span>1</span> Your club</h2>
     <label class="field"><span>Club name</span>
-      <input name="name" maxlength="60" value="{{ form.get('name', '') }}" placeholder="UW Spikeball Club" required></label>
+      <input name="name" maxlength="60" value="{{ form.get('name', '') }}" placeholder="UW Women's Ultimate" required></label>
     <label class="field"><span>Main sport</span>
       <select name="sport" required>
         <option value="">Choose a sport</option>
         {% for key, label in SPORTS.items() %}<option value="{{ key }}" {% if form.get('sport') == key %}selected{% endif %}>{{ SPORT_EMOJI[key] }} {{ label }}</option>{% endfor %}
       </select>
     </label>
+    {{ choice('club_kind', kinds, "What kind of UW club is it?") }}
+    <label class="field"><span>Official club page <em>(how we verify it's real)</em></span>
+      <input name="verification_url" type="url" maxlength="200" value="{{ form.get('verification_url', '') }}"
+             placeholder="https://huskylink.washington.edu/organization/…" required>
+      <small class="muted">Your club's <a href="https://huskylink.washington.edu/organizations" target="_blank" rel="noopener">HuskyLink</a>
+        page, or its <a href="https://www.washington.edu/ima/rec-clubs/club-offerings/" target="_blank" rel="noopener">UW Recreation</a> page.</small></label>
     <label class="field"><span>About the club</span>
       <textarea name="description" rows="4" maxlength="1000" required
-                placeholder="Who you are, what you do, and who should join (hint: everyone!)">{{ form.get('description', '') }}</textarea></label>
+                placeholder="What you do, what a practice looks like, and who should join.">{{ form.get('description', '') }}</textarea></label>
+
+    <h2 class="form-step"><span>2</span> Who it's for</h2>
+    {{ choice('focus', focus, "What's the club's focus?") }}
+    {{ choice('joining', joining, "How do people join?") }}
+    {{ choice('experience', experience, "How much experience do new members need?") }}
+    {{ choice('who_can_join', who, "Who can join?") }}
+    <label class="toggle"><input type="checkbox" name="competes" value="1" {% if form.get('competes') %}checked{% endif %}>
+      <span>We compete against other schools</span></label>
+
+    <h2 class="form-step"><span>3</span> Practices & costs</h2>
     <div class="row">
-      <label class="field"><span>When you meet <em>(optional)</em></span>
-        <input name="meets" maxlength="120" value="{{ form.get('meets', '') }}" placeholder="Tuesdays 7-9 PM"></label>
+      <label class="field"><span>When you practice <em>(optional)</em></span>
+        <input name="meets" maxlength="120" value="{{ form.get('meets', '') }}" placeholder="Tue & Thu 7-9 PM"></label>
       <label class="field"><span>Where <em>(optional)</em></span>
-        <input name="location" maxlength="120" value="{{ form.get('location', '') }}" list="places" placeholder="The Quad"></label>
+        <input name="location" maxlength="120" value="{{ form.get('location', '') }}" list="places" placeholder="Denny Field"></label>
       <datalist id="places">{% for place in locations %}<option value="{{ place }}">{% endfor %}</datalist>
     </div>
-    <label class="field"><span>Contact link <em>(optional: Instagram, website, Discord…)</em></span>
-      <input name="contact_url" type="url" maxlength="200" value="{{ form.get('contact_url', '') }}" placeholder="https://instagram.com/yourclub"></label>
-    <button class="btn btn-block">{{ 'Save changes' if club else 'Create club' }}</button>
+    <div class="row">
+      <label class="field"><span>Dues <em>(leave empty if free)</em></span>
+        <input name="dues" maxlength="60" value="{{ form.get('dues', '') }}" placeholder="$40/quarter"></label>
+      <label class="field"><span>Gear <em>(optional)</em></span>
+        <input name="gear" maxlength="120" value="{{ form.get('gear', '') }}" placeholder="Cleats; discs provided"></label>
+    </div>
+    <label class="field"><span>How to join: first steps for new members <em>(optional)</em></span>
+      <textarea name="how_to_join" rows="2" maxlength="500"
+                placeholder="Sign the waiver on HuskyLink, then come to any Tuesday practice!">{{ form.get('how_to_join', '') }}</textarea></label>
+
+    <h2 class="form-step"><span>4</span> Contact</h2>
+    <div class="row">
+      <label class="field"><span>Club email <em>(optional)</em></span>
+        <input name="club_email" type="email" maxlength="120" value="{{ form.get('club_email', '') }}" placeholder="yourclub@uw.edu"></label>
+      <label class="field"><span>Instagram <em>(optional)</em></span>
+        <input name="instagram" maxlength="31" value="{{ form.get('instagram', '') }}" placeholder="@uwyourclub"></label>
+    </div>
+    <label class="field"><span>Website or Discord <em>(optional)</em></span>
+      <input name="contact_url" type="url" maxlength="200" value="{{ form.get('contact_url', '') }}" placeholder="https://…"></label>
+
+    <h2 class="form-step"><span>5</span> About you</h2>
+    <div class="row">
+      <label class="field"><span>Your role in the club</span>
+        <input name="officer_role" maxlength="40" value="{{ form.get('officer_role', '') }}" placeholder="President" required></label>
+      <label class="field"><span>Active members (about)</span>
+        <input name="member_estimate" type="number" min="{{ min_members }}" max="5000" value="{{ form.get('member_estimate', '') }}"
+               placeholder="25" required></label>
+    </div>
+    <label class="toggle attest"><input type="checkbox" name="attest" value="1" required {% if club %}checked{% endif %}>
+      <span>I'm a current officer of this club, and it's active this quarter.</span></label>
+
+    <button class="btn btn-block btn-large">{{ 'Save changes' if club else 'Submit for verification' }}</button>
   </form>
 </div>
 {% endblock %}

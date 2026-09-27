@@ -25,6 +25,8 @@ together through sports. This version rebuilds it as a mobile-friendly web app f
 - **Security.** CSRF protection on every form, a limit on wrong verification codes, and
   protection against open redirects.
 - **Reminders.** An email an hour before your events, plus an "Up next" banner on the feed.
+- **Safety.** Report profiles and messages (with a saved copy of the message), block people, and review
+  reports on an admin-only page that flags anyone reported by several people.
 - **Your data.** You can delete your account and everything in it from your profile settings.
 - 🎂 The birthday coupon from the original app is still there.
 
@@ -75,6 +77,7 @@ Set these environment variables, for example with an email service's SMTP settin
 MAIL_SERVER, MAIL_PORT (default 587), MAIL_USERNAME, MAIL_PASSWORD, MAIL_FROM
 SECRET_KEY   # a long random string; the app refuses to start publicly without it
 PUBLIC_URL   # the site's address, e.g. https://sportivecircle.app (used in email links)
+ADMIN_EMAILS # who can review reports at /admin/reports, e.g. you@uw.edu (comma-separated)
 ```
 
 ## Event reminders

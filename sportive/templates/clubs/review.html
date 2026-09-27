@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Club requests{% endblock %}
+{% block content %}
+<h1 class="page-title">🏛️ Club requests</h1>
+<p class="muted">Check each club's official page: is it a real UW club, active this quarter, and is the applicant listed
+  as an officer (or can you confirm it another way)?</p>
+<nav class="home-tabs" aria-label="Status">
+  {% for key, label in [('pending', 'Waiting'), ('approved', 'Approved'), ('rejected', 'Needs changes')] %}
+    <a href="{{ url_for('clubs.review_queue', status=key) }}" {% if status == key %}class="is-on" aria-current="page"{% endif %}>{{ label }} ({{ club_counts.get(key, 0) }})</a>
+  {% endfor %}
+</nav>
+<div class="stack">
+  {% for c in clubs %}
+    <article class="card report-card">
+      <div class="report-head">
+        <strong class="club-name">{{ SPORT_EMOJI[c.sport] }} {{ c.name }}</strong>
+        <span class="muted">{{ kinds.get(c.club_kind, '?') }}</span>
+      </div>
+      <p><a href="{{ c.verification_url }}" target="_blank" rel="noopener nofollow"><strong>Open official page ↗</strong></a>
+        <span class="muted">({{ c.verification_url }})</span></p>
+      <p><strong>Applicant:</strong> {{ c.applicant or 'deleted account' }} <span class="muted">({{ c.applicant_email }})</span>,
+        {{ c.officer_role }} · says ~{{ c.member_estimate }} active members</p>
+      <p class="club-about">{{ c.description }}</p>
+      <p class="muted">{{ focus.get(c.focus, '') }} · {{ joining.get(c.joining, '') }} · {{ experience.get(c.experience, '') }}
+        · {{ who.get(c.who_can_join, '') }} · Dues: {{ c.dues or 'Free' }}</p>
+      {% if c.review_note %}<p class="report-details">Note: “{{ c.review_note }}”</p>{% endif %}
+      {% if status != 'approved' %}
+        <div class="review-actions">
+          <form method="post" action="{{ url_for('clubs.review', club_id=c.id, decision='approve') }}">
+            {{ csrf_field() }}<button class="btn">✅ Approve</button></form>
+          <form method="post" action="{{ url_for('clubs.review', club_id=c.id, decision='reject') }}" class="reject-form">
+            {{ csrf_field() }}
+            <input name="note" maxlength="500" placeholder="What should they fix? (required)" aria-label="Reason">
+            <button class="btn btn-danger-ghost">Send back</button>
+          </form>
+        </div>
+      {% else %}
+        <a class="btn btn-small btn-ghost" href="{{ url_for('clubs.view', club_id=c.id) }}">View club</a>
+      {% endif %}
+    </article>
+  {% else %}
+    <div class="card empty"><p class="empty-emoji" aria-hidden="true">🏛️</p><p><strong>Nothing here.</strong></p></div>
+  {% endfor %}
+</div>
+{% endblock %}

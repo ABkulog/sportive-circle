@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Report{% endblock %}
+{% block content %}
+<div class="card form-card">
+  <h1>🚩 Report {{ target.what }}</h1>
+  <p class="muted">Reports are private. {{ target.name.split()[0] }} won't be told who reported them.
+    If someone is in danger right now, call <strong>911</strong>. For non-emergencies on campus, UW Police is
+    <strong>206-685-8973</strong>.</p>
+  {% if target.snapshot %}<blockquote class="report-quote">{{ target.snapshot }}</blockquote>{% endif %}
+  <form method="post" class="form">
+    {{ csrf_field() }}
+    <fieldset class="field">
+      <legend>What's wrong?</legend>
+      <div class="report-reasons">
+        {% for key, label in reasons.items() %}
+          <label class="report-reason"><input type="radio" name="reason" value="{{ key }}" required> <span>{{ label }}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <label class="field"><span>Anything else we should know? <em>(optional)</em></span>
+      <textarea name="details" rows="3" maxlength="1000" placeholder="What happened?"></textarea></label>
+    <label class="toggle">
+      <input type="checkbox" name="block" value="1" checked>
+      <span>Also block {{ target.name.split()[0] }} (they can't message you or add you)</span>
+    </label>
+    <button class="btn btn-block">Send report</button>
+  </form>
+  <p class="center"><a href="{{ target.back }}">Cancel</a></p>
+</div>
+{% endblock %}

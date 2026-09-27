@@ -1341,7 +1341,12 @@ def test_plus_one_rules(accounts, client, app):
 
 CLUB = {"name": "UW Spikeball Club", "sport": "spikeball",
         "description": "Casual roundnet on the Quad. Everyone welcome, nets provided!",
-        "meets": "Tuesdays 5-7 PM", "location": "The Quad", "contact_url": "https://instagram.com/uwspikeball"}
+        "meets": "Tuesdays 5-7 PM", "location": "The Quad", "contact_url": "https://uwspikeball.example.com",
+        "club_kind": "rso", "verification_url": "https://huskylink.washington.edu/organization/uwspikeball",
+        "officer_role": "President", "member_estimate": "30", "focus": "recreational", "joining": "open",
+        "experience": "none", "who_can_join": "everyone", "dues": "", "gear": "Nets provided",
+        "how_to_join": "Come to any Tuesday practice!", "club_email": "spike@uw.edu", "instagram": "@uwspikeball",
+        "attest": "1"}
 
 
 def _club_id(app, name="UW Spikeball Club"):
@@ -1349,29 +1354,42 @@ def _club_id(app, name="UW Spikeball Club"):
         return get_db().execute("SELECT id FROM clubs WHERE name = ?", (name,)).fetchone()[0]
 
 
+def _approve(app, club_id):
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE clubs SET status = 'approved' WHERE id = ?", (club_id,))
+        db.commit()
+
+
 def test_clubs_are_open_to_everyone(accounts, client, app):
     accounts.signup(email="captain@uw.edu", name="Cap Tain")
     client.post("/clubs/new", data=CLUB)
     club = _club_id(app)
+    _approve(app, club)
     accounts.logout()
     directory = client.get("/clubs").data.decode()          # no account needed
     assert "UW Spikeball Club" in directory and "1 member" in directory
     page = client.get(f"/clubs/{club}").data.decode()
-    assert "Casual roundnet" in page and "All levels welcome" in page and "Sign up to join" in page
+    assert "Casual roundnet" in page and "Verified UW club" in page and "Sign up to join" in page
+    assert "No experience needed" in page and "Come to any Tuesday practice!" in page and "@uwspikeball" in page
     assert "Cap Tain" not in page                             # member names need an account
 
 
 def test_club_create_validation(accounts, client):
     accounts.signup()
     assert b"https://" in client.post("/clubs/new", data={**CLUB, "contact_url": "javascript:alert(1)"}).data
+    assert b"official page" in client.post("/clubs/new", data={**CLUB, "verification_url": "https://myclub.com"}).data
+    assert b"at least 5 members" in client.post("/clubs/new", data={**CLUB, "member_estimate": "2"}).data
+    assert b"current officer" in client.post("/clubs/new", data={k: v for k, v in CLUB.items() if k != "attest"}).data
     client.post("/clubs/new", data=CLUB)
-    assert b"already exists" in client.post("/clubs/new", data={**CLUB, "name": "uw spikeball CLUB"}).data
+    assert b"already on Sportive Circle" in client.post("/clubs/new", data={**CLUB, "name": "uw spikeball CLUB"}).data
 
 
 def test_join_leave_and_officers(accounts, client, app):
     accounts.signup(email="captain@uw.edu")
     client.post("/clubs/new", data=CLUB)
     club = _club_id(app)
+    _approve(app, club)
     assert b"only officer" in client.post(f"/clubs/{club}/leave", follow_redirects=True).data
     accounts.logout()
     accounts.signup(email="fan@uw.edu", name="Fan Person")
@@ -1391,6 +1409,7 @@ def test_club_events_are_all_levels(accounts, client, app):
     accounts.signup(email="captain@uw.edu")
     client.post("/clubs/new", data=CLUB)
     club = _club_id(app)
+    _approve(app, club)
     form_page = client.get(f"/events/new?club={club}").data.decode()
     assert "Club event for" in form_page and 'name="skill_level"' not in form_page
     response = client.post("/events/new", data={**event_form(title="Club night", sport="spikeball",
@@ -1418,7 +1437,7 @@ def test_same_sections_everywhere(accounts, client):
     assert 'aria-label="How it works"' in page                              # ❓ in the top bar too
     assert "For you" in page and "My events" in page                        # Home tabs
     menu = client.get("/create").data.decode()
-    assert "Need players" in menu and "New event" in menu and "New club" in menu
+    assert "Need players" in menu and "New event" in menu and "Register your club" in menu
 
 
 def test_visitors_get_simple_menu(client):
@@ -1430,3 +1449,184 @@ def test_chats_hide_the_tab_bar_on_phones(accounts, client):
     accounts.signup()
     event_id = event_id_from(client.post("/events/new", data=event_form()))
     assert b'class="has-app-nav hide-tabs"' in client.get(f"/events/{event_id}/chat").data
+
+
+# ----------------------------------------------------------------- reports
+
+def _two_players_who_played(accounts, app):
+    accounts.signup(email="bad@uw.edu", name="Bad Actor")
+    accounts.logout()
+    accounts.signup(email="me@uw.edu", name="Me Myself")
+    bad, me = _user_id(app, "bad@uw.edu"), _user_id(app, "me@uw.edu")
+    _played_games(app, "soccer", [bad, me])
+    return bad, me
+
+
+def test_report_a_profile_and_block(accounts, client, app):
+    bad, me = _two_players_who_played(accounts, app)
+    form = client.get(f"/report/user/{bad}").data.decode()
+    assert "Report Bad Actor" in form and "won't be told who reported them" in form
+    done = client.post(f"/report/user/{bad}", data={"reason": "harassment", "details": "keeps bugging me", "block": "1"},
+                       follow_redirects=True).data.decode()
+    assert "Thanks for letting us know" in done and "You&#39;ve also blocked them" in done
+    with app.app_context():
+        db = get_db()
+        row = db.execute("SELECT * FROM reports").fetchone()
+        assert (row["reported_user_id"], row["reason"], row["status"]) == (bad, "harassment", "open")
+        assert db.execute("SELECT 1 FROM blocks WHERE blocker_id = ? AND blocked_id = ?", (me, bad)).fetchone()
+    assert client.get(f"/report/user/{me}").status_code == 404        # can't report yourself
+
+
+def test_report_messages_keeps_a_copy(accounts, client, app):
+    bad, me = _two_players_who_played(accounts, app)
+    accounts.logout()
+    accounts.login(email="bad@uw.edu")
+    client.post(f"/messages/{me}", data={"body": "you're trash lol"})
+    accounts.logout()
+    accounts.login(email="me@uw.edu")
+    thread = client.get(f"/messages/{bad}").data.decode()
+    assert "🚩 Report" in thread
+    with app.app_context():
+        message_id = get_db().execute("SELECT id FROM direct_messages").fetchone()[0]
+    client.post(f"/report/dm/{message_id}", data={"reason": "harassment"})
+    with app.app_context():
+        db = get_db()
+        db.execute("DELETE FROM direct_messages")        # even if the message disappears...
+        db.commit()
+        assert db.execute("SELECT snapshot FROM reports").fetchone()[0] == "you're trash lol"   # ...the copy stays
+    client.post(f"/messages/{bad}", data={"body": "stop"})
+    with app.app_context():
+        my_message = get_db().execute("SELECT id FROM direct_messages WHERE sender_id = ?", (me,)).fetchone()[0]
+    assert client.get(f"/report/dm/{my_message}").status_code == 404   # can't report your own message
+
+
+def test_event_chat_report_rules(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    client.post(f"/events/{event_id}/chat", data={"body": "rude message"})
+    with app.app_context():
+        message_id = get_db().execute("SELECT id FROM event_messages").fetchone()[0]
+    assert client.get(f"/report/event_message/{message_id}").status_code == 404   # own message
+    accounts.logout()
+    accounts.signup(email="outsider@uw.edu")
+    assert client.get(f"/report/event_message/{message_id}").status_code == 404   # not in this chat
+    client.post(f"/events/{event_id}/join")
+    poll = client.get(f"/events/{event_id}/chat/poll?after=0").get_json()["messages"]
+    assert poll[0]["report"] == f"/report/event_message/{message_id}"
+    assert client.get(f"/report/event_message/{message_id}").status_code == 200
+
+
+def test_report_spam_limit(accounts, client, app):
+    bad, me = _two_players_who_played(accounts, app)
+    for _ in range(10):
+        with app.app_context():
+            db = get_db()
+            db.execute("INSERT INTO reports (reporter_id, reported_user_id, target_type, target_id, reason, created_at)"
+                       " VALUES (?, ?, 'user', ?, 'spam', ?)", (me, bad, bad, "2099-01-01 00:00"))
+            db.commit()
+    assert b"a lot of reports" in client.post(f"/report/user/{bad}", data={"reason": "spam"}, follow_redirects=True).data
+
+
+def test_admin_reports_page(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="bad@uw.edu", name="Bad Actor")
+    accounts.logout()
+    bad = _user_id(app, "bad@uw.edu")
+    for n in range(3):
+        accounts.signup(email=f"witness{n}@uw.edu")
+        client.post(f"/report/user/{bad}", data={"reason": "threats"})
+        accounts.logout()
+    accounts.signup(email="regular@uw.edu")
+    assert client.get("/admin/reports").status_code == 404        # hidden from non-admins
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    page = client.get("/admin/reports").data.decode()
+    assert "Reported by several people" in page and "Bad Actor" in page and "3 different people" in page
+    assert "🛡️" in page and "Threats or violence" in page
+    with app.app_context():
+        report_id = get_db().execute("SELECT id FROM reports").fetchone()[0]
+    client.post(f"/admin/reports/{report_id}/reviewed")
+    assert "Reviewed (1)" in client.get("/admin/reports").data.decode()
+
+
+
+# ---------------------------------------------------------- club verification
+
+def test_new_clubs_wait_for_verification(accounts, client, app):
+    accounts.signup(email="captain@uw.edu")
+    done = client.post("/clubs/new", data=CLUB, follow_redirects=True).data.decode()
+    assert "Waiting for verification" in done
+    club = _club_id(app)
+    assert client.get(f"/events/new?club={club}").status_code == 403        # no events until verified
+    accounts.logout()
+    assert "UW Spikeball Club" not in client.get("/clubs").data.decode()     # hidden from the public
+    assert client.get(f"/clubs/{club}").status_code == 404
+    accounts.signup(email="fan@uw.edu")
+    assert client.post(f"/clubs/{club}/join").status_code == 404
+
+
+def test_admin_approves_or_sends_back(accounts, client, app, monkeypatch):
+    from sportive import clubs
+    sent = []
+    monkeypatch.setattr(clubs, "send_email", lambda to, subject, body: sent.append((to, subject)))
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    club = _club_id(app)
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    queue = client.get("/admin/clubs").data.decode()
+    assert "UW Spikeball Club" in queue and "huskylink.washington.edu/organization/uwspikeball" in queue
+    assert "~30 active members" in queue
+    assert b"Add a short note" in client.post(f"/admin/clubs/{club}/reject", follow_redirects=True).data
+    client.post(f"/admin/clubs/{club}/reject", data={"note": "That HuskyLink page is for a different club."})
+    assert sent[-1][0] == "captain@uw.edu"
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "different club" in page and "Update and resubmit" in page
+    client.post(f"/clubs/{club}/edit", data={**CLUB, "verification_url": "https://huskylink.washington.edu/organization/spike"})
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM clubs").fetchone()[0] == "pending"   # back in the queue
+    accounts.logout()
+    accounts.login(email="admin@uw.edu")
+    client.post(f"/admin/clubs/{club}/approve")
+    assert "is live" in sent[-1][1]
+    accounts.logout()
+    assert "UW Spikeball Club" in client.get("/clubs").data.decode()
+
+
+def test_regular_users_cant_review_clubs(accounts, client, app):
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    assert client.get("/admin/clubs").status_code == 404
+    assert client.post(f"/admin/clubs/{_club_id(app)}/approve").status_code == 404
+
+
+def test_club_quick_filters(accounts, client, app):
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    client.post("/clubs/new", data={**CLUB, "name": "UW Competitive Spikeball", "joining": "tryouts",
+                                    "experience": "experienced", "dues": "$60/quarter",
+                                    "verification_url": "https://huskylink.washington.edu/organization/comp"})
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE clubs SET status = 'approved'")
+        db.commit()
+    everyone = client.get("/clubs").data.decode()
+    assert "UW Spikeball Club" in everyone and "UW Competitive Spikeball" in everyone
+    beginner = client.get("/clubs?easy=beginner&easy=free&easy=no_tryouts").data.decode()
+    assert "UW Spikeball Club" in beginner and "UW Competitive Spikeball" not in beginner
+
+
+def test_clubs_featured_on_landing_and_home(accounts, client, app):
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    _approve(app, _club_id(app))
+    accounts.logout()
+    assert "Verified UW clubs" in client.get("/").data.decode() and "UW Spikeball Club" in client.get("/").data.decode()
+    accounts.signup(email="fan@uw.edu", sports=("spikeball",))
+    home = client.get("/").data.decode()
+    assert "Clubs for you" in home and "UW Spikeball Club" in home
+    client.post(f"/clubs/{_club_id(app)}/join")
+    assert "Clubs for you" not in client.get("/").data.decode()     # already joined
