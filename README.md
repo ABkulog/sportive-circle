@@ -93,7 +93,9 @@ This runs about 190 checks:
 ```
 
 It runs the code check, all tests, a crawl of every page as a visitor, student and admin (0 broken links
-allowed), and 1,000+ junk requests to every form and URL (0 crashes allowed). GitHub Actions runs the same
+allowed; every page must also have a title, one main heading, no duplicate ids, no template leftovers and the
+security headers), and 1,000+ junk requests to every form and URL (0 crashes allowed). Add `--external` to
+also check every link to other websites. GitHub Actions runs the same
 full check on every push (`.github/workflows/tests.yml`).
 
 ## Project layout

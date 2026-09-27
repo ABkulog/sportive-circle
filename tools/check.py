@@ -5,7 +5,10 @@
 1. Code check (pyflakes): unused or misspelled names.
 2. All tests: unit tests and the Gherkin scenarios.
 3. Link crawl: every page reachable by links, as a visitor, a student and an admin (0 broken allowed).
+   Every page is also checked for: a <title>, exactly one <h1>, no duplicate ids, no template leftovers
+   ("{{", "Undefined"), and the security headers.
 4. Junk-input test: 1,000+ bad requests to every form and URL (0 crashes allowed).
+5. With --external: every link to another website still works (needs the internet).
 
 Steps 3 and 4 use a throwaway database filled by seed.py, so real data is never touched.
 (The phone/tablet/laptop layout scan runs in a browser; see docs/deployment.md.)
@@ -64,7 +67,28 @@ START = ["/", "/how-it-works", "/privacy", "/terms", "/clubs", "/news", "/create
 SKIP = ("/logout", "/static/", "/u/", "photo")
 
 
-def crawl(app, password, who, email):
+def page_problems(url, response):
+    """Small things that are easy to miss on any one page."""
+    page = response.get_data(as_text=True)
+    problems = []
+    if "Content-Security-Policy" not in response.headers:
+        problems.append("no security headers")
+    if not re.search(r"<title>[^<]+</title>", page):
+        problems.append("no <title>")
+    if len(re.findall(r"<h1[ >]", page)) != 1:
+        problems.append(f"{len(re.findall(r'<h1[ >]', page))} <h1> headings (should be 1)")
+    ids = re.findall(r'\sid="([^"]+)"', page)
+    duplicates = sorted({i for i in ids if ids.count(i) > 1})
+    if duplicates:
+        problems.append(f"duplicate ids {duplicates}")
+    visible = re.sub(r"<script.*?</script>|<style.*?</style>|<[^>]+>", " ", page, flags=re.S)
+    for leftover in ("{{", "{%", "Undefined", "Traceback"):
+        if leftover in visible:
+            problems.append(f"template leftover {leftover!r}")
+    return [f"{url}: {problem}" for problem in problems]
+
+
+def crawl(app, password, who, email, external):
     client = logged_in(app, password, email)
     seen, bad, queue = set(), [], deque(START)
     while queue:
@@ -78,9 +102,14 @@ def crawl(app, password, who, email):
             bad.append((response.status_code, url))
         if response.status_code in (301, 302) or "text/html" not in response.content_type:
             continue
+        if response.status_code < 400:
+            bad.extend(page_problems(url, response))
         for href in re.findall(r'(?:href|src)="([^"#]+)', response.get_data(as_text=True)):
             parsed = urlparse(href)
-            if href.startswith(("mailto:", "tel:", "data:")) or parsed.scheme in ("http", "https"):
+            if parsed.scheme in ("http", "https"):
+                external.add(href.replace("&amp;", "&"))
+                continue
+            if href.startswith(("mailto:", "tel:", "data:")):
                 continue
             path = urlparse(urljoin(url, href))
             path = path.path + ("?" + path.query if path.query else "")
@@ -159,15 +188,41 @@ def junk_test(app, password):
     return crashes
 
 
+def check_external(links):
+    """Links to other websites that don't answer. Map tiles/CDN files and demo placeholders are skipped."""
+    from concurrent.futures import ThreadPoolExecutor
+    from urllib.request import Request, urlopen
+
+    def dead(link):
+        if any(skip in link for skip in ("example.com", "{z}", "tile.openstreetmap.org", "google.com/maps/dir",
+                                         "maps.apple.com", "fonts.g", "cdnjs.cloudflare.com")):
+            return None
+        for method in ("HEAD", "GET"):
+            try:
+                request = Request(link, method=method, headers={"User-Agent": "Mozilla/5.0 (SportiveCircle link check)"})
+                with urlopen(request, timeout=15) as response:
+                    if response.status < 400:
+                        return None
+            except Exception as error:  # some sites refuse HEAD; GET is the real test
+                reason = str(error)
+        return f"{link}  ({reason})"
+
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        return sorted(filter(None, pool.map(dead, sorted(links))))
+
+
 def main():
     ok = run("1. Code check (pyflakes)", [PY, "-m", "pyflakes", "sportive", "tests", "tools", "seed.py", "main.py", "wsgi.py"])
     ok &= run("2. Tests (unit + Gherkin)", [PY, "-m", "pytest", "-q"])
     logging.disable(logging.CRITICAL)
     app, password = fresh_app()
-    print("\n== 3. Link crawl")
+    print("\n== 3. Link crawl + page checks")
+    external = set()
     for who, email in [("visitor", None), ("student", "demo.maya@uw.edu"), ("admin", "demo.jordan@uw.edu")]:
-        pages, bad = crawl(app, password, who, email)
-        print(f"{who:>8}: {pages} pages, {len(bad)} broken {bad[:5] if bad else ''}")
+        pages, bad = crawl(app, password, who, email, external)
+        print(f"{who:>8}: {pages} pages, {len(bad)} problems")
+        for problem in bad[:15]:
+            print("   ", problem)
         ok &= not bad
     print("\n== 4. Junk-input test")
     app, password = fresh_app()
@@ -176,6 +231,13 @@ def main():
     for crash in crashes[:20]:
         print("  ", crash)
     ok &= not crashes
+    if "--external" in sys.argv:
+        print(f"\n== 5. External links ({len(external)})")
+        dead = check_external(external)
+        for link in dead:
+            print("   ", link)
+        print(f"{len(dead)} dead")
+        ok &= not dead
     print("\nALL CHECKS PASSED" if ok else "\nSOMETHING FAILED (see above)")
     sys.exit(0 if ok else 1)
 
