@@ -138,3 +138,9 @@ MAIL_SERVER, MAIL_PORT (default 587), MAIL_USERNAME, MAIL_PASSWORD, MAIL_FROM
 - [ ] Intramural (IM) team pages
 - [ ] Reliability ratings (did people show up?)
 - [ ] Usage stats: sign-ups, games played, club members found
+
+## Copyright
+
+© 2026 Aybars Kuloglu. **All rights reserved.** This code is public so people can see my work,
+but it may not be copied, modified, or used in other projects without my written permission.
+See [LICENSE](LICENSE).
