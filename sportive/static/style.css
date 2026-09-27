@@ -42,6 +42,8 @@
 
 /* ============================== Base ============================== */
 * { box-sizing: border-box; }
+/* Anything marked hidden stays hidden, even if a class gives it display: grid/flex. */
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--text);
@@ -205,7 +207,6 @@ body.hide-tabs { padding-bottom: 0; }
 .home-tabs a.is-on, .tab-list button.is-on { color: var(--text); border-bottom-color: var(--text); }
 .home-tabs a:hover { text-decoration: none; color: var(--text); }
 .tab-panel { outline: none; }
-.tab-panel[hidden] { display: none; }
 
 /* ============================== Cards, lists, rows ============================== */
 .card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
@@ -263,7 +264,6 @@ section.card h2, details.card h2 { margin-top: 0; }
 .lead { font-size: 1.05rem; color: var(--muted); max-width: 540px; }
 .welcome-help { display: flex; justify-content: space-between; align-items: center; gap: 10px;
   margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; background: var(--accent-soft); font-size: .9rem; }
-.welcome-help[hidden] { display: none; }
 .welcome-help .link-button { color: var(--muted); }
 .now-row { display: flex; gap: 16px; overflow-x: auto; padding: 4px 2px 12px; margin: 0 0 4px;
   scrollbar-width: none; scroll-snap-type: x mandatory; }
@@ -332,7 +332,6 @@ details.card.fold { padding: 4px 16px; }
 
 /* step-by-step forms */
 .wizard-step { display: grid; gap: 14px; }
-.wizard-step[hidden], .wizard-nav[hidden], [data-wizard-submit][hidden] { display: none; }
 .wizard-progress { display: grid; gap: 6px; }
 .wizard-bar { height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
 .wizard-bar span { display: block; height: 100%; background: var(--purple); transition: width .25s ease; }

@@ -358,6 +358,11 @@ def host_too_big(world, host, n):
     host_game(world, host, max_players=str(n))
 
 
+@when(parsers.parse('"{host}" hosts a Casual basketball game with {n:d} tryout spots'))
+def casual_with_tryouts(world, host, n):
+    host_game(world, host, skill_level="Casual", tryout_spots=str(n))
+
+
 @when(parsers.parse('"{host}" tries to host a Competitive basketball game'))
 def host_competitive(world, host):
     host_game(world, host, skill_level="Competitive")
@@ -371,11 +376,11 @@ def need_players(world, host, n):
         "starts_in": "15", "duration": "60", "needed": str(n), "have": "4"}), person.client)
 
 
-@when(parsers.re(r'"(?P<host>[^"]+)" posts that she needs (?P<n>\d+) more Intermediate players? for soccer '
-                 r'(?:with (?P<tryouts>\d+) tryout spots?|(?P<no_plus_ones>without \+1s))'))
-def need_ranked_players(world, host, n, tryouts, no_plus_ones):
+@when(parsers.re(r'"(?P<host>[^"]+)" posts that she needs (?P<n>\d+) more (?P<level>Intermediate|Casual) players? '
+                 r'for soccer (?:with (?P<tryouts>\d+) tryout spots?|(?P<no_plus_ones>without \+1s))'))
+def need_ranked_players(world, host, n, level, tryouts, no_plus_ones):
     person = world.person(host)
-    data = {"sport": "soccer", "location": "Denny Field", "skill_level": "Intermediate", "starts_in": "15",
+    data = {"sport": "soccer", "location": "Denny Field", "skill_level": level, "starts_in": "15",
             "duration": "60", "needed": n, "have": "4", "tryout_spots": tryouts or "0"}
     if not no_plus_ones:
         data["allow_plus_ones"] = "1"

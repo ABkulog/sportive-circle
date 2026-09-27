@@ -96,6 +96,9 @@
   const update = () => {
     const ranked = ["Intermediate", "Competitive"].includes(level.value);
     fields.forEach((field) => { field.hidden = !ranked; });
+    // Casual / All levels games are open to everyone, so they never have tryout spots.
+    const tryouts = level.form.querySelector('select[name="tryout_spots"]');
+    if (tryouts && !ranked) tryouts.value = "0";
     if (hint) hint.textContent = ranked ? "" : "Tryout spots and +1s are for Intermediate and Competitive games.";
   };
   level.addEventListener("change", update);

@@ -50,3 +50,10 @@ Feature: Ranks
     When "Maya" posts that she needs 2 more Intermediate players for soccer with 0 tryout spots
     And "Maya" opens Maya's game
     Then they see "Bring a friend"
+
+  @FR-RANK-4
+  Scenario: Casual and All levels games can't have tryout spots
+    When "Maya" hosts a Casual basketball game with 2 tryout spots
+    Then they see "Tryout spots are only for Intermediate and Competitive games"
+    When "Maya" posts that she needs 2 more Casual players for soccer with 1 tryout spot
+    Then they see "Tryout spots are only for Intermediate and Competitive games"

@@ -1233,7 +1233,9 @@ def test_tryout_spots(accounts, client, app):
 
 def test_tryout_spots_only_for_ranked_games(accounts, client, app):
     accounts.signup()
-    event_id = event_id_from(client.post("/events/new", data=event_form(skill_level="Casual", tryout_spots="2")))
+    page = client.post("/events/new", data=event_form(skill_level="Casual", tryout_spots="2")).data
+    assert b"Tryout spots are only for Intermediate and Competitive games" in page
+    event_id = event_id_from(client.post("/events/new", data=event_form(skill_level="Casual", tryout_spots="0")))
     with app.app_context():
         assert get_db().execute("SELECT tryout_spots FROM events WHERE id = ?", (event_id,)).fetchone()[0] == 0
 
@@ -1945,3 +1947,10 @@ def test_skill_level_options_have_fixed_values(accounts, client):
         for level in ("All levels", "Casual", "Intermediate", "Competitive"):
             assert f'<option value="{level}"' in html, (page, level)
     assert 'name="tryout_spots"' in client.get("/need-players").data.decode()
+
+
+def test_hidden_always_hides():
+    """Fields hidden by JavaScript (like tryout spots on Casual games) must really disappear,
+    even when their class sets display: grid or flex."""
+    import pathlib
+    assert "[hidden] { display: none !important; }" in pathlib.Path("sportive/static/style.css").read_text()

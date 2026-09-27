@@ -107,7 +107,11 @@ def read_ranked_options(form, skill_level):
     tryout_raw = form.get("tryout_spots", "0").strip() or "0"
     if not tryout_raw.isdigit() or int(tryout_raw) > MAX_TRYOUT_SPOTS:
         return 0, 1, f"Tryout spots can be 0 to {MAX_TRYOUT_SPOTS}."
-    tryout_spots = int(tryout_raw) if skill_level in LEVEL_REQUIREMENT else 0
+    tryout_spots = int(tryout_raw)
+    if tryout_spots and skill_level not in LEVEL_REQUIREMENT:
+        # Tryouts let lower-ranked players into a harder game. Casual and All levels games
+        # are already open to everyone, so there's nothing to try out for.
+        return 0, 1, "Tryout spots are only for Intermediate and Competitive games. Everyone can join this one."
     return tryout_spots, 1 if form.get("allow_plus_ones") else 0, None
 
 
