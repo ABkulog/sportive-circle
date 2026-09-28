@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Club requests{% endblock %}
 {% block content %}
+{% from "_macros.html" import admin_nav %}{{ admin_nav('clubs') }}
 <h1 class="page-title">Club requests</h1>
 <p class="muted">Check each club's official page: is it a real UW club, active this quarter, and is the applicant listed
   as an officer (or can you confirm it another way)?</p>

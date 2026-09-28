@@ -2267,3 +2267,29 @@ def test_admins_get_the_team_badge_and_label(accounts, client, app):
     accounts.login(email="boss@uw.edu")
     page = client.get(f"/u/{boss}").data.decode()
     assert "🐾 Team" not in page and "Sportive Circle Team" not in page
+
+
+def test_suggestion_text_is_escaped_and_length_checked(accounts, client, app):
+    accounts.signup()
+    assert b"5 to 2000 characters" in client.post("/suggestions", data={"kind": "idea", "body": "hi"},
+                                                  follow_redirects=True).data
+    client.post("/suggestions", data={"kind": "bug", "body": "<script>alert(1)</script> broken"})
+    app.config["ADMIN_EMAILS"] = "dubs@uw.edu"
+    page = client.get("/admin/suggestions").data.decode()
+    assert "<script>alert(1)</script>" not in page and "&lt;script&gt;" in page
+    assert "🐞" in client.get("/admin/suggestions?kind=bug").data.decode()
+
+
+def test_admins_see_a_count_of_new_suggestions(accounts, client, app):
+    accounts.signup(email="boss@uw.edu")
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    client.get("/admin/suggestions")                                   # nothing new yet
+    accounts.logout()
+    accounts.signup(email="fan@uw.edu")
+    client.post("/suggestions", data={"kind": "idea", "body": "More spikeball nets please"})
+    accounts.logout()
+    accounts.login(email="boss@uw.edu")
+    assert "💡 Suggestions (1 new)" in client.get("/admin/reports").data.decode()
+    client.get("/admin/suggestions")
+    assert "(1 new)" not in client.get("/admin/reports").data.decode()
+    assert "Suggestions</a>" in client.get("/terms").data.decode()      # footer link on every page

@@ -738,3 +738,8 @@ details.card.fold { border: 0; border-top: 1px solid var(--line); border-bottom:
   background: var(--purple); color: var(--spirit-gold); font: 700 .72rem/1.4 var(--font); letter-spacing: .02em;
   vertical-align: middle; white-space: nowrap; }
 h1 .team-pill { font-size: .78rem; margin-left: 4px; }
+.suggestion-body { white-space: pre-line; overflow-wrap: anywhere; }
+.suggestion-list { gap: 10px; }
+.admin-nav { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 14px; font-size: .88rem; font-weight: 600; }
+.admin-nav a { padding: 6px 0; color: var(--muted); }
+.admin-nav a[aria-current] { color: var(--text); text-decoration: underline; text-underline-offset: 4px; }

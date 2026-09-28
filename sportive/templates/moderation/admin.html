@@ -7,6 +7,7 @@
   </form>
 {% endmacro %}
 {% block content %}
+{% from "_macros.html" import admin_nav %}{{ admin_nav('reports') }}
 <h1 class="page-title">Reports</h1>
 <p class="muted">Read the saved copy, decide, then mark it reviewed. Suspend an account only for serious or repeated
   problems (threats, harassment, hate, spam). If someone may be in danger, contact UW Police (911 in an emergency).</p>

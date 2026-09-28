@@ -63,7 +63,8 @@ def logged_in(app, password, email=None):
 START = ["/", "/how-it-works", "/privacy", "/terms", "/clubs", "/news", "/create", "/me/events", "/friends",
          "/friends?q=ma", "/messages", "/profile/edit", "/profile/badges", "/profile/notifications", "/profile/photo",
          "/clubs/updates", "/admin/reports", "/admin/clubs", "/u/1", "/u/2", "/events/new", "/need-players",
-         "/clubs/new", "/signup", "/login", "/forgot"]
+         "/clubs/new", "/signup", "/login", "/forgot", "/suggestions", "/admin/suggestions",
+         "/admin/suggestions?kind=bug"]
 SKIP = ("/logout", "/static/", "/u/", "photo")
 
 
@@ -147,6 +148,7 @@ FIELDS = {
     "/report/user/2": ["reason", "details", "block"],
     "/admin/clubs/1/reject": ["note"],
     "/profile/photo/remove": [],
+    "/suggestions": ["kind", "body", "anonymous"],
     "/profile/notifications": ["messages_badge", "messages_screen", "news_badge", "club_updates_screen", "bogus_kind_badge"],
     "/admin/users/3/suspend": [],
 }

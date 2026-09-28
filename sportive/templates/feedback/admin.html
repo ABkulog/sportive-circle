@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Suggestions{% endblock %}
+{% block content %}
+{% from "_macros.html" import admin_nav %}{{ admin_nav('suggestions') }}
+<h1 class="page-title">Suggestions</h1>
+<p class="muted">What students would like to see. Only admins can see this page.</p>
+<nav class="home-tabs" aria-label="Filter suggestions">
+  <a href="{{ url_for('feedback.admin_suggestions') }}" {% if not kind %}class="is-on" aria-current="page"{% endif %}>All</a>
+  {% for key, label in kinds.items() %}
+    <a href="{{ url_for('feedback.admin_suggestions', kind=key) }}" {% if kind == key %}class="is-on" aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>
+<div class="stack suggestion-list">
+  {% for s in suggestions %}
+    <article class="card report-card">
+      <div class="report-head">
+        <span class="badge">{{ kinds.get(s.kind, s.kind) }}</span>
+        {% if s.id > last_seen %}<span class="badge badge-gold">New</span>{% endif %}
+        <span class="muted">{{ s.created_at|when }}</span>
+      </div>
+      <p class="suggestion-body">{{ s.body }}</p>
+      <p class="muted">
+        {% if s.anonymous %}Anonymous
+        {% elif s.full_name %}From <a href="{{ url_for('profile.view', user_id=s.user_id) }}">{{ s.full_name }}</a> ({{ s.email }})
+        {% else %}From a deleted account{% endif %}
+      </p>
+    </article>
+  {% else %}
+    <div class="card empty"><p class="empty-emoji" aria-hidden="true">💡</p><p><strong>No suggestions yet.</strong></p></div>
+  {% endfor %}
+</div>
+{% endblock %}

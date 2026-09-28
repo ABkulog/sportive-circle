@@ -131,3 +131,12 @@
     </span>
   </li>
 {% endmacro %}
+
+{% macro admin_nav(active) %}
+  {# Admin pages link to each other, so admins on phones (no sidebar) can reach them all from the shield icon. #}
+  <nav class="admin-nav" aria-label="Admin">
+    <a href="{{ url_for('moderation.admin_reports') }}" {% if active == 'reports' %}aria-current="page"{% endif %}>🛡️ Reports{% set n = open_report_count() %}{% if n %} ({{ n }}){% endif %}</a>
+    <a href="{{ url_for('clubs.review_queue') }}" {% if active == 'clubs' %}aria-current="page"{% endif %}>🚩 Club requests{% set n = pending_club_count() %}{% if n %} ({{ n }}){% endif %}</a>
+    <a href="{{ url_for('feedback.admin_suggestions') }}" {% if active == 'suggestions' %}aria-current="page"{% endif %}>💡 Suggestions{% set n = new_suggestion_count() %}{% if n %} ({{ n }} new){% endif %}</a>
+  </nav>
+{% endmacro %}

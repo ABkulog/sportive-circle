@@ -66,6 +66,11 @@ class World:
     def text(self):
         return html.unescape(self.response.get_data(as_text=True))
 
+    def visible_text(self):
+        """What a person reads: tags removed, spaces collapsed ("From <a>Maya</a>" -> "From Maya")."""
+        page = re.sub(r"<script.*?</script>|<style.*?</style>", " ", self.response.get_data(as_text=True), flags=re.S)
+        return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", page)).split())
+
 
 @pytest.fixture
 def world(app):
@@ -536,12 +541,12 @@ def visitor_home(world):
 
 @then(parsers.parse('they see "{text}"'))
 def they_see(world, text):
-    assert text in world.text()
+    assert text in world.text() or text in world.visible_text()
 
 
 @then(parsers.parse('they don\'t see "{text}"'))
 def they_dont_see(world, text):
-    assert text not in world.text()
+    assert text not in world.text() and text not in world.visible_text()
 
 
 @then(parsers.parse('no account exists for "{email}"'))
@@ -765,3 +770,32 @@ def post_update(world, officer, text):
 @when(parsers.parse('"{name}" opens Club updates'))
 def open_club_updates(world, name):
     world.person(name).client.get("/clubs/updates")
+
+
+# ------------------------------------------------------------------ suggestions
+
+@when(parsers.re(r'"(?P<name>[^"]+)" sends the (?P<anonymous>anonymous )?suggestion "(?P<text>[^"]+)"'))
+def send_suggestion(world, name, anonymous, text):
+    person = world.person(name)
+    data = {"kind": "idea", "body": text}
+    if anonymous:
+        data["anonymous"] = "1"
+    world.saw(person.client.post("/suggestions", data=data, follow_redirects=True), person.client)
+
+
+@when(parsers.parse('"{name}" sends {n:d} suggestions in a row'))
+def send_many_suggestions(world, name, n):
+    for i in range(n):
+        send_suggestion(world, name, None, f"Idea number {i + 1}")
+
+
+@when(parsers.parse('"{name}" opens the suggestions page for admins'))
+def open_admin_suggestions(world, name):
+    person = world.person(name)
+    world.saw(person.client.get("/admin/suggestions"), person.client)
+
+
+@when("a visitor opens the suggestions page")
+def visitor_suggestions(world):
+    client = world.app.test_client()
+    world.saw(client.get("/suggestions", follow_redirects=True), client)

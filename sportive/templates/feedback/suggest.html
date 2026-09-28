@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Suggestions{% endblock %}
+{% block content %}
+<div class="card form-card">
+  <h1>Got an idea?</h1>
+  <p class="muted">Tell us what would make Sportive Circle better, or what's not working. The Sportive Circle team
+    reads every one.</p>
+  <form method="post" class="form">
+    {{ csrf_field() }}
+    <fieldset class="field">
+      <legend>What's it about?</legend>
+      <div class="choice-pills">
+        {% for key, label in kinds.items() %}
+          <label class="choice-pill"><input type="radio" name="kind" value="{{ key }}" required
+                 {% if form.get('kind', 'idea') == key %}checked{% endif %}><span>{{ label }}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <label class="field"><span>Your suggestion</span>
+      <textarea name="body" rows="5" minlength="5" maxlength="{{ max_length }}" required
+                placeholder="It would be great if…">{{ form.get('body', '') }}</textarea></label>
+    <label class="toggle">
+      <input type="checkbox" name="anonymous" value="1" {% if form.get('anonymous') %}checked{% endif %}>
+      <span>Send anonymously <em>(the team won't see your name)</em></span>
+    </label>
+    <button class="btn btn-block">Send suggestion</button>
+  </form>
+  <p class="muted fine-print">To report a person or a message, use 🚩 Report on their profile or message instead.</p>
+</div>
+{% endblock %}

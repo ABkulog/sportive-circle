@@ -94,6 +94,17 @@ def start_markers(user_id):
         _set_marker(user_id, kind, _latest(kind))
 
 
+def seen_value(kind):
+    """The logged-in person's "last looked" marker for any kind (None if they never looked)."""
+    return _marker(g.user["id"], kind) if g.get("user") is not None else None
+
+
+def mark_seen_value(kind, value):
+    if g.get("user") is not None:
+        _set_marker(g.user["id"], kind, value)
+        get_db().commit()
+
+
 def _since(user_id, kind):
     """The marker. Accounts made before notifications existed get one on first use."""
     value = _marker(user_id, kind)
