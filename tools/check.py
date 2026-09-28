@@ -130,7 +130,7 @@ FIELDS = {
     "/signup": ["full_name", "email", "password", "password2", "grad_year", "birth_date", "sports"],
     "/login": ["email", "password", "next"],
     "/forgot": ["email"],
-    "/events/new": ["title", "sport", "location", "skill_level", "starts_at", "ends_at", "players", "outside", "note",
+    "/events/new": ["title", "sport", "location", "skill_level", "starts_at", "ends_at", "players", "note",
                     "club", "is_private", "password", "team_size", "reserve", "repeat", "open_to"],
     "/clubs/1/logo/edit": ["logo", "remove"],
     "/events/2/join": ["password", "next"],
@@ -139,7 +139,7 @@ FIELDS = {
     "/events/2/invite/3/cancel": [],
     "/events/1/requests/3/approve": [],
     "/events/1/requests/3/decline": [],
-    "/need-players": ["sport", "location", "skill_level", "starts_in", "duration", "players", "outside", "note",
+    "/need-players": ["sport", "location", "skill_level", "starts_in", "duration", "players", "note",
                       "is_private", "password", "team_size", "reserve"],
     "/events/2/edit": ["title", "sport", "location", "skill_level", "starts_at", "ends_at", "players", "note"],
     "/profile/edit": ["full_name", "grad_year", "bio", "sports", "pronouns", "gender", "instagram", "snapchat",
@@ -174,7 +174,7 @@ ODD_URLS = ["/events/999999", "/events/0/join", "/clubs/999999", "/u/999999", "/
             "/friends/request/999999",
             "/block/999999", "/reset", "/verify", "/profile/notifications",
             "/admin/users/1/explode", "/admin/users/1/tester/explode", "/clubs/999999/share", "/clubs/999999/qr.svg", "/clubs/999999/roster.csv",
-            "/clubs/999999/logo", "/clubs/1/logo/edit", "/clubs/1/roster.csv", "/events/new?club=1", "/events/1/requests/3/explode", "/admin/users/999999/tester/give", "/admin/users/99999999999999999999/suspend"]
+            "/clubs/999999/logo", "/join/nonsense", "/join/WzEsIDJd.bad", "/clubs/1/logo/edit", "/clubs/1/roster.csv", "/events/new?club=1", "/events/1/requests/3/explode", "/admin/users/999999/tester/give", "/admin/users/99999999999999999999/suspend"]
 
 
 def junk_test(app, password):

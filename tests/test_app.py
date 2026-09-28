@@ -191,11 +191,11 @@ def test_quick_post_counts_existing_players(accounts, client):
     accounts.signup()
     response = client.post("/need-players", data={
         "sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
-        "starts_in": "15", "duration": "60", "players": "10", "outside": "7",
+        "starts_in": "15", "duration": "60", "players": "3",
     })
     page = client.get(f"/events/{event_id_from(response)}").data
     assert b"Need 2 more for Soccer" in page
-    assert b"8 going of 10" in page
+    assert b"1 going of 3" in page
     assert "<strong>Up next</strong>" in client.get("/").data.decode()   # the poster sees their own game once
     accounts.logout()
     accounts.signup(email="someone.else@uw.edu")
@@ -233,7 +233,7 @@ def test_quick_post_title_counts_down_and_start_is_rounded(accounts, client, app
     accounts.signup(email="host@uw.edu")
     event_id = event_id_from(client.post("/need-players", data={
         "sport": "basketball", "location": "IMA (Intramural Activities Building)", "skill_level": "All levels",
-        "starts_in": "15", "duration": "60", "players": "10", "outside": "7",
+        "starts_in": "15", "duration": "60", "players": "3",
     }))
     with app.app_context():
         starts_at = get_db().execute("SELECT starts_at FROM events WHERE id = ?", (event_id,)).fetchone()[0]
@@ -310,7 +310,7 @@ def test_ended_quick_post_title(accounts, client, app):
     accounts.signup()
     event_id = event_id_from(client.post("/need-players", data={
         "sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
-        "starts_in": "0", "duration": "30", "players": "5", "outside": "1",
+        "starts_in": "0", "duration": "30", "players": "4",
     }))
     with app.app_context():
         db = get_db()
@@ -480,7 +480,7 @@ def test_sport_can_only_be_played_at_its_places(accounts, client):
     assert b"Basketball can&#39;t be played at Burke-Gilman Trail" in page
     quick = client.post("/need-players", data={
         "sport": "rowing", "location": "Denny Field", "skill_level": "All levels",
-        "starts_in": "15", "duration": "60", "players": "4", "outside": "1",
+        "starts_in": "15", "duration": "60", "players": "3",
     }).data
     assert b"Rowing / Kayaking can&#39;t be played at Denny Field" in quick
 
@@ -504,7 +504,7 @@ def test_quick_post_player_cap(accounts, client):
     accounts.signup()
     page = client.post("/need-players", data={
         "sport": "tennis", "location": "IMA North Tennis Courts", "skill_level": "All levels",
-        "starts_in": "15", "duration": "60", "players": "5", "outside": "2",
+        "starts_in": "15", "duration": "60", "players": "5",
     }).data
     assert b"Tennis games can have 2 to 4 players." in page
 
@@ -1547,7 +1547,7 @@ def test_need_players_chat_opens(accounts, client):
     accounts.signup()
     response = client.post("/need-players", data={
         "sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
-        "starts_in": "15", "duration": "60", "players": "10", "outside": "7"})
+        "starts_in": "15", "duration": "60", "players": "3"})
     event_id = event_id_from(response)
     page = client.get(f"/events/{event_id}/chat")
     assert page.status_code == 200 and b"Need 2 more for Soccer" in page.data
@@ -1878,7 +1878,7 @@ def test_suspended_profiles_are_hidden_from_students(accounts, client, app):
 def test_chat_title_uses_the_live_need_players_title(accounts, client):
     accounts.signup()
     response = client.post("/need-players", data={"sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
-                                                  "starts_in": "15", "duration": "60", "players": "8", "outside": "4"})
+                                                  "starts_in": "15", "duration": "60", "players": "4"})
     page = client.get(f"/events/{event_id_from(response)}/chat").data.decode()
     assert "<title>Chat · Need 3 more for Soccer" in page
 
@@ -2539,14 +2539,14 @@ def test_host_reserves_spots_while_creating_a_game(accounts, client, app):
     # Need players: "need 2", one reserved for Sam, so the post says Need 1 more.
     _as(accounts, "Maya")
     quick = client.post("/need-players", data={"sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
-                                               "starts_in": "15", "duration": "60", "players": "6", "outside": "3",
+                                               "starts_in": "15", "duration": "60", "players": "3",
                                                "reserve": [ids["Sam"]]})
     quick_id = event_id_from(quick)
     assert "Need 1 more for Soccer" in client.get(f"/events/{quick_id}").data.decode()
     # Can't reserve more than there's room for, or for people who aren't friends.
     too_many = client.post("/need-players", data={"sport": "soccer", "location": "Denny Field",
                                                   "skill_level": "All levels", "starts_in": "15", "duration": "60",
-                                                  "players": "5", "outside": "3", "reserve": [ids["Jordan"], ids["Sam"]]},
+                                                  "players": "2", "reserve": [ids["Jordan"], ids["Sam"]]},
                            follow_redirects=True)
     assert b"only room to reserve 1 spot" in too_many.data
     stranger = client.post("/events/new", data=event_form(title="Other", reserve=[ids["Stranger"]]),
@@ -2559,7 +2559,7 @@ def test_need_players_can_be_private_or_team_vs_team(accounts, client, app):
     _friends(app, ids["Maya"], ids["Mo"])
     _as(accounts, "Maya")
     base = {"sport": "basketball", "location": "IMA (Intramural Activities Building)", "skill_level": "All levels",
-            "starts_in": "15", "duration": "60", "players": "5", "outside": "2"}
+            "starts_in": "15", "duration": "60", "players": "3"}
     private = event_id_from(client.post("/need-players", data={**base, "is_private": "1", "password": "hoops4"}))
     team = event_id_from(client.post("/need-players", data={**base, "team_size": "3", "reserve": [ids["Mo"]]}))
     _as(accounts, "Sam")
@@ -2607,7 +2607,7 @@ def test_create_page_only_shows_what_makes_sense(accounts, client, app):
         row = get_db().execute("SELECT max_players, extra_players, skill_level FROM events WHERE id = ?", (game,)).fetchone()
         assert tuple(row) == (14, 0, "All levels")                               # soccer's usual size
     page = client.get(f"/events/{game}").data.decode()
-    assert "Private soccer game" in page and "Share invite" in page and "Password: dawgs1234" in page  # in the invite text
+    assert "Private soccer game" in page and "Send invite link" in page and "dawgs1234" in page  # host sees the password
     # Not a call to everyone: strangers don't get it up top or as a Need players notification.
     _as(accounts, "Sam")
     feed = client.get("/?scope=all").data.decode()
@@ -2615,7 +2615,7 @@ def test_create_page_only_shows_what_makes_sense(accounts, client, app):
     assert f"/events/{game}" not in happening_soon
     assert f"/events/{game}" in feed and "🔒 Private" in feed                           # listed, with a lock
     assert "Need players" not in client.get("/notifications").data.decode()
-    assert "Share invite" not in client.get(f"/events/{game}").data.decode()              # not a player
+    assert "Send invite link" not in client.get(f"/events/{game}").data.decode()          # not a player
     # Jordan was invited: joins with one tap, no password.
     _as(accounts, "Jordan")
     assert b"You&#39;re in" in client.post(f"/events/{game}/invite/answer", data={"answer": "yes"},
@@ -2627,7 +2627,7 @@ def test_new_private_event_needs_no_skill_level(accounts, client):
     data = event_form(is_private="1", password="dawgs1234")
     del data["skill_level"]                     # hidden (and switched off) for private games
     response = client.post("/events/new", data=data, follow_redirects=True).data.decode()
-    assert "Your private game is up!" in response and "Share invite" in response
+    assert "Your private game is up!" in response and "Send invite link" in response
 
 
 def test_picking_friends_counts_them_once_not_as_extra_spots(accounts, client, app):
@@ -2644,19 +2644,16 @@ def test_picking_friends_counts_them_once_not_as_extra_spots(accounts, client, a
         assert tuple(row) == (10, 0)                             # still 10 players, nothing added on top
     page = client.get(f"/events/{game}").data.decode()
     assert "Need 8 more for Basketball" in page and "8 spots left" in page
-    # Friends who aren't on the app count too: Players 4, 1 app friend + 1 not on the app -> need 1.
+    # Players 3 = you + your app friend + 1 more.
     small = event_id_from(client.post("/need-players", data={
         "sport": "tennis", "location": "IMA South Tennis Courts", "skill_level": "All levels",
-        "starts_in": "30", "duration": "60", "players": "4", "outside": "1", "reserve": [ids["Jordan"]]}))
+        "starts_in": "30", "duration": "60", "players": "3", "reserve": [ids["Jordan"]]}))
     assert "Need 1 more for Tennis" in client.get(f"/events/{small}").data.decode()
     # Everyone already coming: nothing to post.
     full = client.post("/need-players", data={
         "sport": "tennis", "location": "IMA South Tennis Courts", "skill_level": "All levels",
         "starts_in": "30", "duration": "60", "players": "2", "reserve": [ids["Jordan"]]}, follow_redirects=True)
     assert b"Everyone&#39;s already coming" in full.data
-    # More friends than players is refused on both forms.
-    too_many = client.post("/events/new", data=event_form(players="2", outside="2"), follow_redirects=True)
-    assert b"more people than players" in too_many.data
 
 
 def test_players_dropdown_follows_the_sport(accounts, client):
@@ -2877,3 +2874,66 @@ def test_each_notification_shows_in_one_place(accounts, client, app):
     settings = client.get("/settings/notifications").data.decode()
     assert settings.count('class="switch"') == 9          # club requests (officers) and trends (admins) hidden
     assert "Shows on the ✉️ icon" in settings and "Shows on the 🔔 bell" in settings
+
+
+def _invite_path(page):
+    return re.search(r'data-share-url="https?://[^/"]+(/join/[^"]+)"', page).group(1)
+
+
+def test_invite_link_signs_up_a_new_friend_and_puts_them_in_the_game(accounts, client, app):
+    """Feedback: 'AB wants you in their game. Click here to sign up', and after signing up you're in the game."""
+    accounts.signup(email="maya@uw.edu", name="Maya Chen")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Friday hoops", is_private="1",
+                                                                     password="dawgs1234")))
+    page = client.get(f"/events/{game}").data.decode()
+    assert "Maya wants you in their Sportive Circle game: Friday hoops" in page
+    link = _invite_path(page)
+    accounts.logout()
+    landing = client.get(link).data.decode()
+    assert "Maya wants you in their game" in landing and "Friday hoops" in landing and "Sign up and join" in landing
+    client.post("/signup", data={"full_name": "New Friend", "email": "new@uw.edu", "password": "purple-and-gold",
+                                 "password2": "purple-and-gold", "birth_date": "2005-01-15"})
+    done = client.post("/verify", data={"code": accounts.code_for("new@uw.edu")})
+    assert done.headers["Location"] == f"/events/{game}"
+    new = _user_id(app, "new@uw.edu")
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (game, new)).fetchone()  # in!
+        assert db.execute("SELECT status FROM friendships").fetchone()[0] == "accepted"
+    accounts.upload_photo()                                   # the photo step, then back to the game
+    assert "You're going" in client.get(f"/events/{game}").data.decode()
+    accounts.logout()
+    accounts.login(email="maya@uw.edu")
+    assert "New joined from your link and is in Friday hoops" in client.get("/notifications").data.decode()
+
+
+def test_invite_link_for_people_who_already_have_an_account(accounts, client, app):
+    accounts.signup(email="maya@uw.edu", name="Maya Chen")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    link = _invite_path(client.get(f"/events/{game}").data.decode())
+    accounts.logout()
+    accounts.signup(email="old@uw.edu", name="Old Timer")        # logged in: the link just puts them in
+    assert client.get(link).headers["Location"] == f"/events/{game}"
+    old = _user_id(app, "old@uw.edu")
+    with app.app_context():
+        assert get_db().execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (game, old)).fetchone()
+    accounts.logout()
+    accounts.signup(email="later@uw.edu", name="Later Gator")
+    accounts.logout()
+    client.get(link)                                              # logged out: "I have an account" -> log in
+    assert accounts.login(email="later@uw.edu").headers["Location"] == f"/events/{game}"
+    # A made-up or edited link does nothing.
+    assert b"doesn&#39;t work anymore" in client.get("/join/WzEsIDJd.forged", follow_redirects=True).data
+
+
+def test_invite_friends_to_the_app_makes_you_friends(accounts, client, app):
+    accounts.signup(email="maya@uw.edu", name="Maya Chen")
+    link = _invite_path(client.get("/friends").data.decode())
+    assert "Invite friends to Sportive Circle" in client.get("/friends").data.decode()
+    accounts.logout()
+    assert "Maya wants you on Sportive Circle" in client.get(link).data.decode()
+    client.post("/signup", data={"full_name": "Pal Friend", "email": "pal@uw.edu", "password": "purple-and-gold",
+                                 "password2": "purple-and-gold", "birth_date": "2005-01-15"})
+    client.post("/verify", data={"code": accounts.code_for("pal@uw.edu")})
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM friendships").fetchone()[0] == "accepted"

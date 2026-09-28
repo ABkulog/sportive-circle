@@ -11,7 +11,6 @@
   const placeholder = location.options[0];
   const everyPlace = Array.from(location.options).slice(1).map((option) => option.value);
   const players = form.querySelector("[data-players]");
-  const outside = form.querySelector('input[name="outside"]');
   const placeTip = form.querySelector("[data-place-tip]");
   let lastSport = sport.value;
 
@@ -33,7 +32,6 @@
     for (let n = 2; n <= rule.max; n += 1) options.push(new Option(String(n), String(n), false, String(n) === keep));
     players.replaceChildren(...options);
     if (!players.value) players.value = String(rule.default);
-    if (outside) outside.max = rule.max;
     lastSport = sport.value;
   }
 
@@ -58,7 +56,6 @@
   const math = form && form.querySelector("[data-player-math]");
   if (!math) return;
   const players = form.querySelector("[data-players]");
-  const outside = form.querySelector('input[name="outside"]');
   const teamSize = form.querySelector("[data-team-size]");
   const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -71,12 +68,10 @@
         + (mine > team ? ` · that's ${mine - team} too many` : "");
       return;
     }
-    const extra = outside && !outside.disabled ? Math.max(parseInt(outside.value, 10) || 0, 0) : 0;
     const total = parseInt(players && players.value, 10) || 0;
-    const coming = 1 + friends + extra;
+    const coming = 1 + friends;
     let text = "You";
     if (friends) text += ` + ${plural(friends, "friend")}`;
-    if (extra) text += ` + ${extra} not on the app`;
     text += ` = ${coming} of ${total}`;
     const need = total - coming;
     text += need > 0 ? ` · need ${need} more` : need === 0 ? " · full" : ` · that's ${-need} too many`;

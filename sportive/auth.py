@@ -95,6 +95,7 @@ def safe_next(target):
 
 def log_in(user):
     after = session.get("after_login")  # e.g. a shared event link they opened before signing up
+    invite = session.get("invite_link")  # a friend's "you're in my game" link
     session.clear()
     session.permanent = True  # stay logged in on your phone (see PERMANENT_SESSION_LIFETIME)
     session["user_id"] = user["id"]
@@ -105,6 +106,11 @@ def log_in(user):
         today = now_local().date()
         if is_birthday(born, today):
             flash(f"Happy birthday, {user['full_name'].split()[0]}! 🎂", "birthday")
+    if invite:
+        from .parties import accept_invite_link  # imported here: parties.py imports this module
+        destination = accept_invite_link(user, invite)
+        if destination:
+            return destination
     return safe_next(after)
 
 

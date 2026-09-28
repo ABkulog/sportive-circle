@@ -353,7 +353,7 @@ def need_players(world, host, n):
     person = world.person(host)
     world.saw(person.client.post("/need-players", data={
         "sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
-        "starts_in": "15", "duration": "60", "players": str(4 + n), "outside": "3"}), person.client)
+        "starts_in": "15", "duration": "60", "players": str(1 + n)}), person.client)
 
 
 @when(parsers.re(r'"(?P<viewer>[^"]+)" opens (?P<host>\w+)\'s game'))

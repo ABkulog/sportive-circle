@@ -61,19 +61,21 @@
       {% elif event.i_am_going %}
         <span class="going-pill">You're going</span>
       {% endif %}
-      {% if event.is_private and event.i_am_going %}
-        {# Private game: getting people in is the next thing to do, so it's right here. #}
-        {% set invite_text = "Join my game on Sportive Circle: " ~ event_title(event) ~ ", " ~ (event.starts_at|when) ~ ". Password: " ~ event.password %}
+      {% if event.i_am_going %}
+        {# Bringing friends is the next thing to do, so it's right here: one link for anyone (it signs up friends
+           who aren't on the app and puts them in), and the in-app picker for friends who are. #}
+        {% set first = g.user.full_name.split()[0] %}
+        {% set invite_text = first ~ " wants you in their Sportive Circle game: " ~ event_title(event) ~ ", " ~ (event.starts_at|when) ~ ". Tap to sign up and you're in." %}
         <div class="share-box">
-          <p><strong>🔒 Private game</strong> · Password <strong class="password">{{ event.password }}</strong></p>
+          {% if event.is_private %}<p><strong>🔒 Private game</strong> · Password <strong class="password">{{ event.password }}</strong></p>{% endif %}
           <div class="action-pair">
-            <button type="button" class="btn" data-share-title="{{ event_title(event) }}" data-share-url="{{ share_url }}"
-                    data-share-text="{{ invite_text }}"><span data-share-label>Share invite</span></button>
+            <button type="button" class="btn" data-share-title="{{ event_title(event) }}" data-share-url="{{ invite_link(event.id) }}"
+                    data-share-text="{{ invite_text }}"><span data-share-label>Send invite link</span></button>
             {% if can_party_up(event) %}
-              <a class="btn btn-ghost" href="{{ url_for('parties.party_up', event_id=event.id) }}">Invite friends</a>
+              <a class="btn btn-ghost" href="{{ url_for('parties.party_up', event_id=event.id) }}">{{ 'Invite friends' if event.is_private else 'Reserve spots' }}</a>
             {% endif %}
           </div>
-          <small class="muted">The invite has the link and password. Friends you invite in the app don't need it.</small>
+          <small class="muted">The link works for friends who aren't on the app: they sign up and they're in{% if event.is_private %}, no password needed{% endif %}.</small>
         </div>
       {% endif %}
       {% if is_host or event.i_am_going %}
@@ -130,13 +132,10 @@
         <a class="icon-action" href="{{ url_for('social.event_chat', event_id=event.id) }}">
           <span>{{ icon('chat') }}{% if unread %}<span class="count-dot">{{ unread }}</span>{% endif %}</span>Chat</a>
       {% endif %}
-      {% if event.i_am_going and not event.is_private and can_party_up(event) %}
-        <a class="icon-action" href="{{ url_for('parties.party_up', event_id=event.id) }}"><span>{{ icon('friends') }}</span>Reserve spots</a>
-      {% endif %}
       {% if place %}
         <a class="icon-action" href="{{ place.google }}" target="_blank" rel="noopener"><span>{{ icon('directions') }}</span>Directions</a>
       {% endif %}
-      {% if not (event.is_private and event.i_am_going) %}
+      {% if not event.i_am_going %}
       <button type="button" class="icon-action" data-share-title="{{ event_title(event) }}" data-share-url="{{ share_url }}">
         <span>{{ icon('share') }}</span><span data-share-label>Share</span></button>
       {% endif %}

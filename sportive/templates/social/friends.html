@@ -6,6 +6,9 @@
   <a class="person" href="{{ url_for('profile.view', user_id=p.id) }}">{{ avatar(p.id, p.full_name, p.avatar_updated, 40) }}<span><strong>{{ p.full_name }}</strong>{% if extra %}<small class="muted person-extra">{{ extra }}</small>{% endif %}</span></a>
 {% endmacro %}
 <h1 class="page-title">Friends</h1>
+<button type="button" class="btn btn-ghost btn-block invite-app" data-share-title="Sportive Circle" data-share-url="{{ invite_link(0) }}"
+        data-share-text="{{ g.user.full_name.split()[0] }} wants you on Sportive Circle, where UW students find pickup games and clubs. Tap to sign up.">
+  <span data-share-label>Invite friends to Sportive Circle</span></button>
 
 <form method="get" class="people-search" role="search" aria-label="Find people">
   <input type="search" name="q" value="{{ q }}" placeholder="Name or UW NetID" aria-label="Search by name or UW NetID"

@@ -7,11 +7,13 @@ Yes takes the held spot; No frees it for someone else.
 Team vs team: the host's party is team 1. Another group "challenges" them by claiming team 2 the same
 way (the leader joins and holds spots for their friends).
 """
-from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, session, url_for
+from itsdangerous import BadSignature, URLSafeSerializer
 
 from .auth import login_required
 from .db import get_db
-from .events import event_title, get_event, spots_left, try_join
+from .events import event_title, get_event, query_events, spots_left, try_join
+from .links import public_url
 from .invites import HOLD_TIME, MAX_PARTY, held_spots, hold_spots, my_invite, now_param, team_counts
 from .notifications import notify
 from .social import is_blocked_between
@@ -253,3 +255,94 @@ def cancel_invite(event_id, guest_id):
 def can_party_up(event):
     """For templates: show "Party up" on this game?"""
     return g.get("user") is not None and party_plan(event)[2] is None
+
+
+# ---------------------------------------------------------------- invite links (for friends not on the app)
+# "Jordan wants you in their Sportive Circle game. Tap to sign up and you're in." The link is signed with the
+# app's secret key, so nobody can make one for a game they aren't in, or pretend to be someone else.
+# Game 0 = just "join me on Sportive Circle" (you become friends).
+
+def _signer():
+    return URLSafeSerializer(current_app.secret_key, salt="invite-link")
+
+
+def invite_link(event_id=0):
+    """The logged-in person's invite link for a game (or for the app, with event_id 0)."""
+    return public_url("parties.open_invite_link", token=_signer().dumps([int(event_id), g.user["id"]]))
+
+
+def _read_link(token):
+    try:
+        event_id, inviter_id = _signer().loads(token)
+        return int(event_id), int(inviter_id)
+    except (BadSignature, ValueError, TypeError):
+        return None
+
+
+def _open_game(event_id):
+    rows = query_events(["e.id = :id", "e.cancelled = 0", "e.ends_at >= :now"],
+                        {"id": event_id, "now": now_param()}, limit=1) if event_id else []
+    return rows[0] if rows else None
+
+
+@bp.route("/join/<token>")
+def open_invite_link(token):
+    link = _read_link(token)
+    inviter = get_db().execute("SELECT id, full_name FROM users WHERE id = ? AND verified = 1 AND suspended = 0",
+                               (link[1],)).fetchone() if link else None
+    if inviter is None:
+        flash("That invite link doesn't work anymore.", "error")
+        return redirect(url_for("index"))
+    if g.get("user") is not None:
+        return redirect(accept_invite_link(g.user, token) or url_for("index"))
+    event = _open_game(link[0]) if link[0] else None
+    session["invite_link"] = token  # used right after they sign up or log in (auth.log_in)
+    return render_template("events/invite_link.html", inviter=inviter, event=event)
+
+
+def accept_invite_link(user, token):
+    """Someone opened a friend's invite link and is now logged in (maybe just signed up): make them friends and,
+    if it was for a game, put them in it. Returns where to go next (None = nowhere special)."""
+    link = _read_link(token)
+    if link is None or link[1] == user["id"]:
+        return None
+    event_id, inviter_id = link
+    db = get_db()
+    if is_blocked_between(user["id"], inviter_id):
+        return None
+    g.user = user  # they may have logged in during this very request
+    first = user["full_name"].split()[0]
+    friends = db.execute("""SELECT 1 FROM friendships WHERE (requester_id = ? AND addressee_id = ?)
+                            OR (requester_id = ? AND addressee_id = ?)""",
+                         (inviter_id, user["id"], user["id"], inviter_id)).fetchone()
+    if friends:
+        db.execute("""UPDATE friendships SET status = 'accepted' WHERE (requester_id = ? AND addressee_id = ?)
+                      OR (requester_id = ? AND addressee_id = ?)""", (inviter_id, user["id"], user["id"], inviter_id))
+    else:
+        db.execute("INSERT INTO friendships (requester_id, addressee_id, status, created_at) VALUES (?, ?, 'accepted', ?)",
+                   (inviter_id, user["id"], now_param()))
+    db.commit()
+    event = _open_game(event_id)
+    if event is None:
+        if event_id:
+            flash("That game is over or was canceled, but you and your friend are connected now.", "info")
+        return url_for("social.friends") if not event_id else url_for("events.feed")
+    if event["i_am_going"]:
+        return url_for("events.detail", event_id=event_id)
+    inviter_team = db.execute("SELECT team FROM rsvps WHERE event_id = ? AND user_id = ?",
+                              (event_id, inviter_id)).fetchone()
+    if inviter_team is None:  # the friend left the game since sending the link
+        flash("Your friend isn't in that game anymore.", "info")
+        return url_for("events.detail", event_id=event_id)
+    # The link counts as an invite (so a private game's password isn't needed), then join like anyone else.
+    db.execute("""INSERT OR REPLACE INTO invites (event_id, inviter_id, guest_id, team, status, created_at, expires_at)
+                  VALUES (?, ?, ?, ?, 'pending', ?, ?)""",
+               (event_id, inviter_id, user["id"], inviter_team["team"], now_param(), now_param()))
+    db.commit()
+    joined, message = try_join(get_event(event_id), None)
+    flash(f"You're in {event_title(event)}!" if joined else message, "celebrate" if joined else "error")
+    if joined:
+        notify(inviter_id, "invites", f"{first} joined from your link and is in {event_title(event)}.",
+               url_for("events.detail", event_id=event_id), key=f"reply:{event_id}:{user['id']}")
+        db.commit()
+    return url_for("events.detail", event_id=event_id)

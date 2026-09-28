@@ -2,7 +2,7 @@
    Looks like washington.edu: a white page, dark gray text, a Husky Purple header with a gold line, gold bars
    under titles, bold condensed headings and Open Sans. Colors are UW's official digital palette
    (washington.edu/brand): Husky Purple #32006e, Spirit Purple #4b2e83, Husky Gold #b7a57a (and #e8e3d3 on
-   the web), Heritage Gold #85754d. Always light, like UW's own pages. */
+   the web), Heritage Gold #85754d. Light by default, like UW's own pages; dark mode is a choice in Settings. */
 
 /* ============================== Tokens ============================== */
 :root {
@@ -147,7 +147,10 @@ section.band > .section-title:first-child { margin-top: 0; }
 .who-note { margin: 0; font-size: .85rem; }
 .friend-picks { max-height: 232px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius);
   padding: 0 10px; }
-.outside-field { max-width: 200px; }
+.invite-app { margin: -4px 0 14px; }
+.invite-landing { display: grid; gap: 10px; }
+.invite-landing h1, .invite-landing p { margin: 0; }
+.invite-landing .invite-game { margin: 4px 0; }
 .player-math { margin: 0; padding: 10px 12px; border-radius: var(--radius); background: var(--gold-light);
   font-weight: 600; font-size: .92rem; color: var(--purple-strong); }
 .player-math.is-over { background: color-mix(in srgb, var(--danger) 14%, var(--bg)); color: var(--danger); }

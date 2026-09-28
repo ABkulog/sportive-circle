@@ -42,7 +42,8 @@ def query_events(where, params=None, order="e.starts_at", limit=100):
     `where` is a list of SQL conditions written in this file (never user input);
     user values always go through `params`.
     """
-    params = {"me": g.user["id"], "hold_now": now_param(), **(params or {})}
+    me = g.user["id"] if g.get("user") is not None else 0  # 0 = a visitor (e.g. opening an invite link)
+    params = {"me": me, "hold_now": now_param(), **(params or {})}
     sql = f"""
         SELECT e.*, u.full_name AS host_name, u.avatar_updated AS host_avatar, cl.name AS club_name,
                (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id) AS going_count,
@@ -177,8 +178,8 @@ def suggested_password():
 
 def created_message(is_private, reserve, public_text):
     if is_private:
-        return "Your private game is up! Share the invite or invite friends below." if not reserve else \
-            "Your private game is up! Your friends got an invite. Share it with anyone else below."
+        return "Your private game is up! Send the invite link to your friends." if not reserve else \
+            "Your private game is up! Your friends got an invite. Send the link to anyone else."
     return public_text + (" Your friends' spots are held for 30 minutes." if reserve else "")
 
 
@@ -406,12 +407,8 @@ def read_players(form, sport, team_size, event=None):
     """How many can play, and how many friends not on the app are already coming.
     Returns (max_players, extra_players, error). "Players" includes the host; in team vs team it's both teams."""
     cap = SPORT_MAX_PLAYERS[sport]
+    # Friends who aren't on the app get an invite link after posting (so they're counted once they join).
     extra = event["extra_players"] if event is not None else 0
-    if event is None and not team_size:
-        outside = form.get("outside", "").strip() or "0"
-        if not outside.isdigit() or int(outside) > cap:
-            return None, 0, "How many friends not on the app are coming?"
-        extra = int(outside)
     if team_size:
         return 2 * team_size, 0, None
     raw = form.get("players", "").strip()
@@ -421,7 +418,7 @@ def read_players(form, sport, team_size, event=None):
     taken = (event["going_count"] + event["extra_players"]) if event is not None else 1 + extra
     if players < taken:
         return None, 0, (f"{taken} people are already in, so it can't be fewer players than that." if event
-                         else "That's more people than players. Pick more players, or fewer friends.")
+                         else "That's more people than players.")
     return players, extra, None
 
 

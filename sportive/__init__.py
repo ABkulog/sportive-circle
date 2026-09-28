@@ -114,6 +114,7 @@ def _add_template_helpers(app):
         # events
         spots_left=events.spots_left, event_title=events.event_title, place_map=events.place_map, same_day=same_day,
         can_quick_join=events.can_quick_join, can_party_up=parties.can_party_up, join_confirm=events.join_confirm,
+        invite_link=parties.invite_link,
         OPEN_TO=OPEN_TO,
         OPEN_SPOT_CHOICES=events.OPEN_SPOT_CHOICES, now_db=lambda: to_db(now_local()),
         # menu counters
