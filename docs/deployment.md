@@ -14,7 +14,8 @@ A checklist for launching to UW students. It takes about an hour the first time.
 
 ## 2. Email (Brevo, free)
 
-1. Sign up at [brevo.com](https://www.brevo.com) (free plan: 300 emails a day).
+1. Make a separate email just for the app (e.g. a new Gmail), so your UW and personal inboxes stay separate.
+   Then sign up at [brevo.com](https://www.brevo.com) (free plan: 300 emails a day).
 2. **Senders, domains & dedicated IPs → Senders → Add a sender**: use the email you want codes to come from,
    and confirm it from your inbox.
 3. **SMTP & API → SMTP**: note the **SMTP server** (`smtp-relay.brevo.com`), **login**, and create an
@@ -36,6 +37,7 @@ the database, a random secret key, and the reminder job that runs every 10 minut
    | `MAIL_USERNAME` | your Brevo SMTP login |
    | `MAIL_PASSWORD` | your Brevo SMTP key |
    | `MAIL_FROM` | `Sportive Circle <the sender email you confirmed>` |
+   | `CONTACT_EMAIL` | the app's own email (shown on Privacy and Terms), not a personal or UW one |
 
 4. **Apply**. The first build takes a few minutes. Your site is at `https://sportive-circle.onrender.com`
    (or the name Render shows).

@@ -27,6 +27,8 @@ services:
         value: /data/sportive_circle.db
       - key: ADMIN_EMAILS
         value: akulog@uw.edu
+      - key: CONTACT_EMAIL     # shown on the Privacy and Terms pages (use the app's own email, not a personal one)
+        sync: false
       - key: MAIL_SERVER
         sync: false          # "sync: false" = Render asks you for these when you create the Blueprint
       - key: MAIL_PORT

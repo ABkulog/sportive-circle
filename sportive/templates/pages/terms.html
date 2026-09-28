@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Terms{% endblock %}
-{% set contact = config.CONTACT_EMAIL or (config.ADMIN_EMAILS.split(',')[0].strip() if config.ADMIN_EMAILS else '') %}
+{% set contact = config.CONTACT_EMAIL %}{# never fall back to an admin's personal email #}
 {% block content %}
 <article class="card form-card legal">
   <p class="eyebrow">Terms</p>

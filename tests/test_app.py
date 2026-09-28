@@ -2155,3 +2155,11 @@ def test_render_blueprint_is_valid():
     web = blueprint["services"][0]
     assert web["disk"]["mountPath"] == "/data"
     assert {"key": "DATABASE", "value": "/data/sportive_circle.db"} in web["envVars"]
+
+
+def test_legal_pages_never_show_an_admins_personal_email(client, app):
+    app.config["ADMIN_EMAILS"] = "someone.personal@uw.edu"
+    for path in ("/privacy", "/terms"):
+        assert "someone.personal@uw.edu" not in client.get(path).data.decode()
+    app.config["CONTACT_EMAIL"] = "sportivecircle.app@gmail.com"
+    assert "sportivecircle.app@gmail.com" in client.get("/privacy").data.decode()
