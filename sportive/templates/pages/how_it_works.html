@@ -1,110 +1,21 @@
 {% extends "base.html" %}
 {% block title %}How it works{% endblock %}
 {% block content %}
-<section class="how-hero">
-  <p class="eyebrow">How it works</p>
-  <h1>Play sports with other Huskies in 4 steps.</h1>
-</section>
+<h1 class="page-title">How it works</h1>
 
 <ol class="steps simple">
-  <li class="step"><span class="step-number">1</span>
-    <div><h2>Sign up with your UW email</h2><p>We email you a 6-digit code to prove you're a UW student.</p></div></li>
-  <li class="step"><span class="step-number">2</span>
-    <div><h2>Find a game</h2><p><strong>Home</strong> shows games for the sports you picked. Tap <strong>Join</strong>.
-      We'll email you an hour before it starts.</p></div></li>
-  <li class="step"><span class="step-number">3</span>
-    <div><h2>Or start your own</h2><p>Tap <strong>Create</strong>. Use <strong>Need players</strong> if you're playing
-      right now, or <strong>New event</strong> to plan ahead.</p></div></li>
-  <li class="step"><span class="step-number">4</span>
-    <div><h2>Join a club</h2><p>Open <strong>Clubs</strong>, follow the ones you like, and ask to join.
-      An officer confirms new members.</p></div></li>
+  {% for url, text in [(url_for('events.feed'), 'Find a game'), (url_for('create_menu'), 'Start your own'),
+                       (url_for('clubs.directory'), 'Join a club')] %}
+    <li><a class="step" href="{{ url }}"><span class="step-number">{{ loop.index }}</span><h2>{{ text }}</h2></a></li>
+  {% endfor %}
 </ol>
 
-<section class="faq band">
-  <h2>Words you'll see</h2>
-  <dl class="glossary">
-    <div><dt>🤝 Props</dt><dd>A thank-you to a teammate after a game. "Good teammate!"</dd></div>
-    <div><dt>⬆️ Vouch</dt><dd>Telling the app a teammate is ready for harder games in that sport.</dd></div>
-    <div><dt>🔥 Rank</dt><dd>Your level in each sport: Casual → Intermediate → Competitive → Legend.
-      Everyone starts at Casual. Ranks only matter for Intermediate and Competitive games.</dd></div>
-    <div><dt>🎟️ Tryout spot</dt><dd>A spot in a harder game for someone who hasn't ranked up yet.</dd></div>
-    <div><dt>🤝 +1</dt><dd>A friend you bring into a harder game with you.</dd></div>
-    <div><dt>⭐ Follow</dt><dd>See a club's updates and events. You're a <em>member</em> only after an officer confirms you.</dd></div>
-  </dl>
-</section>
-
-<section class="faq band">
-  <h2>Questions</h2>
-  <details>
-    <summary>Is it free?</summary>
-    <p>Yes. No ads, no fees.</p>
-  </details>
-  <details>
-    <summary>Do I have to care about ranks?</summary>
-    <p>No. Casual and All-levels games are open to everyone. Turn on 🧘 chill mode in Edit profile and nobody sees your ranks.</p>
-  </details>
-  <details>
-    <summary>I'm already good. Do I have to start at the bottom?</summary>
-    <p>No. Take a 🎟️ tryout spot in a harder game. If 3 players at that level vouch for you, you move up right away.</p>
-  </details>
-  <details>
-    <summary>Can I play with a friend who isn't ranked?</summary>
-    <p>Yes. In an Intermediate or Competitive game you've joined, tap "Bring a friend" to invite them as your +1.</p>
-  </details>
-  <details>
-    <summary>How do I add friends?</summary>
-    <p>Open <strong>Friends</strong> (the people icon at the top) and search for their name, or add people you've played with.</p>
-  </details>
-  <details>
-    <summary>Will I get spammed with notifications?</summary>
-    <p>No. You choose. In <strong>Profile → Edit profile → Notifications</strong>, pick which things show a number on
-      the tab icons and which show in the "What's new" box on Home. The app never sends pop-ups; the only emails are
-      your sign-up code and game reminders (which you can turn off).</p>
-  </details>
-  <details>
-    <summary>Who can message me?</summary>
-    <p>Friends, people you've played a game with, and officers of clubs you follow or asked to join.
-      Tap ⋯ on anyone's profile to block or report them.</p>
-  </details>
-  <details>
-    <summary>Who can see my email?</summary>
-    <p>Only you and people you've played a game with.</p>
-  </details>
-  <details>
-    <summary>Does the app track my location?</summary>
-    <p>No. "Where am I?" on an event map asks your phone for your location once, uses it on your screen to show the
-      distance, and never sends it to us. If it doesn't work, your browser is blocking location; the app tells you how to turn it on.</p>
-  </details>
-  <details>
-    <summary>Can't make it to a game?</summary>
-    <p>Tap <strong>Leave</strong> on the game so someone else gets your spot. Hosts: tap <strong>Cancel event</strong> and we'll email everyone.</p>
-  </details>
-  <details>
-    <summary>Forgot your password?</summary>
-    <p>Tap "Forgot password?" on the login page. We'll email you a code to set a new one.</p>
-  </details>
-  <details>
-    <summary>How do I change my photo, turn off emails, or delete my account?</summary>
-    <p>Go to <strong>Profile → Edit profile</strong>. Everything is there.</p>
-  </details>
-  <details>
-    <summary>How do I suggest something or report a bug?</summary>
-    <p>Tap <a href="{{ url_for('feedback.suggest') }}">Suggestions</a> at the bottom of any page. The team reads every one,
-      and you can send it anonymously.</p>
-  </details>
-  <details>
-    <summary>Is this run by UW?</summary>
-    <p>No. It's a student project built for Huskies. It isn't an official University of Washington service.
-      See <a href="{{ url_for('privacy') }}">Privacy</a> and <a href="{{ url_for('terms') }}">Terms</a>.</p>
-  </details>
-</section>
-
 <section class="how-cta">
-  <p class="muted">Show up, cheer on beginners, have fun. Go Dawgs! 🐾</p>
   {% if g.user %}
     <a class="btn btn-large" href="{{ url_for('events.feed') }}">Find a game</a>
   {% else %}
     <a class="btn btn-large" href="{{ url_for('auth.signup') }}">Sign up with your UW email</a>
   {% endif %}
+  <p><a href="{{ url_for('faq') }}">Questions? See the FAQ</a></p>
 </section>
 {% endblock %}

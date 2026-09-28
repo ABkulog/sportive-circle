@@ -1,4 +1,4 @@
-"""Simple pages: How it works, Privacy, Terms, the Create menu, and icons browsers ask for."""
+"""Simple pages: How it works, FAQ, Privacy, Terms, the Create menu, and icons browsers ask for."""
 from flask import g, redirect, render_template, url_for
 
 from .auth import login_required
@@ -7,6 +7,10 @@ from .clubs import officer_clubs
 
 def how_it_works():
     return render_template("pages/how_it_works.html")
+
+
+def faq():
+    return render_template("pages/faq.html")
 
 
 def privacy():
@@ -34,6 +38,7 @@ def touch_icon():
 
 def register(app):
     app.add_url_rule("/how-it-works", "how_it_works", how_it_works)
+    app.add_url_rule("/faq", "faq", faq)
     app.add_url_rule("/privacy", "privacy", privacy)
     app.add_url_rule("/terms", "terms", terms)
     app.add_url_rule("/create", "create_menu", create_menu)

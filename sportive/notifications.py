@@ -5,7 +5,7 @@ both, or neither (Profile -> Edit profile -> Notifications). Nothing is ever pus
 here, so nobody gets spammed.
 
 "New" means newer than the last time you looked: opening Club updates clears the club number, opening
-News clears the news number, and so on. Those "last looked" markers live in the seen_markers table.
+your badges clears the badge number, and so on. Those "last looked" markers live in the seen_markers table.
 """
 from collections import namedtuple
 
@@ -14,7 +14,7 @@ from flask import Blueprint, flash, g, redirect, render_template, request, url_f
 from .auth import login_required
 from .db import get_db, user_sports
 from .social import event_chat_unread
-from .timeutil import from_db, now_local, to_db
+from .timeutil import now_local, to_db
 
 bp = Blueprint("notifications", __name__)
 
@@ -29,12 +29,11 @@ KINDS = [
     Kind("club_updates", "📣", "Updates from clubs you follow or joined", "clubs", True, True, "new club update"),
     Kind("club_requests", "🙋", "People asking to join a club you run", "clubs", True, True, "person waiting to join your club"),
     Kind("badges", "🏅", "New badges you earned", "profile", True, True, "new badge"),
-    Kind("news", "📰", "Husky news for your sports", "news", False, False, "new Husky news story"),
     Kind("suggestion_trends", "💡", "Suggestion topics 3+ people asked for (admins)", "admin", True, True,
          "suggestion topic trending"),
 ]
 KIND_BY_KEY = {kind.key: kind for kind in KINDS}
-TABS = ("home", "clubs", "news", "profile", "messages", "friends", "admin")
+TABS = ("home", "clubs", "profile", "messages", "friends", "admin")
 
 
 # ---------------------------------------------------------------- settings
@@ -77,7 +76,7 @@ def _latest(kind):
         return db.execute("SELECT COALESCE(MAX(id), 0) FROM events WHERE is_quick = 1").fetchone()[0]
     if kind == "club_updates":
         return db.execute("SELECT COALESCE(MAX(id), 0) FROM club_posts").fetchone()[0]
-    return to_db(now_local())  # badges, news: by time
+    return to_db(now_local())  # badges: by time
 
 
 def mark_seen(kind):
@@ -92,7 +91,7 @@ def mark_seen(kind):
 def start_markers(user_id):
     """For a brand-new account: everything that exists right now counts as already seen, and
     anything posted from now on is new."""
-    for kind in ("need_players", "club_updates", "badges", "news"):
+    for kind in ("need_players", "club_updates", "badges"):
         _set_marker(user_id, kind, _latest(kind))
 
 
@@ -163,13 +162,6 @@ def _count(kind, me):
     if kind == "suggestion_trends":
         from .feedback import unseen_trends  # imported here because feedback.py imports this module
         return len(unseen_trends())
-    if kind == "news":
-        # Only stories already downloaded for the News page: counting never makes a page wait on GoHuskies.
-        from .news import cached_stories, story_sports  # imported here because news.py imports this module
-        sports, since = set(user_sports(me)), from_db(_since(me, kind))
-        return sum(1 for story in cached_stories()
-                   if story["published"] and story["published"] > since and not story["general"]
-                   and story_sports(story) & sports)
     raise ValueError(kind)
 
 
@@ -200,7 +192,7 @@ LINKS = {
     "messages": ("social.inbox", {}), "friend_requests": ("social.friends", {}),
     "game_chat": ("events.my_events", {}), "need_players": ("events.feed", {"_anchor": "now"}),
     "club_updates": ("clubs.updates", {}), "club_requests": ("clubs.directory", {"mine": 1}),  # officers' club cards show who's waiting
-    "badges": ("profile.badge_locker", {}), "news": ("news.news", {}),
+    "badges": ("profile.badge_locker", {}),
     "suggestion_trends": ("feedback.admin_suggestions", {}),
 }
 

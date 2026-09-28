@@ -516,9 +516,14 @@ def test_sport_stats_command(accounts, client, app):
 
 # ------------------------------------------------- profile pictures & how it works
 
-def test_how_it_works_is_public(client):
-    page = client.get("/how-it-works").data
-    assert b"Sign up with your UW email" in page and b"Need players" in page
+def test_how_it_works_is_short_and_public(client):
+    page = client.get("/how-it-works").data.decode()
+    assert "Sign up with your UW email" in page and "/faq" in page
+    assert page.count('class="step"') == 3  # Find a game, Start your own, Join a club: no essays
+    for step in ("Find a game", "Start your own", "Join a club"):
+        assert step in page
+    faq = client.get("/faq")
+    assert faq.status_code == 200 and b"Is it free?" in faq.data
 
 
 def test_new_users_must_add_a_photo(accounts, client):
@@ -531,10 +536,10 @@ def test_new_users_must_add_a_photo(accounts, client):
     assert client.get("/").status_code == 200
 
 
-def test_first_photo_leads_to_how_it_works(accounts, client):
+def test_first_photo_goes_straight_home(accounts, client):
     accounts.signup(photo=False)
     client.get("/")  # the feed is the normal landing spot, so no special destination
-    assert accounts.upload_photo().headers["Location"] == "/how-it-works"
+    assert accounts.upload_photo().headers["Location"] == "/"
 
 
 def test_photo_is_resized_and_location_data_removed(accounts, client, app):
@@ -611,13 +616,13 @@ def test_soccer_is_played_on_the_fields():
 
 def test_gym_buddy_places():
     from sportive.constants import SPORT_LOCATIONS
-    assert SPORT_LOCATIONS["gym"] == ["IMA (Intramural Activities Building)", "Fitness Center West (under Elm Hall)",
+    assert SPORT_LOCATIONS["gym"] == ["Fitness Center West (under Elm Hall)", "IMA (Intramural Activities Building)",
                                        "Off campus (see note)"]
 
 
 def test_ultimate_frisbee_places(accounts, client):
     from sportive.constants import SPORT_LOCATIONS
-    assert SPORT_LOCATIONS["ultimate"] == ["Denny Field", "The Quad", "Husky Track",
+    assert SPORT_LOCATIONS["ultimate"] == ["Denny Field", "Husky Track", "The Quad",
                                            "Recreation Field 1 (by the IMA)", "Recreation Field 2 (by Husky Track)",
                                            "Recreation Field 3 (by the golf range)",
                                            "Recreation Field 4 (by the golf range)", "Off campus (see note)"]
@@ -638,22 +643,26 @@ def test_football_on_the_fields(accounts, client):
 
 def test_add_photo_later(accounts, client):
     accounts.signup(photo=False)
-    assert b"Add later" in client.get("/profile/photo").data
+    page = client.get("/profile/photo").data.decode()
+    # "Add later" opens a "No problem" pop-up on the same page, with Continue inside it.
+    assert 'data-dialog="later-dialog"' in page and "No problem" in page and "data-dialog-continue" in page
     response = client.post("/profile/photo/skip")
-    assert response.headers["Location"] == "/how-it-works"
+    assert response.headers["Location"] == "/"
     feed = client.get("/")
-    assert feed.status_code == 200                     # still logged in and using the app
-    assert b"Add a profile picture so people know" in feed.data  # gentle reminder
-    accounts.upload_photo()
-    assert b"Add a profile picture so people know" not in client.get("/").data
+    assert feed.status_code == 200 and b"photo-nudge" not in feed.data  # no banner following you around
 
 
-def test_asked_again_after_next_login(accounts, client):
+def test_add_later_is_remembered(accounts, client, app):
     accounts.signup(photo=False)
     client.post("/profile/photo/skip")
     accounts.logout()
     accounts.login()
-    assert client.get("/").headers["Location"] == "/profile/photo"
+    assert client.get("/").status_code == 200           # not asked again at every login
+    me = _user_id(app, "dubs@uw.edu")
+    profile = client.get(f"/u/{me}").data.decode()
+    assert ">Add photo</a>" in profile                   # the profile is where you add it
+    photo_page = client.get("/profile/photo").data.decode()
+    assert "Add later" not in photo_page and "Last step" not in photo_page
 
 
 def test_add_later_keeps_shared_link(accounts, client):
@@ -745,7 +754,6 @@ def test_this_month_works_in_december(monkeypatch):
     assert next_month.date().isoformat() == "2027-01-01"
 
 
-
 # --------------------------------------------------------------- Husky spirit
 
 def _finish_all_events(app):
@@ -816,7 +824,7 @@ def test_celebration_and_footer(accounts, client):
     assert b"Not an official University of Washington service" in response
 
 
-# ------------------------------------------------------------ ranks & badges
+# ------------------------------------------------------------ badges
 
 def _user_id(app, email):
     with app.app_context():
@@ -838,96 +846,6 @@ def _played_games(app, sport, user_ids, count=1, level="Casual", start="2026-09-
             ids.append(cur.lastrowid)
         db.commit()
     return ids
-
-
-def test_rank_ladder_needs_rep_and_vouches():
-    from sportive.ranks import compute_rank
-    assert compute_rank("soccer", 0, 0, 0).name == "Casual 1"
-    assert compute_rank("soccer", 95, 0, 0).name == "Casual 3"
-    blocked = compute_rank("soccer", 400, 2, 0)            # lots of rep, not enough vouches
-    assert blocked.name == "Casual 3" and blocked.blocked_by == "Intermediate" and blocked.vouches == 2
-    assert compute_rank("soccer", 400, 3, 0).name == "Intermediate 3"
-    stuck = compute_rank("soccer", 800, 9, 4)              # Competitive needs 5 vouches from Intermediate+
-    assert stuck.name == "Intermediate 3" and stuck.blocked_by == "Competitive"
-    assert compute_rank("soccer", 800, 9, 5).name == "Competitive 2"
-    assert compute_rank("soccer", 5000, 9, 5).name == "Legend"
-
-
-def test_everyone_starts_casual_and_cant_host_higher_levels(accounts, client):
-    accounts.signup()
-    page = client.post("/events/new", data=event_form(skill_level="Competitive")).data
-    assert b"reached Competitive" in page and b"Casual 1" in page
-    assert client.post("/events/new", data=event_form(skill_level="All levels")).status_code == 302
-    quick = client.post("/need-players", data={
-        "sport": "basketball", "location": "IMA (Intramural Activities Building)", "skill_level": "Intermediate",
-        "starts_in": "15", "duration": "60", "have": "2", "needed": "2"}).data
-    assert b"reached Intermediate" in quick
-
-
-def test_casual_players_cant_join_competitive_games(accounts, client, app):
-    accounts.signup(email="host@uw.edu")
-    event_id = event_id_from(client.post("/events/new", data=event_form()))
-    with app.app_context():
-        db = get_db()
-        db.execute("UPDATE events SET skill_level = 'Competitive' WHERE id = ?", (event_id,))
-        db.commit()
-    accounts.logout()
-    accounts.signup(email="newbie@uw.edu")
-    feed = client.get("/?scope=all").data
-    assert "🔒 Competitive+".encode() in feed and f"/events/{event_id}/join".encode() not in feed
-    page = client.post(f"/events/{event_id}/join", follow_redirects=True).data
-    assert b"reached Competitive" in page
-    with app.app_context():
-        assert get_db().execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (event_id,)).fetchone()[0] == 1
-
-
-def test_props_and_vouches_rules(accounts, client, app):
-    accounts.signup(email="a@uw.edu")
-    accounts.logout()
-    accounts.signup(email="b@uw.edu")
-    a, b = _user_id(app, "a@uw.edu"), _user_id(app, "b@uw.edu")
-    from sportive.timeutil import now_local, to_db
-    recent_start, recent_end = to_db(now_local() - timedelta(hours=3)), to_db(now_local() - timedelta(hours=2))
-    (game,) = _played_games(app, "soccer", [a, b], start=recent_start, end=recent_end)
-    page = client.get(f"/events/{game}").data
-    assert b"GG! How was the game?" in page
-    assert b"can&#39;t give yourself props" in client.post(f"/events/{game}/props/{b}", follow_redirects=True).data
-    client.post(f"/events/{game}/props/{a}")
-    client.post(f"/events/{game}/props/{a}")          # twice = still once
-    client.post(f"/events/{game}/vouch/{a}")
-    with app.app_context():
-        db = get_db()
-        assert db.execute("SELECT COUNT(*) FROM props").fetchone()[0] == 1
-        assert db.execute("SELECT COUNT(*) FROM vouches WHERE sport = 'soccer'").fetchone()[0] == 1
-        from sportive.ranks import sport_rep
-        assert sport_rep(a)["soccer"] == 10 + 10 + 5   # played + hosted + props
-    (old_game,) = _played_games(app, "soccer", [a, b], start="2026-01-05 10:00", end="2026-01-05 11:00")
-    assert b"up to a week" in client.post(f"/events/{old_game}/props/{a}", follow_redirects=True).data
-
-
-def test_rank_up_to_intermediate_unlocks_games(accounts, client, app):
-    accounts.signup(email="star@uw.edu")
-    star = _user_id(app, "star@uw.edu")
-    teammates = []
-    for n in range(3):
-        accounts.logout()
-        accounts.signup(email=f"mate{n}@uw.edu")
-        teammates.append(_user_id(app, f"mate{n}@uw.edu"))
-    _played_games(app, "soccer", [star] + teammates, count=8)  # 8 hosted games = 160 rep
-    with app.app_context():
-        db = get_db()
-        for mate in teammates:
-            db.execute("INSERT INTO vouches VALUES ('soccer', ?, ?, '2026-09-23 10:00')", (mate, star))
-        db.commit()
-    accounts.logout()
-    accounts.login(email="star@uw.edu")
-    feed = client.get("/").data.decode()
-    assert "RANK UP! Soccer: you&#39;re now Intermediate 1" in feed
-    assert "RANK UP!" not in client.get("/").data.decode()   # celebrated only once
-    ok = client.post("/events/new", data=event_form(sport="soccer", location="Denny Field", skill_level="Intermediate"))
-    assert ok.status_code == 302
-    profile = client.get(f"/u/{star}").data
-    assert b"Intermediate 1" in profile and b"Level Up" in profile
 
 
 def test_season_badges_retire():
@@ -979,7 +897,7 @@ def test_many_new_badges_share_one_banner(accounts, client, app):
     me = _user_id(app, "dubs@uw.edu")
     _played_games(app, "soccer", [me], start="2026-09-22 06:30", end="2026-09-22 07:30")
     feed = client.get("/").data.decode()
-    assert "new badges unlocked" in feed and feed.count("New badge unlocked") == 0
+    assert " new badges: " in feed and feed.count("New badge:") == 0
 
 
 # ------------------------------------------------------------ badge showcase
@@ -1126,138 +1044,7 @@ def test_event_group_chat(accounts, client, app):
     assert [m["body"] for m in msgs] == ["on my way!"]
 
 
-# -------------------------------------------------------------------- news
-
-SAMPLE_FEED = """<rss version="2.0"><channel>
-<item><title>Huskies Win B1G Opener</title><link>https://gohuskies.com/news/2026/9/25/volleyball-win</link>
-  <category>Volleyball</category><pubDate>Fri, 25 Sep 2026 18:11:00 PST</pubDate></item>
-<item><title>UW Handed First Loss</title><link>https://gohuskies.com/news/2026/9/26/football-loss</link>
-  <category>Football</category><pubDate>Sat, 26 Sep 2026 23:34:00 PST</pubDate></item>
-<item><title>Academic Honor Roll</title><link>https://gohuskies.com/news/2026/9/20/general</link>
-  <category>Cross Country, Football, Men's Basketball, Softball, Volleyball</category>
-  <pubDate>Sun, 20 Sep 2026 10:00:00 PST</pubDate></item>
-<item><title>Sketchy</title><link>https://evil.example/phish</link><category>Football</category></item>
-</channel></rss>"""
-
-
-def test_news_parsing():
-    from sportive.news import parse_feed
-    stories = parse_feed(SAMPLE_FEED)
-    assert [s["title"] for s in stories] == ["Huskies Win B1G Opener", "UW Handed First Loss", "Academic Honor Roll"]
-    assert stories[1]["teams"] == ["football"] and not stories[1]["general"]
-    assert stories[2]["general"]                     # tagged with every team = department news
-
-
-def test_news_page_filters(accounts, client, monkeypatch):
-    from sportive import news
-    monkeypatch.setattr(news, "get_stories", lambda: sorted(news.parse_feed(SAMPLE_FEED),
-                                                           key=lambda s: s["published"], reverse=True))
-    accounts.signup(sports=("football",))
-    mine = client.get("/news").data
-    assert b"UW Handed First Loss" in mine and b"Huskies Win B1G Opener" not in mine
-    everything = client.get("/news?scope=all").data
-    assert b"Huskies Win B1G Opener" in everything and b"Academic Honor Roll" in everything
-    team = client.get("/news?team=wvball").data
-    assert b"Huskies Win B1G Opener" in team and b"UW Handed First Loss" not in team
-    assert b"GoHuskies.com" in mine and b"evil.example" not in everything
-
-
-def test_news_survives_gohuskies_being_down(monkeypatch):
-    from sportive import news
-    def broken(code):
-        raise OSError("down")
-    monkeypatch.setattr(news, "_download", broken)
-    assert news.fetch_all() == []
-
-
-# ------------------------------------------ placement, tryouts, chill mode, delete
-
-def _set_seen_level(app, user_id, sport, level):
-    with app.app_context():
-        db = get_db()
-        db.execute("INSERT OR REPLACE INTO ranks_seen (user_id, sport, level) VALUES (?, ?, ?)", (user_id, sport, level))
-        db.commit()
-
-
-def test_good_new_player_gets_placed_by_good_players(accounts, client, app):
-    from sportive.ranks import FIRST_LEVEL_OF, compute_rank, sport_rep, vouch_counts
-    accounts.signup(email="star@uw.edu")
-    star = _user_id(app, "star@uw.edu")
-    vets = []
-    for n in range(3):
-        accounts.logout()
-        accounts.signup(email=f"vet{n}@uw.edu")
-        vets.append(_user_id(app, f"vet{n}@uw.edu"))
-        _set_seen_level(app, vets[-1], "basketball", FIRST_LEVEL_OF["Competitive"])  # they're Competitive
-    _played_games(app, "basketball", [vets[0], star] + vets[1:])  # ONE game together
-    with app.app_context():
-        db = get_db()
-        for vet in vets:
-            db.execute("INSERT INTO vouches VALUES ('basketball', ?, ?, '2026-09-23 10:00')", (vet, star))
-        db.commit()
-        rank = compute_rank("basketball", sport_rep(star)["basketball"], *vouch_counts(star, "basketball"))
-    assert rank.name == "Competitive 1"      # one game, 10 rep, straight to Competitive
-
-
-def test_tryout_spots(accounts, client, app):
-    from sportive.ranks import FIRST_LEVEL_OF
-    accounts.signup(email="host@uw.edu")
-    host = _user_id(app, "host@uw.edu")
-    _set_seen_level(app, host, "basketball", FIRST_LEVEL_OF["Competitive"])
-    with app.app_context():  # give the host a real Competitive rank
-        db = get_db()
-        for n in range(5):
-            db.execute("INSERT INTO users (email, password_hash, full_name, verified) VALUES (?, 'x', 'Vet', 1)",
-                       (f"v{n}@uw.edu",))
-        db.commit()
-    vets = [_user_id(app, f"v{n}@uw.edu") for n in range(5)]
-    for vet in vets:
-        _set_seen_level(app, vet, "basketball", FIRST_LEVEL_OF["Competitive"])
-    _played_games(app, "basketball", [host] + vets, count=25)
-    with app.app_context():
-        db = get_db()
-        for vet in vets:
-            db.execute("INSERT INTO vouches VALUES ('basketball', ?, ?, '2026-09-23 10:00')", (vet, host))
-        db.commit()
-    event_id = event_id_from(client.post("/events/new", data=event_form(skill_level="Competitive", tryout_spots="1")))
-    accounts.logout()
-    accounts.signup(email="newbie@uw.edu")
-    feed = client.get("/?scope=all").data.decode()
-    assert "🎟️ 1 tryout spot" in feed and ">Try out<" in feed.replace("\n", "").replace("  ", "")
-    page = client.post(f"/events/{event_id}/join", follow_redirects=True).data.decode()
-    assert "You&#39;re in as a tryout" in page and "🎟️ Tryout</span>" in page
-    accounts.logout()
-    accounts.signup(email="newbie2@uw.edu")
-    assert b"reached Competitive" in client.post(f"/events/{event_id}/join", follow_redirects=True).data
-
-
-def test_tryout_spots_only_for_ranked_games(accounts, client, app):
-    accounts.signup()
-    page = client.post("/events/new", data=event_form(skill_level="Casual", tryout_spots="2")).data
-    assert b"Tryout spots are only for Intermediate and Competitive games" in page
-    event_id = event_id_from(client.post("/events/new", data=event_form(skill_level="Casual", tryout_spots="0")))
-    with app.app_context():
-        assert get_db().execute("SELECT tryout_spots FROM events WHERE id = ?", (event_id,)).fetchone()[0] == 0
-
-
-def test_no_rank_chips_in_casual_games(accounts, client):
-    accounts.signup()
-    event_id = event_id_from(client.post("/events/new", data=event_form(skill_level="Casual")))
-    assert b"rank-chip" not in client.get(f"/events/{event_id}").data
-
-
-def test_chill_mode_hides_ranks(accounts, client, app):
-    accounts.signup(email="chill@uw.edu", sports=("soccer",))
-    chill = _user_id(app, "chill@uw.edu")
-    _played_games(app, "soccer", [chill])
-    client.post("/profile/edit", data={"full_name": "Chill Dawg", "sports": ["soccer"]})  # show_ranks unchecked
-    own = client.get(f"/u/{chill}").data.decode()
-    assert "Chill mode: only you can see these" in own and "Casual 1" in own
-    accounts.logout()
-    accounts.signup(email="other@uw.edu")
-    other = client.get(f"/u/{chill}").data.decode()
-    assert "chill mode" in other and "Casual 1" not in other
-
+# ------------------------------------------------------------ delete
 
 def test_delete_account_needs_are_you_sure(accounts, client, app):
     accounts.signup()
@@ -1275,27 +1062,7 @@ def test_delete_account_needs_are_you_sure(accounts, client, app):
         assert get_db().execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0
 
 
-# ------------------------------------------------------------ bring a friend (+1)
-
-def _make_competitive(app, user_id, sport="basketball"):
-    """Give someone a real Competitive rank in a sport (5 Competitive vouchers + lots of games)."""
-    from sportive.ranks import FIRST_LEVEL_OF
-    with app.app_context():
-        db = get_db()
-        vets = []
-        for n in range(5):
-            cur = db.execute("INSERT INTO users (email, password_hash, full_name, verified) VALUES (?, 'x', 'Vet', 1)",
-                             (f"vet{user_id}-{n}@uw.edu",))
-            vets.append(cur.lastrowid)
-            db.execute("INSERT INTO ranks_seen VALUES (?, ?, ?)", (cur.lastrowid, sport, FIRST_LEVEL_OF["Competitive"]))
-        db.commit()
-    _played_games(app, sport, [user_id] + vets, count=25)
-    with app.app_context():
-        db = get_db()
-        for vet in vets:
-            db.execute("INSERT INTO vouches VALUES (?, ?, ?, '2026-09-23 10:00')", (sport, vet, user_id))
-        db.commit()
-
+# ------------------------------------------------------------ helpers
 
 def _befriend(client, accounts, a_email, b_email, app):
     accounts.login(email=a_email)
@@ -1304,57 +1071,6 @@ def _befriend(client, accounts, a_email, b_email, app):
     accounts.login(email=b_email)
     client.post(f"/friends/accept/{_user_id(app, a_email)}")
     accounts.logout()
-
-
-def test_bring_a_friend_to_a_competitive_game(accounts, client, app):
-    accounts.signup(email="pro@uw.edu", name="Pat Pro")
-    accounts.logout()
-    accounts.signup(email="buddy@uw.edu", name="Bo Buddy")
-    accounts.logout()
-    pro, buddy = _user_id(app, "pro@uw.edu"), _user_id(app, "buddy@uw.edu")
-    _make_competitive(app, pro)
-    _befriend(client, accounts, "pro@uw.edu", "buddy@uw.edu", app)
-    accounts.login(email="pro@uw.edu")
-    event_id = event_id_from(client.post("/events/new", data=event_form(skill_level="Competitive", allow_plus_ones="1")))
-    page = client.get(f"/events/{event_id}").data.decode()
-    assert "Bring a friend" in page and "Bo Buddy" in page
-    client.post(f"/events/{event_id}/plus-one/{buddy}")
-    assert "One +1 per player" in client.post(f"/events/{event_id}/plus-one/{buddy}", follow_redirects=True).data.decode()
-    accounts.logout()
-    accounts.login(email="buddy@uw.edu")
-    assert "invited you as my +1" in client.get(f"/messages/{pro}").data.decode()      # got a DM
-    assert "Join as +1" in client.get("/?scope=all").data.decode()                   # card shows the way in
-    joined = client.post(f"/events/{event_id}/join", follow_redirects=True).data.decode()
-    assert "You&#39;re in as Pat&#39;s +1" in joined and "🤝 Pat's +1" in joined
-    with app.app_context():
-        row = get_db().execute("SELECT plus_one_of, is_tryout FROM rsvps WHERE user_id = ? AND event_id = ?",
-                               (buddy, event_id)).fetchone()
-        assert (row["plus_one_of"], row["is_tryout"]) == (pro, 0)
-
-
-def test_plus_one_rules(accounts, client, app):
-    for email in ("pro@uw.edu", "buddy@uw.edu", "stranger@uw.edu", "buddy2@uw.edu"):
-        accounts.signup(email=email)
-        accounts.logout()
-    pro, stranger = _user_id(app, "pro@uw.edu"), _user_id(app, "stranger@uw.edu")
-    _make_competitive(app, pro)
-    _befriend(client, accounts, "pro@uw.edu", "buddy@uw.edu", app)
-    _befriend(client, accounts, "buddy@uw.edu", "buddy2@uw.edu", app)
-    accounts.login(email="pro@uw.edu")
-    closed = event_id_from(client.post("/events/new", data=event_form(title="No plus ones", skill_level="Competitive")))
-    assert "Bring a friend" not in client.get(f"/events/{closed}").data.decode()   # host turned +1s off
-    event_id = event_id_from(client.post("/events/new", data=event_form(skill_level="Competitive", allow_plus_ones="1")))
-    assert "only bring a friend" in client.post(f"/events/{event_id}/plus-one/{stranger}",
-                                                follow_redirects=True).data.decode()
-    client.post(f"/events/{event_id}/plus-one/{_user_id(app, 'buddy@uw.edu')}")
-    accounts.logout()
-    accounts.login(email="buddy@uw.edu")
-    client.post(f"/events/{event_id}/join")
-    # A +1 can't bring their own +1 (no chains).
-    assert "Bring a friend" not in client.get(f"/events/{event_id}").data.decode()
-    accounts.logout()
-    accounts.login(email="buddy2@uw.edu")
-    assert b"reached Competitive" in client.post(f"/events/{event_id}/join", follow_redirects=True).data
 
 
 # ------------------------------------------------------------------- clubs
@@ -1455,10 +1171,11 @@ def test_club_events_are_all_levels(accounts, client, app):
 def test_same_sections_everywhere(accounts, client):
     accounts.signup()
     page = client.get("/").data.decode()
-    for label in ("Home", "Clubs", "Create", "News", "Profile", "Messages", "Friends", "How it works"):
+    for label in ("Home", "Clubs", "Create", "Profile", "Messages", "Friends", "FAQ"):
         assert f'<span class="tab-label">{label}<' in page, label
+    assert '<span class="tab-label">News<' not in page                       # one thing: playing
     assert 'class="tab  is-active" href="/" aria-current="page"' in page     # Home is highlighted
-    assert 'aria-label="How it works"' in page                              # ❓ in the top bar too
+    assert 'aria-label="FAQ"' in page                                       # ❓ in the top bar opens the FAQ
     assert "For you" in page and "My events" in page                        # Home tabs
     menu = client.get("/create").data.decode()
     assert "Need players" in menu and "New event" in menu and "Register your club" in menu
@@ -1573,7 +1290,6 @@ def test_admin_reports_page(accounts, client, app):
     assert "Reviewed (1)" in client.get("/admin/reports").data.decode()
 
 
-
 # ---------------------------------------------------------- club verification
 
 def test_new_clubs_wait_for_verification(accounts, client, app):
@@ -1667,7 +1383,6 @@ def test_joining_a_club_jumps_to_how_to_join(accounts, client, app):
     assert response.headers["Location"].endswith(f"/clubs/{club}#how-to-join")
     page = client.get(f"/clubs/{club}").data.decode()
     assert page.index('id="how-to-join"') < page.index('class="quick-facts"')   # before the Quick facts
-
 
 
 # ---------------------------------------------------------- club membership
@@ -1771,7 +1486,6 @@ def test_club_updates_feed(accounts, client, app):
     assert client.post("/clubs/updates", data={"club": club, "body": "spam"}).status_code == 403   # not an officer
     client.post(f"/clubs/{club}/follow")
     assert "Practice moved to the Quad!" in client.get("/clubs/updates").data.decode()
-
 
 
 def test_club_socials(accounts, client, app):
@@ -1940,13 +1654,22 @@ def test_calendar_lines_are_folded():
 
 
 def test_skill_level_options_have_fixed_values(accounts, client):
-    """forms.js adds a 🔒 to locked levels' text; the submitted value must stay the plain level name."""
+    """The submitted value is always the plain level name."""
     accounts.signup()
     for page in ("/events/new", "/need-players"):
         html = client.get(page).data.decode()
         for level in ("All levels", "Casual", "Intermediate", "Competitive"):
             assert f'<option value="{level}"' in html, (page, level)
-    assert 'name="tryout_spots"' in client.get("/need-players").data.decode()
+
+
+def test_dropdowns_are_alphabetical():
+    from sportive.constants import LOCATIONS, SPORT_LOCATIONS, SPORTS
+    labels = list(SPORTS.values())
+    assert labels[:-1] == sorted(labels[:-1]) and labels[-1] == "Other"
+    places = [place.removeprefix("The ") for place in LOCATIONS[:-2]]
+    assert places == sorted(places) and LOCATIONS[-2:] == ["Off campus (see note)", "Online"]
+    for sport, allowed in SPORT_LOCATIONS.items():
+        assert allowed == sorted(allowed, key=LOCATIONS.index), sport
 
 
 def test_hidden_always_hides():
@@ -2105,8 +1828,8 @@ def test_remove_profile_photo(accounts, client, app):
     with app.app_context():
         assert get_db().execute("SELECT avatar_updated FROM users WHERE id = ?", (me,)).fetchone()[0] is None
         assert get_db().execute("SELECT COUNT(*) FROM avatars").fetchone()[0] == 0
-    page = client.get("/")                        # not forced back to the "add a photo" step...
-    assert page.status_code == 200 and b"Add a profile picture so people know" in page.data   # ...just reminded
+    page = client.get("/")                        # not forced back to the "add a photo" step, and no banner
+    assert page.status_code == 200 and b"photo-nudge" not in page.data
 
 
 def test_first_photo_still_required_to_pick_one(accounts, client):

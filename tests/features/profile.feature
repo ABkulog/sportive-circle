@@ -15,11 +15,12 @@ Feature: Profiles
     Then the saved photo is a 256 by 256 JPEG without GPS data
 
   @FR-PROF-3
-  Scenario: Your own profile has Edit profile and Change photo buttons
+  Scenario: Your own profile has one Edit profile button, and Add photo only without a photo
     Given "Maya" is a Husky
     When "Maya" opens her own profile
     Then they see "Edit profile"
-    And they see "Change photo"
+    And they don't see "Add photo"
+    And they don't see "Change photo"
 
   @FR-PROF-4
   Scenario: Emails are private until you've played together

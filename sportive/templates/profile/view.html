@@ -6,8 +6,8 @@
 <section class="profile">
   <div class="profile-top">
     {% if me %}
-      <a class="profile-photo" href="{{ url_for('profile.photo_upload') }}" aria-label="Change profile picture">
-        {{ avatar(user.id, user.full_name, user.avatar_updated, 84) }}<span class="photo-badge" aria-hidden="true">📷</span></a>
+      <a class="profile-photo" href="{{ url_for('profile.photo_upload') }}" aria-label="Profile picture">
+        {{ avatar(user.id, user.full_name, user.avatar_updated, 84) }}</a>
     {% else %}
       <span class="profile-photo">{{ avatar(user.id, user.full_name, user.avatar_updated, 84) }}</span>
     {% endif %}
@@ -23,7 +23,7 @@
   {% if me %}
     <div class="profile-buttons">
       <a class="btn btn-ghost" href="{{ url_for('profile.edit') }}">Edit profile</a>
-      <a class="btn btn-ghost" href="{{ url_for('profile.photo_upload') }}">Change photo</a>
+      {% if not user.avatar_updated %}<a class="btn" href="{{ url_for('profile.photo_upload') }}">Add photo</a>{% endif %}
     </div>
   {% elif relation.i_blocked %}
     <div class="profile-buttons">
@@ -95,50 +95,6 @@
   {% endif %}
 </section>
 {% endif %}
-
-<section class="band">
-  <h2>Ranks</h2>
-  {% if not user.show_ranks and user.id != g.user.id %}
-    <p class="muted">🧘 {{ user.full_name.split()[0] }} is in chill mode, so their ranks are hidden. Just here to play!</p>
-  {% elif ranks %}
-    {% if not user.show_ranks %}<p class="muted">🧘 Chill mode: only you can see these.</p>{% endif %}
-    <ul class="rank-chips" aria-label="Ranks by sport">
-      {% for sport, r in ranks.items() %}
-        <li class="rank-chip tier-{{ r.tier|lower }}">{{ SPORT_EMOJI[sport] }} {{ r.name }}</li>
-      {% endfor %}
-    </ul>
-    {% if me %}
-    <details class="fold rank-progress">
-      <summary>See my progress</summary>
-    <div class="rank-cards">
-      {% for sport, r in ranks.items() %}
-        <div class="rank-card tier-{{ r.tier|lower }}">
-          <div class="rank-card-top">
-            <span class="rank-sport">{{ SPORT_EMOJI[sport] }} {{ SPORTS[sport] }}</span>
-            <span class="rank-chip tier-{{ r.tier|lower }}">{{ r.name }}</span>
-          </div>
-          <div class="rank-bar" role="progressbar" aria-valuenow="{{ r.progress }}" aria-valuemin="0" aria-valuemax="100"
-               aria-label="Progress to {{ r.next_name or 'max rank' }}"><span style="width: {{ r.progress }}%"></span></div>
-          <p class="rank-meta">
-            <strong>{{ r.rep }} rep</strong>
-            {% if r.blocked_by %}
-              · needs {{ r.vouches_needed - r.vouches }} more vouch{{ 'es' if r.vouches_needed - r.vouches != 1 }}
-                {% if r.blocked_by == 'Competitive' %}from Intermediate+ players{% endif %} to reach {{ r.blocked_by }}
-            {% elif r.next_name %}
-              · {{ r.next_rep - r.rep }} rep to {{ r.next_name }}
-            {% else %}
-              · max rank 👑
-            {% endif %}
-          </p>
-        </div>
-      {% endfor %}
-    </div>
-    </details>
-    {% endif %}
-  {% else %}
-    <p class="muted">Everyone starts at Casual 1. Play games to rank up.</p>
-  {% endif %}
-</section>
 
 <section class="band">
   <h2 class="section-title">{{ 'Games you host' if me else 'Games ' ~ user.full_name.split()[0] ~ ' hosts' }}</h2>

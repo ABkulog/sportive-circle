@@ -21,6 +21,7 @@ def close_db(exception=None):
 # Columns added after the first version. "CREATE TABLE IF NOT EXISTS" never changes a table
 # that already exists, so databases with real data get these added here instead.
 # To add a column later: put it in schema.sql AND append it here.
+# (Columns and tables of removed features, like ranks, stay in older databases unused; nothing reads them.)
 ADDED_COLUMNS = [
     ("users", "verify_sent_at", "TEXT"),
     ("users", "failed_logins", "INTEGER NOT NULL DEFAULT 0"),
@@ -29,11 +30,6 @@ ADDED_COLUMNS = [
     ("rsvps", "reminder_sent", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "avatar_updated", "TEXT"),
     ("users", "showcase", "TEXT"),
-    ("users", "show_ranks", "INTEGER NOT NULL DEFAULT 1"),
-    ("events", "tryout_spots", "INTEGER NOT NULL DEFAULT 0"),
-    ("rsvps", "is_tryout", "INTEGER NOT NULL DEFAULT 0"),
-    ("events", "allow_plus_ones", "INTEGER NOT NULL DEFAULT 1"),
-    ("rsvps", "plus_one_of", "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
     ("events", "club_id", "INTEGER REFERENCES clubs(id) ON DELETE SET NULL"),
     ("clubs", "status", "TEXT NOT NULL DEFAULT 'pending'"),
     ("clubs", "club_kind", "TEXT NOT NULL DEFAULT ''"),
@@ -60,6 +56,7 @@ ADDED_COLUMNS = [
     ("clubs", "facebook", "TEXT NOT NULL DEFAULT ''"),
     ("clubs", "youtube", "TEXT NOT NULL DEFAULT ''"),
     ("users", "suspended", "INTEGER NOT NULL DEFAULT 0"),
+    ("users", "photo_skipped", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

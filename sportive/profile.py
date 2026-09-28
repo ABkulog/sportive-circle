@@ -13,7 +13,6 @@ from .events import celebrate_progress, query_events, tell_players_it_was_cancel
 from .photos import make_avatar
 from .badges import (ROLE_BADGES, SHOWCASE_SLOTS, catalog, earned_badges, is_retired, rarity,
                      set_showcase, showcase, sync_badges)
-from .ranks import LEVELS, user_ranks
 from .moderation import is_admin
 from .notifications import mark_seen
 from .textutil import one_line
@@ -24,14 +23,15 @@ bp = Blueprint("profile", __name__)
 
 # Pages you can still open before adding a profile picture.
 ALLOWED_WITHOUT_PHOTO = {"profile.photo_upload", "profile.photo_skip", "profile.photo", "profile.delete_account",
-                         "auth.logout", "how_it_works", "privacy", "terms", "static", "favicon", "touch_icon",
+                         "auth.logout", "how_it_works", "faq", "privacy", "terms", "static", "favicon", "touch_icon",
                          "touch_icon_precomposed"}
 
 
 @bp.before_app_request
 def require_profile_picture():
-    """Everyone needs a profile picture, so people know who they're meeting at the court."""
-    if g.get("user") is not None and not g.user["avatar_updated"] and not session.get("photo_skipped") \
+    """New accounts see the photo step once, so people know who they're meeting at the court.
+    "Add later" is remembered: nobody gets asked again on every page or every login."""
+    if g.get("user") is not None and not g.user["avatar_updated"] and not g.user["photo_skipped"] \
             and request.endpoint not in ALLOWED_WITHOUT_PHOTO:
         if request.method == "GET" and request.path != "/":
             session["after_photo"] = request.full_path  # e.g. a shared event link; go there afterwards
@@ -41,7 +41,7 @@ def require_profile_picture():
 @bp.route("/profile/photo", methods=("GET", "POST"))
 @login_required
 def photo_upload():
-    first_time = not g.user["avatar_updated"]
+    first_time = not g.user["avatar_updated"] and not g.user["photo_skipped"]  # the sign-up step
     if request.method == "POST":
         upload = request.files.get("photo")
         if (upload is None or not upload.filename) and not first_time:
@@ -62,13 +62,10 @@ def photo_upload():
                 db.execute("UPDATE users SET avatar_updated = ? WHERE id = ?", (version, g.user["id"]))
                 db.commit()
                 if first_time:
+                    flash("Looking good. You're all set!", "celebrate")
                     destination = session.pop("after_photo", None)
-                    if destination:
-                        flash("Looking good, Husky! You're all set.", "celebrate")
-                        return redirect(safe_next(destination))
-                    flash("Looking good, Husky! You're all set. Here's how Sportive Circle works.", "celebrate")
-                    return redirect(url_for("how_it_works"))
-                flash("Profile picture updated.", "success")
+                    return redirect(safe_next(destination) if destination else url_for("events.feed"))
+                flash("Photo updated.", "success")
                 return redirect(url_for("profile.view", user_id=g.user["id"]))
     return render_template("profile/photo.html", first_time=first_time)
 
@@ -76,25 +73,24 @@ def photo_upload():
 @bp.route("/profile/photo/remove", methods=("POST",))
 @login_required
 def photo_remove():
-    """Remove your photo. You won't be sent back to the "add a photo" step; a banner gently reminds you."""
+    """Remove your photo. You won't be sent back to the "add a photo" step."""
     db = get_db()
     db.execute("DELETE FROM avatars WHERE user_id = ?", (g.user["id"],))
-    db.execute("UPDATE users SET avatar_updated = NULL WHERE id = ?", (g.user["id"],))
+    db.execute("UPDATE users SET avatar_updated = NULL, photo_skipped = 1 WHERE id = ?", (g.user["id"],))
     db.commit()
-    session["photo_skipped"] = True
-    flash("Photo removed. Add one any time, so people recognize you at the game.", "info")
+    flash("Photo removed.", "info")
     return redirect(url_for("profile.view", user_id=g.user["id"]))
 
 
 @bp.route("/profile/photo/skip", methods=("POST",))
 @login_required
 def photo_skip():
-    """'Add later': let them in for now. They're asked again next time they log in,
-    and a banner reminds them until they add one."""
-    session["photo_skipped"] = True
-    flash("No problem! You can add a profile picture any time from your profile.", "info")
+    """'Add later': the page already said "No problem" in a pop-up. Remembered, so they aren't asked again."""
+    db = get_db()
+    db.execute("UPDATE users SET photo_skipped = 1 WHERE id = ?", (g.user["id"],))
+    db.commit()
     destination = session.pop("after_photo", None)
-    return redirect(safe_next(destination) if destination else url_for("how_it_works"))
+    return redirect(safe_next(destination) if destination else url_for("events.feed"))
 
 
 @bp.route("/u/<int:user_id>/photo")
@@ -113,7 +109,7 @@ def photo(user_id):
 @login_required
 def view(user_id):
     user = get_db().execute(
-        "SELECT id, full_name, email, grad_year, bio, avatar_updated, show_ranks, suspended, created_at FROM users"
+        "SELECT id, full_name, email, grad_year, bio, avatar_updated, suspended, created_at FROM users"
         " WHERE id = ? AND verified = 1",
         (user_id,),
     ).fetchone()
@@ -132,7 +128,6 @@ def view(user_id):
         mark_seen("badges")
     else:
         sync_badges(user_id)  # keep their showcase up to date
-    ranks = user_ranks(user_id)
     relation = None
     if user_id != g.user["id"]:
         me = g.user["id"]
@@ -140,7 +135,7 @@ def view(user_id):
                     "i_blocked": i_blocked(me, user_id), "blocked_me": is_blocked_between(me, user_id)
                     and not i_blocked(me, user_id)}
     return render_template("profile/view.html", user=user, sports=user_sports(user_id), hosting=hosting,
-                           show_email=show_email, ranks=ranks, levels=LEVELS,
+                           show_email=show_email,
                            showcase=showcase(user_id), earned=earned_badges(user_id), rarity=rarity(),
                            is_retired=is_retired, relation=relation)
 
@@ -175,7 +170,6 @@ def edit():
         bio = form.get("bio", "").strip()
         sports = [s for s in form.getlist("sports") if s in SPORTS]
         email_reminders = 1 if form.get("email_reminders") else 0
-        show_ranks = 1 if form.get("show_ranks") else 0
 
         error = None
         if not full_name:
@@ -189,9 +183,8 @@ def edit():
 
         if error is None:
             db = get_db()
-            db.execute("UPDATE users SET full_name = ?, grad_year = ?, bio = ?, email_reminders = ?, show_ranks = ?"
-                       " WHERE id = ?",
-                       (full_name, int(grad_year) if grad_year else None, bio, email_reminders, show_ranks, me["id"]))
+            db.execute("UPDATE users SET full_name = ?, grad_year = ?, bio = ?, email_reminders = ? WHERE id = ?",
+                       (full_name, int(grad_year) if grad_year else None, bio, email_reminders, me["id"]))
             set_user_sports(me["id"], sports)
             db.commit()
             flash("Profile saved.", "success")
@@ -200,8 +193,7 @@ def edit():
     else:
         form = MultiDict([("full_name", me["full_name"]), ("grad_year", me["grad_year"] or ""), ("bio", me["bio"])]
                          + [("sports", s) for s in user_sports(me["id"])]
-                         + ([("email_reminders", "1")] if me["email_reminders"] else [])
-                         + ([("show_ranks", "1")] if me["show_ranks"] else []))
+                         + ([("email_reminders", "1")] if me["email_reminders"] else []))
     return render_template("profile/edit.html", form=form, max_grad_year=now_local().year + 8)
 
 
@@ -233,7 +225,6 @@ def what_you_would_lose(user_id):
     return {
         "badges": one("SELECT COUNT(*) FROM user_badges WHERE user_id = ?", user_id),
         "og_badges": sum(1 for badge in catalog() if badge.until and badge.key in earned_badges(user_id)),
-        "ranks": user_ranks(user_id),
         "games": one("SELECT COUNT(*) FROM rsvps r JOIN events e ON e.id = r.event_id"
                      " WHERE r.user_id = ? AND e.cancelled = 0 AND e.ends_at < ?", user_id, now),
         "hosting": one("SELECT COUNT(*) FROM events WHERE host_id = ? AND cancelled = 0 AND ends_at >= ?", user_id, now),

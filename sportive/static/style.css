@@ -163,8 +163,6 @@ body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: 
 .tab.is-active { color: var(--text); }
 .tab.is-active .icon { stroke-width: 2.4; color: var(--accent); }
 .tab.is-active .tab-label { font-weight: 700; }
-.tab.is-active .tab-icon::after { content: ""; position: absolute; bottom: -5px; left: 50%; width: 4px; height: 4px;
-  margin-left: -2px; border-radius: 50%; background: var(--spirit-gold); }
 .side-logout { margin: 0; }
 body.hide-tabs .appnav { display: none; }
 body.hide-tabs { padding-bottom: 0; }
@@ -210,6 +208,12 @@ body.hide-tabs { padding-bottom: 0; }
 .danger-link, .link-button.danger-link { color: var(--danger); }
 .count-dot { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 5px;
   border-radius: 999px; background: var(--danger); color: #fff; font: 700 .66rem/1 var(--font); }
+/* Pop-ups (<dialog>): a small centered card, like an iPhone alert. */
+.popup { width: min(340px, calc(100vw - 32px)); padding: 22px 20px 18px; border: 0; border-radius: 16px;
+  background: var(--bg); color: var(--text); text-align: center; box-shadow: 0 12px 40px rgb(0 0 0 / .25); }
+.popup::backdrop { background: rgb(0 0 0 / .45); }
+.popup h2 { margin: 0 0 6px; font-size: 1.15rem; }
+.popup p { margin: 0 0 16px; color: var(--muted); }
 .back-link { display: inline-flex; align-items: center; gap: 2px; min-height: 36px; margin-bottom: 4px; color: var(--muted); font-weight: 600; font-size: .9rem; }
 
 /* chips & tags: quiet, neutral */
@@ -259,18 +263,16 @@ section.card h2, details.card h2 { margin-top: 0; }
 .people > li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .people > li:last-child { border-bottom: 0; }
 .post-game-row { justify-content: space-between; flex-wrap: wrap; }
-.post-game-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.post-game-actions form { margin: 0; }
 .person { display: inline-flex; align-items: center; gap: 10px; color: var(--text); font-weight: 600; }
 .person:hover { text-decoration: none; }
 .person-extra { display: block; font-weight: 400; color: var(--muted); }
-.people .rank-chip { margin-left: auto; }
 
 /* avatars */
 .avatar-img { --size: 40px; width: var(--size); height: var(--size); flex: none; border-radius: 50%;
   object-fit: cover; background: var(--surface); }
+/* Initials, like Gmail or iMessage: the letter sits in the exact middle of the circle. */
 .avatar-initial { display: inline-grid; place-items: center; background: var(--accent-soft); color: var(--accent);
-  font-weight: 700; font-size: calc(var(--size) * .42); }
+  font-weight: 700; font-size: calc(var(--size) * .42); line-height: 1; text-align: center; }
 
 /* ============================== Event rows (Home, My events, profiles) ============================== */
 .event-card { position: relative; display: flex; gap: 12px; align-items: center; padding: 14px 0;
@@ -394,10 +396,6 @@ form[data-wizard] .form-step { display: none; }
 .flash-error { border-left-color: var(--danger); }
 .flash-info { border-left-color: var(--accent); }
 .flash-birthday { border-left-color: var(--gold); }
-.photo-nudge { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; align-items: center;
-  margin-bottom: 12px; padding: 10px 14px; border-radius: 10px; background: var(--surface); color: var(--text); font-size: .9rem; }
-.photo-nudge:hover { text-decoration: none; }
-.photo-nudge strong { color: var(--accent); }
 .note { background: var(--surface); border-radius: 10px; padding: 12px; white-space: pre-line; }
 
 /* ============================== Event page ============================== */
@@ -424,7 +422,6 @@ form[data-wizard] .form-step { display: none; }
 .map-status { margin: 0; min-height: 1.4em; font-size: .88rem; }
 .cancel-event { margin: 14px 0 0; text-align: center; }
 .locked-level { border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
-.post-game h2 { margin-bottom: 4px; }
 
 /* ============================== Profiles & badges ============================== */
 /* Profile header, like Instagram: photo + name, then bio, then full-width buttons. */
@@ -434,9 +431,8 @@ form[data-wizard] .form-step { display: none; }
 .profile-photo { position: relative; flex: none; display: inline-flex; line-height: 0; border-radius: 50%;
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--purple); }
 .profile-photo .avatar-img { display: block; }
+.profile-photo .avatar-initial { display: grid; }
 .profile-photo:hover { text-decoration: none; }
-.photo-badge { position: absolute; right: -4px; bottom: -4px; width: 30px; height: 30px; border-radius: 50%;
-  display: grid; place-items: center; font-size: .9rem; background: var(--bg); box-shadow: 0 0 0 1px var(--line); }
 .profile-name { min-width: 0; }
 .profile-name h1 { margin: 0 0 2px; overflow-wrap: anywhere; }
 .profile-name p { margin: 0; font-size: .92rem; overflow-wrap: anywhere; }
@@ -494,26 +490,6 @@ form[data-wizard] .form-step { display: none; }
 .file-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .photo-picker:focus-within .btn { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* ranks */
-.rank-chip { display: inline-block; padding: 3px 9px; border-radius: 999px; background: var(--surface);
-  font: 650 .75rem/1.4 var(--font); color: var(--muted); white-space: nowrap; }
-.rank-chip.tier-intermediate { color: #7a6420; }
-.rank-chip.tier-competitive { color: var(--accent); }
-.rank-chip.tier-legend { color: var(--purple-strong); box-shadow: inset 0 0 0 1.5px var(--gold); }
-@media (prefers-color-scheme: dark) {
-  .rank-chip.tier-intermediate { color: #e2cf93; }
-  .rank-chip.tier-legend { color: var(--spirit-gold); }
-}
-.rank-chips { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.rank-chips .rank-chip { font-size: .85rem; padding: 5px 12px; color: var(--text); }
-.rank-cards { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-top: 8px; }
-.rank-card { display: grid; gap: 8px; padding: 12px; border-radius: 10px; background: var(--surface); }
-.rank-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.rank-sport { font-weight: 600; }
-.rank-bar { height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
-.rank-bar span { display: block; height: 100%; background: var(--purple); }
-.rank-meta { margin: 0; font-size: .82rem; color: var(--muted); }
-.rank-meta strong { color: var(--text); }
 .stat-row { list-style: none; display: flex; justify-content: space-around; padding: 12px 0; margin: 14px 0 8px;
   border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .stat-row li { display: grid; justify-items: center; }
@@ -585,16 +561,6 @@ form[data-wizard] .form-step { display: none; }
 .team-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .team-chips .chip { white-space: nowrap; font-size: .85rem; }
 .team-chips .chip:hover { text-decoration: none; }
-.news-card { display: flex; gap: 12px; align-items: center; padding: 14px 0; color: var(--text);
-  border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
-.news-card:hover { text-decoration: none; }
-.news-card:hover .news-title { text-decoration: underline; }
-.news-emoji { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; font-size: 1.2rem; }
-.news-body { flex: 1; min-width: 0; display: grid; gap: 2px; }
-.news-team { font-size: .75rem; font-weight: 600; color: var(--muted); }
-.news-title { line-height: 1.35; font-weight: 600; }
-.news-arrow { color: var(--faint); }
-.news-credit { font-size: .82rem; margin-top: 16px; }
 
 /* ============================== Chat & messages ============================== */
 .chat-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
@@ -661,7 +627,6 @@ form[data-wizard] .form-step { display: none; }
 .feature h3 { margin: 0 0 2px; }
 .feature p { margin: 0; color: var(--muted); }
 .sport-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
-.how-hero { padding: 8px 0 4px; }
 .steps { list-style: none; padding: 0; margin: 12px 0 20px; }
 .step { display: flex; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
 .step h2 { margin: 0 0 2px; font-size: 1rem; }
@@ -674,11 +639,8 @@ form[data-wizard] .form-step { display: none; }
 .faq details p { margin: 8px 0 0; color: var(--muted); }
 .how-cta { text-align: center; padding: 28px 0 8px; }
 .step-number { background: var(--purple); color: var(--spirit-gold); }
-.glossary { margin: 0; }
-.glossary div { padding: 10px 0; border-bottom: 1px solid var(--line); }
-.glossary dt { font-weight: 700; }
-.glossary dd { margin: 2px 0 0; color: var(--muted); }
-.faq + .faq { margin-top: 20px; }
+.step, .step:hover { color: var(--text); text-decoration: none; }
+.how-cta p { margin-top: 14px; }
 /* Privacy & Terms */
 .legal h2 { margin-top: 22px; }
 .legal li { margin-bottom: 6px; }

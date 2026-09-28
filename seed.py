@@ -60,12 +60,12 @@ def demo_picture(name, color):
     return make_avatar(output.getvalue())
 
 
-# Past games so demo players already have ranks: (host index, sport, place, how many games)
+# Past games so demo players already have a history and badges: (host index, sport, place, how many games)
 HISTORY = [
-    (0, "basketball", "IMA (Intramural Activities Building)", 9),  # Maya -> Intermediate in basketball
-    (2, "climbing", "IMA (Intramural Activities Building)", 8),    # Sam -> Intermediate in climbing
-    (1, "ultimate", "Denny Field", 8),                             # Jordan -> Intermediate in ultimate
-    (3, "tennis", "IMA South Tennis Courts", 3),                   # Priya -> still Casual
+    (0, "basketball", "IMA (Intramural Activities Building)", 9),
+    (2, "climbing", "IMA (Intramural Activities Building)", 8),
+    (1, "ultimate", "Denny Field", 8),
+    (3, "tennis", "IMA South Tennis Courts", 3),
 ]
 
 
@@ -123,9 +123,6 @@ def add_history(db, ids, now):
             for user_id in ids:  # everyone played
                 db.execute("INSERT INTO rsvps (event_id, user_id, created_at, reminder_sent) VALUES (?, ?, ?, 1)",
                            (cur.lastrowid, user_id, to_db(starts - timedelta(days=1))))
-        for other in ids:  # the other three vouch for the host
-            if other != ids[host] and games >= 8:
-                db.execute("INSERT OR IGNORE INTO vouches VALUES (?, ?, ?, ?)", (sport, other, ids[host], to_db(now)))
 
 
 def main():
@@ -169,7 +166,7 @@ def main():
         add_history(db, ids, now)
         add_clubs(db, ids, now)
         db.commit()
-        print(f"Added {len(USERS)} demo users and {len(EVENTS)} events, with past games and ranks.")
+        print(f"Added {len(USERS)} demo users and {len(EVENTS)} events, with past games.")
         print(f"Log in as {USERS[0][0]} with password {DEMO_PASSWORD}")
 
 

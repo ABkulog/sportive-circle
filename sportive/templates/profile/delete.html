@@ -8,10 +8,6 @@
   <ul class="lose-list">
     <li>🏅 <strong>{{ lose.badges }}</strong> badge{{ 's' if lose.badges != 1 }}{% if lose.og_badges %},
       including <strong>{{ lose.og_badges }}</strong> limited/OG badge{{ 's' if lose.og_badges != 1 }} you can never earn again{% endif %}</li>
-    {% if lose.ranks %}
-      <li>🔥 Your ranks:
-        {% for sport, r in lose.ranks.items() %}{{ SPORT_EMOJI[sport] }} {{ r.name }}{% if not loop.last %}, {% endif %}{% endfor %}</li>
-    {% endif %}
     <li>🐾 Your history of <strong>{{ lose.games }}</strong> game{{ 's' if lose.games != 1 }}</li>
     <li>👥 <strong>{{ lose.friends }}</strong> friend{{ 's' if lose.friends != 1 }} and <strong>{{ lose.messages }}</strong> message{{ 's' if lose.messages != 1 }}</li>
     {% if lose.hosting %}

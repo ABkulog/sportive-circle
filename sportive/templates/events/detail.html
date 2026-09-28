@@ -16,6 +16,7 @@
 {% block content %}
 {% set left = spots_left(event) %}
 {% set is_host = event.host_id == g.user.id %}
+<a class="back-link" href="{{ url_for('events.feed') }}" data-back>← Back</a>
 <article class="card detail">
   <div class="detail-head">
     <div class="event-emoji big" aria-hidden="true">{{ SPORT_EMOJI[event.sport] }}</div>
@@ -23,7 +24,7 @@
       <h1>{{ event_title(event) }}</h1>
       <div class="badges">
         <span class="badge">{{ SPORTS[event.sport] }}</span>
-        <span class="badge">{{ event.skill_level }}</span>
+        {% if event.skill_level != 'All levels' %}<span class="badge">{{ event.skill_level }}</span>{% endif %}
         {% if event.is_quick %}<span class="badge badge-gold">Need players</span>{% endif %}
         {% if event.club_id %}<a class="badge badge-club" href="{{ url_for('clubs.view', club_id=event.club_id) }}">🏛️ {{ event.club_name }}</a>{% endif %}
         {% if event.cancelled %}<span class="badge badge-danger">Canceled</span>{% elif ended %}<span class="badge badge-muted">Ended</span>{% endif %}
@@ -58,19 +59,6 @@
         <p class="muted">You can't join this game.</p>
       {% elif left == 0 %}
         <button class="btn btn-large btn-block" disabled>Full</button>
-      {% elif my_invite %}
-        <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
-          {{ csrf_field() }}<button class="btn btn-gold btn-large btn-block">Join as {{ my_invite.full_name.split()[0] }}'s +1</button>
-        </form>
-        <p class="hint">{{ my_invite.full_name.split()[0] }} is bringing you to this {{ event.skill_level }} game.</p>
-      {% elif tryout %}
-        <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
-          {{ csrf_field() }}<button class="btn btn-gold btn-large btn-block">Try out</button>
-        </form>
-        <p class="hint">A tryout spot for players still ranking up. Play well, then ask for vouches.</p>
-      {% elif not level_ok %}
-        <button class="btn btn-large btn-block" disabled>{{ event.skill_level }}+ only</button>
-        <p class="hint">{{ level_reason }}</p>
       {% else %}
         <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
           {{ csrf_field() }}<button class="btn btn-large btn-block">Join</button>
@@ -136,13 +124,6 @@
         {% if is_team(person.id) %}<span class="team-pill" title="Runs Sportive Circle">🐾 Team</span>{% endif %}
         {% if person.grad_year %}<span class="muted">’{{ (person.grad_year|string)[-2:] }}</span>{% endif %}
         {% if person.id == event.host_id %}<span class="badge badge-purple">Host</span>{% endif %}
-        {% if person.is_tryout %}<span class="badge badge-gold">🎟️ Tryout</span>{% endif %}
-        {% if person.plus_one_of %}<span class="badge badge-gold">🤝 {{ names.get(person.plus_one_of, 'A friend') }}'s +1</span>{% endif %}
-        {# Ranks only show in ranked games, and never for people in chill mode. #}
-        {% if ranked_game and person.show_ranks %}
-          {% set r = ranks[person.id] %}
-          <span class="rank-chip tier-{{ r.tier|lower }}" title="{{ SPORTS[event.sport] }} rank">{{ r.name }}</span>
-        {% endif %}
       </li>
     {% endfor %}
     {% if event.extra_players %}
@@ -150,67 +131,4 @@
     {% endif %}
   </ul>
 </section>
-{% if plus_one.eligible %}
-  <details class="band fold" id="plus-one" {% if plus_one.sent %}open{% endif %}>
-    <summary><strong>🤝 Bring a friend</strong> <span class="muted">· one +1 for this game</span></summary>
-    {% if plus_one.sent %}
-      <p>You invited <strong>{{ plus_one.sent.full_name }}</strong> as your +1.
-        {% if plus_one.sent.joined %}They're in! ✅{% else %}Waiting for them to join.{% endif %}</p>
-      {% if not plus_one.sent.joined %}
-        <form method="post" action="{{ url_for('events.cancel_plus_one', event_id=event.id) }}">
-          {{ csrf_field() }}<button class="btn btn-small btn-ghost">Cancel invite</button>
-        </form>
-      {% endif %}
-    {% elif plus_one.full %}
-      <p class="muted">This game already has the max number of +1s.</p>
-    {% else %}
-      <p class="muted">Bring a friend who isn't {{ event.skill_level }} yet.</p>
-      <ul class="people">
-        {% for f in plus_one.friends %}
-          <li class="post-game-row">
-            <span class="person">{{ avatar(f.id, f.full_name, f.avatar_updated, 32) }}{{ f.full_name }}</span>
-            <form method="post" action="{{ url_for('events.invite_plus_one', event_id=event.id, friend_id=f.id) }}">
-              {{ csrf_field() }}<button class="btn btn-small">Invite as +1</button>
-            </form>
-          </li>
-        {% else %}
-          <li class="muted">Add <a href="{{ url_for('social.friends') }}">friends</a> first. Then you can bring one as your +1.</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-  </details>
-{% endif %}
-
-{% if post_game %}
-  <section class="band post-game" id="post-game">
-    <h2>GG! How was the game?</h2>
-    <p class="muted">Give your teammates some love. It helps them rank up in {{ SPORTS[event.sport] }}.
-      <strong>🤝 Props</strong> = good teammate. <strong>⬆️ Vouch</strong> = ready for the next level.</p>
-    <ul class="people">
-      {% for person in attendees if person.id != g.user.id %}
-        <li class="post-game-row">
-          <span class="person">{{ avatar(person.id, person.full_name, person.avatar_updated, 32) }}{{ person.full_name }}</span>
-          <span class="post-game-actions">
-            {% if person.id in props_given %}
-              <span class="done-pill">🤝 Props sent</span>
-            {% else %}
-              <form method="post" action="{{ url_for('events.give_props', event_id=event.id, user_id=person.id) }}">
-                {{ csrf_field() }}<button class="btn btn-small">Props</button>
-              </form>
-            {% endif %}
-            {% if person.id in vouched %}
-              <span class="done-pill">⬆️ Vouched</span>
-            {% else %}
-              <form method="post" action="{{ url_for('events.vouch', event_id=event.id, user_id=person.id) }}">
-                {{ csrf_field() }}<button class="btn btn-small btn-ghost">Vouch</button>
-              </form>
-            {% endif %}
-          </span>
-        </li>
-      {% else %}
-        <li class="muted">Nobody else on the app played this one.</li>
-      {% endfor %}
-    </ul>
-  </section>
-{% endif %}
 {% endblock %}

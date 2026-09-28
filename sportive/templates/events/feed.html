@@ -4,7 +4,7 @@
 {% block content %}
 {{ home_tabs('feed') }}
 <aside class="welcome-help" data-tip="welcome" hidden>
-  <span>👋 New here? <a href="{{ url_for('how_it_works') }}">See how Sportive Circle works</a> in 1 minute.</span>
+  <span>New here? <a href="{{ url_for('how_it_works') }}">How it works</a> · <a href="{{ url_for('faq') }}">FAQ</a></span>
   <button type="button" class="link-button" aria-label="Dismiss" data-tip-close>{{ icon('x') }}</button>
 </aside>
 <header class="feed-hello compact">

@@ -23,6 +23,32 @@
     });
   });
 
+  // <a data-back>: go back to wherever you came from in the app (the link itself is the fallback,
+  // e.g. when the page was opened from a shared link).
+  document.querySelectorAll("[data-back]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      let fromHere = false;
+      try { fromHere = new URL(document.referrer).origin === location.origin; } catch (e) { /* no referrer */ }
+      if (fromHere && history.length > 1) { event.preventDefault(); history.back(); }
+    });
+  });
+
+  // <form data-dialog="id">: show that <dialog> first (e.g. "No problem!" after "Add later"); its
+  // button sends the form. Without JavaScript the form just sends right away.
+  document.querySelectorAll("form[data-dialog]").forEach((form) => {
+    const dialog = document.getElementById(form.dataset.dialog);
+    if (!dialog || typeof dialog.showModal !== "function") return;
+    form.addEventListener("submit", (event) => {
+      if (form.dataset.dialogShown) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      dialog.showModal();
+    }, true);
+    dialog.querySelectorAll("[data-dialog-continue]").forEach((button) => {
+      button.addEventListener("click", () => { form.dataset.dialogShown = "1"; dialog.close(); form.requestSubmit(); });
+    });
+  });
+
   // <select data-autosubmit>: filters apply as soon as you pick something.
   document.addEventListener("change", (event) => {
     const field = event.target;

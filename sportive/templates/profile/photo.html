@@ -6,9 +6,9 @@
   {% if first_time %}
     <p class="eyebrow">Last step</p>
     <h1>Add a profile picture</h1>
-    <p class="muted">Use a clear photo of your face, so people can find you at the court or the trailhead.</p>
+    <p class="muted">Use a clear photo of your face.</p>
   {% else %}
-    <h1>Change your profile picture</h1>
+    <h1>Profile picture</h1>
   {% endif %}
 
   <form method="post" enctype="multipart/form-data" class="form photo-form">
@@ -20,21 +20,26 @@
       <span class="btn btn-ghost">Choose a photo</span>
       <input type="file" name="photo" id="photo-input" accept="image/*" class="file-input" {% if first_time %}required{% endif %}>
     </label>
-    <button class="btn btn-block">{{ 'Save photo' if first_time else 'Save' }}</button>
+    <button class="btn btn-block">Save</button>
   </form>
 
   {% if first_time %}
-    <form method="post" action="{{ url_for('profile.photo_skip') }}">
+    <form method="post" action="{{ url_for('profile.photo_skip') }}" data-dialog="later-dialog">
       {{ csrf_field() }}<button class="btn btn-ghost">Add later</button>
     </form>
+    <dialog id="later-dialog" class="popup" aria-labelledby="later-title">
+      <h2 id="later-title">No problem</h2>
+      <p>You can add one anytime from your profile.</p>
+      <button type="button" class="btn btn-block" data-dialog-continue>Continue</button>
+    </dialog>
   {% else %}
-    <p class="muted fine-print">Not changing it? Just tap Save to go back.</p>
     <div class="photo-extra">
-      <a class="btn btn-ghost" href="{{ url_for('profile.view', user_id=g.user.id) }}">Back to my profile</a>
-      <form method="post" action="{{ url_for('profile.photo_remove') }}"
-            data-confirm="Remove your profile picture? People use it to find you at games.">
+      <a class="btn btn-ghost" href="{{ url_for('profile.view', user_id=g.user.id) }}">Back</a>
+      {% if g.user.avatar_updated %}
+      <form method="post" action="{{ url_for('profile.photo_remove') }}" data-confirm="Remove your profile picture?">
         {{ csrf_field() }}<button class="btn btn-danger-ghost">Remove photo</button>
       </form>
+      {% endif %}
     </div>
   {% endif %}
 </div>

@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
     email_reminders INTEGER NOT NULL DEFAULT 1,    -- 0 = don't email me before events
     avatar_updated  TEXT,                          -- when the profile picture changed (NULL = none yet)
     showcase        TEXT,                          -- up to 3 badge keys shown on the profile, comma-separated
-    show_ranks      INTEGER NOT NULL DEFAULT 1,    -- 0 = chill mode (ranks hidden from others)
+    photo_skipped   INTEGER NOT NULL DEFAULT 0,    -- 1 = chose "Add later" (don't ask again)
     suspended       INTEGER NOT NULL DEFAULT 0,    -- 1 = an admin suspended the account (can't log in)
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -52,8 +52,6 @@ CREATE TABLE IF NOT EXISTS events (
     extra_players INTEGER NOT NULL DEFAULT 0,      -- people already playing who aren't on the app
     note          TEXT NOT NULL DEFAULT '',
     is_quick      INTEGER NOT NULL DEFAULT 0,      -- 1 = "Need players" quick post
-    tryout_spots  INTEGER NOT NULL DEFAULT 0,      -- spots lower-ranked players can take to prove themselves
-    allow_plus_ones INTEGER NOT NULL DEFAULT 1,    -- ranked players may bring one friend (+1)
     club_id       INTEGER REFERENCES clubs(id) ON DELETE SET NULL,  -- a club's event (always all levels)
     cancelled     INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
@@ -66,47 +64,18 @@ CREATE TABLE IF NOT EXISTS rsvps (
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),  -- the app always passes Seattle time
     reminder_sent INTEGER NOT NULL DEFAULT 0,
-    is_tryout     INTEGER NOT NULL DEFAULT 0,      -- joined through a tryout spot
-    plus_one_of   INTEGER REFERENCES users(id) ON DELETE SET NULL,  -- joined as this friend's +1
     PRIMARY KEY (event_id, user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_rsvps_user ON rsvps(user_id);
 
--- ---------------------------------------------------------------- ranks & badges
--- 🤝 Props: after a game, players give each other props (once per person per game).
-CREATE TABLE IF NOT EXISTS props (
-    event_id    INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    giver_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at  TEXT NOT NULL,
-    PRIMARY KEY (event_id, giver_id, receiver_id)
-);
-
--- ⬆️ Vouches: "they're ready for the next level" in a sport (once per person per sport).
-CREATE TABLE IF NOT EXISTS vouches (
-    sport       TEXT NOT NULL,
-    giver_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at  TEXT NOT NULL,
-    PRIMARY KEY (sport, giver_id, receiver_id)
-);
-CREATE INDEX IF NOT EXISTS idx_vouches_receiver ON vouches(receiver_id, sport);
-
+-- ---------------------------------------------------------------- badges
 -- Badges are saved when earned, so they (and the date) stay forever, even limited ones.
 CREATE TABLE IF NOT EXISTS user_badges (
     user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     badge     TEXT NOT NULL,
     earned_at TEXT NOT NULL,
     PRIMARY KEY (user_id, badge)
-);
-
--- The last rank each person has seen per sport, to celebrate rank-ups.
-CREATE TABLE IF NOT EXISTS ranks_seen (
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    sport   TEXT NOT NULL,
-    level   INTEGER NOT NULL,
-    PRIMARY KEY (user_id, sport)
 );
 
 -- ---------------------------------------------------------------- social
@@ -159,17 +128,8 @@ CREATE TABLE IF NOT EXISTS event_chat_seen (
     PRIMARY KEY (event_id, user_id)
 );
 
--- "Bring a friend": a ranked player invites one friend (+1) into a ranked game.
-CREATE TABLE IF NOT EXISTS plus_one_invites (
-    event_id   INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    sponsor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    guest_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at TEXT NOT NULL,
-    PRIMARY KEY (event_id, guest_id)
-);
-
 -- ---------------------------------------------------------------- clubs
--- Verified UW clubs. Anyone can browse approved clubs; officers confirm who becomes a member. No ranks here.
+-- Verified UW clubs. Anyone can browse approved clubs; officers confirm who becomes a member.
 CREATE TABLE IF NOT EXISTS clubs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL UNIQUE COLLATE NOCASE,

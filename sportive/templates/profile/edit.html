@@ -19,10 +19,6 @@
       <textarea name="bio" maxlength="300" rows="3" placeholder="CSE '28. Always down for pickup hoops.">{{ form.get('bio', '') }}</textarea></label>
     {{ sport_checkboxes(form) }}
     <label class="toggle">
-      <input type="checkbox" name="show_ranks" value="1" {% if form.get('show_ranks') %}checked{% endif %}>
-      <span>Show my ranks to other people <em>(turn off for 🧘 chill mode)</em></span>
-    </label>
-    <label class="toggle">
       <input type="checkbox" name="email_reminders" value="1" {% if form.get('email_reminders') %}checked{% endif %}>
       <span>Email me an hour before events I'm going to</span>
     </label>

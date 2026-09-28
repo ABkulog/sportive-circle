@@ -8,7 +8,6 @@ from datetime import date
 
 from .db import get_db
 from .moderation import admin_emails
-from .ranks import FIRST_LEVEL_OF, user_ranks
 from .timeutil import from_db, now_local, to_db
 
 Badge = namedtuple("Badge", "key emoji name how until")  # until = last day it can be earned (None = forever)
@@ -34,12 +33,6 @@ PERMANENT = [
     Badge("regular", "🔥", "Regular", "Play 10 games", None),
     Badge("veteran", "🎖️", "Veteran", "Play 50 games", None),
     Badge("pack_leader", "🐺", "Pack Leader", "Host 5 games", None),
-    Badge("good_sport", "🤝", "Good Sport", "Get 10 props from teammates", None),
-    Badge("hype_dawg", "📣", "Hype Dawg", "Give 10 props to teammates", None),
-    Badge("level_up", "⬆️", "Level Up", "Reach Intermediate in any sport", None),
-    Badge("competitor", "💎", "Competitor", "Reach Competitive in any sport", None),
-    Badge("legend", "👑", "Legend", "Reach Legend in any sport", None),
-    Badge("multi_threat", "⭐", "Multi-Threat", "Reach Intermediate in 2 different sports", None),
     Badge("rain_or_shine", "🌧️", "Rain or Shine", "Play during Seattle's rainy season (Oct–Mar)", None),
     Badge("early_dawg", "🌅", "Early Dawg", "Play a game that starts between 5 and 8 AM", None),
     Badge("night_dawg", "🌙", "Night Dawg", "Play a game that starts at 9 PM or later (after midnight counts!)", None),
@@ -96,9 +89,6 @@ def eligible(user_id):
     ).fetchall()
     starts = [from_db(game["starts_at"]) for game in games]
     hosted = sum(1 for game in games if game["host_id"] == user_id)
-    props_in = db.execute("SELECT COUNT(*) FROM props WHERE receiver_id = ?", (user_id,)).fetchone()[0]
-    props_out = db.execute("SELECT COUNT(*) FROM props WHERE giver_id = ?", (user_id,)).fetchone()[0]
-    levels = [rank.level for rank in user_ranks(user_id).values()]
 
     keys = set()
     checks = {
@@ -106,12 +96,6 @@ def eligible(user_id):
         "regular": len(games) >= 10,
         "veteran": len(games) >= 50,
         "pack_leader": hosted >= 5,
-        "good_sport": props_in >= 10,
-        "hype_dawg": props_out >= 10,
-        "level_up": any(level >= FIRST_LEVEL_OF["Intermediate"] for level in levels),
-        "competitor": any(level >= FIRST_LEVEL_OF["Competitive"] for level in levels),
-        "legend": any(level >= FIRST_LEVEL_OF["Legend"] for level in levels),
-        "multi_threat": sum(level >= FIRST_LEVEL_OF["Intermediate"] for level in levels) >= 2,
         "rain_or_shine": any(s.month in (10, 11, 12, 1, 2, 3) for s in starts),
         "early_dawg": any(5 <= s.hour < 8 for s in starts),
         "night_dawg": any(s.hour >= 21 or s.hour < 5 for s in starts),

@@ -60,7 +60,7 @@ def logged_in(app, password, email=None):
 
 # ------------------------------------------------------------------ 3. link crawl
 
-START = ["/", "/how-it-works", "/privacy", "/terms", "/clubs", "/news", "/create", "/me/events", "/friends",
+START = ["/", "/how-it-works", "/faq", "/privacy", "/terms", "/clubs", "/create", "/me/events", "/friends",
          "/friends?q=ma", "/messages", "/profile/edit", "/profile/badges", "/profile/notifications", "/profile/photo",
          "/clubs/updates", "/admin/reports", "/admin/clubs", "/u/1", "/u/2", "/events/new", "/need-players",
          "/clubs/new", "/signup", "/login", "/forgot", "/suggestions", "/admin/suggestions",
@@ -130,9 +130,8 @@ FIELDS = {
     "/login": ["email", "password", "next"],
     "/forgot": ["email"],
     "/events/new": ["title", "sport", "location", "skill_level", "starts_at", "ends_at", "max_players", "note",
-                    "tryout_spots", "allow_plus_ones", "club"],
-    "/need-players": ["sport", "location", "skill_level", "starts_in", "duration", "needed", "have", "note",
-                      "tryout_spots"],
+                    "club"],
+    "/need-players": ["sport", "location", "skill_level", "starts_in", "duration", "needed", "have", "note"],
     "/events/2/edit": ["title", "sport", "location", "skill_level", "starts_at", "ends_at", "max_players", "note"],
     "/profile/edit": ["full_name", "grad_year", "bio", "sports"],
     "/profile/password": ["current_password", "password", "password2"],
@@ -149,17 +148,17 @@ FIELDS = {
     "/admin/clubs/1/reject": ["note"],
     "/profile/photo/remove": [],
     "/suggestions": ["kind", "body", "anonymous"],
-    "/profile/notifications": ["messages_badge", "messages_screen", "news_badge", "club_updates_screen", "bogus_kind_badge"],
+    "/profile/notifications": ["messages_badge", "messages_screen", "badges_badge", "club_updates_screen", "bogus_kind_badge"],
     "/admin/users/3/suspend": [],
 }
 
 GETS = ["/?sport={}", "/?when={}", "/?location={}", "/?skill={}&scope={}", "/clubs?q={}&sport={}&easy={}",
-        "/friends?q={}", "/news?team={}&scope={}", "/messages/2/poll?after={}", "/events/2/chat/poll?after={}",
+        "/friends?q={}", "/messages/2/poll?after={}", "/events/2/chat/poll?after={}",
         "/login?next={}", "/signup?next={}", "/clubs/new?sport={}", "/events/new?sport={}&club={}"]
 
 ODD_URLS = ["/events/999999", "/events/0/join", "/clubs/999999", "/u/999999", "/u/999999/photo", "/messages/999999",
             "/report/nothing/1", "/report/dm/999999", "/admin/users/999999/suspend", "/clubs/1/members/999999/approve",
-            "/events/2/props/999999", "/events/2/vouch/999999", "/events/2/plus-one/999999", "/friends/request/999999",
+            "/friends/request/999999",
             "/block/999999", "/reset", "/verify", "/profile/notifications",
             "/admin/users/1/explode", "/admin/users/99999999999999999999/suspend"]
 

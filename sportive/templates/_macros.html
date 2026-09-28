@@ -25,22 +25,6 @@
   </fieldset>
 {% endmacro %}
 
-{% macro ranked_options(form) %}
-  {# Tryout spots and +1s. forms.js shows them only for Intermediate / Competitive games. #}
-  <small class="muted" data-ranked-hint></small>
-  <label class="field" data-tryout-field>
-    <span>Tryout spots</span>
-    <select name="tryout_spots">
-      {% for n in range(0, 4) %}<option value="{{ n }}" {% if form.get('tryout_spots', '0')|string == n|string %}selected{% endif %}>{{ n if n else 'None' }}</option>{% endfor %}
-    </select>
-    <small class="muted">Spots for players who haven't ranked up yet but want to prove themselves.</small>
-  </label>
-  <label class="toggle" data-tryout-field>
-    <input type="checkbox" name="allow_plus_ones" value="1" {% if form.get('allow_plus_ones') %}checked{% endif %}>
-    <span>Let players bring one friend as a +1 <em>(max 2 per game)</em></span>
-  </label>
-{% endmacro %}
-
 {% macro select(name, label, options, current, placeholder=None) %}
   <label class="field">
     <span>{{ label }}</span>
@@ -70,10 +54,7 @@
         {% if e.cancelled %}<span class="badge badge-danger">Canceled</span>
         {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Hosting</span>
         {% elif e.i_am_going %}<span class="badge badge-success">You're going</span>
-        {% elif left == 0 %}<span class="badge badge-muted">Full</span>
-        {% elif can_join_or_tryout(e) == 'plus_one' %}<span class="badge badge-gold">🤝 You're invited as a +1</span>
-        {% elif can_join_or_tryout(e) == 'tryout' %}<span class="badge badge-gold">🎟️ {{ e.tryout_spots - e.tryouts_used }} tryout spot{{ 's' if e.tryout_spots - e.tryouts_used != 1 }}</span>
-        {% elif not can_join_level(e.sport, e.skill_level) %}<span class="badge badge-muted">🔒 {{ e.skill_level }}+</span>{% endif %}
+        {% elif left == 0 %}<span class="badge badge-muted">Full</span>{% endif %}
       </div>
     </div>
     <div class="event-side">
@@ -86,13 +67,11 @@
         <strong>{{ e.going_count + e.extra_players }}</strong>{% if e.max_players %}/{{ e.max_players }}{% endif %}
         <small>going</small>
       </div>
-      {% set way_in = can_join_or_tryout(e) %}
-      {% if not e.cancelled and not e.i_am_going and left != 0 and way_in %}
+      {% if not e.cancelled and not e.i_am_going and left != 0 %}
         <form method="post" action="{{ url_for('events.join', event_id=e.id) }}" class="card-join">
           {{ csrf_field() }}
           <input type="hidden" name="next" value="{{ request.full_path }}">
-          <button class="btn btn-small {% if way_in in ('tryout', 'plus_one') %}btn-gold{% endif %}"
-                  aria-label="Join {{ event_title(e) }}">{{ 'Try out' if way_in == 'tryout' else ('Join as +1' if way_in == 'plus_one' else 'Join') }}</button>
+          <button class="btn btn-small" aria-label="Join {{ event_title(e) }}">Join</button>
         </form>
       {% endif %}
     </div>

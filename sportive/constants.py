@@ -5,23 +5,24 @@ database, so only change a key if there is no data using it yet; labels are
 safe to change any time.
 """
 
+# Alphabetical (Other last), because that's the order every dropdown shows them in.
 SPORTS = {
     "basketball": "Basketball",
-    "soccer": "Soccer",
-    "football": "Football",
-    "volleyball": "Volleyball",
-    "spikeball": "Spikeball",
-    "ultimate": "Ultimate Frisbee",
-    "tennis": "Tennis",
-    "pickleball": "Pickleball",
-    "running": "Running",
-    "climbing": "Climbing",
-    "gym": "Gym Buddy",
-    "rowing": "Rowing / Kayaking",
-    "snow": "Skiing / Snowboarding",
-    "hiking": "Hiking",
     "biking": "Biking",
+    "climbing": "Climbing",
     "esports": "Esports",
+    "football": "Football",
+    "gym": "Gym Buddy",
+    "hiking": "Hiking",
+    "pickleball": "Pickleball",
+    "rowing": "Rowing / Kayaking",
+    "running": "Running",
+    "snow": "Skiing / Snowboarding",
+    "soccer": "Soccer",
+    "spikeball": "Spikeball",
+    "tennis": "Tennis",
+    "ultimate": "Ultimate Frisbee",
+    "volleyball": "Volleyball",
     "other": "Other",
 }
 
@@ -45,22 +46,23 @@ SPORT_EMOJI = {
     "other": "🏅",
 }
 
+# Alphabetical ("The Quad" under Q), with Off campus and Online last.
 LOCATIONS = [
+    "Burke-Gilman Trail",
+    "Denny Field",
+    "Fitness Center West (under Elm Hall)",
+    "Green Lake Park pickleball courts",
+    "Hec Edmundson Pavilion",
+    "Husky Track",
     "IMA (Intramural Activities Building)",
     "IMA North Tennis Courts",
     "IMA South Tennis Courts",
-    "Fitness Center West (under Elm Hall)",
+    "The Quad",
     "Recreation Field 1 (by the IMA)",
     "Recreation Field 2 (by Husky Track)",
     "Recreation Field 3 (by the golf range)",
     "Recreation Field 4 (by the golf range)",
-    "Husky Track",
     "Waterfront Activities Center (WAC)",
-    "Denny Field",
-    "The Quad",
-    "Hec Edmundson Pavilion",
-    "Burke-Gilman Trail",
-    "Green Lake Park pickleball courts",
     "Off campus (see note)",
     "Online",
 ]
@@ -132,6 +134,8 @@ SPORT_LOCATIONS = {
     "esports": [ONLINE, OFF_CAMPUS],
     "other": LOCATIONS,
 }
+# Each sport's places in the same (alphabetical) order as the full list.
+SPORT_LOCATIONS = {sport: sorted(places, key=LOCATIONS.index) for sport, places in SPORT_LOCATIONS.items()}
 
 # Most players one event can have, including the host. First guesses: run
 # `flask --app main sport-stats` once people are using the app and adjust these.

@@ -188,27 +188,6 @@ def game_soon(world, host, player):
                 rsvp_time=now_local() - timedelta(days=1))
 
 
-@given(parsers.parse('"{name}" is Intermediate in {sport}'))
-def is_intermediate(world, name, sport):
-    """15 finished games (150 rep) plus 3 vouches: exactly what Intermediate needs."""
-    person = world.person(name)
-    start = now_local() - timedelta(days=30)
-    with world.app.app_context():
-        db = get_db()
-        for i in range(15):
-            cur = db.execute("INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level)"
-                             " VALUES (?, 'Practice', ?, 'Denny Field', ?, ?, 'Casual')",
-                             (person.id, sport, to_db(start + timedelta(days=i)), to_db(start + timedelta(days=i, hours=1))))
-            db.execute("INSERT INTO rsvps (event_id, user_id, created_at) VALUES (?, ?, ?)",
-                       (cur.lastrowid, person.id, to_db(start)))
-        for i in range(3):
-            giver = db.execute("INSERT INTO users (email, password_hash, full_name, verified) VALUES (?, 'x', ?, 1)",
-                               (f"voucher{i}.{person.id}@uw.edu", f"Teammate {i}")).lastrowid
-            db.execute("INSERT INTO vouches (sport, giver_id, receiver_id, created_at) VALUES (?, ?, ?, ?)",
-                       (sport, giver, person.id, to_db(start)))
-        db.commit()
-
-
 @given(parsers.parse('"{a}" and "{b}" are friends'))
 def given_friends(world, a, b):
     first, second = world.person(a), world.person(b)
@@ -363,12 +342,8 @@ def host_too_big(world, host, n):
     host_game(world, host, max_players=str(n))
 
 
-@when(parsers.parse('"{host}" hosts a Casual basketball game with {n:d} tryout spots'))
-def casual_with_tryouts(world, host, n):
-    host_game(world, host, skill_level="Casual", tryout_spots=str(n))
-
-
-@when(parsers.parse('"{host}" tries to host a Competitive basketball game'))
+@given(parsers.parse('"{host}" hosts a Competitive basketball game tomorrow'))
+@when(parsers.parse('"{host}" hosts a Competitive basketball game tomorrow'))
 def host_competitive(world, host):
     host_game(world, host, skill_level="Competitive")
 
@@ -379,23 +354,6 @@ def need_players(world, host, n):
     world.saw(person.client.post("/need-players", data={
         "sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
         "starts_in": "15", "duration": "60", "needed": str(n), "have": "4"}), person.client)
-
-
-@when(parsers.re(r'"(?P<host>[^"]+)" posts that she needs (?P<n>\d+) more (?P<level>Intermediate|Casual) players? '
-                 r'for soccer (?:with (?P<tryouts>\d+) tryout spots?|(?P<no_plus_ones>without \+1s))'))
-def need_ranked_players(world, host, n, level, tryouts, no_plus_ones):
-    person = world.person(host)
-    data = {"sport": "soccer", "location": "Denny Field", "skill_level": level, "starts_in": "15",
-            "duration": "60", "needed": n, "have": "4", "tryout_spots": tryouts or "0"}
-    if not no_plus_ones:
-        data["allow_plus_ones"] = "1"
-    response = person.client.post("/need-players", data=data)
-    match = re.search(r"/events/(\d+)", response.headers.get("Location", ""))
-    if match:
-        world.games[person.first] = int(match.group(1))
-        world.saw(response, person.client)
-    else:
-        world.saw(person.client.post("/need-players", data=data, follow_redirects=True), person.client)
 
 
 @when(parsers.re(r'"(?P<viewer>[^"]+)" opens (?P<host>\w+)\'s game'))
@@ -433,14 +391,6 @@ def run_reminders(world):
 def open_chat(world, name, host):
     person = world.person(name)
     world.saw(person.client.get(f"/events/{world.games[host]}/chat", follow_redirects=True), person.client)
-
-
-@when(parsers.parse('"{giver}" gives {receiver} props'))
-def give_props(world, giver, receiver):
-    person = world.person(giver)
-    target = person if receiver == "herself" else world.person(receiver)
-    world.saw(person.client.post(f"/events/{next(iter(world.games.values()))}/props/{target.id}",
-                                 follow_redirects=True), person.client)
 
 
 # ------------------------------------------------------------------ When: clubs
@@ -595,11 +545,6 @@ def sees_in_feed(world, name, text):
 @then(parsers.re(r"(?P<host>\w+)'s game has (?P<n>\d+) players?"))
 def game_has_players(world, host, n):
     assert world.db("SELECT COUNT(*) AS n FROM rsvps WHERE event_id = ?", (world.games[host],))[0]["n"] == int(n)
-
-
-@then(parsers.parse("{host}'s game doesn't allow +1s"))
-def no_plus_ones(world, host):
-    assert world.db("SELECT allow_plus_ones FROM events WHERE id = ?", (world.games[host],))[0][0] == 0
 
 
 @then(parsers.parse('"{email}" gets an email about "{text}"'))

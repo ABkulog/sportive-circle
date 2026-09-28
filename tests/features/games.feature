@@ -41,6 +41,13 @@ Feature: Games
     When "Maya" posts that she needs 2 more for soccer in 15 minutes
     Then "Jordan" sees "Need 2 more for Soccer" in the feed
 
+  @FR-EVT-10
+  Scenario: Skill level is only a label, so anyone can join
+    Given "Maya" hosts a Competitive basketball game tomorrow
+    When "Jordan" joins Maya's game
+    Then they see "You're in"
+    And Maya's game has 2 players
+
   @FR-EVT-5
   Scenario: A full game can't be overbooked
     Given "Maya" hosts a tennis game for 2 players tomorrow

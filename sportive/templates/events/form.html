@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import select, ranked_options %}
+{% from "_macros.html" import select %}
 {% block title %}{{ 'Edit event' if event else 'New event' }}{% endblock %}
 {% block content %}
 <div class="card form-card">
@@ -14,10 +14,9 @@
       {{ select('sport', 'Sport', SPORTS.items(), form.get('sport', ''), 'Choose a sport') }}
       {% if not club and not (event and event.club_id) %}
       <label class="field"><span>Skill level</span>
-        <select name="skill_level" {% if event %}data-keep="{{ event.sport }}|{{ event.skill_level }}"{% endif %}>
+        <select name="skill_level">
           {% for level in SKILL_LEVELS %}<option value="{{ level }}" {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
         </select>
-        <small class="muted" data-level-hint></small>
       </label>
       {% endif %}
     </div>
@@ -34,14 +33,13 @@
       <label class="field"><span>Ends</span>
         <input name="ends_at" type="datetime-local" value="{{ form.get('ends_at', '') }}" required></label>
     </div>
-    {% set has_extras = form.get('max_players') or form.get('note') or (form.get('tryout_spots') and form.get('tryout_spots')|string != '0') %}
+    {% set has_extras = form.get('max_players') or form.get('note') %}
     <details class="fold more-options" {% if has_extras %}open{% endif %}>
-      <summary>More options <span class="muted">· max players, note{% if not club %}, tryouts, +1s{% endif %}</span></summary>
+      <summary>More options <span class="muted">· max players, note</span></summary>
       <div class="form">
       <label class="field"><span>Max players, including you</span>
         <input name="max_players" type="number" min="2" value="{{ form.get('max_players', '') }}" placeholder="Pick a sport first">
         <small class="muted" data-max-hint></small></label>
-      {% if not club and not (event and event.club_id) %}{{ ranked_options(form) }}{% endif %}
       <label class="field"><span>Note</span>
         <textarea name="note" maxlength="500" rows="3" placeholder="Court 3, bring a light and a dark shirt">{{ form.get('note', '') }}</textarea></label>
       </div>
@@ -50,6 +48,5 @@
   </form>
 </div>
 <script type="application/json" id="sport-rules">{{ SPORT_RULES|tojson }}</script>
-<script type="application/json" id="my-tiers">{{ {"mine": my_tier_map(), "needs": LEVEL_TIERS}|tojson }}</script>
 <script src="{{ url_for('static', filename='forms.js') }}" defer></script>
 {% endblock %}
