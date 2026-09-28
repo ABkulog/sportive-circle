@@ -706,10 +706,54 @@ def test_reminder_email_is_friendly(accounts, client, app, monkeypatch):
     with app.app_context():
         reminders.send_due_reminders()
     subject, body = sent["player@uw.edu"]
-    assert subject.startswith("🏀 Evening hoops starts in") and "see you there!" in subject
-    assert "Hey Dubs! 👋" in body and "You + 1 other\n" in body and "tap “Leave”" in body
+    assert re.fullmatch(r"Evening hoops starts in \d+ min", subject)
+    assert "Hey Dubs, your game is coming up" in body and "You + 1 other\n" in body and "Tap “Leave”" in body
+    assert "Settings → Email" in body
     host_subject, host_body = sent["host@uw.edu"]
     assert "You're the host" in host_body
+
+
+def test_reminders_run_by_themselves(accounts, client, app, monkeypatch):
+    """No outside scheduler needed: each round sends what's due, and nobody gets a reminder twice,
+    even when two copies of the app check at the same moment."""
+    from sportive import reminders
+    sent = []
+    monkeypatch.setattr(reminders, "send_email", lambda to, subject, body, **kwargs: sent.append(to))
+    _reminder_setup(accounts, client, app, joined_minutes_before=120)
+    reminders.reminder_round(app)
+    reminders.reminder_round(app)
+    assert sorted(sent) == ["host@uw.edu", "player@uw.edu"]
+
+    with app.app_context():
+        get_db().execute("UPDATE rsvps SET reminder_sent = 0")
+        get_db().commit()
+    sent.clear()
+    other_copy_ran = []
+
+    def send_while_another_copy_checks(to, subject, body, **kwargs):
+        sent.append(to)
+        if not other_copy_ran:  # this copy already read both reminders; now the other copy checks too
+            other_copy_ran.append(True)
+            reminders.reminder_round(app)
+    monkeypatch.setattr(reminders, "send_email", send_while_another_copy_checks)
+    reminders.reminder_round(app)
+    assert sorted(sent) == ["host@uw.edu", "player@uw.edu"]
+
+
+def test_reminder_loop_only_runs_on_the_server(tmp_path, monkeypatch):
+    from sportive import reminders
+    started = []
+    monkeypatch.setattr(reminders, "start_reminder_loop", lambda app: started.append(app))
+    monkeypatch.delenv("REMINDER_LOOP", raising=False)
+    monkeypatch.delenv("RENDER_EXTERNAL_URL", raising=False)
+    monkeypatch.setenv("SECRET_KEY", "t")
+    create_app({"DATABASE": str(tmp_path / "a.db")})
+    assert started == []  # a laptop doesn't email anyone
+    monkeypatch.setenv("RENDER_EXTERNAL_URL", "https://sportive-circle.onrender.com")
+    create_app({"DATABASE": str(tmp_path / "a.db")})
+    assert len(started) == 1
+    create_app({"TESTING": True, "DATABASE": str(tmp_path / "a.db")})
+    assert len(started) == 1  # never during tests
 
 
 # ---------------------------------------------------------------- maps

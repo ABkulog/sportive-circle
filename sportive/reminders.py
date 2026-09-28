@@ -1,21 +1,23 @@
 """Email reminders before events.
 
-Run every ~10 minutes, either as a command on the server:
-    flask --app wsgi send-reminders
-or, on hosts where scheduled jobs can't open the database (like Render), by calling
+On Render the app checks every 5 minutes by itself (start_reminder_loop), so no outside scheduler is needed.
+To send them by hand:
+    flask --app wsgi send-reminders          (on the server; locally: .venv/bin/flask --app main send-reminders)
+or from another scheduler:
     POST /tasks/send-reminders   with the header  X-Task-Token: <TASK_TOKEN>
-Locally:
-    .venv/bin/flask --app main send-reminders
 """
-import secrets
 import logging
+import random
+import secrets
+import threading
+import time
 from datetime import timedelta
 
 import click
 from flask import Blueprint, abort, current_app, jsonify, request
 from flask.cli import with_appcontext
 
-from .constants import SPORT_EMOJI, SPORTS
+from .constants import SPORTS
 from .db import get_db
 from .mail import compose, send_email
 from .timeutil import fmt_clock, from_db, now_local, to_db
@@ -25,33 +27,31 @@ log = logging.getLogger(__name__)
 REMIND_BEFORE = timedelta(minutes=60)
 # Someone who joined 5 minutes before a game doesn't need a reminder about it.
 MIN_NOTICE = timedelta(minutes=15)
+CHECK_EVERY = timedelta(minutes=5)
 
 
 def reminder_email(row, minutes):
-    """The friendly heads-up email. Returns (subject, plain text, HTML)."""
-    emoji = SPORT_EMOJI[row["sport"]]
+    """The heads-up email. Returns (subject, plain text, HTML)."""
     title = f"{SPORTS[row['sport']]} pickup game" if row["is_quick"] else row["title"]
     first_name = row["full_name"].split()[0]
     link = f"{current_app.config['PUBLIC_URL'].rstrip('/')}/events/{row['event_id']}"
     others = row["going"] - 1
-    crew = f"👥 You + {others} other{'s' if others != 1 else ''}" if others > 0 else "👥 Just you so far, share the link!"
+    crew = f"You + {others} other{'s' if others != 1 else ''}" if others > 0 else "Just you so far. Share the link!"
 
     if row["host_id"] == row["user_id"]:
-        plans_changed = ("You're the host, so people are counting on you 🙌 If plans change, "
-                         "just cancel the event so nobody shows up to an empty field.")
+        plans_changed = "You're the host. If plans change, cancel the game so nobody shows up for nothing."
     else:
-        plans_changed = ("Can't make it anymore? No worries, just tap “Leave” on the event "
-                         "so someone else can grab your spot.")
+        plans_changed = "Can't make it? Tap “Leave” on the game so someone else can take your spot."
 
-    subject = f"{emoji} {title} starts in {minutes} min, see you there!"
+    subject = f"{title} starts in {minutes} min"
     body, html = compose(
-        subject, f"{title} starts in {minutes} min ⏰",
-        [f"Hey {first_name}! 👋 Quick heads up, your game is coming up:",
-         f"🕐 {fmt_clock(row['starts_at'])} (in {minutes} min)", f"📍 {row['location']}", crew],
+        subject, subject,
+        [f"Hey {first_name}, your game is coming up:",
+         f"{fmt_clock(row['starts_at'])} (in {minutes} min)", row["location"], crew],
         after=[plans_changed],
         button=("See the game", link),
         reason="You're getting this because you joined this game. "
-               "Don't want reminders? Turn them off in Profile → Edit profile.",
+               "Turn these off in Settings → Email.",
         preheader=f"{fmt_clock(row['starts_at'])} at {row['location']}")
     return subject, body, html
 
@@ -74,20 +74,43 @@ def send_due_reminders():
 
     sent = 0
     for row in rows:
+        # Mark it before sending, and only send if this run was the one that marked it: the app runs more
+        # than one copy of itself, and nobody should get the same reminder twice. (A failed send isn't retried.)
+        claimed = db.execute("UPDATE rsvps SET reminder_sent = 1 WHERE event_id = ? AND user_id = ?"
+                             " AND reminder_sent = 0", (row["event_id"], row["user_id"])).rowcount
+        db.commit()
         starts = from_db(row["starts_at"])
         joined = from_db(row["joined_at"][:16])
-        if starts - joined >= MIN_NOTICE:
+        if claimed and starts - joined >= MIN_NOTICE:
             subject, body, html = reminder_email(row, minutes=int((starts - now).total_seconds() // 60))
             try:
                 send_email(row["email"], subject, body, html=html)
                 sent += 1
             except Exception:  # one bad address or email hiccup must not stop everyone else's reminders
                 log.exception("Couldn't send a reminder to %s", row["email"])
-        # Mark it either way, so nobody gets the same reminder twice.
-        db.execute("UPDATE rsvps SET reminder_sent = 1 WHERE event_id = ? AND user_id = ?",
-                   (row["event_id"], row["user_id"]))
-        db.commit()
     return sent
+
+
+def reminder_round(app):
+    """One check: send whatever reminders are due. Never raises (the loop has to keep going)."""
+    try:
+        with app.app_context():
+            sent = send_due_reminders()
+        if sent:
+            log.info("Sent %d reminder(s).", sent)
+    except Exception:
+        log.exception("Couldn't check for reminders")
+
+
+def start_reminder_loop(app):
+    """Check for due reminders every few minutes in the background, for as long as the site runs."""
+    def loop():
+        time.sleep(random.uniform(30, 90))  # let the site finish starting; the copies don't all check at once
+        while True:
+            reminder_round(app)
+            time.sleep(CHECK_EVERY.total_seconds())
+
+    threading.Thread(target=loop, name="reminders", daemon=True).start()
 
 
 bp = Blueprint("tasks", __name__)

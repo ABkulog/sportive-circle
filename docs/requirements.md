@@ -62,7 +62,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-EVT-8 | The feed shows upcoming games for your sports, with filters for sport, day (today / week / month), place, level and open spots. Sports and places are listed alphabetically. | Must | ✅ |
 | FR-EVT-9 | Event pages have a map, walking directions (Google or Apple Maps), "Where am I?" with distance, share, and "Add to calendar" (.ics). | Should | ✅ |
 | FR-EVT-10 | "Where am I?" explains how to turn location on when the browser blocks it, retries with rough location if precise location times out, and still works if the map can't load. | Should | ✅ |
-| FR-EVT-11 | Everyone going to a game gets an email reminder an hour before (can be turned off). | Should | ✅ |
+| FR-EVT-11 | Everyone going to a game gets an email reminder an hour before (can be turned off). The app checks every 5 minutes by itself (no outside scheduler), and nobody gets the same reminder twice. | Should | ✅ |
 | FR-EVT-12 | Everyone going to a game can use its group chat. | Should | ✅ |
 | FR-EVT-13 | When the host changes the time, place, sport or note, everyone who joined gets a notice in the bell; a time or place change also sends an email. | Must | ✅ |
 | FR-EVT-14 | The skill level is a label chosen by the host, not a gate: anyone can join any game. The note says what the host is looking for. | Must | ✅ |

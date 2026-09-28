@@ -1,9 +1,7 @@
 # Render Blueprint: Render reads this file from GitHub and sets everything up.
 # Render dashboard -> New -> Blueprint -> pick this repository -> fill in the email settings -> Apply.
 #
-# Reminders: a free scheduler (cron-job.org) calls POST /tasks/send-reminders every 10 minutes with the
-# header "X-Task-Token: <TASK_TOKEN>" (copy TASK_TOKEN from the service's Environment tab).
-# See docs/deployment.md, step 4.
+# Reminders: the app sends them by itself every 5 minutes (sportive/reminders.py). Nothing to set up.
 services:
   # The website.
   - type: web

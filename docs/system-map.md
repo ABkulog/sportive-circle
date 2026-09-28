@@ -282,7 +282,7 @@ flowchart LR
     Dev["Your laptop<br/>python main.py"] -- git push --> GH["GitHub<br/>tests run in Actions"]
     GH -- deploy --> Host["Host (e.g. Render / Railway / Fly.io)<br/>gunicorn wsgi:app<br/>BEHIND_PROXY=1"]
     Host --- Disk[("Persistent disk:<br/>sportive_circle.db")]
-    Cron["Scheduler every 10 min"] -- "flask send-reminders" --> Host
+    Host -- "every 5 min: reminder emails" --> Host
 ```
 
 See [deployment.md](deployment.md) for step-by-step instructions.

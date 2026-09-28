@@ -130,7 +130,7 @@ sportive/
   moderation.py       reports, the admin reports page, suspending accounts
   badges.py           badges (earned, seasonal, given)
   pages.py            How it works, FAQ, Privacy, Terms, the Create menu
-  reminders.py        "send-reminders" command (run every 10 minutes)
+  reminders.py        game reminder emails (the app checks every 5 minutes by itself)
   stats.py            "sport-stats" command (to tune player limits)
   links.py, mail.py, photos.py, spirit.py, timeutil.py   helpers
   templates/          pages (Jinja)

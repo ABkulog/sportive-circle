@@ -47,20 +47,13 @@ database, and random secret keys.
 
 Every push to `main` on GitHub redeploys automatically. The database stays on the disk.
 
-## 4. Reminders (free, with cron-job.org)
+## 4. Reminders
 
-Every 10 minutes something has to ask the site to send "your game starts in an hour" emails. A free
-scheduler does it:
+Nothing to do: on Render the app checks every 5 minutes by itself and emails everyone whose game starts
+within the hour (each person once). To turn it off, set `REMINDER_LOOP` = `0` in Render → Environment.
 
-1. In Render, open the **sportive-circle** service → **Environment** → copy the value of **TASK_TOKEN**.
-2. Sign up at [cron-job.org](https://cron-job.org) (free) → **Create cronjob**:
-   - **URL:** `https://sportivecircle.com/tasks/send-reminders` (or your onrender.com address)
-   - **Schedule:** every 10 minutes
-   - **Advanced → Request method:** `POST`
-   - **Advanced → Headers:** `X-Task-Token` = the TASK_TOKEN you copied
-3. Save, then use **Test run**: it should answer `{"sent": 0}` (or how many reminders it sent).
-
-Keep the token private: it's the password for that link. Without it, the link answers "not found".
+(`POST /tasks/send-reminders` with the header `X-Task-Token: <TASK_TOKEN>` still works, for an outside
+scheduler or a manual test.)
 
 ### Adding or removing an admin
 
@@ -87,10 +80,29 @@ To show up on Google: [Google Search Console](https://search.google.com/search-c
 verify with the TXT record it gives you (add it in the registrar's DNS) → **Sitemaps** → submit
 `https://sportivecircle.com/sitemap.xml`. It can take a few days to a few weeks.
 
-Optional, better email: in Brevo → **Senders, domains** → add the domain `sportivecircle.com` and add the
-records Brevo shows (DKIM, SPF, DMARC) at the registrar. Then set `MAIL_FROM` to
-`Sportive Circle <hello@sportivecircle.com>`: codes are much less likely to land in Junk. Most registrars
-can forward `hello@sportivecircle.com` to your Gmail for free.
+### Email from your own domain (hello@sportivecircle.com)
+
+Codes and reminders are much less likely to land in Junk when they come from your own domain.
+
+1. **Porkbun → sportivecircle.com → Email forwarding**: forward `hello` to your own inbox (free), so replies
+   and privacy questions reach you.
+2. **Brevo → Settings → Senders, domains & dedicated IPs → Domains → Add a domain** → `sportivecircle.com` →
+   authenticate it yourself. Brevo shows a few DNS records (a `brevo-code` TXT, DKIM and DMARC).
+3. **Porkbun → DNS**: add each one. The host is the part before `.sportivecircle.com` (empty for the domain
+   itself). Keep the existing `v=spf1` TXT. If Brevo asks for SPF, edit that record to
+   `v=spf1 include:_spf.porkbun.com include:spf.brevo.com ~all`, because a domain can only have one SPF record.
+4. **Brevo → Authenticate** (DNS can take a few minutes). Then **Senders → Add a sender**:
+   `Sportive Circle`, `hello@sportivecircle.com`.
+5. **Render → Environment**: `MAIL_FROM` = `Sportive Circle <hello@sportivecircle.com>` and
+   `CONTACT_EMAIL` = `hello@sportivecircle.com` → Save. Test it: sign up with a new account, or run
+   `flask --app wsgi check-email you@uw.edu` in the Render Shell.
+
+### If a secret leaks (SECRET_KEY, TASK_TOKEN)
+
+Render → sportive-circle → **Environment** → **Edit** → give `SECRET_KEY` and `TASK_TOKEN` new random values
+→ **Save, rebuild and deploy**. To make a value on a Mac:
+`python3 -c "import secrets; print(secrets.token_hex(32))" | pbcopy` (copies it; paste it into Render).
+A new `SECRET_KEY` logs everyone out once and turns off invite links that were already shared.
 
 ## 5. Backups
 

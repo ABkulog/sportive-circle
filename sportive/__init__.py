@@ -70,6 +70,8 @@ def create_app(test_config=None):
         CONTACT_EMAIL=os.environ.get("CONTACT_EMAIL", ""),
         # Secret the scheduler sends to /tasks/send-reminders (unset = that page doesn't exist).
         TASK_TOKEN=os.environ.get("TASK_TOKEN"),
+        # Send game reminders from inside the app (on by default on Render; REMINDER_LOOP=0 turns it off).
+        REMINDER_LOOP=(_setting("REMINDER_LOOP") or ("1" if os.environ.get("RENDER_EXTERNAL_URL") else "0")) == "1",
     )
     if test_config:
         app.config.update(test_config)
@@ -99,6 +101,8 @@ def create_app(test_config=None):
     # A number too big for the database (e.g. /events/99999999999999999999) can't be a real page.
     app.register_error_handler(OverflowError, _error_page(404, ERRORS[404]))
     app.after_request(_security_headers)
+    if app.config["REMINDER_LOOP"] and not app.testing:
+        reminders.start_reminder_loop(app)
     return app
 
 
