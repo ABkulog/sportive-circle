@@ -91,6 +91,7 @@ def create_app(test_config=None):
     app.cli.add_command(mail.check_email_command)
 
     _add_template_helpers(app)
+    _version_static_files(app)
     for code, message in ERRORS.items():
         app.register_error_handler(code, _error_page(code, message))
     # A number too big for the database (e.g. /events/99999999999999999999) can't be a real page.
@@ -117,6 +118,22 @@ def _add_template_helpers(app):
         is_team=moderation.is_team,
     )
     app.jinja_env.filters.update(when=fmt_when, clock=fmt_clock, relative=fmt_relative)
+
+
+def _version_static_files(app):
+    """Links to our CSS and JS end in ?v=<when the file changed>, so phones (Safari keeps old copies
+    for a long time) load the new version right after an update instead of showing yesterday's look."""
+    versions = {}
+
+    @app.url_defaults
+    def add_version(endpoint, values):
+        if endpoint == "static" and "filename" in values and "v" not in values:
+            name = values["filename"]
+            if name not in versions:
+                path = os.path.join(app.static_folder, name)
+                versions[name] = int(os.path.getmtime(path)) if os.path.isfile(path) else None
+            if versions[name]:
+                values["v"] = versions[name]
 
 
 def _security_headers(response):

@@ -1672,6 +1672,17 @@ def test_dropdowns_are_alphabetical():
         assert allowed == sorted(allowed, key=LOCATIONS.index), sport
 
 
+def test_no_gold_dot_under_the_active_tab_and_css_updates_reach_phones(accounts, client):
+    """Testers: the yellow dot under the selected tab covered the tab's text on iPhones."""
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text()
+    assert ".tab-icon::after" not in css and ".tab.is-active .tab-icon::after" not in css
+    accounts.signup()
+    page = client.get("/").data.decode()
+    # ?v= changes whenever the file changes, so Safari can't keep showing the old look
+    assert re.search(r'/static/style\.css\?v=\d+', page) and re.search(r'/static/app\.js\?v=\d+', page)
+
+
 def test_hidden_always_hides():
     """Fields hidden by JavaScript (like tryout spots on Casual games) must really disappear,
     even when their class sets display: grid or flex."""
