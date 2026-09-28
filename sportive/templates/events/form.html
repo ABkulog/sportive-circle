@@ -43,15 +43,16 @@
     {% set team_game = event.team_size if event else form.get('team_size') %}
     {% set has_extras = form.get('max_players') or form.get('note') or team_game %}
     <details class="fold more-options" {% if has_extras %}open{% endif %}>
-      <summary>More options <span class="muted">· team vs team, max players, note</span></summary>
+      <summary>More options <span class="muted">· format, max players, note</span></summary>
       <div class="form">
       {% if event %}
         {% if event.team_size %}<p class="muted">Team vs team, {{ event.team_size }}v{{ event.team_size }}.</p>{% endif %}
       {% else %}
-        <label class="field"><span>Type of game</span>
+        {% set sizes = SPORT_TEAM_SIZES.get(form.get('sport', ''), []) %}
+        <label class="field" data-team-field {% if not sizes %}hidden{% endif %}><span>Format</span>
           <select name="team_size" data-team-size>
-            <option value="">Anyone can join</option>
-            {% for n in range(2, 12) %}<option value="{{ n }}" {% if form.get('team_size')|string == n|string %}selected{% endif %}>Team vs team, {{ n }}v{{ n }}</option>{% endfor %}
+            <option value="">Regular game</option>
+            {% for n in sizes %}<option value="{{ n }}" {% if form.get('team_size')|string == n|string %}selected{% endif %}>{{ n }}v{{ n }} team vs team</option>{% endfor %}
           </select>
           <small class="muted">Team vs team: you bring your team, another group challenges you.</small></label>
       {% endif %}

@@ -58,7 +58,8 @@
 })();
 
 // Private game: the password box shows only when "Private game" is on.
-// Team vs team: the team size sets the number of players, so "Max players" hides; sizes too big for the sport are off.
+// Format: only the team sizes that make sense for the chosen sport (none for running, hiking...). A team
+// game's size sets the number of players, so "Max players" hides.
 (function () {
   const form = document.querySelector("form[data-sport-form]");
   if (!form) return;
@@ -78,16 +79,19 @@
   if (teamSize && rulesElement) {
     const rules = JSON.parse(rulesElement.textContent);
     const sport = form.querySelector('select[name="sport"]');
-    const update = () => {
-      const rule = rules[sport.value];
-      for (const option of teamSize.options) {
-        if (option.value) option.disabled = Boolean(rule) && Number(option.value) * 2 > rule.max;
-      }
-      if (teamSize.selectedOptions[0] && teamSize.selectedOptions[0].disabled) teamSize.value = "";
-      if (maxField) maxField.hidden = Boolean(teamSize.value);
+    const field = form.querySelector("[data-team-field]");
+    const regular = teamSize.options[0];
+    const updateSizes = () => {
+      const sizes = (rules[sport.value] && rules[sport.value].teams) || [];
+      const current = teamSize.value;
+      teamSize.replaceChildren(regular, ...sizes.map((n) => new Option(`${n}v${n} team vs team`, n, false, String(n) === current)));
+      if (!sizes.map(String).includes(current)) teamSize.value = "";
+      if (field) field.hidden = sizes.length === 0;
+      updateMax();
     };
-    sport.addEventListener("change", update);
-    teamSize.addEventListener("change", update);
-    update();
+    const updateMax = () => { if (maxField) maxField.hidden = Boolean(teamSize.value); };
+    sport.addEventListener("change", updateSizes);
+    teamSize.addEventListener("change", updateMax);
+    updateSizes();
   }
 })();

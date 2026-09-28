@@ -2390,8 +2390,8 @@ def test_team_vs_team(accounts, client, app):
     _friends(app, ids["Maya"], ids["Mo"])
     _friends(app, ids["Jordan"], ids["Jay"], ids["Sam"])
     _as(accounts, "Maya")
-    assert b"teams can have 2 to 5 players" in client.post("/events/new", data=event_form(team_size="6"),
-                                                           follow_redirects=True).data
+    assert b"Basketball teams can be 2v2, 3v3, 4v4, 5v5." in client.post(
+        "/events/new", data=event_form(team_size="9"), follow_redirects=True).data   # no 9v9 basketball
     game = event_id_from(client.post("/events/new", data=event_form(team_size="2", title="2v2 run")))
     client.post(f"/events/{game}/party", data={"friend": [ids["Mo"]]})       # Maya brings Mo to team 1
     _as(accounts, "Mo")
@@ -2413,6 +2413,22 @@ def test_team_vs_team(accounts, client, app):
     with app.app_context():
         teams = dict(get_db().execute("SELECT user_id, team FROM rsvps WHERE event_id = ?", (game,)).fetchall())
     assert teams == {ids["Maya"]: 1, ids["Mo"]: 1, ids["Jordan"]: 2, ids["Jay"]: 2}
+
+
+def test_team_sizes_fit_the_sport(accounts, client, app):
+    """Testers: "If I pick basketball, why would I play 9v9?" And "Anyone can join" next to Private made no sense."""
+    from sportive.constants import SPORT_MAX_PLAYERS, SPORT_TEAM_SIZES
+    for sport, sizes in SPORT_TEAM_SIZES.items():
+        assert sizes and max(sizes) * 2 <= SPORT_MAX_PLAYERS[sport], sport
+    accounts.signup()
+    page = client.get("/events/new?sport=basketball").data.decode()
+    assert "Anyone can join" not in page and ">Regular game<" in page
+    assert ">5v5 team vs team<" in page and ">9v9 team vs team<" not in page
+    assert "data-team-field hidden" in client.get("/events/new?sport=running").data.decode()
+    run = event_form(sport="running", location="Burke-Gilman Trail", team_size="2")
+    assert b"Running isn&#39;t played team vs team" in client.post("/events/new", data=run, follow_redirects=True).data
+    spike = event_form(sport="spikeball", location="The Quad", team_size="2")
+    assert client.post("/events/new", data=spike).status_code == 302
 
 
 def test_open_spots_filter(accounts, client, app):

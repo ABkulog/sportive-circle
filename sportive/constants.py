@@ -159,6 +159,21 @@ SPORT_MAX_PLAYERS = {
     "other": 30,
 }
 
+# Team vs team: the sizes that make sense for each sport (players per team). Sports that aren't played as two
+# teams (running, hiking, the gym...) aren't listed, so they don't offer team vs team at all.
+SPORT_TEAM_SIZES = {
+    "basketball": [2, 3, 4, 5],
+    "soccer": [5, 6, 7, 8, 9, 10, 11],
+    "football": [5, 6, 7, 8, 9, 10, 11],
+    "volleyball": [2, 3, 4, 6],
+    "spikeball": [2],
+    "ultimate": [4, 5, 6, 7],
+    "tennis": [2],
+    "pickleball": [2],
+    "esports": [2, 3, 4, 5],
+    "other": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+}
+
 SKILL_LEVELS = ["All levels", "Casual", "Intermediate", "Competitive"]
 
 # How long one event can last, in hours. Trips (a hike, a day on the slopes, a bike ride) can take days;

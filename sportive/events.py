@@ -11,7 +11,7 @@ from .auth import login_required, safe_next
 from .badges import sync_badges
 from .clubs import featured_clubs, suggested_clubs
 from .constants import (DEFAULT_MAX_HOURS, LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
-                        SKILL_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, SPORT_MAX_PLAYERS, SPORTS)
+                        SKILL_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, SPORT_MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .db import get_db, user_sports
 from .invites import (HELD, count_wrong_password, held_spots, hold_minutes_left, my_invite, now_param,
                       pending_invites, requested_invites, team_counts, too_many_password_tries)
@@ -286,14 +286,17 @@ def read_event_form(form, event=None):
     # Team vs team is chosen when the game is made (people join a team, so it can't change later).
     team_size = event["team_size"] if event is not None else None
     team_raw = form.get("team_size", "").strip()
+    sizes = SPORT_TEAM_SIZES.get(sport, [])
     if event is None and team_raw:
-        if not team_raw.isdigit() or not 2 <= int(team_raw) <= cap // 2:
-            return None, f"{SPORTS[sport]} teams can have 2 to {cap // 2} players."
+        if not sizes:
+            return None, f"{SPORTS[sport]} isn't played team vs team. Pick Regular game."
+        if not team_raw.isdigit() or int(team_raw) not in sizes:
+            return None, f"{SPORTS[sport]} teams can be {', '.join(f'{n}v{n}' for n in sizes)}."
         team_size = int(team_raw)
     if team_size:
         max_players = 2 * team_size
-        if event is not None and event["sport"] != sport and 2 * team_size > cap:
-            return None, f"{SPORTS[sport]} teams can have at most {cap // 2} players."
+        if event is not None and team_size not in sizes:
+            return None, f"A {team_size}v{team_size} game can't be changed to {SPORTS[sport]}."
 
     return {
         "title": title, "sport": sport, "location": location, "skill_level": skill_level,
