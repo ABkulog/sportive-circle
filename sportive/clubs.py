@@ -15,7 +15,7 @@ from .auth import login_required
 from .constants import LOCATIONS, SPORT_EMOJI, SPORTS
 from .db import get_db
 from .links import public_url
-from .mail import send_email
+from .mail import compose, send_email
 from .moderation import is_admin
 from .notifications import mark_seen
 from .textutil import one_line
@@ -408,10 +408,14 @@ def join(club_id):
     for officer in db.execute("""SELECT u.email FROM club_members m JOIN users u ON u.id = m.user_id
                                  WHERE m.club_id = ? AND m.role = 'officer'""", (club_id,)):
         try:
-            send_email(officer["email"], f"{g.user['full_name']} {what} {club['name']}",
-                       f"{g.user['full_name']} {what} {club['name']}."
-                       + (f"\n\nTheir answer: {message}" if message else "")
-                       + f"\n\nConfirm or decline them here: {_club_link(club_id)}#requests")
+            subject = f"{g.user['full_name']} {what} {club['name']}"
+            answer = [f"Their answer to “{club['join_question']}”:", message] if message and club["join_question"] \
+                else ([f"Their message: {message}"] if message else [])
+            body, html = compose(subject, f"{g.user['full_name']} {what} {club['name']} 🙋", answer,
+                                 after=["Confirm or decline them from your club's Members tab."],
+                                 button=("Review requests", f"{_club_link(club_id)}#requests"),
+                                 reason=f"You're getting this because you're an officer of {club['name']}.")
+            send_email(officer["email"], subject, body, html=html)
         except Exception:  # email trouble shouldn't stop the request
             log.exception("Couldn't email officer %s about a join request", officer["email"])
     if new_role == "tryout":
@@ -566,12 +570,14 @@ def pending_club_count():
     return get_db().execute("SELECT COUNT(*) FROM clubs WHERE status = 'pending'").fetchone()[0]
 
 
-def _notify_officers(club, subject, body):
+def _notify_officers(club, subject, heading, lines, button):
+    body, html = compose(subject, heading, lines, button=button,
+                         reason=f"You're getting this because you're an officer of {club['name']}.")
     for row in get_db().execute(
             """SELECT u.email FROM club_members m JOIN users u ON u.id = m.user_id
                WHERE m.club_id = ? AND m.role = 'officer'""", (club["id"],)):
         try:
-            send_email(row["email"], subject, body)
+            send_email(row["email"], subject, body, html=html)
         except Exception:  # email trouble shouldn't block the review
             log.exception("Couldn't email officer %s", row["email"])
 
@@ -611,13 +617,15 @@ def review(club_id, decision):
     db.commit()
     link = _club_link(club_id)
     if decision == "approve":
-        _notify_officers(club, f"✅ {club['name']} is live on Sportive Circle!",
-                         f"Your club is verified and now visible to every Husky: {link}\n\n"
-                         "Next: post an announcement and add your next practice as a club event. Go Dawgs! 🐺")
+        _notify_officers(club, f"✅ {club['name']} is live on Sportive Circle!", f"{club['name']} is live! 🎉",
+                         ["Your club is verified and now visible to every Husky.",
+                          "Next: post an update and add your next practice as a club event."],
+                         ("Open your club", link))
         flash(f"Approved {club['name']}. The officers were emailed.", "success")
     else:
-        _notify_officers(club, f"About your Sportive Circle club: {club['name']}",
-                         f"We couldn't verify your club yet. Here's what to fix:\n\n{note}\n\n"
-                         f"Update it here and it'll be reviewed again: {link}")
+        _notify_officers(club, f"About your Sportive Circle club: {club['name']}", "One quick fix needed",
+                         [f"We couldn't verify {club['name']} yet. Here's what to fix:", note,
+                          "Update it and it'll be reviewed again."],
+                         ("Update your club", link))
         flash(f"Sent {club['name']} back to the officers with your note.", "info")
     return redirect(url_for("clubs.review_queue"))

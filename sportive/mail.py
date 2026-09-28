@@ -4,18 +4,20 @@ import smtplib
 from email.message import EmailMessage
 
 import click
-from flask import current_app
+from flask import current_app, render_template
 from flask.cli import with_appcontext
 
 log = logging.getLogger(__name__)
 
 
-def send_email(to, subject, body):
-    """Send an email. Returns False in local development, where nothing is actually sent."""
+def send_email(to, subject, body, html=None):
+    """Send an email (plain text, plus the designed HTML version when given).
+    Returns False in local development, where nothing is actually sent."""
     cfg = current_app.config
     if current_app.testing:
         # Tests read what would have been sent from app.extensions["outbox"].
-        current_app.extensions.setdefault("outbox", []).append({"to": to, "subject": subject, "body": body})
+        current_app.extensions.setdefault("outbox", []).append({"to": to, "subject": subject, "body": body,
+                                                                "html": html})
     if not cfg.get("MAIL_SERVER"):
         if current_app.debug or current_app.testing:
             log.warning("DEV email (not sent) to %s: %s\n%s", to, subject, body)
@@ -26,11 +28,43 @@ def send_email(to, subject, body):
     msg["From"] = cfg.get("MAIL_FROM") or f"Sportive Circle <{cfg['MAIL_USERNAME']}>"
     msg["To"] = to
     msg.set_content(body)
+    if html:
+        msg.add_alternative(html, subtype="html")
     with smtplib.SMTP(cfg["MAIL_SERVER"], cfg["MAIL_PORT"]) as smtp:
         smtp.starttls()
         smtp.login(cfg["MAIL_USERNAME"], cfg["MAIL_PASSWORD"])
         smtp.send_message(msg)
     return True
+
+
+def compose(subject, heading, lines, code=None, after=(), button=None, reason=None, preheader=None):
+    """A friendly email in the app's design: (plain text, HTML), with the same words in both.
+
+    lines/after: short paragraphs before/after the code. button: (label, url). reason: why they got it.
+    """
+    site = current_app.config["PUBLIC_URL"].rstrip("/")
+    text = [heading, ""]
+    text += [line + "\n" for line in lines]
+    if code:
+        text += [f"Your code: {code}", ""]
+    text += [line + "\n" for line in after]
+    if button:
+        text += [f"{button[0]}: {button[1]}", ""]
+    text += ["Go Dawgs! 💜💛", "The Sportive Circle team", "", "--"]
+    if reason:
+        text.append(reason)
+    text.append("Sportive Circle is a student project for UW Huskies, not an official University of Washington service.")
+    text.append(site)
+    html = render_template("emails/message.html", subject=subject, heading=heading, lines=lines, code=code,
+                           after=after, button=button, reason=reason, preheader=preheader, site=site,
+                           site_name=site.replace("https://", "").replace("http://", ""))
+    return "\n".join(text), html
+
+
+def send_designed(to, subject, heading, lines, **options):
+    """compose() + send_email(): the way every email in the app is sent."""
+    text, html = compose(subject, heading, lines, **options)
+    return send_email(to, subject, text, html=html)
 
 
 def failure_reason(error):
@@ -99,5 +133,7 @@ def check_email_command(to):
         click.echo(f"COULDN'T CONNECT: {error}")
         return
     if to:
-        send_email(to, "Sportive Circle test email", "It works! Emails from Sportive Circle can be sent. Go Dawgs!")
+        send_designed(to, "Sportive Circle test email", "It works! 🎉",
+                      ["Emails from Sportive Circle can be sent. This is what they look like."],
+                      reason="You're getting this because an admin tested the email settings.")
         click.echo(f"TEST EMAIL SENT to {to} (check Junk too).")

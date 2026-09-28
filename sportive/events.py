@@ -14,7 +14,7 @@ from .constants import (LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START
 from .db import get_db, user_sports
 from .links import public_url
 from .notifications import mark_seen, on_screen
-from .mail import send_email
+from .mail import compose, send_email
 from .ranks import (LEVEL_REQUIREMENT, check_rank_ups, compute_rank, level_allowed, my_ranks, played_together,
                     props_open, sport_rep, vouch_counts)
 from .social import is_blocked_between
@@ -467,10 +467,15 @@ def tell_players_it_was_cancelled(event):
     title, when = event_title(event), fmt_when(event["starts_at"])
     for player in players:
         try:
-            send_email(player["email"], f"Canceled: {title} ({when})",
-                       f"Hey {player['full_name'].split()[0]},\n\n"
-                       f"Heads up: {event['host_name']} canceled {title} ({when}, {event['location']}).\n\n"
-                       f"Find another game: {public_url('events.feed')}\n\nGo Dawgs!\nSportive Circle")
+            subject = f"Canceled: {title} ({when})"
+            body, html = compose(
+                subject, f"{title} was canceled",
+                [f"Hey {player['full_name'].split()[0]}, heads up: {event['host_name']} canceled this game.",
+                 f"🕐 {when}", f"📍 {event['location']}", "No worries, there are more games waiting for you."],
+                button=("Find another game", public_url("events.feed")),
+                reason="You're getting this because you joined this game.",
+                preheader=f"{event['host_name']} canceled {title}.")
+            send_email(player["email"], subject, body, html=html)
         except Exception:  # one bad address shouldn't stop the others
             log.exception("Couldn't email %s about a canceled event", player["email"])
 

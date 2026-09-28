@@ -17,7 +17,7 @@ from flask.cli import with_appcontext
 
 from .constants import SPORT_EMOJI, SPORTS
 from .db import get_db
-from .mail import send_email
+from .mail import compose, send_email
 from .timeutil import fmt_clock, from_db, now_local, to_db
 
 log = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ MIN_NOTICE = timedelta(minutes=15)
 
 
 def reminder_email(row, minutes):
-    """The friendly heads-up email. Returns (subject, body)."""
+    """The friendly heads-up email. Returns (subject, plain text, HTML)."""
     emoji = SPORT_EMOJI[row["sport"]]
     title = f"{SPORTS[row['sport']]} pickup game" if row["is_quick"] else row["title"]
     first_name = row["full_name"].split()[0]
@@ -44,19 +44,16 @@ def reminder_email(row, minutes):
                          "so someone else can grab your spot.")
 
     subject = f"{emoji} {title} starts in {minutes} min, see you there!"
-    body = (
-        f"Hey {first_name}! 👋\n\n"
-        f"Quick heads up, {title} is coming up soon:\n\n"
-        f"🕐 {fmt_clock(row['starts_at'])} (in {minutes} min)\n"
-        f"📍 {row['location']}\n"
-        f"{crew}\n\n"
-        f"See the details and who's going: {link}\n\n"
-        f"{plans_changed}\n\n"
-        "Have fun out there. Go Dawgs! 🐺💜💛\n"
-        "Sportive Circle\n\n"
-        "(Don't want these emails? Turn them off in Profile → Edit profile.)"
-    )
-    return subject, body
+    body, html = compose(
+        subject, f"{title} starts in {minutes} min ⏰",
+        [f"Hey {first_name}! 👋 Quick heads up, your game is coming up:",
+         f"🕐 {fmt_clock(row['starts_at'])} (in {minutes} min)", f"📍 {row['location']}", crew],
+        after=[plans_changed],
+        button=("See the game", link),
+        reason="You're getting this because you joined this game. "
+               "Don't want reminders? Turn them off in Profile → Edit profile.",
+        preheader=f"{fmt_clock(row['starts_at'])} at {row['location']}")
+    return subject, body, html
 
 
 def send_due_reminders():
@@ -80,9 +77,9 @@ def send_due_reminders():
         starts = from_db(row["starts_at"])
         joined = from_db(row["joined_at"][:16])
         if starts - joined >= MIN_NOTICE:
-            subject, body = reminder_email(row, minutes=int((starts - now).total_seconds() // 60))
+            subject, body, html = reminder_email(row, minutes=int((starts - now).total_seconds() // 60))
             try:
-                send_email(row["email"], subject, body)
+                send_email(row["email"], subject, body, html=html)
                 sent += 1
             except Exception:  # one bad address or email hiccup must not stop everyone else's reminders
                 log.exception("Couldn't send a reminder to %s", row["email"])

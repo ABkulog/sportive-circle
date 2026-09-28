@@ -406,7 +406,7 @@ def _reminder_setup(accounts, client, app, joined_minutes_before):
 def test_reminders_are_sent_once(accounts, client, app, monkeypatch):
     from sportive import reminders
     sent = []
-    monkeypatch.setattr(reminders, "send_email", lambda to, subject, body: sent.append((to, subject, body)))
+    monkeypatch.setattr(reminders, "send_email", lambda to, subject, body, **kwargs: sent.append((to, subject, body)))
     _reminder_setup(accounts, client, app, joined_minutes_before=120)
     with app.app_context():
         assert reminders.send_due_reminders() == 2  # host + player
@@ -418,7 +418,7 @@ def test_reminders_are_sent_once(accounts, client, app, monkeypatch):
 def test_no_reminder_for_last_minute_joins_or_opt_outs(accounts, client, app, monkeypatch):
     from sportive import reminders
     sent = []
-    monkeypatch.setattr(reminders, "send_email", lambda to, subject, body: sent.append(to))
+    monkeypatch.setattr(reminders, "send_email", lambda to, subject, body, **kwargs: sent.append(to))
     _reminder_setup(accounts, client, app, joined_minutes_before=5)
     with app.app_context():
         assert reminders.send_due_reminders() == 0
@@ -428,7 +428,7 @@ def test_no_reminder_for_last_minute_joins_or_opt_outs(accounts, client, app, mo
 def test_reminder_opt_out(accounts, client, app, monkeypatch):
     from sportive import reminders
     sent = []
-    monkeypatch.setattr(reminders, "send_email", lambda to, subject, body: sent.append(to))
+    monkeypatch.setattr(reminders, "send_email", lambda to, subject, body, **kwargs: sent.append(to))
     _reminder_setup(accounts, client, app, joined_minutes_before=120)
     client.post("/profile/edit", data={"full_name": "Player"})  # reminders box left unchecked
     with app.app_context():
@@ -668,7 +668,7 @@ def test_add_later_keeps_shared_link(accounts, client):
 def test_reminder_email_is_friendly(accounts, client, app, monkeypatch):
     from sportive import reminders
     sent = {}
-    monkeypatch.setattr(reminders, "send_email", lambda to, subject, body: sent.update({to: (subject, body)}))
+    monkeypatch.setattr(reminders, "send_email", lambda to, subject, body, **kwargs: sent.update({to: (subject, body)}))
     _reminder_setup(accounts, client, app, joined_minutes_before=120)
     with app.app_context():
         reminders.send_due_reminders()
@@ -1592,7 +1592,7 @@ def test_new_clubs_wait_for_verification(accounts, client, app):
 def test_admin_approves_or_sends_back(accounts, client, app, monkeypatch):
     from sportive import clubs
     sent = []
-    monkeypatch.setattr(clubs, "send_email", lambda to, subject, body: sent.append((to, subject)))
+    monkeypatch.setattr(clubs, "send_email", lambda to, subject, body, **kwargs: sent.append((to, subject)))
     app.config["ADMIN_EMAILS"] = "admin@uw.edu"
     accounts.signup(email="captain@uw.edu")
     client.post("/clubs/new", data=CLUB)
@@ -2003,7 +2003,7 @@ def test_one_failed_reminder_doesnt_stop_the_others(accounts, client, app, monke
         db.commit()
         calls = []
 
-        def flaky(to, subject, body):
+        def flaky(to, subject, body, **kwargs):
             calls.append(to)
             if to == "host@uw.edu":
                 raise OSError("mailbox full")
@@ -2309,3 +2309,58 @@ def test_keywords_ignore_filler_and_merge_similar_words():
     assert keywords("Please add badminton courts to the app!") == {"badminton", "court"}
     assert "notification" in keywords("the notifs are too much") and "notification" in keywords("fewer notis")
     assert keywords("The map is broken") == {"map", "bug"}
+
+
+def test_code_email_is_designed_friendly_and_safe(client, app):
+    client.post("/signup", data={"full_name": "Dubs Husky", "email": "dubs@uw.edu", "password": "purple-and-gold",
+                                 "password2": "purple-and-gold", "birth_date": "2005-01-15"})
+    message = app.extensions["outbox"][-1]
+    code = re.search(r"\d{6}", message["subject"]).group(0)
+    assert message["subject"] == f"{code} is your Sportive Circle code"        # code first: phones can autofill it
+    assert "Welcome to the pack, Dubs!" in message["body"] and code in message["body"]   # plain-text version
+    html = message["html"]
+    assert "Welcome to the pack, Dubs!" in html and code in html and "Sportive" in html
+    assert "<img" not in html and "<script" not in html                       # nothing to block or distrust
+    assert "not an official University of Washington service" in html
+
+
+def test_emails_escape_what_people_type(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.logout()
+    accounts.signup(email="sneaky@uw.edu", name="Sneaky <b>Husky</b>")
+    client.post(f"/clubs/{club}/join", data={"message": '<a href="https://evil.example">click</a>'})
+    html = [m for m in app.extensions["outbox"] if m["to"] == "captain@uw.edu"][-1]["html"]
+    assert '<a href="https://evil.example">' not in html and "&lt;a href=" in html
+
+
+def test_real_email_has_text_and_html_parts(app, monkeypatch):
+    import smtplib
+    sent = []
+
+    class FakeSMTP:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def starttls(self):
+            pass
+
+        def login(self, *args):
+            pass
+
+        def send_message(self, message):
+            sent.append(message)
+
+    monkeypatch.setattr(smtplib, "SMTP", FakeSMTP)
+    app.config.update(TESTING=False, MAIL_SERVER="smtp.example.com", MAIL_USERNAME="u", MAIL_PASSWORD="p",
+                      MAIL_FROM="Sportive Circle <sportivecircle@gmail.com>")
+    with app.test_request_context():
+        from sportive.mail import send_designed
+        send_designed("dubs@uw.edu", "Hi", "Hello!", ["A line."], button=("Open", "https://x.test"))
+    types = [part.get_content_type() for part in sent[0].walk()]
+    assert "text/plain" in types and "text/html" in types

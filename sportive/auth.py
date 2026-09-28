@@ -13,7 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from .constants import SPORTS
 from .db import get_db, set_user_sports
-from .mail import failure_reason, send_email
+from .mail import compose, failure_reason, send_email
 from .textutil import one_line
 from .timeutil import from_db, now_local, to_db
 
@@ -112,18 +112,22 @@ def log_in(user):
 
 def send_verification_email(email, code, purpose="signup"):
     minutes = CODE_TTL.seconds // 60
+    row = get_db().execute("SELECT full_name FROM users WHERE email = ?", (email,)).fetchone()
+    first = row["full_name"].split()[0] if row and row["full_name"].strip() else "Husky"
+    after = [f"Type it on the Sportive Circle page you just came from. It expires in {minutes} minutes."]
     if purpose == "reset":
-        subject = f"Reset your Sportive Circle password: {code}"
-        body = (f"Your code to reset your Sportive Circle password is {code}.\n"
-                f"It expires in {minutes} minutes.\n\n"
-                "If you didn't ask for this, ignore this email. Your password hasn't changed.")
+        subject = f"{code} is your Sportive Circle password reset code"
+        heading, lines = f"Reset your password, {first}", ["Here's the code to set a new password:"]
+        reason = "Didn't ask for this? You can ignore this email. Your password hasn't changed."
     else:
-        subject = f"Your Sportive Circle code: {code}"
-        body = (f"Welcome, Husky! Your Sportive Circle verification code is {code}.\n"
-                f"It expires in {minutes} minutes.\n\n"
-                "If you didn't sign up, you can ignore this email.")
+        subject = f"{code} is your Sportive Circle code"
+        heading = f"Welcome to the pack, {first}! 🐺"
+        lines = ["You're one step away from finding people to play sports with. Here's your code:"]
+        reason = "Didn't sign up? You can ignore this email. Nothing happens without the code."
+    body, html = compose(subject, heading, lines, code=code, after=after, reason=reason,
+                         preheader=f"Your code is {code}. It expires in {minutes} minutes.")
     try:
-        sent = send_email(email, subject, body)
+        sent = send_email(email, subject, body, html=html)
     except Exception as error:  # the email service refused or is down: say so instead of crashing
         log.exception("Couldn't send a code email to %s", email)
         # Let them ask for a new code right away (no 1-minute wait for an email that never went out).
