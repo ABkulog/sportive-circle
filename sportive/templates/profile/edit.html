@@ -44,7 +44,7 @@
   </form>
 </details>
 
-<form method="post" action="{{ url_for('auth.logout') }}" class="card form-card center">
+<form method="post" action="{{ url_for('auth.logout') }}" data-confirm="Log out of Sportive Circle?" class="card form-card center">
   {{ csrf_field() }}<button class="btn btn-ghost btn-block">Log out</button>
 </form>
 

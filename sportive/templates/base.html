@@ -44,7 +44,7 @@
         {# Still setting up (no profile picture yet). #}
         <nav class="nav">
           <a href="{{ url_for('how_it_works') }}">How it works</a>
-          <form method="post" action="{{ url_for('auth.logout') }}">
+          <form method="post" action="{{ url_for('auth.logout') }}" data-confirm="Log out of Sportive Circle?">
             {{ csrf_field() }}<button class="link-button">Log out</button>
           </form>
         </nav>
@@ -77,7 +77,7 @@
           {{ tab(url_for('clubs.review_queue'), 'flag', 'Club requests', ep == 'clubs.review_queue', pending_club_count()) }}
           {{ tab(url_for('feedback.admin_suggestions'), 'help', 'Suggestions', ep == 'feedback.admin_suggestions', nav_badges.admin) }}
         {% endif %}
-        <form method="post" action="{{ url_for('auth.logout') }}" class="side-logout">
+        <form method="post" action="{{ url_for('auth.logout') }}" data-confirm="Log out of Sportive Circle?" class="side-logout">
           {{ csrf_field() }}<button class="tab"><span class="tab-icon">{{ icon('logout') }}</span><span class="tab-label">Log out</span></button>
         </form>
       </div>

@@ -2364,3 +2364,11 @@ def test_real_email_has_text_and_html_parts(app, monkeypatch):
         send_designed("dubs@uw.edu", "Hi", "Hello!", ["A line."], button=("Open", "https://x.test"))
     types = [part.get_content_type() for part in sent[0].walk()]
     assert "text/plain" in types and "text/html" in types
+
+
+def test_every_log_out_button_asks_first(accounts, client):
+    accounts.signup()
+    for path in ("/", "/profile/edit", "/how-it-works"):
+        page = client.get(path).data.decode()
+        forms = re.findall(r'<form[^>]*action="/logout"[^>]*>', page)
+        assert forms and all('data-confirm="Log out of Sportive Circle?"' in form for form in forms), path
