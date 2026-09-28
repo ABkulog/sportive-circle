@@ -14,6 +14,7 @@ from .photos import MAX_UPLOAD_MB
 from .timeutil import fmt_clock, fmt_relative, fmt_when, now_local, same_day, to_db
 
 DEV_SECRET_KEY = "dev-only-change-me"
+SITE_URL = "https://sportivecircle.com"  # the real address (Render also answers at *.onrender.com)
 
 # Where the browser may load things from. Scripts only come from our own files and the one map
 # library on cdnjs, so even if someone sneaks HTML into a name or message, it can't run code.
@@ -39,8 +40,9 @@ def _setting(name):
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
-    # PUBLIC_URL wins; on Render, RENDER_EXTERNAL_URL (e.g. https://sportive-circle.onrender.com) is set for us.
-    public_url = os.environ.get("PUBLIC_URL") or os.environ.get("RENDER_EXTERNAL_URL") or "http://localhost:5050"
+    # PUBLIC_URL wins; on Render (which sets RENDER_EXTERNAL_URL) it's our own domain, never the onrender.com one.
+    public_url = (_setting("PUBLIC_URL") or (SITE_URL if os.environ.get("RENDER_EXTERNAL_URL") else None)
+                  or "http://localhost:5050")
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("SECRET_KEY", DEV_SECRET_KEY),
         DATABASE=os.environ.get("DATABASE", os.path.join(app.instance_path, "sportive_circle.db")),

@@ -54,7 +54,7 @@ scheduler does it:
 
 1. In Render, open the **sportive-circle** service → **Environment** → copy the value of **TASK_TOKEN**.
 2. Sign up at [cron-job.org](https://cron-job.org) (free) → **Create cronjob**:
-   - **URL:** `https://<your-app>.onrender.com/tasks/send-reminders`
+   - **URL:** `https://sportivecircle.com/tasks/send-reminders` (or your onrender.com address)
    - **Schedule:** every 10 minutes
    - **Advanced → Request method:** `POST`
    - **Advanced → Headers:** `X-Task-Token` = the TASK_TOKEN you copied
@@ -78,8 +78,9 @@ About $10-15 a year. The site keeps working at the onrender.com address the whol
    `sportivecircle.com` and a **CNAME** for `www` pointing to `sportive-circle.onrender.com`).
 3. **At the registrar → DNS**: delete the default "parking" records and add exactly what Render shows.
 4. Wait until Render says **Verified** (minutes to a few hours). Render adds the HTTPS certificate for free.
-5. **Render → Environment → `PUBLIC_URL`** = `https://sportivecircle.com` → Save. Emails, share buttons,
-   calendar files, club QR codes and search engines then all use the new address.
+5. Nothing to set: on Render the app already uses `https://sportivecircle.com` (the `PUBLIC_URL` in
+   `render.yaml`, and `SITE_URL` in `sportive/__init__.py`) for emails, share buttons, calendar files, club QR
+   codes and search engines. To use another address, set `PUBLIC_URL` in Render → Environment.
 6. Make new flyers: `.venv/bin/python tools/make_qr.py https://sportivecircle.com`.
 
 To show up on Google: [Google Search Console](https://search.google.com/search-console) → add the domain →

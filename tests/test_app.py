@@ -2830,6 +2830,20 @@ def test_search_engines_and_link_previews(client, app):
     assert b"<loc>https://sportivecircle.com/clubs</loc>" in sitemap.data and b"/faq</loc>" in sitemap.data
 
 
+def test_public_address_is_our_domain_on_render(tmp_path, monkeypatch):
+    """Links in emails, shares and the canonical tag use sportivecircle.com, not the onrender.com address."""
+    def address():
+        return create_app({"TESTING": True, "DATABASE": str(tmp_path / "a.db")}).config["PUBLIC_URL"]
+
+    monkeypatch.delenv("PUBLIC_URL", raising=False)
+    monkeypatch.delenv("RENDER_EXTERNAL_URL", raising=False)
+    assert address() == "http://localhost:5050"
+    monkeypatch.setenv("RENDER_EXTERNAL_URL", "https://sportive-circle.onrender.com")
+    assert address() == "https://sportivecircle.com"
+    monkeypatch.setenv("PUBLIC_URL", " https://example.org \n")
+    assert address() == "https://example.org"
+
+
 def test_settings_page_is_separate_from_edit_profile(accounts, client, app):
     accounts.signup()
     me = _user_id(app, "dubs@uw.edu")

@@ -27,6 +27,8 @@ services:
         generateValue: true
       - key: BEHIND_PROXY
         value: "1"
+      - key: PUBLIC_URL        # the address used in emails, share links, QR codes and for Google
+        value: https://sportivecircle.com
       - key: DATABASE
         value: /data/sportive_circle.db
       - key: ADMIN_EMAILS      # comma-separated UW emails, e.g. "you@uw.edu,teammate@uw.edu" (set in Render, kept out of GitHub)
