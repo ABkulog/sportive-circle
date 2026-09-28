@@ -2189,3 +2189,12 @@ def test_forgot_password_survives_the_email_service_failing(accounts, client, mo
     accounts.logout()
     monkeypatch.setattr(auth, "send_email", lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
     assert client.post("/forgot", data={"email": "dubs@uw.edu"}, follow_redirects=True).status_code == 200
+
+
+def test_resend_doesnt_claim_success_when_email_fails(client, app, monkeypatch):
+    from sportive import auth
+    monkeypatch.setattr(auth, "send_email", lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
+    client.post("/signup", data={"full_name": "Dubs Husky", "email": "dubs@uw.edu", "password": "purple-and-gold",
+                                 "password2": "purple-and-gold", "birth_date": "2005-01-15"})
+    page = client.post("/verify/resend", follow_redirects=True).data.decode()
+    assert "couldn&#39;t send the email" in page and "We sent you a new code" not in page

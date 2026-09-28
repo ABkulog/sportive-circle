@@ -155,7 +155,7 @@ def start_verification(email, session_key="pending_email"):
     )
     db.commit()
     session[session_key] = email
-    send_verification_email(email, code, "reset" if session_key == "reset_email" else "signup")
+    return send_verification_email(email, code, "reset" if session_key == "reset_email" else "signup")
 
 
 # ----------------------------------------------------------------- sign up
@@ -284,8 +284,8 @@ def resend_code():
     if code_recently_sent(email):
         flash("We just sent you a code. Wait a minute before asking for another one.", "error")
         return redirect(url_for("auth.verify"))
-    start_verification(email)
-    flash("We sent you a new code.", "success")
+    if start_verification(email):  # on failure, send_verification_email already explained what happened
+        flash("We sent you a new code.", "success")
     return redirect(url_for("auth.verify"))
 
 
