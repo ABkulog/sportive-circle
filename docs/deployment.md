@@ -67,6 +67,30 @@ Keep the token private: it's the password for that link. Without it, the link an
 Render → **sportive-circle** → **Environment** → edit `ADMIN_EMAILS` (comma-separated UW emails) → **Save**.
 The site restarts in about a minute. Each admin signs up in the app with that exact UW email.
 
+## 4b. Your own address (sportivecircle.com)
+
+About $10-15 a year. The site keeps working at the onrender.com address the whole time.
+
+1. **Buy the domain** at a registrar such as [Porkbun](https://porkbun.com) or [Namecheap](https://www.namecheap.com):
+   search `sportivecircle.com`, buy it, and turn on **auto-renew** (WHOIS privacy should be free).
+2. **Render → sportive-circle → Settings → Custom Domains → Add**: add `sportivecircle.com`, then
+   `www.sportivecircle.com`. Render shows the DNS records to create (usually an **A** or **ALIAS** record for
+   `sportivecircle.com` and a **CNAME** for `www` pointing to `sportive-circle.onrender.com`).
+3. **At the registrar → DNS**: delete the default "parking" records and add exactly what Render shows.
+4. Wait until Render says **Verified** (minutes to a few hours). Render adds the HTTPS certificate for free.
+5. **Render → Environment → `PUBLIC_URL`** = `https://sportivecircle.com` → Save. Emails, share buttons,
+   calendar files, club QR codes and search engines then all use the new address.
+6. Make new flyers: `.venv/bin/python tools/make_qr.py https://sportivecircle.com`.
+
+To show up on Google: [Google Search Console](https://search.google.com/search-console) → add the domain →
+verify with the TXT record it gives you (add it in the registrar's DNS) → **Sitemaps** → submit
+`https://sportivecircle.com/sitemap.xml`. It can take a few days to a few weeks.
+
+Optional, better email: in Brevo → **Senders, domains** → add the domain `sportivecircle.com` and add the
+records Brevo shows (DKIM, SPF, DMARC) at the registrar. Then set `MAIL_FROM` to
+`Sportive Circle <hello@sportivecircle.com>`: codes are much less likely to land in Junk. Most registrars
+can forward `hello@sportivecircle.com` to your Gmail for free.
+
 ## 5. Backups
 
 The whole app is one file: `sportive_circle.db` on the disk. Render snapshots paid disks every day

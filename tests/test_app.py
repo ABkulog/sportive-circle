@@ -2814,3 +2814,16 @@ def test_officers_get_a_roster_members_dont(accounts, client, app):
     page = client.get(f"/clubs/{club}").data.decode()
     assert "captain@uw.edu" not in page and "Copy all emails" not in page
     assert client.get(f"/clubs/{club}/roster.csv").status_code == 403
+
+
+def test_search_engines_and_link_previews(client, app):
+    """So "sportive circle" can be found on Google, and shared links show a card in iMessage."""
+    app.config["PUBLIC_URL"] = "https://sportivecircle.com"
+    page = client.get("/").data.decode()
+    assert '<link rel="canonical" href="https://sportivecircle.com/">' in page
+    assert 'property="og:image" content="https://sportivecircle.com/static/share-card.png' in page
+    robots = client.get("/robots.txt").data.decode()
+    assert "Disallow: /messages" in robots and "Sitemap: https://sportivecircle.com/sitemap.xml" in robots
+    sitemap = client.get("/sitemap.xml")
+    assert sitemap.mimetype == "application/xml"
+    assert b"<loc>https://sportivecircle.com/clubs</loc>" in sitemap.data and b"/faq</loc>" in sitemap.data

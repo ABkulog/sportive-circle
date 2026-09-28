@@ -14,6 +14,17 @@
   <meta name="color-scheme" content="light only">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
   <meta name="apple-mobile-web-app-title" content="Sportive Circle">
+  {# Search engines and link previews (iMessage, Instagram, GroupMe). The canonical link keeps Google on the
+     real address (PUBLIC_URL, e.g. sportivecircle.com) even when the page is opened some other way. #}
+  {% set site = config.PUBLIC_URL.rstrip('/') %}
+  <link rel="canonical" href="{{ site }}{{ request.path }}">
+  <meta property="og:site_name" content="Sportive Circle">
+  <meta property="og:title" content="{{ self.title() }} · Sportive Circle">
+  <meta property="og:description" content="Find pickup games, verified UW clubs and people to play sports with. For UW Huskies.">
+  <meta property="og:url" content="{{ site }}{{ request.path }}">
+  <meta property="og:image" content="{{ site }}{{ url_for('static', filename='share-card.png') }}">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
   {% block head %}{% endblock %}
 </head>
 {% set app_nav = g.user and (g.user.avatar_updated or g.user.photo_skipped) %}
