@@ -2393,6 +2393,9 @@ def test_check_email_can_send_a_test_to_every_admin(app, monkeypatch):
         def login(self, *args):
             pass
 
+        def send_message(self, message):
+            pass
+
     monkeypatch.setattr(smtplib, "SMTP", OkSMTP)
     app.config.update(MAIL_SERVER="smtp-relay.brevo.com", MAIL_USERNAME="x@smtp-brevo.com",
                       MAIL_PASSWORD="xsmtpsib-" + "a" * 81, ADMIN_EMAILS="akulog@uw.edu, teammate@uw.edu")

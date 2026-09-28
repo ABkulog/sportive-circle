@@ -134,14 +134,14 @@ def check_email_command(to, admins):
     except OSError as error:
         click.echo(f"COULDN'T CONNECT: {error}")
         return
-    recipients = [to] if to else []
+    # (address, is that person an admin?)
+    recipients = [(to, False)] if to else []
     if admins:
         from .moderation import admin_emails  # imported here: moderation.py imports the app's blueprints
-        recipients += sorted(admin_emails())
+        recipients += [(address, True) for address in sorted(admin_emails())]
         if not recipients:
             click.echo("ADMIN_EMAILS is empty, so there's nobody to send to.")
-    for address in recipients:
-        is_admin = admins and address.lower() in (a.lower() for a in recipients[1 if to else 0:])
+    for address, is_admin in recipients:
         send_designed(address, "Sportive Circle test email", "Emails are working! 🎉",
                       ["This is a test from Sportive Circle. If you can read this, the app's emails (sign-up "
                        "codes, reminders and club notices) reach your inbox."]
