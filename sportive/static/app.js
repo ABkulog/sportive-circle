@@ -23,14 +23,27 @@
     });
   });
 
-  // <a data-back>: go back to wherever you came from in the app (the link itself is the fallback,
-  // e.g. when the page was opened from a shared link).
-  document.querySelectorAll("[data-back]").forEach((link) => {
-    link.addEventListener("click", (event) => {
-      let fromHere = false;
-      try { fromHere = new URL(document.referrer).origin === location.origin; } catch (e) { /* no referrer */ }
-      if (fromHere && history.length > 1) { event.preventDefault(); history.back(); }
-    });
+  // <a data-back>: "Back" goes to the page you were on before this one (Home, My events, the bell...).
+  // Pages that belong to this one, like a game's chat or edit page, don't count: coming back from the
+  // chat and tapping Back takes you out of the game, never into the chat again. The link's own href is
+  // the fallback (e.g. the page was opened from a shared link).
+  document.querySelectorAll("a[data-back]").forEach((link) => {
+    const here = location.pathname.replace(/\/$/, "");
+    const key = `sc-back:${here}`;
+    let from = null;
+    try {
+      const referrer = new URL(document.referrer);
+      if (referrer.origin === location.origin) from = referrer;
+    } catch (e) { /* no referrer */ }
+    const inside = from && (from.pathname === here || from.pathname.startsWith(`${here}/`));
+    const outside = from && !inside ? from.pathname + from.search : null;
+    try {
+      if (outside) sessionStorage.setItem(key, outside);
+      const saved = sessionStorage.getItem(key);
+      if (saved) link.href = saved;
+    } catch (e) {
+      if (outside) link.href = outside;  // storage blocked: the page right before still works
+    }
   });
 
   // <form data-dialog="id">: show that <dialog> first (e.g. "No problem!" after "Add later"); its
