@@ -18,23 +18,23 @@
     <div class="row">
       <label class="field"><span>Pronouns <em>(optional)</em></span>
         <input name="pronouns" maxlength="20" value="{{ form.get('pronouns', '') }}" placeholder="she/her"></label>
-      <label class="field"><span>Gender <em>(optional)</em></span>
+      <label class="field"><span>Gender <em>(optional, only used for games open to women or men)</em></span>
         <select name="gender">
           {% for value, label in genders.items() %}<option value="{{ value }}" {% if form.get('gender', '') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
         </select></label>
     </div>
     <label class="field"><span>Bio <em>(optional)</em></span>
       <textarea name="bio" maxlength="300" rows="3" placeholder="Always down for pickup hoops">{{ form.get('bio', '') }}</textarea></label>
-    {{ sport_checkboxes(form) }}
-    <details class="fold" {% if has_socials %}open{% endif %}>
-      <summary>Socials <span class="muted">· optional, so people can DM you where you already are</span></summary>
+    <fieldset class="field socials-field">
+      <legend>Your socials <em>(optional, shown under your bio)</em></legend>
       <div class="row">
         {% for key, label in socials.items() %}
           <label class="field"><span>{{ label }}</span>
             <input name="{{ key }}" maxlength="40" value="{{ form.get(key, '') }}" placeholder="@username" autocapitalize="off" spellcheck="false"></label>
         {% endfor %}
       </div>
-    </details>
+    </fieldset>
+    {{ sport_checkboxes(form) }}
     <label class="toggle">
       <input type="checkbox" name="email_reminders" value="1" {% if form.get('email_reminders') %}checked{% endif %}>
       <span>Email me an hour before my games</span>

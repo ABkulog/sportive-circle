@@ -684,7 +684,8 @@ def test_add_later_is_remembered(accounts, client, app):
     assert client.get("/").status_code == 200           # not asked again at every login
     me = _user_id(app, "dubs@uw.edu")
     profile = client.get(f"/u/{me}").data.decode()
-    assert ">Add photo</a>" in profile                   # the profile is where you add it
+    assert ">Add photo</a>" not in profile and ">Edit profile</a>" in profile   # one button; the photo is in there
+    assert "Add photo" in client.get("/profile/edit").data.decode()
     photo_page = client.get("/profile/photo").data.decode()
     assert "Add later" not in photo_page and "Last step" not in photo_page
 
@@ -2658,3 +2659,53 @@ def test_players_dropdown_follows_the_sport(accounts, client):
     options = re.findall(r'<select name="players" data-players>(.*?)</select>', page, re.S)[0]
     assert '<option value="10" selected>' in options and '<option value="11"' not in options   # 5v5, max 10
     assert '"default": 10' in page                             # forms.js picks each sport's usual size
+
+
+def _set_gender(app, user_id, gender):
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE users SET gender = ? WHERE id = ?", (gender, user_id))
+        db.commit()
+
+
+def test_games_can_be_open_to_a_group_like_uw_rec_hours(accounts, client, app):
+    """Feedback: gym buddies might not want to match across genders, without being offensive about it."""
+    ids = _people(accounts, app, "Maya", "Mo", "Kai", "Blank")
+    _set_gender(app, ids["Maya"], "woman")
+    _set_gender(app, ids["Mo"], "man")
+    _set_gender(app, ids["Kai"], "nonbinary")
+    _as(accounts, "Maya")
+    gym = dict(sport="gym", location="IMA (Intramural Activities Building)", title="Leg day buddy", players="2")
+    women = event_id_from(client.post("/events/new", data=event_form(open_to="women", **gym)))
+    women_nb = event_id_from(client.post("/events/new", data=event_form(open_to="women_nb", **{**gym, "title": "Lift"})))
+    assert "Women only" in client.get(f"/events/{women}").data.decode()
+    # Mo said "man" on his profile: these aren't in his feed, and he can't join.
+    _as(accounts, "Mo")
+    feed = client.get("/?scope=all").data.decode()
+    assert "Leg day buddy" not in feed and "Lift" not in feed
+    assert b"This game is for women." in client.post(f"/events/{women}/join", follow_redirects=True).data
+    # Kai (nonbinary): not the women-only one, yes the women & nonbinary one.
+    _as(accounts, "Kai")
+    assert b"This game is for women." in client.post(f"/events/{women}/join", follow_redirects=True).data
+    assert b"You&#39;re in" in client.post(f"/events/{women_nb}/join", follow_redirects=True).data
+    # Left gender blank (it's optional): nothing is assumed; the Join button just asks to confirm.
+    _as(accounts, "Blank")
+    page = client.get(f"/events/{women}").data.decode()
+    assert 'data-confirm="This game is for women. Join?"' in page
+    assert b"You&#39;re in" in client.post(f"/events/{women}/join", follow_redirects=True).data
+    # The host can take someone off their game; they get a notice.
+    _as(accounts, "Maya")
+    client.post(f"/events/{women}/players/{ids['Blank']}/remove")
+    _as(accounts, "Blank")
+    assert "Maya took you off Leg day buddy" in client.get("/notifications").data.decode()
+    assert client.post(f"/events/{women}/players/{ids['Maya']}/remove").status_code == 403   # only the host
+
+
+def test_private_games_are_open_to_whoever_the_host_invites(accounts, client, app):
+    accounts.signup()
+    game = event_id_from(client.post("/events/new", data=event_form(is_private="1", password="dawgs1234",
+                                                                     open_to="men")))
+    with app.app_context():
+        assert get_db().execute("SELECT open_to FROM events WHERE id = ?", (game,)).fetchone()[0] == "everyone"
+    assert b"pick who the game is open to" in client.post("/events/new", data=event_form(
+        title="Weird", open_to="aliens"), follow_redirects=True).data

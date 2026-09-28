@@ -10,7 +10,7 @@ from werkzeug.datastructures import MultiDict
 from .auth import login_required, safe_next
 from .badges import sync_badges
 from .clubs import featured_clubs, suggested_clubs
-from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
+from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, OPEN_TO, OPEN_TO_GENDERS, STATED_GENDERS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
                         SKILL_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, SPORT_MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .db import get_db, user_sports
 from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots, my_invite,
@@ -75,7 +75,7 @@ def spots_left(event):
 
 def can_quick_join(event):
     """For the Join button on feed cards: private and team games need their page (password, teams)."""
-    return (not event["cancelled"] and not event["i_am_going"] and not event["team_size"]
+    return (not event["cancelled"] and not event["i_am_going"] and not event["team_size"] and not not_for_me(event)
             and (event["i_am_invited"] or (not event["is_private"] and spots_left(event) != 0)))
 
 
@@ -123,11 +123,13 @@ def insert_event(data, reserve=()):
     db = get_db()
     cur = db.execute(
         """INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level,
-                               max_players, extra_players, note, is_quick, club_id, is_private, password, team_size)
+                               max_players, extra_players, note, is_quick, club_id, is_private, password, team_size,
+                               open_to)
            VALUES (:host_id, :title, :sport, :location, :starts_at, :ends_at, :skill_level,
-                   :max_players, :extra_players, :note, :is_quick, :club_id, :is_private, :password, :team_size)""",
+                   :max_players, :extra_players, :note, :is_quick, :club_id, :is_private, :password, :team_size,
+                   :open_to)""",
         {"host_id": g.user["id"], "extra_players": 0, "is_quick": 0, "club_id": None, "is_private": 0,
-         "password": "", "team_size": None, **data},
+         "password": "", "team_size": None, "open_to": "everyone", **data},
     )
     # The host is automatically going to their own event (on team 1 in a team vs team game).
     db.execute("INSERT INTO rsvps (event_id, user_id, created_at, team) VALUES (?, ?, ?, ?)",
@@ -215,7 +217,7 @@ def feed():
         filters["scope"] = "interests" if my_sports else "all"
 
     now = now_local()
-    where = ["e.cancelled = 0", "e.ends_at >= :now", NOT_BLOCKED]
+    where = ["e.cancelled = 0", "e.ends_at >= :now", NOT_BLOCKED, games_open_to_me()]
     params = {"now": to_db(now)}
 
     if filters["sport"] in SPORTS:
@@ -255,6 +257,7 @@ def feed():
     need_players = [
         e for e in query_events(
             ["e.cancelled = 0", "e.is_quick = 1", "e.ends_at >= :now", "e.starts_at <= :soon", NOT_BLOCKED,
+             games_open_to_me(),
              # a private post isn't a call to everyone: only its players and invited friends see it up top
              "(e.is_private = 0 OR EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"
              " OR EXISTS (SELECT 1 FROM invites i WHERE i.event_id = e.id AND i.guest_id = :me AND i.status = 'pending'))"],
@@ -333,13 +336,52 @@ def read_event_form(form, event=None):
     max_players, extra_players, error = read_players(form, sport, team_size, event)
     if error:
         return None, error
+    open_to, error = read_open_to(form, is_private)
+    if error:
+        return None, error
 
     return {
         "title": title, "sport": sport, "location": location, "skill_level": skill_level,
         "starts_at": to_db(starts), "ends_at": to_db(ends), "max_players": max_players,
         "extra_players": extra_players, "note": note,
-        "is_private": is_private, "password": password, "team_size": team_size,
+        "is_private": is_private, "password": password, "team_size": team_size, "open_to": open_to,
     }, None
+
+
+def read_open_to(form, is_private):
+    """Who an open game is for (private games are for whoever the host invites). Returns (open_to, error)."""
+    open_to = form.get("open_to") or "everyone"
+    if is_private:
+        return "everyone", None
+    if open_to not in OPEN_TO:
+        return "everyone", "Please pick who the game is open to."
+    return open_to, None
+
+
+def not_for_me(event):
+    """Why this game isn't open to me, from the gender I chose on my profile (None = it's open to me)."""
+    groups = OPEN_TO_GENDERS.get(event["open_to"])
+    gender = g.user["gender"] if g.get("user") is not None else ""
+    if groups and gender in STATED_GENDERS and gender not in groups:
+        return f"This game is for {OPEN_TO[event['open_to']].lower()}{' players' if event['open_to'] == 'women_nb' else ''}."
+    return None
+
+
+def join_confirm(event):
+    """For the Join buttons: people who left gender blank are asked to confirm a game that's for a group."""
+    gender = g.user["gender"] if g.get("user") is not None else ""
+    if event["open_to"] in OPEN_TO_GENDERS and gender not in STATED_GENDERS:
+        return f"This game is for {OPEN_TO[event['open_to']].lower()}. Join?"
+    return ""
+
+
+def games_open_to_me():
+    """SQL: leave out games whose group doesn't include the gender on my profile (nothing is hidden if it's blank)."""
+    gender = g.user["gender"] if g.get("user") is not None else ""
+    if gender not in STATED_GENDERS:
+        return "1"
+    fits = ["everyone"] + [key for key, genders in OPEN_TO_GENDERS.items() if gender in genders]
+    return f"e.open_to IN ({', '.join(repr(key) for key in fits)})"
 
 
 def read_players(form, sport, team_size, event=None):
@@ -433,7 +475,8 @@ def edit(event_id):
             db.execute(
                 """UPDATE events SET title = :title, sport = :sport, location = :location,
                        starts_at = :starts_at, ends_at = :ends_at, skill_level = :skill_level,
-                       max_players = :max_players, note = :note, is_private = :is_private, password = :password
+                       max_players = :max_players, note = :note, is_private = :is_private, password = :password,
+                       open_to = :open_to
                    WHERE id = :id""",
                 {**data, "id": event_id},
             )
@@ -449,6 +492,7 @@ def edit(event_id):
             "ends_at": to_form(event["ends_at"]), "note": event["note"],
             "players": event["max_players"] or "",
             "is_private": "1" if event["is_private"] else "", "password": event["password"],
+            "open_to": event["open_to"],
         })
     return render_template("events/form.html", form=form, event=event, min_start="")
 
@@ -568,8 +612,11 @@ def quick():
             error = "Please choose when you're playing."
         elif len(note) > 500:
             error = "Note is too long (500 characters max)."
+        open_to = "everyone"
         if error is None:
             is_private, password, team_size, error = read_game_options(form, sport)
+        if error is None:
+            open_to, error = read_open_to(form, is_private)
         if error is None:
             max_players, extra, error = read_players(form, sport, team_size)
         if error is None:
@@ -589,7 +636,7 @@ def quick():
                 "sport": sport, "location": location,
                 "skill_level": skill_level, "starts_at": to_db(starts), "ends_at": to_db(ends),
                 "max_players": max_players, "extra_players": extra, "note": note, "is_quick": 1,
-                "is_private": is_private, "password": password, "team_size": team_size,
+                "is_private": is_private, "password": password, "team_size": team_size, "open_to": open_to,
             }, reserve)
             flash(created_message(is_private, reserve, "Posted! It's at the top of everyone's feed."), "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))
@@ -651,6 +698,8 @@ def join_problem(event, password=None):
     if is_blocked_between(me, event["host_id"]):
         # Blocking means no contact at all, and that includes showing up to each other's games.
         return "You can't join this game."
+    if not_for_me(event):
+        return not_for_me(event)
     if event["team_size"] and invite is None:
         return "Team games are invite-only. Challenge them with your own team, or ask a player to invite you."
     if event["is_private"] and invite is None:
@@ -793,6 +842,23 @@ def leave(event_id):
         db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, g.user["id"]))
         db.commit()
         flash("You left. Your spot is open again.", "info")
+    return redirect(url_for("events.detail", event_id=event_id))
+
+
+@bp.route("/events/<int:event_id>/players/<int:user_id>/remove", methods=("POST",))
+@login_required
+def remove_player(event_id, user_id):
+    """The host takes someone off their game (e.g. they don't fit who it's for). They get a notice."""
+    event = get_event(event_id, host_only=True)
+    if user_id == g.user["id"] or from_db(event["ends_at"]) < now_local():
+        abort(400)
+    db = get_db()
+    cur = db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, user_id))
+    if cur.rowcount:
+        notify(user_id, "game_updates", f"{g.user['full_name'].split()[0]} took you off {event_title(event)}.",
+               url_for("events.feed"))
+    db.commit()
+    flash("Removed from the game." if cur.rowcount else "They're not in this game.", "info")
     return redirect(url_for("events.detail", event_id=event_id))
 
 

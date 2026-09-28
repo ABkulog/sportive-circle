@@ -250,8 +250,7 @@ def edit():
                          + [("sports", s) for s in user_sports(me["id"])]
                          + ([("email_reminders", "1")] if me["email_reminders"] else []))
     return render_template("profile/edit.html", form=form, max_grad_year=now_local().year + 8, genders=GENDERS,
-                           socials={key: SOCIALS[key][0] for key in PERSON_SOCIALS},
-                           has_socials=any(form.get(key) for key in PERSON_SOCIALS))
+                           socials={key: SOCIALS[key][0] for key in PERSON_SOCIALS})
 
 
 @bp.route("/profile/password", methods=("POST",))

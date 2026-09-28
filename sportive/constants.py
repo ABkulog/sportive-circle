@@ -183,6 +183,13 @@ DEFAULT_PLAYERS = {
 
 SKILL_LEVELS = ["All levels", "Casual", "Intermediate", "Competitive"]
 
+# "Open to": a game can be for everyone (the default) or, like UW Recreation's women-only hours, for a group.
+# Same choices as clubs. Someone whose profile says a gender outside the group can't join; people who left
+# gender blank (it's optional) are asked to confirm instead, so nobody is guessed about.
+OPEN_TO = {"everyone": "Everyone", "women": "Women", "men": "Men", "women_nb": "Women & nonbinary"}
+OPEN_TO_GENDERS = {"women": {"woman"}, "men": {"man"}, "women_nb": {"woman", "nonbinary"}}
+STATED_GENDERS = {"woman", "man", "nonbinary"}  # "another identity" and blank never block anyone
+
 # How long one event can last, in hours. Trips (a hike, a day on the slopes, a bike ride) can take days;
 # a pickup game can't. (Testers asked why a Spikeball game could be 24 hours long.)
 DEFAULT_MAX_HOURS = 6

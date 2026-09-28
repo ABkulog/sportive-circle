@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import select, who_can_join, format_field, players_block %}
+{% from "_macros.html" import select, who_can_join, format_field, players_block, open_to_field %}
 {% block title %}Need players{% endblock %}
 {% block content %}
 <div class="card form-card">
@@ -24,6 +24,7 @@
     </div>
     {{ who_can_join(form) }}
     {{ format_field(form) }}
+    {{ open_to_field(form) }}
     {{ players_block(form, friends) }}
     <label class="field" data-show="public" {% if form.get('is_private') %}hidden{% endif %}><span>Skill level</span>
       <select name="skill_level">

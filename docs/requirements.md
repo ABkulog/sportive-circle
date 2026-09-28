@@ -46,7 +46,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-PROF-3 | Users can edit name, class year, bio, sports, photo and reminder emails. Their own profile has one Edit profile button, plus Add photo only when there's no photo; initials sit centered when there's no photo. | Must | ✅ |
 | FR-PROF-4 | A user's email is shown only to themselves and people they've played a game with. | Must | ✅ |
 | FR-PROF-5 | On the photo page, Save without picking a new photo goes back to the profile, and users can remove their photo (with an "Are you sure?"). | Should | ✅ |
-| FR-PROF-6 | Optional pronouns, gender, and Instagram / Snapchat / TikTok / X usernames, shown only if filled in (so people can DM where they already are). | Should | ✅ |
+| FR-PROF-6 | Optional pronouns, gender (says it's only used for games open to women or men), and Instagram / Snapchat / TikTok / X usernames right under the bio in Edit profile, shown on the profile only if filled in. | Should | ✅ |
 
 ### Games and events (EVT)
 
@@ -69,6 +69,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-EVT-15 | "N+ open spots" filter, for groups looking for a game together. | Should | ✅ |
 | FR-EVT-16 | Games have a sensible maximum length: 6 hours for court and field sports, 12 for running, rowing and esports, 3 days for trips. | Should | ✅ |
 | FR-EVT-17 | Game pages have a Back button that returns to where you came from (never into the game's own chat). | Should | ✅ |
+| FR-EVT-18 | Open games can be "Open to" everyone, women, men, or women & nonbinary (like UW Recreation's women-only hours). People whose profile gender is outside the group can't join and don't see it in their feed; people who left gender blank confirm instead. Hosts can remove a player (who gets a notice). | Should | ✅ |
 
 ### Parties, private games, team vs team (PARTY, PRIV, TEAM)
 

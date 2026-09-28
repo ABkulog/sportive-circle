@@ -45,6 +45,13 @@
     <small class="muted">Friends you invite don't need it. You can share it after.</small></label>
 {% endmacro %}
 
+{% macro open_to_field(form) %}
+  <label class="field" data-show="public" {% if form.get('is_private') %}hidden{% endif %}><span>Open to</span>
+    <select name="open_to">
+      {% for key, label in OPEN_TO.items() %}<option value="{{ key }}" {% if form.get('open_to', 'everyone') == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label>
+{% endmacro %}
+
 {% macro format_field(form) %}
   {% set sizes = SPORT_TEAM_SIZES.get(form.get('sport', ''), []) %}
   <label class="field" data-show="public" data-team-field {% if not sizes or form.get('is_private') %}hidden{% endif %}><span>Format</span>
@@ -121,6 +128,7 @@
         {% if e.club_name %}<span class="badge badge-club">🏛️ {{ e.club_name }}</span>{% endif %}
         {% if e.is_private %}<span class="badge">🔒 Private</span>{% endif %}
         {% if e.team_size %}<span class="badge">{{ e.team_size }}v{{ e.team_size }} teams</span>{% endif %}
+        {% if e.open_to != 'everyone' %}<span class="badge">{{ OPEN_TO[e.open_to] }}{% if e.open_to != 'women_nb' %} only{% endif %}</span>{% endif %}
         {% if e.skill_level in ('Intermediate', 'Competitive') %}<span class="badge badge-level">{{ e.skill_level }}</span>{% endif %}
         {% if e.cancelled %}<span class="badge badge-danger">Canceled</span>
         {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Hosting</span>
@@ -140,7 +148,7 @@
         <small>going</small>
       </div>
       {% if can_quick_join(e) %}
-        <form method="post" action="{{ url_for('events.join', event_id=e.id) }}" class="card-join">
+        <form method="post" action="{{ url_for('events.join', event_id=e.id) }}" class="card-join" {% if join_confirm(e) %}data-confirm="{{ join_confirm(e) }}"{% endif %}>
           {{ csrf_field() }}
           <input type="hidden" name="next" value="{{ request.full_path }}">
           <button class="btn btn-small" aria-label="Join {{ event_title(e) }}">Join</button>

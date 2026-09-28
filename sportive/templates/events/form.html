@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import select, who_can_join, format_field, players_block %}
+{% from "_macros.html" import select, who_can_join, format_field, players_block, open_to_field %}
 {% block title %}{{ 'Edit event' if event else 'New event' }}{% endblock %}
 {% block content %}
 <div class="card form-card">
@@ -39,6 +39,7 @@
     {% else %}
       {{ format_field(form) }}
     {% endif %}
+    {% if not club and not (event and event.club_id) %}{{ open_to_field(form) }}{% endif %}
     {{ players_block(form, friends, event) }}
     <label class="field"><span>Note <em>(optional)</em></span>
       <textarea name="note" maxlength="500" rows="2" placeholder="Court 3, bring a light and a dark shirt">{{ form.get('note', '') }}</textarea></label>

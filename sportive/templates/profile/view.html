@@ -31,7 +31,6 @@
   {% if me %}
     <div class="profile-buttons">
       <a class="btn btn-ghost" href="{{ url_for('profile.edit') }}">Edit profile</a>
-      {% if not user.avatar_updated %}<a class="btn" href="{{ url_for('profile.photo_upload') }}">Add photo</a>{% endif %}
     </div>
   {% elif relation.i_blocked %}
     <div class="profile-buttons">

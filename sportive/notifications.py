@@ -161,6 +161,7 @@ def _count(kind, me):
     if kind == "game_chat":
         return sum(event_chat_unread().values())
     if kind == "need_players":
+        from .events import games_open_to_me  # imported here because events.py imports this module
         sports = user_sports(me)
         if not sports:
             return 0
@@ -168,7 +169,7 @@ def _count(kind, me):
         return db.execute(
             f"""SELECT COUNT(*) FROM events e
                 WHERE e.is_quick = 1 AND e.is_private = 0 AND e.cancelled = 0 AND e.ends_at >= ? AND e.host_id != ?
-                  AND e.id > ?
+                  AND e.id > ? AND {games_open_to_me()}
                   AND (e.max_players IS NULL
                        OR e.extra_players + (SELECT COUNT(*) FROM rsvps x WHERE x.event_id = e.id) < e.max_players)
                   AND e.sport IN ({marks})

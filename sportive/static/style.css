@@ -94,6 +94,8 @@ section.band > .section-title:first-child { margin-top: 0; }
 .player-math { margin: 0; padding: 10px 12px; border-radius: var(--radius); background: var(--gold-light);
   font-weight: 600; font-size: .92rem; color: var(--purple-strong); }
 .player-math.is-over { background: #fbe9e7; color: var(--danger); }
+.remove-player { display: inline; margin-left: auto; }
+.remove-player .link-button { color: var(--muted); font-size: .85rem; padding: 6px 0; }
 .share-box { display: grid; gap: 10px; margin-top: 10px; padding: 14px; border-radius: var(--radius); background: var(--accent-soft); }
 .share-box p { margin: 0; }
 .invite-box { display: grid; gap: 8px; padding: 14px; border-radius: var(--radius); background: var(--accent-soft); }
@@ -452,6 +454,7 @@ form[data-wizard] .form-step { display: none; }
 .profile-photo .avatar-initial { display: grid; }
 .profile-photo:hover { text-decoration: none; }
 .profile-name { min-width: 0; }
+.socials-field .row { grid-template-columns: 1fr 1fr; }
 .profile-socials { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .92rem; }
 .profile-socials a { display: inline-block; padding: 4px 0; font-weight: 600; }
 .profile-name h1 { margin: 0 0 2px; overflow-wrap: anywhere; }

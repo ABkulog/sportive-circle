@@ -28,6 +28,7 @@
         {% if event.is_quick %}<span class="badge badge-gold">Need players</span>{% endif %}
         {% if event.is_private %}<span class="badge">🔒 Private</span>{% endif %}
         {% if event.team_size %}<span class="badge badge-purple">Team vs team · {{ event.team_size }}v{{ event.team_size }}</span>{% endif %}
+        {% if event.open_to != 'everyone' %}<span class="badge badge-gold">{{ OPEN_TO[event.open_to] }}{% if event.open_to != 'women_nb' %} only{% endif %}</span>{% endif %}
         {% if event.club_id %}<a class="badge badge-club" href="{{ url_for('clubs.view', club_id=event.club_id) }}">🏛️ {{ event.club_name }}</a>{% endif %}
         {% if event.cancelled %}<span class="badge badge-danger">Canceled</span>{% elif ended %}<span class="badge badge-muted">Ended</span>{% endif %}
       </div>
@@ -101,7 +102,7 @@
       {% elif spots_for_me == 0 %}
         <button class="btn btn-large btn-block" disabled>Full</button>
       {% elif event.is_private %}
-        <form method="post" action="{{ url_for('events.join', event_id=event.id) }}" class="password-join">
+        <form method="post" action="{{ url_for('events.join', event_id=event.id) }}" class="password-join" {% if join_confirm(event) %}data-confirm="{{ join_confirm(event) }}"{% endif %}>
           {{ csrf_field() }}
           <label class="field"><span>Password</span>
             <input name="password" required maxlength="30" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
@@ -109,7 +110,7 @@
         </form>
         <p class="hint">Private game. Ask the host for the password, or to invite you.</p>
       {% else %}
-        <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
+        <form method="post" action="{{ url_for('events.join', event_id=event.id) }}" {% if join_confirm(event) %}data-confirm="{{ join_confirm(event) }}"{% endif %}>
           {{ csrf_field() }}<button class="btn btn-large btn-block">Join</button>
         </form>
         {% if can_party_up(event) %}
@@ -176,7 +177,12 @@
   <a class="person" href="{{ url_for('profile.view', user_id=person.id) }}">{{ avatar(person.id, person.full_name, person.avatar_updated, 36) }}{{ person.full_name }}</a>
   {% if is_team(person.id) %}<span class="team-pill" title="Runs Sportive Circle">🐾 Team</span>{% endif %}
   {% if person.grad_year %}<span class="muted">’{{ (person.grad_year|string)[-2:] }}</span>{% endif %}
-  {% if person.id == event.host_id %}<span class="badge badge-purple">Host</span>{% endif %}
+  {% if person.id == event.host_id %}<span class="badge badge-purple">Host</span>
+  {% elif is_host and not ended and not event.cancelled %}
+    <form method="post" action="{{ url_for('events.remove_player', event_id=event.id, user_id=person.id) }}" class="remove-player"
+          data-confirm="Take {{ person.full_name.split()[0] }} off this game? They'll get a notice.">
+      {{ csrf_field() }}<button class="link-button">Remove</button></form>
+  {% endif %}
 {% endmacro %}
 
 {% if teams %}

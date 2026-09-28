@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS events (
     is_private    INTEGER NOT NULL DEFAULT 0,      -- 1 = joining needs the password (or an invite)
     password      TEXT NOT NULL DEFAULT '',        -- a private game's password, shown to the host and players
     team_size     INTEGER,                         -- team vs team: players per team (NULL = a regular game)
+    open_to       TEXT NOT NULL DEFAULT 'everyone', -- everyone / women / men / women_nb (constants.OPEN_TO)
     cancelled     INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );

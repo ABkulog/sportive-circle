@@ -68,6 +68,7 @@ ADDED_COLUMNS = [
     ("events", "team_size", "INTEGER"),
     ("rsvps", "team", "INTEGER"),
     ("invites", "note", "TEXT NOT NULL DEFAULT ''"),
+    ("events", "open_to", "TEXT NOT NULL DEFAULT 'everyone'"),
 ]
 
 
