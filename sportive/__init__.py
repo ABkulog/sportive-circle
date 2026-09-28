@@ -118,7 +118,7 @@ def _add_template_helpers(app):
         tab_badges=notifications.tab_badges, badge_text=notifications.badge_text,
         chat_unread=social.event_chat_unread, is_admin=moderation.is_admin,
         open_report_count=moderation.open_report_count, pending_club_count=clubs.pending_club_count,
-        is_team=moderation.is_team, new_suggestion_count=feedback.new_suggestion_count,
+        is_team=moderation.is_team,
     )
     app.jinja_env.filters.update(when=fmt_when, clock=fmt_clock, relative=fmt_relative)
 

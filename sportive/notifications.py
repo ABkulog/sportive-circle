@@ -30,9 +30,11 @@ KINDS = [
     Kind("club_requests", "🙋", "People asking to join a club you run", "clubs", True, True, "person waiting to join your club"),
     Kind("badges", "🏅", "New badges you earned", "profile", True, True, "new badge"),
     Kind("news", "📰", "Husky news for your sports", "news", False, False, "new Husky news story"),
+    Kind("suggestion_trends", "💡", "Suggestion topics 3+ people asked for (admins)", "admin", True, True,
+         "suggestion topic trending"),
 ]
 KIND_BY_KEY = {kind.key: kind for kind in KINDS}
-TABS = ("home", "clubs", "news", "profile", "messages", "friends")
+TABS = ("home", "clubs", "news", "profile", "messages", "friends", "admin")
 
 
 # ---------------------------------------------------------------- settings
@@ -158,6 +160,9 @@ def _count(kind, me):
     if kind == "badges":
         return db.execute("SELECT COUNT(*) FROM user_badges WHERE user_id = ? AND earned_at > ?",
                           (me, _since(me, kind))).fetchone()[0]
+    if kind == "suggestion_trends":
+        from .feedback import unseen_trends  # imported here because feedback.py imports this module
+        return len(unseen_trends())
     if kind == "news":
         # Only stories already downloaded for the News page: counting never makes a page wait on GoHuskies.
         from .news import cached_stories, story_sports  # imported here because news.py imports this module
@@ -196,6 +201,7 @@ LINKS = {
     "game_chat": ("events.my_events", {}), "need_players": ("events.feed", {"_anchor": "now"}),
     "club_updates": ("clubs.updates", {}), "club_requests": ("clubs.directory", {"mine": 1}),  # officers' club cards show who's waiting
     "badges": ("profile.badge_locker", {}), "news": ("news.news", {}),
+    "suggestion_trends": ("feedback.admin_suggestions", {}),
 }
 
 
@@ -210,6 +216,8 @@ def on_screen():
             text = f"{n} {kind.link}{'' if n == 1 else 's'}".replace("persons", "people")
             if kind.key == "game_chat" and n != 1:
                 text = f"{n} new messages in your games' chats"
+            if kind.key == "suggestion_trends":
+                text = "1 suggestion topic is trending" if n == 1 else f"{n} suggestion topics are trending"
             items.append((kind.emoji, text, url_for(endpoint, **values)))
     return items
 
@@ -230,5 +238,7 @@ def notification_settings():
         return redirect(url_for("notifications.notification_settings"))
     is_officer = get_db().execute(
         "SELECT 1 FROM club_members WHERE user_id = ? AND role = 'officer' LIMIT 1", (me,)).fetchone() is not None
-    kinds = [kind for kind in KINDS if kind.key != "club_requests" or is_officer]
+    from .moderation import is_admin
+    kinds = [kind for kind in KINDS
+             if (kind.key != "club_requests" or is_officer) and (kind.key != "suggestion_trends" or is_admin())]
     return render_template("profile/notifications.html", kinds=kinds, chosen=settings(me))

@@ -119,7 +119,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-INFO-1 | A How it works page explains the app in plain words, with a glossary. | Must | ✅ |
 | FR-INFO-2 | Privacy and Terms pages, linked from every page and from sign-up. | Must | ✅ |
 | FR-INFO-3 | Husky news from GoHuskies.com, filtered to your sports or any team. | Could | ✅ |
-| FR-INFO-4 | A Suggestions link in the footer: logged-in students send ideas or problems (optionally anonymous, max 5 an hour); only admins can read them. | Should | ✅ |
+| FR-INFO-4 | A Suggestions link in the footer: logged-in students send ideas or problems (optionally anonymous, max 5 an hour); only admins can read them. Suggestions are scanned for keywords, and admins are notified only when 3+ different people bring up the same topic within 30 days. | Should | ✅ |
 
 ---
 

@@ -35,7 +35,7 @@
       <a class="brand" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='icon.svg') }}" alt="" width="28" height="28"><span>Sportive<span class="brand-accent">Circle</span></span></a>
       {% if app_nav %}
         <nav class="top-icons" aria-label="Shortcuts">
-          {% if is_admin() %}{% set open_reports = open_report_count() %}<a href="{{ url_for('moderation.admin_reports') }}" aria-label="Reports{% if open_reports %}, {{ open_reports }} open{% endif %}" title="Reports">{{ icon('shield') }}{% if open_reports %}<span class="count-dot">{{ open_reports }}</span>{% endif %}</a>{% endif %}
+          {% if is_admin() %}{% set open_reports = open_report_count() + nav_badges.admin %}<a href="{{ url_for('moderation.admin_reports') }}" aria-label="Admin{% if open_reports %}, {{ open_reports }} new{% endif %}" title="Admin">{{ icon('shield') }}{% if open_reports %}<span class="count-dot">{{ open_reports }}</span>{% endif %}</a>{% endif %}
           <a href="{{ url_for('how_it_works') }}" aria-label="How it works" title="How it works">{{ icon('help') }}</a>
           <a href="{{ url_for('social.friends') }}" aria-label="Friends{% if nav_badges.friends %}, {{ nav_badges.friends }} new{% endif %}" title="Friends">{{ icon('friends') }}{% if nav_badges.friends %}<span class="count-dot">{{ badge_text(nav_badges.friends) }}</span>{% endif %}</a>
           <a href="{{ url_for('social.inbox') }}" aria-label="Messages{% if nav_badges.messages %}, {{ nav_badges.messages }} unread{% endif %}" title="Messages">{{ icon('send') }}{% if nav_badges.messages %}<span class="count-dot">{{ badge_text(nav_badges.messages) }}</span>{% endif %}</a>
@@ -75,7 +75,7 @@
         {% if is_admin() %}
           {{ tab(url_for('moderation.admin_reports'), 'shield', 'Reports', ep.startswith('moderation.admin'), open_report_count()) }}
           {{ tab(url_for('clubs.review_queue'), 'flag', 'Club requests', ep == 'clubs.review_queue', pending_club_count()) }}
-          {{ tab(url_for('feedback.admin_suggestions'), 'help', 'Suggestions', ep == 'feedback.admin_suggestions', new_suggestion_count()) }}
+          {{ tab(url_for('feedback.admin_suggestions'), 'help', 'Suggestions', ep == 'feedback.admin_suggestions', nav_badges.admin) }}
         {% endif %}
         <form method="post" action="{{ url_for('auth.logout') }}" class="side-logout">
           {{ csrf_field() }}<button class="tab"><span class="tab-icon">{{ icon('logout') }}</span><span class="tab-label">Log out</span></button>

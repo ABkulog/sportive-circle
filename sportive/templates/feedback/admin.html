@@ -3,7 +3,23 @@
 {% block content %}
 {% from "_macros.html" import admin_nav %}{{ admin_nav('suggestions') }}
 <h1 class="page-title">Suggestions</h1>
-<p class="muted">What students would like to see. Only admins can see this page.</p>
+<p class="muted">What students would like to see. Only admins can see this page. You're only notified when
+  {{ trend_people }}+ different people bring up the same topic.</p>
+
+<section class="trends" aria-label="Trending topics">
+  <h2 class="section-title">🔥 Trending (last 30 days)</h2>
+  {% if trends %}
+    <ul class="trend-list">
+      {% for word, people, mentions in trends %}
+        <li><a class="chip {% if topic == word %}is-on{% endif %}" href="{{ url_for('feedback.admin_suggestions', topic=word) }}">
+          <strong>{{ word }}</strong> · {{ people }} people{% if word in fresh %} <span class="badge badge-gold">New</span>{% endif %}</a></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">Nothing yet. A topic shows up here once {{ trend_people }} different people mention it.</p>
+  {% endif %}
+</section>
+{% if topic %}<p><strong>Suggestions about “{{ topic }}”</strong> · <a href="{{ url_for('feedback.admin_suggestions') }}">Show all</a></p>{% endif %}
 <nav class="home-tabs" aria-label="Filter suggestions">
   <a href="{{ url_for('feedback.admin_suggestions') }}" {% if not kind %}class="is-on" aria-current="page"{% endif %}>All</a>
   {% for key, label in kinds.items() %}

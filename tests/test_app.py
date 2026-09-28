@@ -1566,7 +1566,7 @@ def test_admin_reports_page(accounts, client, app):
     accounts.signup(email="admin@uw.edu")
     page = client.get("/admin/reports").data.decode()
     assert "Reported by several people" in page and "Bad Actor" in page and "3 different people" in page
-    assert 'aria-label="Reports' in page and "Threats or violence" in page
+    assert 'aria-label="Admin' in page and "Threats or violence" in page
     with app.app_context():
         report_id = get_db().execute("SELECT id FROM reports").fetchone()[0]
     client.post(f"/admin/reports/{report_id}/reviewed")
@@ -2280,16 +2280,32 @@ def test_suggestion_text_is_escaped_and_length_checked(accounts, client, app):
     assert "🐞" in client.get("/admin/suggestions?kind=bug").data.decode()
 
 
-def test_admins_see_a_count_of_new_suggestions(accounts, client, app):
-    accounts.signup(email="boss@uw.edu")
+def test_admins_are_only_notified_about_topics_3_people_mention(accounts, client, app):
     app.config["ADMIN_EMAILS"] = "boss@uw.edu"
-    client.get("/admin/suggestions")                                   # nothing new yet
+    accounts.signup(email="boss@uw.edu")
     accounts.logout()
-    accounts.signup(email="fan@uw.edu")
-    client.post("/suggestions", data={"kind": "idea", "body": "More spikeball nets please"})
-    accounts.logout()
+    for i, text in enumerate(["Please add badminton!", "Badminton courts would be great", "Can we get badminton"]):
+        accounts.signup(email=f"fan{i}@uw.edu")
+        client.post("/suggestions", data={"kind": "idea", "body": text})
+        if i == 0:
+            for _ in range(3):   # one person saying something 3 times is still only 1 person
+                client.post("/suggestions", data={"kind": "idea", "body": "more pickleball times"})
+        accounts.logout()
+        accounts.login(email="boss@uw.edu")
+        page = client.get("/").data.decode()
+        assert ("1 suggestion topic is trending" in page) == (i == 2), i   # quiet until the third person
+        accounts.logout()
     accounts.login(email="boss@uw.edu")
-    assert "💡 Suggestions (1 new)" in client.get("/admin/reports").data.decode()
-    client.get("/admin/suggestions")
-    assert "(1 new)" not in client.get("/admin/reports").data.decode()
+    admin_page = client.get("/admin/suggestions").data.decode()
+    assert "<strong>badminton</strong> · 3 people" in admin_page and "<strong>pickleball</strong>" not in admin_page
+    assert "1 suggestion topic is trending" not in client.get("/").data.decode()   # seen: no more notification
+    topic_page = client.get("/admin/suggestions?topic=badminton").data.decode()
+    assert "Can we get badminton" in topic_page and "more pickleball" not in topic_page
     assert "Suggestions</a>" in client.get("/terms").data.decode()      # footer link on every page
+
+
+def test_keywords_ignore_filler_and_merge_similar_words():
+    from sportive.feedback import keywords
+    assert keywords("Please add badminton courts to the app!") == {"badminton", "court"}
+    assert "notification" in keywords("the notifs are too much") and "notification" in keywords("fewer notis")
+    assert keywords("The map is broken") == {"map", "bug"}

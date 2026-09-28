@@ -35,3 +35,14 @@ Feature: Suggestions
   Scenario: Suggestions are limited to 5 an hour
     When "Maya" sends 6 suggestions in a row
     Then they see "You can send more in an hour"
+
+  @FR-INFO-4
+  Scenario: Admins only hear about topics 3 different people bring up
+    Given "Jordan" is a Husky
+    And "Sam" is a Husky
+    When "Maya" sends the suggestion "Please add badminton"
+    And "Jordan" sends the suggestion "badminton courts pls"
+    Then "Admin" has 0 on the Admin icon
+    When "Sam" sends the suggestion "We need badminton"
+    Then "Admin" has 1 on the Admin icon
+    And "Admin" sees "1 suggestion topic is trending" in What's new
