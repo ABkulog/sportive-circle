@@ -20,7 +20,7 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 URL = sys.argv[1] if len(sys.argv) > 1 else "https://sportive-circle.onrender.com"
 OUT = os.path.join(ROOT, "marketing")
-PURPLE, GOLD, WHITE = "#4b2e83", "#ffc700", "#ffffff"
+PURPLE, GOLD, WHITE = "#4b2e83", "#b7a57a", "#ffffff"  # UW Spirit Purple + Husky Gold
 
 
 def paw(size):
