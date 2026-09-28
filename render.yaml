@@ -29,8 +29,8 @@ services:
         value: "1"
       - key: DATABASE
         value: /data/sportive_circle.db
-      - key: ADMIN_EMAILS
-        value: akulog@uw.edu
+      - key: ADMIN_EMAILS      # comma-separated UW emails, e.g. "you@uw.edu,teammate@uw.edu" (set in Render, kept out of GitHub)
+        sync: false
       - key: CONTACT_EMAIL     # shown on the Privacy and Terms pages (use the app's own email, not a personal one)
         sync: false
       - key: MAIL_SERVER

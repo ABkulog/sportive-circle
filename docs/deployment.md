@@ -38,10 +38,11 @@ database, and random secret keys.
    | `MAIL_PASSWORD` | your Brevo SMTP key |
    | `MAIL_FROM` | `Sportive Circle <the sender email you confirmed>` |
    | `CONTACT_EMAIL` | the app's own email (shown on Privacy and Terms), not a personal or UW one |
+   | `ADMIN_EMAILS` | the admins' UW emails, separated by commas: `you@uw.edu,teammate@uw.edu` |
 
 4. **Apply**. The first build takes a few minutes. Your site is at `https://sportive-circle.onrender.com`
    (or the name Render shows).
-5. Open it, sign up with your UW email (`ADMIN_EMAILS` in `render.yaml` makes that account an admin), and
+5. Open it, sign up with your UW email (being in `ADMIN_EMAILS` makes that account an admin), and
    check the code email arrives (look in Junk too).
 
 Every push to `main` on GitHub redeploys automatically. The database stays on the disk.
@@ -60,6 +61,11 @@ scheduler does it:
 3. Save, then use **Test run**: it should answer `{"sent": 0}` (or how many reminders it sent).
 
 Keep the token private: it's the password for that link. Without it, the link answers "not found".
+
+### Adding or removing an admin
+
+Render → **sportive-circle** → **Environment** → edit `ADMIN_EMAILS` (comma-separated UW emails) → **Save**.
+The site restarts in about a minute. Each admin signs up in the app with that exact UW email.
 
 ## 5. Backups
 
