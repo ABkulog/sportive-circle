@@ -17,8 +17,10 @@
   --accent-soft: #f1edf8;      /* a whisper of purple for boxes that need attention */
 
   --bg: #ffffff;
-  --surface: #f5f4f7;          /* inputs, quiet panels */
-  --line: #e2e0e7;             /* hairlines */
+  --surface: #f1eff5;          /* inputs, quiet panels */
+  --line: #d9d6e0;             /* hairlines */
+  --control: #e8e5ee;          /* secondary buttons, chips, switches: a bit darker than the page */
+  --control-line: #cdc8d8;     /* their thin outline, so they don't melt into the white page */
   --band: #f3f0e8;             /* thick dividers between sections: a warm, light gold */
   --tile: #faf9fb;             /* one game in a list */
   --text: #262626;
@@ -48,6 +50,8 @@
   --bg: #15121c;
   --surface: #211c2b;
   --line: #342d42;
+  --control: #2a2436;
+  --control-line: #3d3550;
   --band: #0f0d14;
   --tile: #1b1724;
   --text: #ece9f2;
@@ -71,6 +75,8 @@
     --bg: #15121c;
     --surface: #211c2b;
     --line: #342d42;
+    --control: #2a2436;
+    --control-line: #3d3550;
     --band: #0f0d14;
     --tile: #1b1724;
     --text: #ece9f2;
@@ -180,7 +186,7 @@ section.band > .section-title:first-child { margin-top: 0; }
 .switch-text { display: grid; gap: 1px; font-weight: 600; }
 .switch-text small { font-weight: 400; }
 .switch { appearance: none; -webkit-appearance: none; flex: none; width: 46px; height: 28px; margin: 0; border-radius: 999px;
-  background: var(--line); position: relative; cursor: pointer; transition: background .15s; }
+  background: var(--control-line); position: relative; cursor: pointer; transition: background .15s; }
 .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
   background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / .3); transition: transform .15s; }
 .switch:checked { background: var(--purple); }
@@ -288,8 +294,8 @@ body.hide-tabs { padding-bottom: 0; }
 }
 .btn:hover { background: var(--purple-strong); text-decoration: none; }
 .btn:disabled, .btn[disabled] { background: var(--surface); color: var(--faint); cursor: not-allowed; }
-.btn-ghost, .btn-danger-ghost { background: var(--surface); color: var(--text); }
-.btn-ghost:hover { background: var(--line); }
+.btn-ghost, .btn-danger-ghost { background: var(--control); color: var(--text); box-shadow: inset 0 0 0 1px var(--control-line); }
+.btn-ghost:hover { background: var(--control-line); text-decoration: none; }
 .btn-danger-ghost { color: var(--danger); }
 .btn-danger-ghost:hover { background: var(--line); }
 .btn-gold { background: var(--purple); }          /* one main-button style everywhere */
@@ -313,7 +319,7 @@ body.hide-tabs { padding-bottom: 0; }
 
 /* chips & tags: quiet, neutral */
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
-  background: var(--surface); color: var(--text); font-size: .88rem; border: 0; }
+  background: var(--control); color: var(--text); font-size: .88rem; border: 0; box-shadow: inset 0 0 0 1px var(--control-line); }
 .chip.is-on { background: var(--purple); color: var(--on-accent); }
 .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .badge { display: inline-block; font-size: .72rem; font-weight: 600; padding: 2px 8px; border-radius: 6px;
@@ -328,7 +334,8 @@ body.hide-tabs { padding-bottom: 0; }
 .done-pill { font-size: .85rem; }
 
 /* segmented control & tabs */
-.segmented { display: inline-flex; background: var(--surface); border-radius: 10px; padding: 3px; }
+.segmented { display: inline-flex; background: var(--control); border-radius: 10px; padding: 3px;
+  box-shadow: inset 0 0 0 1px var(--control-line); }
 .segmented label { flex: 0 0 auto; }
 
 .segmented span, .segmented-link { display: block; padding: 6px 14px; border-radius: 8px; font-size: .9rem;
@@ -436,7 +443,7 @@ section.card h2, details.card h2 { margin-top: 0; }
 .field { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
 .field > span, .field legend { font-weight: 600; font-size: .9rem; padding: 0; margin-bottom: 6px; }
 input, select, textarea {
-  width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px;
+  width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid var(--control-line); border-radius: 10px;
   background: var(--surface); color: var(--text); font: 16px/1.4 var(--font);   /* 16px: no zoom on iPhone */
 }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); background: var(--bg); }
@@ -452,7 +459,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: .85; }
 .segmented input, .chip-check input, .choice-pill input {
   position: absolute; left: 0; top: 0; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
 .chip-check span, .choice-pill span { display: inline-block; padding: 8px 13px; border-radius: 999px; cursor: pointer;
-  background: var(--surface); border: 1px solid var(--line); font-size: .9rem; user-select: none; }
+  background: var(--control); border: 1px solid var(--control-line); font-size: .9rem; user-select: none; }
 .chip-check input:checked + span, .choice-pill input:checked + span { background: var(--purple); border-color: var(--purple); color: var(--on-accent); }
 .chip-check input:focus-visible + span, .choice-pill input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .social-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
