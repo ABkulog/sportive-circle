@@ -10,11 +10,11 @@ from werkzeug.datastructures import MultiDict
 from .auth import login_required, safe_next
 from .badges import sync_badges
 from .clubs import featured_clubs, suggested_clubs
-from .constants import (LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS, SKILL_LEVELS,
-                        SPORT_LOCATIONS, SPORT_MAX_PLAYERS, SPORTS)
+from .constants import (DEFAULT_MAX_HOURS, LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
+                        SKILL_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, SPORT_MAX_PLAYERS, SPORTS)
 from .db import get_db, user_sports
 from .invites import (HELD, count_wrong_password, held_spots, hold_minutes_left, my_invite, now_param,
-                      pending_invites, team_counts, too_many_password_tries)
+                      pending_invites, requested_invites, team_counts, too_many_password_tries)
 from .links import public_url
 from .notifications import mark_seen, notify
 from .mail import compose, send_email
@@ -26,7 +26,6 @@ from .timeutil import fmt_clock, fmt_when, from_db, now_local, parse_form, to_db
 bp = Blueprint("events", __name__)
 log = logging.getLogger(__name__)
 
-MAX_EVENT_LENGTH = timedelta(days=3)   # long enough for a ski or hiking trip
 MIN_PASSWORD, MAX_PASSWORD = 4, 30     # private games
 MAX_DAYS_AHEAD = 365
 OPEN_SPOT_CHOICES = ("2", "3", "4", "5", "10")  # the "Open spots" filter on Home
@@ -252,8 +251,10 @@ def read_event_form(form, event=None):
         return None, "Event end time cannot be empty."
     if ends <= starts:
         return None, "The event has to end after it starts."
-    if ends - starts > MAX_EVENT_LENGTH:
-        return None, "Events can be at most 3 days long."
+    max_hours = SPORT_MAX_HOURS.get(sport, DEFAULT_MAX_HOURS)
+    if ends - starts > timedelta(hours=max_hours):
+        longest = f"{max_hours // 24} days" if max_hours % 24 == 0 else f"{max_hours} hours"
+        return None, f"{SPORTS[sport]} events can be at most {longest} long."
     if ends <= now:
         return None, "The end time has already passed."
     start_changed = event is None or to_db(starts) != event["starts_at"]
@@ -558,6 +559,7 @@ def detail(event_id):
                            blocked=is_blocked_between(me, event["host_id"]),
                            invite=invite, hold_minutes=hold_minutes_left(invite),
                            invited=pending_invites(event_id), teams=teams, my_team=my_team,
+                           requests=requested_invites(event_id) if event["i_am_going"] else [],
                            # my own held spot is still mine to take, even if the game looks full to others
                            spots_for_me=None if spots_left(event) is None
                            else spots_left(event) + (1 if hold_minutes_left(invite) else 0))

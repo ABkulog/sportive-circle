@@ -121,6 +121,19 @@ def test_event_validation(accounts, client):
         assert message in client.post("/events/new", data=data).data, message
 
 
+def test_games_cant_last_all_day_but_trips_can(accounts, client):
+    """Testers: "Why is the Spikeball 24 hours long?" Court and field games max out at 6 hours."""
+    accounts.signup()
+    day = dict(starts_at=form_time(timedelta(days=1)), ends_at=form_time(timedelta(days=2)))
+    too_long = client.post("/events/new", data=event_form(sport="spikeball", location="The Quad", **day)).data
+    assert b"Spikeball events can be at most 6 hours long." in too_long
+    trip = event_form(title="Rainier day hike", sport="hiking", location="Off campus (see note)", **day)
+    assert client.post("/events/new", data=trip).status_code == 302
+    three_days = dict(starts_at=form_time(timedelta(days=1)), ends_at=form_time(timedelta(days=5)))
+    assert b"at most 3 days long" in client.post("/events/new", data=event_form(
+        sport="snow", location="Off campus (see note)", **three_days)).data
+
+
 def test_duplicate_event_is_rejected(accounts, client):
     accounts.signup()
     client.post("/events/new", data=event_form())
@@ -2422,3 +2435,60 @@ def test_blocked_people_cant_party_into_your_game(accounts, client, app):
     _as(accounts, "Jordan")
     assert b"can&#39;t join" in client.get(f"/events/{game}/party", follow_redirects=True).data
     assert b"Join with friends" not in client.get(f"/events/{game}").data
+
+
+def test_private_game_host_approves_friends_players_bring(accounts, client, app):
+    """Testers: "If you want to bring your friend, you make the request to the host, with a note.
+    Otherwise, who's John?" Only in private games; the host says yes first."""
+    ids = _people(accounts, app, "Maya", "Sam", "John", "Kim")
+    _friends(app, ids["Sam"], ids["John"], ids["Kim"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(is_private="1", password="dawgs26",
+                                                                     title="Hoops")))
+    _as(accounts, "Sam")
+    client.post(f"/events/{game}/join", data={"password": "dawgs26"})
+    party = client.get(f"/events/{game}/party").data.decode()
+    assert 'name="note"' in party and "Ask Maya" in party
+    done = client.post(f"/events/{game}/party", data={"friend": [ids["John"], ids["Kim"]], "note": "My roommates"},
+                       follow_redirects=True).data.decode()
+    assert "Asked Maya" in done and "Waiting for Maya" in done
+    _as(accounts, "John")                                   # nothing to answer until Maya says yes
+    assert "You down?" not in client.get(f"/events/{game}").data.decode()
+    _as(accounts, "Maya")
+    assert "Sam wants to bring John, Kim to Hoops: “My roommates”" in client.get("/notifications").data.decode()
+    page = client.get(f"/events/{game}").data.decode()
+    assert "Requests" in page and "My roommates" in page
+    client.post(f"/events/{game}/requests/{ids['John']}/approve")
+    client.post(f"/events/{game}/requests/{ids['Kim']}/decline")
+    _as(accounts, "John")                                   # approved: invite, held spot, no password needed
+    assert "Sam invited you. You down?" in client.get(f"/events/{game}").data.decode()
+    assert b"You&#39;re in" in client.post(f"/events/{game}/invite/answer", data={"answer": "yes"},
+                                            follow_redirects=True).data
+    _as(accounts, "Kim")
+    assert "You down?" not in client.get(f"/events/{game}").data.decode()
+    _as(accounts, "Sam")
+    bell = client.get("/notifications").data.decode()
+    assert "Maya said yes to John" in bell and "Maya can&#39;t fit Kim into Hoops" in bell
+    _as(accounts, "Kim")                                    # only the host answers requests
+    assert client.post(f"/events/{game}/requests/{ids['Kim']}/approve").status_code == 403
+
+
+def test_team_invites_go_to_the_right_team_and_private_teams_cant_be_challenged(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Mo", "Max", "Solo")
+    _friends(app, ids["Maya"], ids["Mo"])
+    _friends(app, ids["Mo"], ids["Max"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(team_size="3", title="3v3")))
+    client.post(f"/events/{game}/party", data={"friend": [ids["Mo"]]})
+    _as(accounts, "Mo")          # invited to Maya's team: joining with a friend puts both on team 1, not team 2
+    client.post(f"/events/{game}/party", data={"friend": [ids["Max"]]})
+    _as(accounts, "Max")
+    client.post(f"/events/{game}/invite/answer", data={"answer": "yes"})
+    with app.app_context():
+        teams = dict(get_db().execute("SELECT user_id, team FROM rsvps WHERE event_id = ?", (game,)).fetchall())
+    assert teams == {ids["Maya"]: 1, ids["Mo"]: 1, ids["Max"]: 1}
+    _as(accounts, "Maya")
+    private = event_id_from(client.post("/events/new", data=event_form(team_size="2", is_private="1",
+                                                                        password="secret1", title="Private 2v2")))
+    _as(accounts, "Solo")
+    assert b"Ask the host to invite you" in client.get(f"/events/{private}/party", follow_redirects=True).data

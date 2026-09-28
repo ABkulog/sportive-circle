@@ -431,6 +431,21 @@ def party_up(world, name, friend):
                                  follow_redirects=True), person.client)
 
 
+@when(parsers.parse('"{name}" asks to bring "{friend}" with the note "{note}"'))
+def ask_to_bring(world, name, friend, note):
+    person = world.person(name)
+    world.saw(person.client.post(f"/events/{the_game(world)}/party",
+                                 data={"friend": world.person(friend).id, "note": note}, follow_redirects=True),
+              person.client)
+
+
+@when(parsers.parse('"{host}" approves the request for "{guest}"'))
+def approve_request(world, host, guest):
+    person = world.person(host)
+    world.saw(person.client.post(f"/events/{the_game(world)}/requests/{world.person(guest).id}/approve",
+                                 follow_redirects=True), person.client)
+
+
 @when(parsers.parse('"{name}" challenges {host}\'s game with "{friend}"'))
 def challenge(world, name, host, friend):
     person = world.person(name)
@@ -455,6 +470,7 @@ def host_team_game(world, host):
     host_game(world, host, team_size="2", title="2v2")
 
 
+@given(parsers.parse('"{name}" tries to join {host}\'s game with the password "{password}"'))
 @when(parsers.parse('"{name}" tries to join {host}\'s game with the password "{password}"'))
 def join_with_password(world, name, host, password):
     person = world.person(name)

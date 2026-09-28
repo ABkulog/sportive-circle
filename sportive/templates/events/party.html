@@ -6,11 +6,15 @@
 <div class="card form-card">
   <h1>{{ 'Challenge with your team' if challenge else 'Party up' }}</h1>
   <p class="muted">{{ event_title(event) }} · {{ event.starts_at|when }}</p>
+  {% if host_ok %}
+    <p class="muted">Pick friends to bring. {{ event.host_name.split()[0] }} says yes first, then their spots are held for 30 min.</p>
+  {% else %}
   <p class="muted">
     {% if joining_now %}You join now, and{% else %}Pick friends.{% endif %}
     {{ 'their' if joining_now else 'Their' }} spots are held for 30 min while they say yes.
     {% if room is not none %}<strong>{{ room - (1 if joining_now else 0) }} spot{{ 's' if room - (1 if joining_now else 0) != 1 }} for friends.</strong>{% endif %}
   </p>
+  {% endif %}
   {% if friends %}
     <form method="post" class="form">
       {{ csrf_field() }}
@@ -22,7 +26,11 @@
           </label></li>
         {% endfor %}
       </ul>
-      <button class="btn btn-block btn-large">{{ 'Join and invite' if joining_now else 'Invite' }}</button>
+      {% if host_ok %}
+        <label class="field"><span>Note for {{ event.host_name.split()[0] }} <em>(it's a private game, so they say yes first)</em></span>
+          <input name="note" maxlength="{{ max_note }}" placeholder="My roommate, he's good"></label>
+      {% endif %}
+      <button class="btn btn-block btn-large">{{ 'Ask ' ~ event.host_name.split()[0] if host_ok and not joining_now else ('Join and invite' if joining_now else 'Invite') }}</button>
     </form>
   {% else %}
     <p>None of your friends can be invited to this one yet.</p>

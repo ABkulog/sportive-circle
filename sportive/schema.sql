@@ -81,7 +81,9 @@ CREATE INDEX IF NOT EXISTS idx_rsvps_user ON rsvps(user_id);
 
 -- Invites to a game, from anyone going (a "party"). While `expires_at` hasn't passed, a pending invite
 -- holds a spot for that friend, so a group can join together without strangers taking their spots.
--- After that the invite still works if there's room. status: pending / accepted / declined / canceled.
+-- After that the invite still works if there's room. status: pending / accepted / declined / canceled,
+-- or 'requested': in a private game, a player who isn't the host asked to bring a friend (with a note),
+-- and the host hasn't said yes yet (nothing is held until they do).
 CREATE TABLE IF NOT EXISTS invites (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id    INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -89,6 +91,7 @@ CREATE TABLE IF NOT EXISTS invites (
     guest_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     team        INTEGER,                        -- team vs team: which team the spot is on
     status      TEXT NOT NULL DEFAULT 'pending',
+    note        TEXT NOT NULL DEFAULT '',       -- "this is my roommate", for the host of a private game
     created_at  TEXT NOT NULL,
     expires_at  TEXT NOT NULL,                  -- the held spot is free again after this
     UNIQUE (event_id, guest_id)

@@ -46,6 +46,14 @@ def pending_invites(event_id):
            WHERE i.event_id = ? AND i.status = 'pending' ORDER BY i.id""", (event_id,)).fetchall()
 
 
+def requested_invites(event_id):
+    """Friends players asked to bring to a private game, waiting for the host's yes."""
+    return get_db().execute(
+        """SELECT i.*, g.full_name AS guest_name, g.avatar_updated AS guest_avatar, v.full_name AS inviter_name
+           FROM invites i JOIN users g ON g.id = i.guest_id JOIN users v ON v.id = i.inviter_id
+           WHERE i.event_id = ? AND i.status = 'requested' ORDER BY i.id""", (event_id,)).fetchall()
+
+
 def held_spots(event_id, team=None, except_user=None):
     """Spots held right now (on one team, if given), not counting `except_user`'s own hold."""
     sql = "SELECT COUNT(*) FROM invites WHERE event_id = ? AND status = 'pending' AND expires_at > ?"

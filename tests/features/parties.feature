@@ -50,6 +50,17 @@ Feature: Playing with friends
     When "Jordan" says yes to the invite
     Then Maya's game has 2 players
 
+  @FR-PRIV-3
+  Scenario: In a private game, the host says yes to friends other players bring
+    Given "Maya" hosts a private basketball game with the password "dawgs26"
+    And "Sam" and "Jordan" are friends
+    And "Sam" tries to join Maya's game with the password "dawgs26"
+    When "Sam" asks to bring "Jordan" with the note "my roommate"
+    Then "Maya" sees "Sam wants to bring Jordan to Pickup 5v5: “my roommate”" in the bell
+    When "Maya" approves the request for "Jordan"
+    And "Jordan" says yes to the invite
+    Then Maya's game has 3 players
+
   @FR-TEAM-1
   Scenario: Team vs team: another group challenges the host's team
     Given "Sam" and "Jordan" are friends

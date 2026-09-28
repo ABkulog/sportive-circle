@@ -135,6 +135,8 @@ FIELDS = {
     "/events/2/party": ["friend"],
     "/events/2/invite/answer": ["answer"],
     "/events/2/invite/3/cancel": [],
+    "/events/1/requests/3/approve": [],
+    "/events/1/requests/3/decline": [],
     "/need-players": ["sport", "location", "skill_level", "starts_in", "duration", "needed", "have", "note"],
     "/events/2/edit": ["title", "sport", "location", "skill_level", "starts_at", "ends_at", "max_players", "note"],
     "/profile/edit": ["full_name", "grad_year", "bio", "sports", "pronouns", "gender", "instagram", "snapchat",
@@ -166,7 +168,7 @@ ODD_URLS = ["/events/999999", "/events/0/join", "/clubs/999999", "/u/999999", "/
             "/report/nothing/1", "/report/dm/999999", "/admin/users/999999/suspend", "/clubs/1/members/999999/approve",
             "/friends/request/999999",
             "/block/999999", "/reset", "/verify", "/profile/notifications",
-            "/admin/users/1/explode", "/admin/users/1/tester/explode", "/admin/users/999999/tester/give", "/admin/users/99999999999999999999/suspend"]
+            "/admin/users/1/explode", "/admin/users/1/tester/explode", "/events/1/requests/3/explode", "/admin/users/999999/tester/give", "/admin/users/99999999999999999999/suspend"]
 
 
 def junk_test(app, password):

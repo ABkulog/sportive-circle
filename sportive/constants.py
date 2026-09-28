@@ -161,6 +161,11 @@ SPORT_MAX_PLAYERS = {
 
 SKILL_LEVELS = ["All levels", "Casual", "Intermediate", "Competitive"]
 
+# How long one event can last, in hours. Trips (a hike, a day on the slopes, a bike ride) can take days;
+# a pickup game can't. (Testers asked why a Spikeball game could be 24 hours long.)
+DEFAULT_MAX_HOURS = 6
+SPORT_MAX_HOURS = {"hiking": 72, "snow": 72, "biking": 72, "rowing": 12, "running": 12, "esports": 12, "other": 72}
+
 # "Need players" quick posts: (minutes from now, label)
 QUICK_START_OPTIONS = [(0, "Right now"), (15, "In 15 min"), (30, "In 30 min"), (60, "In 1 hour"), (120, "In 2 hours")]
 QUICK_DURATIONS = [(30, "30 min"), (60, "1 hour"), (90, "1.5 hours"), (120, "2 hours")]

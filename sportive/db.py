@@ -67,6 +67,7 @@ ADDED_COLUMNS = [
     ("events", "password", "TEXT NOT NULL DEFAULT ''"),
     ("events", "team_size", "INTEGER"),
     ("rsvps", "team", "INTEGER"),
+    ("invites", "note", "TEXT NOT NULL DEFAULT ''"),
 ]
 
 
