@@ -2,22 +2,21 @@
 {% block title %}Create{% endblock %}
 {% block content %}
 <h1 class="page-title">Create</h1>
-<p class="muted">What do you want to start?</p>
 <div class="create-grid">
   <a class="card create-option create-gold" href="{{ url_for('events.quick') }}">
     <span class="create-emoji" aria-hidden="true">⚡</span>
     <strong>Need players</strong>
-    <span class="muted">Playing <em>right now</em> and short a few people? Post it in seconds.</span>
+    <span class="muted">Short a few people right now</span>
   </a>
   <a class="card create-option" href="{{ url_for('events.create') }}">
     <span class="create-emoji" aria-hidden="true">📅</span>
     <strong>New event</strong>
-    <span class="muted">Plan a game ahead: pick the day, time, place and how many people.</span>
+    <span class="muted">Plan one for later</span>
   </a>
   <a class="card create-option" href="{{ url_for('clubs.create') }}">
     <span class="create-emoji" aria-hidden="true">🏛️</span>
     <strong>Register your club</strong>
-    <span class="muted">Officer of an active UW club? Get it verified so every Husky can find and join it.</span>
+    <span class="muted">For club officers</span>
   </a>
 </div>
 {% if officer_clubs %}

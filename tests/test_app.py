@@ -64,7 +64,7 @@ def test_signup_verify_and_login(accounts, client, app):
         assert user["password_hash"] != "purple-and-gold"  # stored hashed, never plain
     accounts.logout()
     assert accounts.login().status_code == 302
-    assert b", Dubs!" in client.get("/").data  # "Morning, Dubs!" / "Evening, Dubs!" ...
+    assert b"Hey, Dubs" in client.get("/").data
 
 
 def test_wrong_code_is_rejected_and_attempts_are_limited(accounts, client):
@@ -85,7 +85,7 @@ def test_unverified_user_cannot_log_in(accounts, client):
 def test_wrong_password(accounts):
     accounts.signup()
     accounts.logout()
-    assert b"Wrong email or password!" in accounts.login(password="nope-nope-nope").data
+    assert b"Wrong email or password." in accounts.login(password="nope-nope-nope").data
 
 
 def test_email_already_used(accounts):
@@ -139,7 +139,7 @@ def test_join_leave_and_capacity(accounts, client):
 
     accounts.signup(email="third@uw.edu")
     response = client.post(f"/events/{event_id}/join", follow_redirects=True)
-    assert b"this event is full" in response.data
+    assert b"this game is full" in response.data
     accounts.logout()
 
     accounts.login(email="second@uw.edu")
@@ -273,9 +273,12 @@ def test_login_locks_after_too_many_wrong_passwords(accounts):
     assert b"Too many wrong passwords" in accounts.login().data  # even the right one is blocked
 
 
-def test_resend_code_has_a_cooldown(accounts, client):
+def test_resend_code_has_a_cooldown_with_a_countdown(accounts, client):
     accounts.signup(verify=False)
-    assert b"Wait a minute" in client.post("/verify/resend", follow_redirects=True).data
+    page = client.post("/verify/resend", follow_redirects=True).data.decode()
+    assert "Give it a minute" in page
+    wait = int(re.search(r'data-countdown="(\d+)"', page).group(1))
+    assert 50 <= wait <= 61 and "Resend code in {s}s" in page   # app.js counts down from here
 
 
 def test_shared_link_survives_signup(accounts, client):
@@ -771,14 +774,12 @@ def _finish_all_events(app):
         db.commit()
 
 
-def test_greeting_by_time_of_day():
-    from datetime import datetime
-    from sportive.spirit import SPIRIT_LINES, greeting
-    assert greeting("Maya", datetime(2026, 9, 27, 8, 0))[0] == "Morning, Maya!"
-    assert greeting("Maya", datetime(2026, 9, 27, 14, 0))[0] == "Afternoon, Maya!"
-    assert greeting("Maya", datetime(2026, 9, 27, 19, 0))[0] == "Evening, Maya!"
-    assert greeting("Maya", datetime(2026, 9, 27, 1, 0))[0] == "Late night, Maya!"
-    assert greeting("Maya")[1] in SPIRIT_LINES
+def test_greeting_is_plain(accounts, client):
+    from sportive.spirit import greeting
+    assert greeting("Maya") == "Hey, Maya"
+    accounts.signup(name="Maya Chen")
+    page = client.get("/").data.decode()
+    assert "Hey, Maya" in page and "Late night" not in page and "Bow down" not in page
 
 
 def test_badges(accounts, client, app):
@@ -827,7 +828,7 @@ def test_top_dawgs(accounts, client, app, monkeypatch):
 def test_celebration_and_footer(accounts, client):
     accounts.signup()
     response = client.post("/events/new", data=event_form(), follow_redirects=True).data
-    assert b"flash-celebrate" in response and b"Go Dawgs" in response
+    assert b"flash-celebrate" in response and b"Your game is up!" in response
     assert b"Made by Huskies, for Huskies" in response
     assert b"Not an official University of Washington service" in response
 
@@ -944,7 +945,7 @@ def test_friend_requests(accounts, client, app):
     accounts.login(email="a@uw.edu")
     assert b'<span class="count-dot">1</span>' in client.get("/friends").data   # 1 request in the nav
     client.post(f"/friends/accept/{b}")
-    assert "✅ Friends".encode() in client.get(f"/u/{b}").data
+    assert b">Friends</span>" in client.get(f"/u/{b}").data
     client.post(f"/friends/remove/{b}")
     assert b"+ Add friend" in client.get(f"/u/{b}").data
 
@@ -1040,7 +1041,7 @@ def test_event_group_chat(accounts, client, app):
     accounts.logout()
     accounts.signup(email="player@uw.edu")
     outside = client.get(f"/events/{event_id}/chat", follow_redirects=True).data
-    assert b"Join the event to see" in outside and b"Court 3" not in outside
+    assert b"Join the game to use its chat" in outside and b"Court 3" not in outside
     assert client.get(f"/events/{event_id}/chat/poll").status_code == 403
     client.post(f"/events/{event_id}/join")
     detail = client.get(f"/events/{event_id}").data
@@ -1058,8 +1059,8 @@ def test_delete_account_needs_are_you_sure(accounts, client, app):
     accounts.signup()
     client.post("/events/new", data=event_form())
     page = client.get("/profile/delete").data.decode()
-    assert "Are you sure" in page and "No, keep my account" in page and "can't be undone" in page
-    assert "upcoming event you host" in page
+    assert "Delete your account?" in page and "No, keep my account" in page and "can't be undone" in page
+    assert "upcoming game you host" in page
     wrong = client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "yes"},
                         follow_redirects=True).data
     assert b"Type DELETE" in wrong
@@ -1114,7 +1115,7 @@ def test_clubs_are_open_to_everyone(accounts, client, app):
     directory = client.get("/clubs").data.decode()          # no account needed
     assert "UW Spikeball Club" in directory and "1 member" in directory
     page = client.get(f"/clubs/{club}").data.decode()
-    assert "Casual roundnet" in page and "✅ Verified" in page and "Sign up to join" in page
+    assert "Casual roundnet" in page and ">Verified<" in page and "Sign up to join" in page
     assert "No experience needed" in page and "Come to any Tuesday practice!" in page and "@uwspikeball" in page
     assert "Cap Tain" not in page                             # member names need an account
 
@@ -1159,7 +1160,7 @@ def test_club_events_are_all_levels(accounts, client, app):
     club = _club_id(app)
     _approve(app, club)
     form_page = client.get(f"/events/new?club={club}").data.decode()
-    assert "Club event for" in form_page and 'name="skill_level"' not in form_page
+    assert "Open to all levels" in form_page and 'name="skill_level"' not in form_page
     response = client.post("/events/new", data={**event_form(title="Club night", sport="spikeball",
                                                              location="The Quad", skill_level="Competitive"),
                                                 "club": club})
@@ -1217,7 +1218,7 @@ def test_report_a_profile_and_block(accounts, client, app):
     assert "Report Bad Actor" in form and "won't be told who reported them" in form
     done = client.post(f"/report/user/{bad}", data={"reason": "harassment", "details": "keeps bugging me", "block": "1"},
                        follow_redirects=True).data.decode()
-    assert "Thanks for letting us know" in done and "You&#39;ve also blocked them" in done
+    assert "Thanks. We&#39;ll look into it" in done and "You&#39;ve also blocked them" in done
     with app.app_context():
         db = get_db()
         row = db.execute("SELECT * FROM reports").fetchone()
@@ -1435,7 +1436,7 @@ def test_tryouts_flow_with_messages(accounts, client, app):
 def test_application_needs_an_answer(accounts, client, app):
     club = _approved_club(accounts, client, app, joining="application")
     accounts.signup(email="applicant@uw.edu")
-    assert b"answer the club&#39;s question" in client.post(f"/clubs/{club}/join", follow_redirects=True).data
+    assert b"Answer the club&#39;s question" in client.post(f"/clubs/{club}/join", follow_redirects=True).data
     client.post(f"/clubs/{club}/join", data={"message": "I love spikeball"})
     with app.app_context():
         row = get_db().execute("SELECT role, message FROM club_members WHERE user_id = ?",
@@ -2049,7 +2050,7 @@ def test_suggestion_text_is_escaped_and_length_checked(accounts, client, app):
     app.config["ADMIN_EMAILS"] = "dubs@uw.edu"
     page = client.get("/admin/suggestions").data.decode()
     assert "<script>alert(1)</script>" not in page and "&lt;script&gt;" in page
-    assert "🐞" in client.get("/admin/suggestions?kind=bug").data.decode()
+    assert "Something&#39;s broken" in client.get("/admin/suggestions?kind=bug").data.decode()
 
 
 def test_admins_are_only_notified_about_topics_3_people_mention(accounts, client, app):

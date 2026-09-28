@@ -22,7 +22,7 @@
     </select>
   </div>
   <div class="choice-pills" role="group" aria-label="Quick filters">
-    {% for key, text in [('beginner', '🌱 No experience needed'), ('free', '💵 Free'), ('no_tryouts', '🚪 No tryouts')] %}
+    {% for key, text in [('beginner', 'No experience needed'), ('free', 'Free'), ('no_tryouts', 'No tryouts')] %}
       <label class="choice-pill"><input type="checkbox" name="easy" value="{{ key }}" {% if key in easy %}checked{% endif %}
              data-autosubmit><span>{{ text }}</span></label>
     {% endfor %}
@@ -38,21 +38,20 @@
       <strong class="club-name">{{ c.name }}</strong>
       <span class="club-desc muted">{{ c.description|truncate(110) }}</span>
       <span class="badges">
-        <span class="badge">👥 {{ c.member_count }} member{{ 's' if c.member_count != 1 }}</span>
-        {% if c.upcoming %}<span class="badge">📅 {{ c.upcoming }} upcoming</span>{% endif %}
-        {% if c.status == 'approved' %}<span class="badge badge-verified">✅ Verified</span>
+        <span class="badge">{{ c.member_count }} member{{ 's' if c.member_count != 1 }}</span>
+        {% if c.upcoming %}<span class="badge">{{ c.upcoming }} upcoming</span>{% endif %}
+        {% if c.status == 'approved' %}<span class="badge badge-verified">Verified</span>
         {% elif c.status == 'pending' %}<span class="badge badge-gold">⏳ In review</span>
         {% else %}<span class="badge badge-danger">Needs changes</span>{% endif %}
         {% if c.my_status == 'officer' and c.waiting %}<span class="badge badge-gold">🙋 {{ c.waiting }} waiting to join</span>{% endif %}
         {% if c.my_status in ('member', 'officer') %}<span class="badge badge-success">{{ 'Officer' if c.my_status == 'officer' else 'Member' }}</span>
         {% elif c.my_status == 'follower' %}<span class="badge">Following</span>
         {% elif c.my_status in ('requested', 'tryout') %}<span class="badge badge-gold">Waiting</span>{% endif %}
-        {% if c.experience == 'none' %}<span class="badge">🌱 Beginners welcome</span>{% endif %}
+        {% if c.experience == 'none' %}<span class="badge">Beginners welcome</span>{% endif %}
       </span>
     </a>
   {% else %}
     <div class="card empty">
-      <p class="empty-emoji" aria-hidden="true">🏛️</p>
       <p><strong>{% if q or sport or mine %}No clubs match that.{% else %}No clubs yet.{% endif %}</strong></p>
       <p class="muted">Are you an officer of an active UW club? Register it so other Huskies can find you.</p>
       {% if g.user %}<a class="btn" href="{{ url_for('clubs.create') }}">Register your club</a>

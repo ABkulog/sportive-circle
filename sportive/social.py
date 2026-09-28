@@ -252,14 +252,14 @@ def send_request(user_id):
     status = friendship_status(me, user_id)
     db = get_db()
     if user_id == me:
-        flash("You're already your own best friend 😄", "info")
+        flash("That's you!", "info")
     elif is_blocked_between(me, user_id):
         flash("You can't send a friend request to this person.", "error")
     elif status == "received":  # they already asked me: just accept
         db.execute("UPDATE friendships SET status = 'accepted' WHERE requester_id = ? AND addressee_id = ?",
                    (user_id, me))
         db.commit()
-        flash("You're friends now! 🐺🤝🐺", "celebrate")
+        flash("You're friends now!", "celebrate")
     elif status == "none":
         db.execute("INSERT INTO friendships (requester_id, addressee_id, created_at) VALUES (?, ?, ?)",
                    (me, user_id, to_db(now_local())))
@@ -276,7 +276,7 @@ def accept_request(user_id):
                      " AND status = 'pending'", (user_id, g.user["id"]))
     db.commit()
     if cur.rowcount:
-        flash("You're friends now! 🐺🤝🐺", "celebrate")
+        flash("You're friends now!", "celebrate")
     return _back(url_for("social.friends"))
 
 
@@ -356,8 +356,7 @@ def thread(user_id):
     allowed = can_message(me, user_id)
     if request.method == "POST":
         if not allowed:
-            flash("You can message friends, people you've played with, and club officers. "
-                  "Send a friend request first!", "error")
+            flash("You can message friends, people you've played with, and club officers.", "error")
         else:
             body, error = clean_body(request.form.get("body"))
             if error:
@@ -417,14 +416,14 @@ def _mark_chat_seen(event_id, rows):
 def event_chat(event_id):
     event, going = _event_for_chat(event_id)
     if not going:
-        flash("Join the event to see and send messages in its group chat.", "info")
+        flash("Join the game to use its chat.", "info")
         return redirect(url_for("events.detail", event_id=event_id))
     if request.method == "POST":
         body, error = clean_body(request.form.get("body"))
         if error:
             flash(error, "error")
         elif event["cancelled"]:
-            flash("This event was canceled, so its chat is closed.", "error")
+            flash("This game was canceled, so its chat is closed.", "error")
         else:
             db = get_db()
             db.execute("INSERT INTO event_messages (event_id, sender_id, body, created_at) VALUES (?, ?, ?, ?)",

@@ -17,7 +17,7 @@
     <div class="event-emoji big" aria-hidden="true">{{ SPORT_EMOJI[club.sport] }}</div>
     <div class="club-profile-main">
       <h1>{{ club.name }}</h1>
-      <p class="club-sub">{% if club.status == 'approved' %}<span class="verified">✅ Verified</span> · {% endif %}{{ SPORTS[club.sport] }} · {{ focus.get(club.focus, '') }}</p>
+      <p class="club-sub">{% if club.status == 'approved' %}<span class="verified">Verified</span> · {% endif %}{{ SPORTS[club.sport] }} · {{ focus.get(club.focus, '') }}</p>
     </div>
   </div>
   <ul class="stat-row" aria-label="Club stats">
@@ -42,7 +42,7 @@
       </div>
     {% elif role in ('requested', 'tryout') %}
       <div class="waiting-box">
-        <strong>{{ '🎟️ Signed up for tryouts' if role == 'tryout' else '⏳ Request sent' }}</strong>
+        <strong>{{ 'Signed up for tryouts' if role == 'tryout' else 'Request sent' }}</strong>
         <span class="muted">{{ 'An officer marks who makes the team.' if role == 'tryout' else 'An officer will confirm you.' }}</span>
       </div>
     {% else %}
@@ -84,18 +84,18 @@
   {# About: everything you need before joining #}
   <section class="tab-panel" data-tab-panel="about" id="about" role="tabpanel">
     {% if club.how_to_join %}
-      <div class="how-to-join" id="how-to-join" tabindex="-1"><strong>🚀 How to join</strong><p>{{ club.how_to_join }}</p></div>
+      <div class="how-to-join" id="how-to-join" tabindex="-1"><strong>How to join</strong><p>{{ club.how_to_join }}</p></div>
     {% endif %}
     {% if club.focus %}
       <ul class="quick-facts" aria-label="Quick facts">
-        <li><span aria-hidden="true">🚪</span><small>Joining</small><strong>{{ joining[club.joining] }}</strong></li>
-        <li><span aria-hidden="true">📈</span><small>Experience</small><strong>{{ experience[club.experience] }}</strong></li>
-        <li><span aria-hidden="true">💵</span><small>Dues</small><strong>{{ club.dues or 'Free' }}</strong></li>
-        <li><span aria-hidden="true">🗓️</span><small>Practices</small><strong>{{ club.meets or 'Ask the club' }}</strong></li>
-        <li><span aria-hidden="true">📍</span><small>Where</small><strong>{{ club.location or 'Ask the club' }}</strong></li>
-        <li><span aria-hidden="true">🙋</span><small>Who can join</small><strong>{{ who[club.who_can_join] }}</strong></li>
-        {% if club.gear %}<li><span aria-hidden="true">🎒</span><small>Gear</small><strong>{{ club.gear }}</strong></li>{% endif %}
-        <li><span aria-hidden="true">🏆</span><small>Competes</small><strong>{{ 'Vs. other schools' if club.competes else 'No' }}</strong></li>
+        <li><small>Joining</small><strong>{{ joining[club.joining] }}</strong></li>
+        <li><small>Experience</small><strong>{{ experience[club.experience] }}</strong></li>
+        <li><small>Dues</small><strong>{{ club.dues or 'Free' }}</strong></li>
+        <li><small>Practices</small><strong>{{ club.meets or 'Ask the club' }}</strong></li>
+        <li><small>Where</small><strong>{{ club.location or 'Ask the club' }}</strong></li>
+        <li><small>Who can join</small><strong>{{ who[club.who_can_join] }}</strong></li>
+        {% if club.gear %}<li><small>Gear</small><strong>{{ club.gear }}</strong></li>{% endif %}
+        <li><small>Competes</small><strong>{{ 'Vs. other schools' if club.competes else 'No' }}</strong></li>
       </ul>
     {% endif %}
 
@@ -185,7 +185,7 @@
             <li class="request-row">
               <div class="post-game-row">
                 <a class="person" href="{{ url_for('profile.view', user_id=r.id) }}">{{ avatar(r.id, r.full_name, r.avatar_updated, 36) }}{{ r.full_name }}</a>
-                <span class="badge {{ 'badge-gold' if r.role == 'tryout' else '' }}">{{ '🎟️ Trying out' if r.role == 'tryout' else '🙋 Requested' }}</span>
+                <span class="badge {{ 'badge-gold' if r.role == 'tryout' else '' }}">{{ 'Trying out' if r.role == 'tryout' else 'Requested' }}</span>
               </div>
               {% if r.message %}<p class="request-answer"><small class="muted">{{ club.join_question or 'Their message' }}</small><br>{{ r.message }}</p>{% endif %}
               <div class="post-game-actions">

@@ -35,7 +35,7 @@
   {% elif not relation.blocked_me %}
     <div class="profile-buttons">
       {% if relation.friend == 'friends' %}
-        <span class="btn btn-ghost is-static">✅ Friends</span>
+        <span class="btn btn-ghost is-static">Friends</span>
       {% elif relation.friend == 'sent' %}
         <span class="btn btn-ghost is-static">Request sent</span>
       {% elif relation.friend == 'received' %}
@@ -65,7 +65,7 @@
               data-confirm="Block {{ user.full_name.split()[0] }}? They won't be able to message you or add you.">
           {{ csrf_field() }}<button class="link-button danger-link">Block</button>
         </form>
-        <a class="danger-link" href="{{ url_for('moderation.report', target_type='user', target_id=user.id) }}">🚩 Report</a>
+        <a class="danger-link" href="{{ url_for('moderation.report', target_type='user', target_id=user.id) }}">Report</a>
         </div>
       </details>
     </div>
@@ -91,7 +91,7 @@
       {% endfor %}
     </ul>
   {% else %}
-    <p class="muted">No badges yet. Play your first game to earn 🐾 First Game.</p>
+    <p class="muted">None yet. Play a game to earn your first.</p>
   {% endif %}
 </section>
 {% endif %}

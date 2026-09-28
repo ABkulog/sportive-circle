@@ -2,7 +2,7 @@
 {% block title %}Play sports with Huskies{% endblock %}
 {% block content %}
 <section class="hero husky-hero">
-  <p class="eyebrow">🐾 For UW students</p>
+  <p class="eyebrow">For UW students</p>
   <h1>Find people to play with.<br><span class="gold">Go Dawgs.</span></h1>
   <p class="lead">Pickup games, running buddies and verified UW clubs, all in one place.
     Sign up with your UW email and join a game today.</p>
@@ -24,15 +24,15 @@
 
 <section class="features">
   <div class="feature">
-    <h3>⚡ Short a few players?</h3>
+    <h3>Short a few players?</h3>
     <p>Post "need 2 for 5v5" in seconds. It shows up at the top of everyone's feed.</p>
   </div>
   <div class="feature">
-    <h3>🏛️ Real UW clubs</h3>
+    <h3>Real UW clubs</h3>
     <p>Every club is checked against HuskyLink or UW Recreation before it's listed.</p>
   </div>
   <div class="feature">
-    <h3>🐺 Only Huskies</h3>
+    <h3>Only Huskies</h3>
     <p>Every account uses a verified UW email, so you know who you're playing with.</p>
   </div>
 </section>
@@ -46,8 +46,8 @@
           <span class="club-emoji" aria-hidden="true">{{ SPORT_EMOJI[c.sport] }}</span>
           <strong class="club-name">{{ c.name }}</strong>
           <span class="club-desc muted">{{ c.description|truncate(90) }}</span>
-          <span class="badges"><span class="badge badge-verified">✅ Verified</span>
-            {% if c.experience == 'none' %}<span class="badge">🌱 Beginners welcome</span>{% endif %}</span>
+          <span class="badges"><span class="badge badge-verified">Verified</span>
+            {% if c.experience == 'none' %}<span class="badge">Beginners welcome</span>{% endif %}</span>
         </a>
       {% endfor %}
     </div>

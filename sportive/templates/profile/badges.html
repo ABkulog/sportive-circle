@@ -3,20 +3,19 @@
 {% block title %}Badge locker{% endblock %}
 {% block content %}
 <h1 class="page-title">Badge locker</h1>
-<p class="muted">Pick <strong>{{ slots }}</strong> badges to show on your profile. The rest stay safe in here,
-  and you can switch them out any time.</p>
+<p class="muted">Pick {{ slots }} to show on your profile.</p>
 
 <form method="post" class="locker-form" id="locker">
   {{ csrf_field() }}
   <div class="locker-bar card">
     <span><strong id="picked-count" data-slots="{{ slots }}">{{ shown|length }}</strong>/{{ slots }} showing</span>
-    <button class="btn">Save showcase</button>
+    <button class="btn">Save</button>
   </div>
 
   <h2 class="band-title">Earned ({{ earned|length }})</h2>
   <ul class="husky-badges">
     {% for b in badges if b.key in earned %}{{ badge_tile(b, earned, rarity, is_retired, pick=(b.key in shown)) }}
-    {% else %}<li class="muted">No badges yet. Go play a game! 🐾</li>{% endfor %}
+    {% else %}<li class="muted">None yet. Play a game!</li>{% endfor %}
   </ul>
 
   <h2 class="band-title">Still to earn</h2>

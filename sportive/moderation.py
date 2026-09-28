@@ -121,7 +121,7 @@ def report(target_type, target_id):
             if request.form.get("block"):
                 block_user(me, target["user_id"])
             db.commit()
-            flash("Thanks for letting us know. 🙏 We'll review it, and they won't be told who reported them."
+            flash("Thanks. We'll look into it, and they won't know it was you."
                   + (" You've also blocked them." if request.form.get("block") else ""), "info")
             return redirect(target["back"])
     return render_template("moderation/report.html", target=target, target_type=target_type,

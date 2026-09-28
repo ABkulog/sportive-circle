@@ -302,8 +302,8 @@ def create():
             db.execute("INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, 'officer', ?)",
                        (cur.lastrowid, g.user["id"], now))
             db.commit()
-            flash("Thanks! 🏛️ Your club is being reviewed. We check that it's a real, active UW club, usually "
-                  "within 2 days, and we'll email you when it's live.", "success")
+            flash("Thanks! We'll check it's a real UW club (usually within 2 days) and email you when it's live.",
+                  "success")
             return redirect(url_for("clubs.view", club_id=cur.lastrowid))
         flash(error, "error")
     return _club_form_page(form, None, error_field if request.method == "POST" else None)
@@ -334,7 +334,7 @@ def edit(club_id):
                        {**data, "status": status, "id": club_id})
             db.commit()
             if status == "pending" and club["status"] != "pending":
-                flash("Saved! Since the club's name or official page changed, it'll be quickly re-verified.", "info")
+                flash("Saved. The name or official page changed, so we'll quickly check it again.", "info")
             else:
                 flash("Club updated.", "success")
             return redirect(url_for("clubs.view", club_id=club_id))
@@ -374,7 +374,7 @@ def follow(club_id):
                      (club_id, g.user["id"], to_db(now_local())))
     db.commit()
     if cur.rowcount:
-        flash(f"You're following {club['name']} ⭐ You'll see their announcements and events.", "success")
+        flash(f"Following {club['name']}. Their updates show up in Clubs.", "success")
     return redirect(url_for("clubs.view", club_id=club_id))
 
 
@@ -394,7 +394,7 @@ def join(club_id):
         flash("Please keep your answer under 500 characters.", "error")
         return redirect(url_for("clubs.view", club_id=club_id) + "#join")
     if club["join_question"] and club["joining"] == "application" and not message:
-        flash("Please answer the club's question so the officers can get to know you.", "error")
+        flash("Answer the club's question first.", "error")
         return redirect(url_for("clubs.view", club_id=club_id) + "#join")
     new_role = "tryout" if club["joining"] == "tryouts" else "requested"
     db = get_db()
@@ -419,11 +419,9 @@ def join(club_id):
         except Exception:  # email trouble shouldn't stop the request
             log.exception("Couldn't email officer %s about a join request", officer["email"])
     if new_role == "tryout":
-        flash(f"You're signed up for {club['name']} tryouts! 🎟️ The officers will mark you as a member if you make "
-              "the team. Your first steps are right below. 👇", "celebrate")
+        flash(f"You're signed up for {club['name']} tryouts. Next steps are below.", "celebrate")
     else:
-        flash(f"Request sent to {club['name']}! 🙋 You'll be a member once an officer confirms you. "
-              "Your first steps are right below. 👇", "celebrate")
+        flash("Request sent. An officer will confirm you. Next steps are below.", "celebrate")
     return redirect(url_for("clubs.view", club_id=club_id) + ("#how-to-join" if club["how_to_join"] else ""))
 
 
@@ -444,7 +442,7 @@ def decide(club_id, user_id, decision):
         made_it = "You made the team! " if row["role"] == "tryout" else ""
         _dm(me, user_id, f"✅ {made_it}You're officially a member of {club['name']}. Welcome! "
                          f"{SPORT_EMOJI[club['sport']]} {_club_link(club_id)}")
-        flash("Confirmed! They're a member now, and we sent them a welcome message.", "success")
+        flash("Confirmed. They're a member now.", "success")
     elif decision == "decline" and row["role"] in WAITING_ROLES:
         # They stay a follower, so they still see what the club is up to.
         db.execute("UPDATE club_members SET role = 'follower', message = '' WHERE club_id = ? AND user_id = ?",
@@ -456,7 +454,7 @@ def decide(club_id, user_id, decision):
             body = (f"Thanks for your interest in {club['name']}! We can't add you as a member right now, "
                     "but you're still following the club and we hope to see you around. 💜")
         _dm(me, user_id, body)
-        flash("Declined. We sent them a kind message, and they're still following the club.", "info")
+        flash("Declined. They still follow the club.", "info")
     elif decision == "remove" and row["role"] == "member":
         db.execute("DELETE FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, user_id))
         flash("Removed from the club.", "info")
@@ -473,8 +471,7 @@ def leave(club_id):
     officers = db.execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'officer'",
                           (club_id,)).fetchone()[0]
     if role == "officer" and officers == 1:
-        flash("You're the only officer. Make someone else an officer before you leave, so the club isn't left "
-              "without a leader.", "error")
+        flash("You're the only officer. Make someone else an officer before you leave.", "error")
     elif role is not None:
         db.execute("DELETE FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, g.user["id"]))
         db.commit()
@@ -492,7 +489,7 @@ def make_officer(club_id, user_id):
     db.execute("UPDATE club_members SET role = 'officer' WHERE club_id = ? AND user_id = ? AND role = 'member'",
                (club_id, user_id))
     db.commit()
-    flash("They're an officer now. 🎖️", "success")
+    flash("They're an officer now.", "success")
     return redirect(url_for("clubs.view", club_id=club_id) + "#members")
 
 
@@ -516,7 +513,7 @@ def updates():
             db.execute("INSERT INTO club_posts (club_id, author_id, body, created_at) VALUES (?, ?, ?, ?)",
                        (club_id, me, body, to_db(now_local())))
             db.commit()
-            flash("Posted! 📣 Everyone following your club will see it.", "success")
+            flash("Posted. Your followers will see it.", "success")
         return redirect(url_for("clubs.updates"))
     posts = db.execute(
         """SELECT p.*, c.name AS club_name, c.sport, u.full_name, u.avatar_updated,
@@ -547,7 +544,7 @@ def post(club_id):
         db.execute("INSERT INTO club_posts (club_id, author_id, body, created_at) VALUES (?, ?, ?, ?)",
                    (club_id, g.user["id"], body, to_db(now_local())))
         db.commit()
-        flash("Announcement posted! 📣", "success")
+        flash("Posted.", "success")
     return redirect(url_for("clubs.view", club_id=club_id) + "#announcements")
 
 

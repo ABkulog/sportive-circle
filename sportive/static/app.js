@@ -62,6 +62,22 @@
     });
   });
 
+  // <button data-countdown="42" data-countdown-text="Resend code in {s}s">: disabled and counting down,
+  // then usable. (The server checks the same wait.)
+  document.querySelectorAll("button[data-countdown]").forEach((button) => {
+    let left = parseInt(button.dataset.countdown, 10) || 0;
+    if (left <= 0) return;
+    const label = button.textContent;
+    const tick = () => {
+      if (left <= 0) { button.disabled = false; button.textContent = label; return; }
+      button.disabled = true;
+      button.textContent = button.dataset.countdownText.replace("{s}", left);
+      left -= 1;
+      setTimeout(tick, 1000);
+    };
+    tick();
+  });
+
   // <select data-autosubmit>: filters apply as soon as you pick something.
   document.addEventListener("change", (event) => {
     const field = event.target;

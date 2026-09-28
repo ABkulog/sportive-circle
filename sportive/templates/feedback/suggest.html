@@ -3,8 +3,7 @@
 {% block content %}
 <div class="card form-card">
   <h1>Got an idea?</h1>
-  <p class="muted">Tell us what would make Sportive Circle better, or what's not working. The Sportive Circle team
-    reads every one.</p>
+  <p class="muted">What would make it better? What's broken? We read every one.</p>
   <form method="post" class="form">
     {{ csrf_field() }}
     <fieldset class="field">
@@ -21,10 +20,10 @@
                 placeholder="It would be great if…">{{ form.get('body', '') }}</textarea></label>
     <label class="toggle">
       <input type="checkbox" name="anonymous" value="1" {% if form.get('anonymous') %}checked{% endif %}>
-      <span>Send anonymously <em>(the team won't see your name)</em></span>
+      <span>Send anonymously</span>
     </label>
-    <button class="btn btn-block">Send suggestion</button>
+    <button class="btn btn-block">Send</button>
   </form>
-  <p class="muted fine-print">To report a person or a message, use 🚩 Report on their profile or message instead.</p>
+  <p class="muted fine-print">To report someone, use Report on their profile.</p>
 </div>
 {% endblock %}

@@ -2,24 +2,22 @@
 {% block title %}Delete account{% endblock %}
 {% block content %}
 <div class="card form-card delete-card">
-  <p class="error-paw" aria-hidden="true">🐾</p>
-  <h1>Are you sure you want to delete your account?</h1>
-  <p>This <strong>can't be undone</strong>. Here's what you'd lose forever:</p>
+  <h1>Delete your account?</h1>
+  <p>This <strong>can't be undone</strong>. You'd lose:</p>
   <ul class="lose-list">
-    <li>🏅 <strong>{{ lose.badges }}</strong> badge{{ 's' if lose.badges != 1 }}{% if lose.og_badges %},
-      including <strong>{{ lose.og_badges }}</strong> limited/OG badge{{ 's' if lose.og_badges != 1 }} you can never earn again{% endif %}</li>
-    <li>🐾 Your history of <strong>{{ lose.games }}</strong> game{{ 's' if lose.games != 1 }}</li>
-    <li>👥 <strong>{{ lose.friends }}</strong> friend{{ 's' if lose.friends != 1 }} and <strong>{{ lose.messages }}</strong> message{{ 's' if lose.messages != 1 }}</li>
+    <li><strong>{{ lose.badges }}</strong> badge{{ 's' if lose.badges != 1 }}{% if lose.og_badges %}
+      ({{ lose.og_badges }} you can never earn again){% endif %}</li>
+    <li><strong>{{ lose.games }}</strong> game{{ 's' if lose.games != 1 }} in your history</li>
+    <li><strong>{{ lose.friends }}</strong> friend{{ 's' if lose.friends != 1 }} and <strong>{{ lose.messages }}</strong> message{{ 's' if lose.messages != 1 }}</li>
     {% if lose.hosting %}
-      <li>📅 <strong>{{ lose.hosting }}</strong> upcoming event{{ 's' if lose.hosting != 1 }} you host. They'll be deleted,
-        and everyone who joined will lose them too.</li>
+      <li><strong>{{ lose.hosting }}</strong> upcoming game{{ 's' if lose.hosting != 1 }} you host (canceled for everyone)</li>
     {% endif %}
   </ul>
 
   {% if sole_officer %}
     <p class="flash flash-error">You're the only officer of
       {% for c in sole_officer %}<a href="{{ url_for('clubs.view', club_id=c.id) }}#members">{{ c.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
-      Make another member an officer first (Members tab → ⋯), so the club isn't left without a leader.</p>
+      Make someone else an officer first (Members → ⋯).</p>
   {% endif %}
   <a class="btn btn-large btn-block" href="{{ url_for('profile.view', user_id=g.user.id) }}">No, keep my account</a>
 

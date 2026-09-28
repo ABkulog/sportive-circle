@@ -52,9 +52,9 @@
     {# 1. The one main action #}
     <div class="primary-action">
       {% if is_host %}
-        <span class="going-pill">⭐ You're hosting</span>
+        <span class="going-pill">You're hosting</span>
       {% elif event.i_am_going %}
-        <span class="going-pill">✅ You're going</span>
+        <span class="going-pill">You're going</span>
       {% elif blocked %}
         <p class="muted">You can't join this game.</p>
       {% elif left == 0 %}
@@ -103,7 +103,7 @@
         </div>
       </details>
     {% elif event.location.startswith('Off campus') %}
-      <p class="muted">📍 Off campus: the address is in the note.</p>
+      <p class="muted">Off campus: the address is in the note.</p>
     {% endif %}
 
     {% if is_host %}

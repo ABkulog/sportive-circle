@@ -155,7 +155,7 @@ def badge_locker():
         if error:
             flash(error, "error")
         else:
-            flash("Showcase updated! Flex away 😎", "success")
+            flash("Saved.", "success")
             return redirect(url_for("profile.view", user_id=me))
     sync_badges(me)
     mark_seen("badges")
@@ -258,8 +258,7 @@ def delete_account():
         return render_template("profile/delete.html", lose=what_you_would_lose(g.user["id"]), word=CONFIRM_WORD,
                                sole_officer=sole_officer)
     if sole_officer:
-        flash(f"You're the only officer of {sole_officer[0]['name']}. Make someone else an officer first, "
-              "so the club isn't left without a leader.", "error")
+        flash(f"You're the only officer of {sole_officer[0]['name']}. Make someone else an officer first.", "error")
         return redirect(url_for("profile.delete_account"))
     if request.form.get("confirm", "").strip().upper() != CONFIRM_WORD:
         flash(f"Type {CONFIRM_WORD} in the box to confirm. Your account was not deleted.", "error")
@@ -276,5 +275,5 @@ def delete_account():
     db.execute("DELETE FROM users WHERE id = ?", (g.user["id"],))
     db.commit()
     session.clear()
-    flash("Your account and everything in it was deleted. Once a Husky, always a Husky 💜", "info")
+    flash("Your account was deleted.", "info")
     return redirect(url_for("index"))

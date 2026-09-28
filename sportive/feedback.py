@@ -20,7 +20,7 @@ from .timeutil import now_local, to_db
 
 bp = Blueprint("feedback", __name__)
 
-KINDS = {"idea": "💡 An idea", "bug": "🐞 Something's broken", "other": "💬 Something else"}
+KINDS = {"idea": "Idea", "bug": "Something's broken", "other": "Other"}
 MIN_LENGTH, MAX_LENGTH = 5, 2000
 MAX_PER_HOUR = 5
 
@@ -113,7 +113,7 @@ def suggest():
             db.execute("INSERT INTO suggestions (user_id, anonymous, kind, body, created_at) VALUES (?, ?, ?, ?, ?)",
                        (g.user["id"], 1 if form.get("anonymous") else 0, kind, body, to_db(now_local())))
             db.commit()
-            flash("Thank you! 💜 The Sportive Circle team reads every suggestion.", "success")
+            flash("Thanks! We read every one.", "success")
             return redirect(url_for("feedback.suggest"))
     return render_template("feedback/suggest.html", form=form, kinds=KINDS, max_length=MAX_LENGTH)
 

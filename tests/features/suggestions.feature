@@ -8,7 +8,7 @@ Feature: Suggestions
   @FR-INFO-4
   Scenario: A suggestion reaches the admins, with the sender's name
     When "Maya" sends the suggestion "Add a pickleball ladder"
-    Then they see "Thank you!"
+    Then they see "Thanks! We read every one."
     When "Admin" opens the suggestions page for admins
     Then they see "Add a pickleball ladder"
     And they see "From Maya"

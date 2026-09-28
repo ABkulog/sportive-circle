@@ -22,7 +22,7 @@
                           ("%d mutual friend%s"|format(p.mutual, "" if p.mutual == 1 else "s")) if p.mutual else "",
                           "Played together" if p.played else ""]|select|join(" · ") %}
           <li class="post-game-row">{{ person_row(p, clues) }}
-            {% if p.status == 'friends' %}<span class="done-pill">✅ Friends</span>
+            {% if p.status == 'friends' %}<span class="done-pill">Friends</span>
             {% elif p.status == 'sent' %}<span class="done-pill">Request sent</span>
             {% elif p.status == 'received' %}
               <form method="post" action="{{ url_for('social.accept_request', user_id=p.id) }}">
@@ -67,7 +67,7 @@
         <a class="btn btn-small btn-ghost" href="{{ url_for('social.thread', user_id=p.id) }}">Message</a>
       </li>
     {% else %}
-      <li class="muted">No friends yet. Search for someone above, or add people you've played with. 🐾</li>
+      <li class="muted">No friends yet. Search above.</li>
     {% endfor %}
   </ul>
 </section>

@@ -15,7 +15,7 @@
 <div class="card form-card club-form">
   <h1>{{ 'Edit club' if club else 'Register your club' }}</h1>
   {% if not club %}
-    <p class="muted">For active UW clubs. We verify each one (usually within 2 days) and email you when it's live.</p>
+    <p class="muted">We check each club (usually within 2 days) and email you when it's live.</p>
   {% endif %}
   <form method="post" class="form" {% if not club %}data-wizard{% endif %} data-error-field="{{ error_field or '' }}">
     {{ csrf_field() }}
@@ -48,7 +48,7 @@
     <label class="field"><span>A question for people who want to join</span>
       <input name="join_question" maxlength="150" value="{{ form.get('join_question', '') }}"
              placeholder="What position do you play, and how long have you played?" required>
-      <small class="muted">They answer it when they ask to join or sign up for tryouts, and you see it in your requests.</small></label>
+      <small class="muted">You'll see their answers in your requests.</small></label>
     <label class="toggle"><input type="checkbox" name="competes" value="1" {% if form.get('competes') %}checked{% endif %}>
       <span>We compete against other schools</span></label>
     </section>
@@ -74,8 +74,7 @@
     <section class="wizard-step" data-step="4">
     <h2 class="form-step"><span>4</span> Contact</h2>
     <label class="field"><span>Club email</span>
-      <input name="club_email" type="email" maxlength="120" value="{{ form.get('club_email', '') }}" placeholder="yourclub@uw.edu" required>
-      <small class="muted">Required, so students (and our team) can always reach the club.</small></label>
+      <input name="club_email" type="email" maxlength="120" value="{{ form.get('club_email', '') }}" placeholder="yourclub@uw.edu" required></label>
     <fieldset class="field">
       <legend>Social media <em>(optional, add any your club uses)</em></legend>
       <div class="social-grid">

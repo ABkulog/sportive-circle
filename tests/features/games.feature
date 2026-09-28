@@ -54,7 +54,7 @@ Feature: Games
     And "Jordan" joins Maya's game
     And "Sam" is a Husky
     When "Sam" joins Maya's game
-    Then they see "Sorry, this event is full"
+    Then they see "Sorry, this game is full"
 
   @FR-EVT-5
   Scenario: Leaving frees your spot
@@ -112,4 +112,4 @@ Feature: Games
     Given "Maya" hosts a basketball game tomorrow
     And "Sam" is a Husky
     When "Sam" opens the chat for Maya's game
-    Then they see "Join the event to see and send messages"
+    Then they see "Join the game to use its chat"

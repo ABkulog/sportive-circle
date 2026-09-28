@@ -104,7 +104,7 @@ def log_in(user):
         born = date.fromisoformat(user["birth_date"])
         today = now_local().date()
         if is_birthday(born, today):
-            flash(f"🎂 Happy birthday, {user['full_name'].split()[0]}! Go Dawgs!", "birthday")
+            flash(f"Happy birthday, {user['full_name'].split()[0]}! 🎂", "birthday")
     return safe_next(after)
 
 
@@ -144,10 +144,19 @@ def send_verification_email(email, code, purpose="signup"):
     return True
 
 
-def code_recently_sent(email):
-    """True if we emailed this address a code less than a minute ago (stops email spam)."""
+def resend_wait(email):
+    """Seconds until a new code can be sent to this address (0 = now). Stops email spam, and powers the
+    "Resend code in 42s" countdown."""
     row = get_db().execute("SELECT verify_sent_at FROM users WHERE email = ?", (email,)).fetchone()
-    return bool(row and row["verify_sent_at"] and now_local() < from_db(row["verify_sent_at"]) + RESEND_COOLDOWN)
+    if not row or not row["verify_sent_at"]:
+        return 0
+    left = from_db(row["verify_sent_at"]) + RESEND_COOLDOWN - now_local()
+    return max(0, int(left.total_seconds()) + 1) if left.total_seconds() > 0 else 0
+
+
+def code_recently_sent(email):
+    """True if we emailed this address a code less than a minute ago."""
+    return resend_wait(email) > 0
 
 
 def start_verification(email, session_key="pending_email"):
@@ -275,10 +284,10 @@ def verify():
             start_markers(user["id"])
             db.commit()
             destination = log_in(user)
-            flash(f"Welcome to the pack, {user['full_name'].split()[0]}! 🐺", "celebrate")
+            flash(f"Welcome, {user['full_name'].split()[0]}!", "celebrate")
             return redirect(destination)
         flash(error, "error")
-    return render_template("auth/verify.html", email=email)
+    return render_template("auth/verify.html", email=email, wait=resend_wait(email))
 
 
 @bp.route("/verify/resend", methods=("POST",))
@@ -287,7 +296,7 @@ def resend_code():
     if not email:
         return redirect(url_for("auth.login"))
     if code_recently_sent(email):
-        flash("We just sent you a code. Wait a minute before asking for another one.", "error")
+        flash("We just sent a code. Give it a minute.", "error")
         return redirect(url_for("auth.verify"))
     if start_verification(email):  # on failure, send_verification_email already explained what happened
         flash("We sent you a new code.", "success")
@@ -315,17 +324,17 @@ def login():
                 db.execute("UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?",
                            (0 if locked else failed, locked, user["id"]))
                 db.commit()
-            flash("Wrong email or password!", "error")
+            flash("Wrong email or password.", "error")
         elif user["suspended"]:
-            flash("This account is suspended because it broke the community rules. "
-                  "If you think that's a mistake, contact us (see the Terms page).", "error")
+            flash("This account is suspended for breaking the rules. Think it's a mistake? See the Terms page.",
+                  "error")
         elif not user["verified"]:
             if code_recently_sent(email):
                 session["pending_email"] = email
-                flash("Please verify your email first. Use the code we just sent you.", "info")
+                flash("Check your email for the code we sent you.", "info")
             else:
                 start_verification(email)
-                flash("Please verify your email first. We sent you a new code.", "info")
+                flash("Check your email. We sent you a new code.", "info")
             return redirect(url_for("auth.verify"))
         else:
             return redirect(log_in(user))
@@ -378,7 +387,7 @@ def reset_password():
                        " verify_attempts = 0 WHERE id = ?", (hash_password(password), user["id"]))
             db.commit()
             destination = log_in(user)
-            flash("Password changed. You're logged in. 🐺", "success")
+            flash("Password changed. You're logged in.", "success")
             return redirect(destination)
         flash(error, "error")
     return render_template("auth/reset.html", email=email)

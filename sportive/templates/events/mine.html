@@ -9,7 +9,7 @@
   <h2>Hosting</h2>
   <div class="stack">
     {% for e in hosting %}{{ event_card(e) }}{% else %}
-      <p class="muted">You're not hosting anything. <a href="{{ url_for('events.create') }}">Create an event</a></p>
+      <p class="muted">Nothing yet. <a href="{{ url_for('create_menu') }}">Create one</a></p>
     {% endfor %}
   </div>
 </section>
@@ -18,7 +18,7 @@
   <h2>Going</h2>
   <div class="stack">
     {% for e in going %}{{ event_card(e) }}{% else %}
-      <p class="muted">You haven't joined anything yet. <a href="{{ url_for('events.feed') }}">Browse the feed</a></p>
+      <p class="muted">Nothing yet. <a href="{{ url_for('events.feed') }}">Find a game</a></p>
     {% endfor %}
   </div>
 </section>

@@ -189,11 +189,10 @@ def feed():
         {"now": to_db(now), "soon": to_db(now + UP_NEXT_WINDOW)}, limit=1)
 
     celebrate_progress(g.user["id"])
-    hello, spirit_line = greeting(g.user["full_name"].split()[0], now)
     mark_seen("need_players")
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
-                           hello=hello, spirit_line=spirit_line, top_dawgs=top_dawgs(now=now),
+                           hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now),
                            club_picks=suggested_clubs(g.user["id"], my_sports))
 
 
@@ -285,7 +284,7 @@ def create():
                 error = "This event has already been created."
         if error is None:
             event_id = insert_event(data)
-            flash("Your event is live! Go Dawgs 💜💛", "celebrate")
+            flash("Your game is up!", "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))
         flash(error, "error")
     else:
@@ -314,7 +313,7 @@ def club_for_new_event(club_id):
 def edit(event_id):
     event = get_event(event_id, host_only=True)
     if event["cancelled"]:
-        flash("This event was canceled, so it can't be edited.", "error")
+        flash("This game was canceled, so it can't be edited.", "error")
         return redirect(url_for("events.detail", event_id=event_id))
     if request.method == "POST":
         form = request.form
@@ -355,7 +354,7 @@ def cancel(event_id):
     db.execute("UPDATE events SET cancelled = 1 WHERE id = ?", (event_id,))
     db.commit()
     tell_players_it_was_cancelled(event)
-    flash("Event canceled. We let everyone who joined know.", "info")
+    flash("Canceled. Everyone who joined was told.", "info")
     return redirect(url_for("events.my_events"))
 
 
@@ -478,7 +477,7 @@ def quick():
                 # `have` includes the host, who is counted through their RSVP.
                 "max_players": have + needed, "extra_players": have - 1, "note": note, "is_quick": 1,
             })
-            flash("Posted! The whole pack can see it at the top of the feed 🐺", "celebrate")
+            flash("Posted! It's at the top of everyone's feed.", "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))
         flash(error, "error")
     return render_template("events/quick.html", form=form, start_options=QUICK_START_OPTIONS,
@@ -515,9 +514,9 @@ def detail(event_id):
 def join(event_id):
     event = get_event(event_id)
     if event["cancelled"]:
-        flash("This event was canceled.", "error")
+        flash("This game was canceled.", "error")
     elif from_db(event["ends_at"]) < now_local():
-        flash("This event already ended.", "error")
+        flash("This game already ended.", "error")
     elif event["i_am_going"]:
         flash("You're already going.", "info")
     elif is_blocked_between(g.user["id"], event["host_id"]):
@@ -536,13 +535,13 @@ def join(event_id):
         )
         db.commit()
         if cur.rowcount:
-            flash("You're in! See you there, Dawg 🐺", "celebrate")
+            flash("You're in! See you there.", "celebrate")
             clash = overlapping_event(event)
             if clash:
                 flash(f"Heads up: this overlaps with “{event_title(clash)}” ({fmt_clock(clash['starts_at'])}), "
                       "which you're also going to.", "info")
         else:
-            flash("Sorry, this event is full. Check the feed for another game!", "error")
+            flash("Sorry, this game is full.", "error")
     if request.form.get("next"):  # joined from a card in the feed: stay there
         return redirect(safe_next(request.form["next"]))
     return redirect(url_for("events.detail", event_id=event_id))
@@ -621,14 +620,14 @@ def calendar_file(event_id):
 def leave(event_id):
     event = get_event(event_id)
     if event["host_id"] == g.user["id"]:
-        flash("You're the host. Cancel the event instead if you can't make it.", "error")
+        flash("You're the host. Cancel the game instead.", "error")
     elif from_db(event["ends_at"]) < now_local():
         flash("This game is over, so it stays in your history.", "info")
     else:
         db = get_db()
         db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, g.user["id"]))
         db.commit()
-        flash("You left the event. Your spot is open for another Dawg.", "info")
+        flash("You left. Your spot is open again.", "info")
     return redirect(url_for("events.detail", event_id=event_id))
 
 

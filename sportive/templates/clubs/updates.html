@@ -41,13 +41,12 @@
     </article>
   {% else %}
     <div class="card empty">
-      <p class="empty-emoji" aria-hidden="true">📣</p>
       {% if following %}
         <p><strong>No updates yet.</strong></p>
         <p class="muted">When your clubs post, it shows up here.</p>
       {% else %}
         <p><strong>Follow clubs to see their updates here.</strong></p>
-        <p class="muted">Tap ⭐ Follow on any club: practice changes, events and news show up in this feed.</p>
+        <p class="muted">Follow a club to see its updates here.</p>
         <a class="btn" href="{{ url_for('clubs.directory') }}">Find clubs</a>
       {% endif %}
     </div>

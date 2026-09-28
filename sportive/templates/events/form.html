@@ -4,7 +4,7 @@
 {% block content %}
 <div class="card form-card">
   <h1>{{ 'Edit event' if event else 'Create event' }}</h1>
-  {% if club %}<p class="club-banner">🏛️ Club event for <strong>{{ club.name }}</strong>. Club events are open to all levels.</p>{% endif %}
+  {% if club %}<p class="club-banner">For <strong>{{ club.name }}</strong>. Open to all levels.</p>{% endif %}
   <form method="post" class="form" data-sport-form>
     {{ csrf_field() }}
     {% if club %}<input type="hidden" name="club" value="{{ club.id }}">{% endif %}
