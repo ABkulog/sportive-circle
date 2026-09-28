@@ -125,6 +125,26 @@ def add_history(db, ids, now):
                            (cur.lastrowid, user_id, to_db(starts - timedelta(days=1))))
 
 
+def add_friends_and_games(db, ids, now):
+    """Demo friendships, a private game and a team vs team game, so parties can be tried out locally."""
+    for a, b in ((0, 1), (1, 2), (1, 3), (0, 3)):
+        db.execute("INSERT INTO friendships (requester_id, addressee_id, status, created_at) VALUES (?, ?, 'accepted', ?)",
+                   (ids[a], ids[b], to_db(now)))
+    starts = (now + timedelta(days=3)).replace(hour=18, minute=0)
+    for host, title, sport, place, extra in (
+            (2, "Friends-only pickup (password: demo)", "basketball", "IMA (Intramural Activities Building)",
+             {"is_private": 1, "password": "demo", "max_players": 10}),
+            (0, "3v3 hoops, bring a team", "basketball", "IMA (Intramural Activities Building)",
+             {"team_size": 3, "max_players": 6})):
+        cur = db.execute(
+            "INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level, max_players,"
+            " is_private, password, team_size) VALUES (?, ?, ?, ?, ?, ?, 'All levels', ?, ?, ?, ?)",
+            (ids[host], title, sport, place, to_db(starts), to_db(starts + timedelta(hours=2)), extra["max_players"],
+             extra.get("is_private", 0), extra.get("password", ""), extra.get("team_size")))
+        db.execute("INSERT INTO rsvps (event_id, user_id, created_at, team) VALUES (?, ?, ?, ?)",
+                   (cur.lastrowid, ids[host], to_db(now), 1 if extra.get("team_size") else None))
+
+
 def main():
     app = create_app({"DEBUG": True})
     with app.app_context():
@@ -165,6 +185,7 @@ def main():
                     db.execute("INSERT INTO rsvps (event_id, user_id, created_at) VALUES (?, ?, ?)", (cur.lastrowid, other, joined))
         add_history(db, ids, now)
         add_clubs(db, ids, now)
+        add_friends_and_games(db, ids, now)
         db.commit()
         print(f"Added {len(USERS)} demo users and {len(EVENTS)} events, with past games.")
         print(f"Log in as {USERS[0][0]} with password {DEMO_PASSWORD}")

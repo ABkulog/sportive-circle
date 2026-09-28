@@ -26,6 +26,8 @@
         <span class="badge">{{ SPORTS[event.sport] }}</span>
         {% if event.skill_level != 'All levels' %}<span class="badge">{{ event.skill_level }}</span>{% endif %}
         {% if event.is_quick %}<span class="badge badge-gold">Need players</span>{% endif %}
+        {% if event.is_private %}<span class="badge">🔒 Private</span>{% endif %}
+        {% if event.team_size %}<span class="badge badge-purple">Team vs team · {{ event.team_size }}v{{ event.team_size }}</span>{% endif %}
         {% if event.club_id %}<a class="badge badge-club" href="{{ url_for('clubs.view', club_id=event.club_id) }}">🏛️ {{ event.club_name }}</a>{% endif %}
         {% if event.cancelled %}<span class="badge badge-danger">Canceled</span>{% elif ended %}<span class="badge badge-muted">Ended</span>{% endif %}
       </div>
@@ -43,7 +45,12 @@
     <div><dt>Players</dt><dd>
       {{ event.going_count + event.extra_players }} going{% if event.max_players %} of {{ event.max_players }}
         · {% if left == 0 %}<strong>full</strong>{% else %}<strong>{{ left }} spot{{ 's' if left != 1 }} left</strong>{% endif %}{% endif %}
+      {% if event.held_count %}<small class="muted fact-note">{{ event.held_count }} held for invited friends</small>{% endif %}
     </dd></div>
+    {% if event.is_private and (is_host or event.i_am_going) %}
+      <div><dt>Password</dt><dd><strong class="password">{{ event.password }}</strong>
+        <small class="muted fact-note">Share it with people you want in.</small></dd></div>
+    {% endif %}
   </dl>
 
   {% if event.note %}<p class="note">{{ event.note }}</p>{% endif %}
@@ -57,12 +64,44 @@
         <span class="going-pill">You're going</span>
       {% elif blocked %}
         <p class="muted">You can't join this game.</p>
-      {% elif left == 0 %}
+      {% elif invite %}
+        <div class="invite-box">
+          <strong>{{ invite.inviter_name.split()[0] }} invited you. You down?</strong>
+          <small class="muted">{% if hold_minutes %}Your spot is held for {{ hold_minutes }} more min.{% else %}Join if there's still room.{% endif %}</small>
+          <div class="action-pair">
+            <form method="post" action="{{ url_for('parties.answer_invite', event_id=event.id) }}">
+              {{ csrf_field() }}<input type="hidden" name="answer" value="yes"><button class="btn btn-large btn-block">I'm in</button>
+            </form>
+            <form method="post" action="{{ url_for('parties.answer_invite', event_id=event.id) }}">
+              {{ csrf_field() }}<input type="hidden" name="answer" value="no"><button class="btn btn-ghost btn-large btn-block">Can't make it</button>
+            </form>
+          </div>
+        </div>
+      {% elif event.team_size %}
+        {% if can_party_up(event) %}
+          <a class="btn btn-large btn-block" href="{{ url_for('parties.party_up', event_id=event.id) }}">Challenge with your team</a>
+          <p class="hint">Pick {{ event.team_size - 1 }} friends. Their spots are held for 30 min.</p>
+        {% else %}
+          <button class="btn btn-large btn-block" disabled>Teams are set</button>
+          <p class="hint">Ask a player to invite you.</p>
+        {% endif %}
+      {% elif spots_for_me == 0 %}
         <button class="btn btn-large btn-block" disabled>Full</button>
+      {% elif event.is_private %}
+        <form method="post" action="{{ url_for('events.join', event_id=event.id) }}" class="password-join">
+          {{ csrf_field() }}
+          <label class="field"><span>Password</span>
+            <input name="password" required maxlength="30" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+          <button class="btn btn-large btn-block">Join</button>
+        </form>
+        <p class="hint">Private game. Ask the host for the password, or to invite you.</p>
       {% else %}
         <form method="post" action="{{ url_for('events.join', event_id=event.id) }}">
           {{ csrf_field() }}<button class="btn btn-large btn-block">Join</button>
         </form>
+        {% if can_party_up(event) %}
+          <p class="hint"><a href="{{ url_for('parties.party_up', event_id=event.id) }}">Join with friends</a></p>
+        {% endif %}
       {% endif %}
     </div>
 
@@ -72,6 +111,9 @@
         {% set unread = chat_unread().get(event.id, 0) %}
         <a class="icon-action" href="{{ url_for('social.event_chat', event_id=event.id) }}">
           <span>{{ icon('chat') }}{% if unread %}<span class="count-dot">{{ unread }}</span>{% endif %}</span>Chat</a>
+      {% endif %}
+      {% if event.i_am_going and can_party_up(event) %}
+        <a class="icon-action" href="{{ url_for('parties.party_up', event_id=event.id) }}"><span>{{ icon('friends') }}</span>Party up</a>
       {% endif %}
       {% if place %}
         <a class="icon-action" href="{{ place.google }}" target="_blank" rel="noopener"><span>{{ icon('directions') }}</span>Directions</a>
@@ -115,20 +157,60 @@
   {% endif %}
 </article>
 
+{% macro person_line(person) %}
+  <a class="person" href="{{ url_for('profile.view', user_id=person.id) }}">{{ avatar(person.id, person.full_name, person.avatar_updated, 36) }}{{ person.full_name }}</a>
+  {% if is_team(person.id) %}<span class="team-pill" title="Runs Sportive Circle">🐾 Team</span>{% endif %}
+  {% if person.grad_year %}<span class="muted">’{{ (person.grad_year|string)[-2:] }}</span>{% endif %}
+  {% if person.id == event.host_id %}<span class="badge badge-purple">Host</span>{% endif %}
+{% endmacro %}
+
+{% if teams %}
+  <section class="band teams">
+    <h2>Teams</h2>
+    <div class="team-columns">
+      {% for number, name in [(1, event.host_name.split()[0] ~ "'s team"), (2, "Challengers")] %}
+        {% set t = teams[number] %}
+        <div class="team-column {% if my_team == number %}is-mine{% endif %}">
+          <h3>{{ name }} <span class="muted">{{ t.count }}/{{ event.team_size }}</span></h3>
+          <ul class="people">
+            {% for person in t.players %}<li>{{ person_line(person) }}</li>{% endfor %}
+            {% if t.held %}<li class="muted">+ {{ t.held }} invited</li>{% endif %}
+            {% if not t.count and not t.held %}<li class="muted">Open. Bring a team!</li>{% endif %}
+          </ul>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+{% else %}
 <section class="band">
   <h2>Who's going</h2>
   <ul class="people">
     {% for person in attendees %}
-      <li>
-        <a class="person" href="{{ url_for('profile.view', user_id=person.id) }}">{{ avatar(person.id, person.full_name, person.avatar_updated, 36) }}{{ person.full_name }}</a>
-        {% if is_team(person.id) %}<span class="team-pill" title="Runs Sportive Circle">🐾 Team</span>{% endif %}
-        {% if person.grad_year %}<span class="muted">’{{ (person.grad_year|string)[-2:] }}</span>{% endif %}
-        {% if person.id == event.host_id %}<span class="badge badge-purple">Host</span>{% endif %}
-      </li>
+      <li>{{ person_line(person) }}</li>
     {% endfor %}
     {% if event.extra_players %}
       <li class="muted">+ {{ event.extra_players }} already playing (not on the app)</li>
     {% endif %}
   </ul>
 </section>
+{% endif %}
+
+{% if invited and (event.i_am_going or is_host) %}
+  <section class="band">
+    <h2>Invited</h2>
+    <ul class="people">
+      {% for i in invited %}
+        <li class="post-game-row">
+          <span class="person">{{ avatar(i.guest_id, i.guest_name, i.guest_avatar, 32) }}<span>{{ i.guest_name }}
+            <small class="muted person-extra">{{ i.inviter_name.split()[0] }}'s invite{% if i.expires_at > now_db() %} · spot held{% endif %}</small></span></span>
+          {% if i.inviter_id == g.user.id %}
+            <form method="post" action="{{ url_for('parties.cancel_invite', event_id=event.id, guest_id=i.guest_id) }}">
+              {{ csrf_field() }}<button class="btn btn-small btn-ghost">Cancel</button>
+            </form>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
 {% endblock %}

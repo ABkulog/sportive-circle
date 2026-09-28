@@ -1,5 +1,6 @@
 """Feed, event create/edit/cancel, RSVPs, 'Need players' quick posts, and My events."""
 import logging
+import secrets
 from datetime import datetime, time, timedelta, timezone
 from urllib.parse import quote
 
@@ -12,6 +13,8 @@ from .clubs import featured_clubs, suggested_clubs
 from .constants import (LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS, SKILL_LEVELS,
                         SPORT_LOCATIONS, SPORT_MAX_PLAYERS, SPORTS)
 from .db import get_db, user_sports
+from .invites import (HELD, count_wrong_password, held_spots, hold_minutes_left, my_invite, now_param,
+                      pending_invites, team_counts, too_many_password_tries)
 from .links import public_url
 from .notifications import mark_seen, notify
 from .mail import compose, send_email
@@ -24,7 +27,9 @@ bp = Blueprint("events", __name__)
 log = logging.getLogger(__name__)
 
 MAX_EVENT_LENGTH = timedelta(days=3)   # long enough for a ski or hiking trip
+MIN_PASSWORD, MAX_PASSWORD = 4, 30     # private games
 MAX_DAYS_AHEAD = 365
+OPEN_SPOT_CHOICES = ("2", "3", "4", "5", "10")  # the "Open spots" filter on Home
 QUICK_WINDOW = timedelta(hours=3)      # quick posts starting this soon go to the top of the feed
 UP_NEXT_WINDOW = timedelta(hours=2)    # your own events starting this soon get a banner on the feed
 
@@ -37,11 +42,14 @@ def query_events(where, params=None, order="e.starts_at", limit=100):
     `where` is a list of SQL conditions written in this file (never user input);
     user values always go through `params`.
     """
-    params = {"me": g.user["id"], **(params or {})}
+    params = {"me": g.user["id"], "hold_now": now_param(), **(params or {})}
     sql = f"""
         SELECT e.*, u.full_name AS host_name, u.avatar_updated AS host_avatar, cl.name AS club_name,
                (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id) AS going_count,
-               EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me) AS i_am_going
+               EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me) AS i_am_going,
+               {HELD} AS held_count,
+               EXISTS (SELECT 1 FROM invites i WHERE i.event_id = e.id AND i.guest_id = :me
+                       AND i.status = 'pending') AS i_am_invited
         FROM events e JOIN users u ON u.id = e.host_id LEFT JOIN clubs cl ON cl.id = e.club_id
         WHERE {" AND ".join(where)}
         ORDER BY {order}
@@ -60,10 +68,16 @@ def get_event(event_id, host_only=False):
 
 
 def spots_left(event):
-    """None = unlimited."""
+    """Open spots anyone can take (held spots for invited friends don't count). None = unlimited."""
     if event["max_players"] is None:
         return None
-    return max(event["max_players"] - event["going_count"] - event["extra_players"], 0)
+    return max(event["max_players"] - event["going_count"] - event["extra_players"] - event["held_count"], 0)
+
+
+def can_quick_join(event):
+    """For the Join button on feed cards: private and team games need their page (password, teams)."""
+    return (not event["cancelled"] and not event["i_am_going"] and not event["team_size"]
+            and (event["i_am_invited"] or (not event["is_private"] and spots_left(event) != 0)))
 
 
 def event_title(event):
@@ -104,14 +118,15 @@ def insert_event(data):
     db = get_db()
     cur = db.execute(
         """INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level,
-                               max_players, extra_players, note, is_quick, club_id)
+                               max_players, extra_players, note, is_quick, club_id, is_private, password, team_size)
            VALUES (:host_id, :title, :sport, :location, :starts_at, :ends_at, :skill_level,
-                   :max_players, :extra_players, :note, :is_quick, :club_id)""",
-        {"host_id": g.user["id"], "extra_players": 0, "is_quick": 0, "club_id": None, **data},
+                   :max_players, :extra_players, :note, :is_quick, :club_id, :is_private, :password, :team_size)""",
+        {"host_id": g.user["id"], "extra_players": 0, "is_quick": 0, "club_id": None, "is_private": 0,
+         "password": "", "team_size": None, **data},
     )
-    # The host is automatically going to their own event.
-    db.execute("INSERT INTO rsvps (event_id, user_id, created_at) VALUES (?, ?, ?)",
-               (cur.lastrowid, g.user["id"], to_db(now_local())))
+    # The host is automatically going to their own event (on team 1 in a team vs team game).
+    db.execute("INSERT INTO rsvps (event_id, user_id, created_at, team) VALUES (?, ?, ?, ?)",
+               (cur.lastrowid, g.user["id"], to_db(now_local()), 1 if data.get("team_size") else None))
     db.commit()
     return cur.lastrowid
 
@@ -137,7 +152,7 @@ def feed():
         return render_template("landing.html", clubs=featured_clubs())
 
     my_sports = user_sports(g.user["id"])
-    filters = {key: request.args.get(key, "") for key in ("scope", "sport", "location", "skill", "when")}
+    filters = {key: request.args.get(key, "") for key in ("scope", "sport", "location", "skill", "when", "open")}
     if filters["scope"] not in ("interests", "all"):
         filters["scope"] = "interests" if my_sports else "all"
 
@@ -158,6 +173,13 @@ def feed():
     if filters["skill"] in SKILL_LEVELS:
         where.append("e.skill_level = :skill")
         params["skill"] = filters["skill"]
+    if filters["open"] in OPEN_SPOT_CHOICES:
+        # "We're a group of 5": games with at least that many spots anyone can take right now.
+        where.append(f"(e.max_players IS NULL OR e.max_players - e.extra_players - {HELD}"
+                     " - (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id) >= :min_open)")
+        params["min_open"] = int(filters["open"])
+    else:
+        filters["open"] = ""
     if filters["when"] == "today":
         where.append("e.starts_at < :until")
         params["until"] = to_db(datetime.combine(now.date() + timedelta(days=1), time()))
@@ -255,9 +277,27 @@ def read_event_form(form, event=None):
     if len(note) > 500:
         return None, "Note is too long (500 characters max)."
 
+    is_private = 1 if form.get("is_private") else 0
+    password = one_line(form.get("password")) if is_private else ""
+    if is_private and not MIN_PASSWORD <= len(password) <= MAX_PASSWORD:
+        return None, f"Pick a password for your private game ({MIN_PASSWORD} to {MAX_PASSWORD} characters)."
+
+    # Team vs team is chosen when the game is made (people join a team, so it can't change later).
+    team_size = event["team_size"] if event is not None else None
+    team_raw = form.get("team_size", "").strip()
+    if event is None and team_raw:
+        if not team_raw.isdigit() or not 2 <= int(team_raw) <= cap // 2:
+            return None, f"{SPORTS[sport]} teams can have 2 to {cap // 2} players."
+        team_size = int(team_raw)
+    if team_size:
+        max_players = 2 * team_size
+        if event is not None and event["sport"] != sport and 2 * team_size > cap:
+            return None, f"{SPORTS[sport]} teams can have at most {cap // 2} players."
+
     return {
         "title": title, "sport": sport, "location": location, "skill_level": skill_level,
         "starts_at": to_db(starts), "ends_at": to_db(ends), "max_players": max_players, "note": note,
+        "is_private": is_private, "password": password, "team_size": team_size,
     }, None
 
 
@@ -325,7 +365,7 @@ def edit(event_id):
             db.execute(
                 """UPDATE events SET title = :title, sport = :sport, location = :location,
                        starts_at = :starts_at, ends_at = :ends_at, skill_level = :skill_level,
-                       max_players = :max_players, note = :note
+                       max_players = :max_players, note = :note, is_private = :is_private, password = :password
                    WHERE id = :id""",
                 {**data, "id": event_id},
             )
@@ -340,6 +380,7 @@ def edit(event_id):
             "skill_level": event["skill_level"], "starts_at": to_form(event["starts_at"]),
             "ends_at": to_form(event["ends_at"]), "note": event["note"],
             "max_players": event["max_players"] or "",
+            "is_private": "1" if event["is_private"] else "", "password": event["password"],
         })
     return render_template("events/form.html", form=form, event=event, min_start="")
 
@@ -497,52 +538,102 @@ def _int(value):
 @login_required
 def detail(event_id):
     event = get_event(event_id)
+    me = g.user["id"]
     attendees = get_db().execute(
-        """SELECT u.id, u.full_name, u.grad_year, u.avatar_updated
+        """SELECT u.id, u.full_name, u.grad_year, u.avatar_updated, r.team
            FROM rsvps r JOIN users u ON u.id = r.user_id
            WHERE r.event_id = ? ORDER BY r.created_at""",
         (event_id,),
     ).fetchall()
+    invite = None if event["i_am_going"] else my_invite(event_id, me)
+    my_team = next((person["team"] for person in attendees if person["id"] == me), None)
+    teams = None
+    if event["team_size"]:
+        counts = team_counts(event_id)
+        teams = {team: {"players": [p for p in attendees if p["team"] == team], "count": counts[team],
+                        "held": held_spots(event_id, team=team)} for team in (1, 2)}
     return render_template("events/detail.html", event=event, attendees=attendees,
                            ended=from_db(event["ends_at"]) < now_local(),
                            share_url=public_url("events.detail", event_id=event_id),
-                           blocked=is_blocked_between(g.user["id"], event["host_id"]))
+                           blocked=is_blocked_between(me, event["host_id"]),
+                           invite=invite, hold_minutes=hold_minutes_left(invite),
+                           invited=pending_invites(event_id), teams=teams, my_team=my_team,
+                           # my own held spot is still mine to take, even if the game looks full to others
+                           spots_for_me=None if spots_left(event) is None
+                           else spots_left(event) + (1 if hold_minutes_left(invite) else 0))
+
+
+def join_problem(event, password=None):
+    """Why I can't join this game right now (None = I can). Checks everything except the capacity,
+    which try_join checks in the same statement that adds the player."""
+    me = g.user["id"]
+    invite = my_invite(event["id"], me)
+    if event["cancelled"]:
+        return "This game was canceled."
+    if from_db(event["ends_at"]) < now_local():
+        return "This game already ended."
+    if event["i_am_going"]:
+        return "You're already going."
+    if is_blocked_between(me, event["host_id"]):
+        # Blocking means no contact at all, and that includes showing up to each other's games.
+        return "You can't join this game."
+    if event["team_size"] and invite is None:
+        return "Team games are invite-only. Challenge them with your own team, or ask a player to invite you."
+    if event["is_private"] and invite is None:
+        if too_many_password_tries(event["id"], me):
+            return "Too many wrong passwords. Try again in an hour, or ask to be invited."
+        if not password or not secrets.compare_digest(password.strip(), event["password"]):
+            count_wrong_password(event["id"], me)
+            return "That's not the password." if password else "This game is private. Enter the password."
+    return None
+
+
+def try_join(event, password=None, team=None):
+    """Join (or explain why not). Returns (joined, message). Uses my held spot if I was invited."""
+    problem = join_problem(event, password)
+    if problem:
+        return False, problem
+    me = g.user["id"]
+    invite = my_invite(event["id"], me)
+    team = invite["team"] if invite and invite["team"] else team
+    db = get_db()
+    # The capacity check and the insert happen in one statement, so two people tapping "Join" at the
+    # same moment can't both take the last spot. Spots held for other invited friends don't count as open.
+    cur = db.execute(
+        f"""INSERT INTO rsvps (event_id, user_id, created_at, team)
+            SELECT e.id, :me, :now, :team FROM events e
+            WHERE e.id = :id AND (e.max_players IS NULL OR
+                  e.extra_players + (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id)
+                  + ({HELD} - (SELECT COUNT(*) FROM invites o WHERE o.event_id = e.id AND o.guest_id = :me
+                                AND o.status = 'pending' AND o.expires_at > :hold_now)) < e.max_players)
+              AND (:team IS NULL OR e.team_size IS NULL OR
+                   (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id AND r.team = :team)
+                   + (SELECT COUNT(*) FROM invites t WHERE t.event_id = e.id AND t.team = :team AND t.guest_id != :me
+                      AND t.status = 'pending' AND t.expires_at > :hold_now) < e.team_size)""",
+        {"me": me, "id": event["id"], "now": to_db(now_local()), "hold_now": now_param(), "team": team})
+    if not cur.rowcount:
+        db.commit()
+        return False, "Sorry, this game is full."
+    if invite:
+        db.execute("UPDATE invites SET status = 'accepted' WHERE id = ?", (invite["id"],))
+        notify(invite["inviter_id"], "invites", f"{g.user['full_name'].split()[0]} is in for {event_title(event)}.",
+               url_for("events.detail", event_id=event["id"]))
+    db.commit()
+    return True, "You're in! See you there."
 
 
 @bp.route("/events/<int:event_id>/join", methods=("POST",))
 @login_required
 def join(event_id):
     event = get_event(event_id)
-    if event["cancelled"]:
-        flash("This game was canceled.", "error")
-    elif from_db(event["ends_at"]) < now_local():
-        flash("This game already ended.", "error")
-    elif event["i_am_going"]:
-        flash("You're already going.", "info")
-    elif is_blocked_between(g.user["id"], event["host_id"]):
-        # Blocking means no contact at all, and that includes showing up to each other's games.
-        flash("You can't join this game.", "error")
-    else:
-        db = get_db()
-        # The capacity check and the insert happen in one statement, so two people
-        # clicking "Join" at the same moment can't both take the last spot.
-        cur = db.execute(
-            """INSERT INTO rsvps (event_id, user_id, created_at)
-               SELECT e.id, :me, :now FROM events e
-               WHERE e.id = :id AND (e.max_players IS NULL OR
-                     e.extra_players + (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id) < e.max_players)""",
-            {"me": g.user["id"], "id": event_id, "now": to_db(now_local())},
-        )
-        db.commit()
-        if cur.rowcount:
-            flash("You're in! See you there.", "celebrate")
-            clash = overlapping_event(event)
-            if clash:
-                flash(f"Heads up: this overlaps with “{event_title(clash)}” ({fmt_clock(clash['starts_at'])}), "
-                      "which you're also going to.", "info")
-        else:
-            flash("Sorry, this game is full.", "error")
-    if request.form.get("next"):  # joined from a card in the feed: stay there
+    joined, message = try_join(event, request.form.get("password"))
+    flash(message, "celebrate" if joined else ("info" if message == "You're already going." else "error"))
+    if joined:
+        clash = overlapping_event(event)
+        if clash:
+            flash(f"Heads up: this overlaps with “{event_title(clash)}” ({fmt_clock(clash['starts_at'])}), "
+                  "which you're also going to.", "info")
+    if request.form.get("next") and (joined or not event["is_private"]):  # joined from a feed card: stay there
         return redirect(safe_next(request.form["next"]))
     return redirect(url_for("events.detail", event_id=event_id))
 

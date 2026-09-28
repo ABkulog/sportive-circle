@@ -34,7 +34,7 @@
 
 <section class="band home-section" aria-labelledby="games-title">
 <h2 class="home-section-title" id="games-title">{{ 'Games for you' if filters.scope == 'interests' else 'All games' }}</h2>
-{% set active_filters = [filters.sport, filters.when, filters.location, filters.skill]|select|list|length %}
+{% set active_filters = [filters.sport, filters.when, filters.location, filters.skill, filters.open]|select|list|length %}
 <form method="get" class="filter-bar" aria-label="Filter games">
   <div class="segmented small" role="radiogroup" aria-label="Which sports">
     <label><input type="radio" name="scope" value="interests" {% if filters.scope == 'interests' %}checked{% endif %} data-autosubmit><span>My sports</span></label>
@@ -56,6 +56,10 @@
       <select name="location" aria-label="Location" data-autosubmit>
         <option value="">Anywhere</option>
         {% for loc in LOCATIONS %}<option {% if filters.location == loc %}selected{% endif %}>{{ loc }}</option>{% endfor %}
+      </select>
+      <select name="open" aria-label="Open spots" data-autosubmit>
+        <option value="">Any open spots</option>
+        {% for n in OPEN_SPOT_CHOICES %}<option value="{{ n }}" {% if filters.open == n %}selected{% endif %}>{{ n }}+ open spots</option>{% endfor %}
       </select>
       <select name="skill" aria-label="Skill level" data-autosubmit>
         <option value="">Any level</option>

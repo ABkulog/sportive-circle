@@ -2221,3 +2221,204 @@ def test_check_email_can_send_a_test_to_every_admin(app, monkeypatch):
     assert "TEST EMAIL SENT to akulog@uw.edu" in output and "TEST EMAIL SENT to teammate@uw.edu" in output
     sent = {m["to"]: m for m in app.extensions["outbox"]}
     assert "You're an admin" in sent["teammate@uw.edu"]["body"]
+
+
+# ------------------------------------------------ parties, private games, team vs team (tester feedback)
+
+def _people(accounts, app, *names):
+    """Sign up several people; returns {first name: user id}. Ends logged out."""
+    ids = {}
+    for name in names:
+        email = f"{name.lower()}@uw.edu"
+        accounts.signup(email=email, name=f"{name} Husky")
+        ids[name] = _user_id(app, email)
+        accounts.logout()
+    return ids
+
+
+def _friends(app, a, *others):
+    with app.app_context():
+        db = get_db()
+        for other in others:
+            db.execute("INSERT OR REPLACE INTO friendships (requester_id, addressee_id, status, created_at)"
+                       " VALUES (?, ?, 'accepted', '2026-09-01 10:00')", (a, other))
+        db.commit()
+
+
+def _as(accounts, name):
+    accounts.logout()
+    accounts.login(email=f"{name.lower()}@uw.edu")
+
+
+def test_party_up_holds_spots_for_friends(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Stranger")
+    _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(sport="tennis", location="IMA South Tennis Courts",
+                                                                     max_players="3", title="Doubles-ish")))
+    party_page = client.get(f"/events/{game}/party").data.decode()
+    assert "Jordan Husky" in party_page and "Sam Husky" in party_page and "2 spots for friends" in party_page
+    done = client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"], ids["Sam"]]}, follow_redirects=True)
+    assert b"held for 30 minutes" in done.data
+    # A stranger can't take the held spots: the game looks full to them.
+    _as(accounts, "Stranger")
+    assert b"Sorry, this game is full" in client.post(f"/events/{game}/join", follow_redirects=True).data
+    # Jordan gets a notice and a "You down?" box, and takes his held spot.
+    _as(accounts, "Jordan")
+    assert "Maya wants you in Doubles-ish" in client.get("/notifications").data.decode()
+    page = client.get(f"/events/{game}").data.decode()
+    assert "Maya invited you. You down?" in page and "held for" in page
+    assert b"You&#39;re in" in client.post(f"/events/{game}/invite/answer", data={"answer": "yes"},
+                                            follow_redirects=True).data
+    # Sam says no: his spot opens up, and Maya hears about both answers.
+    _as(accounts, "Sam")
+    client.post(f"/events/{game}/invite/answer", data={"answer": "no"})
+    _as(accounts, "Stranger")
+    assert b"You&#39;re in" in client.post(f"/events/{game}/join", follow_redirects=True).data
+    _as(accounts, "Maya")
+    bell = client.get("/notifications").data.decode()
+    assert "Jordan is in for Doubles-ish" in bell and "Sam can&#39;t make Doubles-ish" in bell
+
+
+def test_held_spots_open_up_after_30_minutes(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan", "Stranger")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(sport="tennis", location="IMA South Tennis Courts",
+                                                                     max_players="2")))
+    client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"]]})
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE invites SET expires_at = '2020-01-01 00:00'")   # time's up
+        db.commit()
+    _as(accounts, "Stranger")
+    assert b"You&#39;re in" in client.post(f"/events/{game}/join", follow_redirects=True).data
+    _as(accounts, "Jordan")                                   # the invite still works, but the spot is gone
+    assert "Join if there's still room" in client.get(f"/events/{game}").data.decode()
+    assert b"this game is full" in client.post(f"/events/{game}/invite/answer", data={"answer": "yes"},
+                                                follow_redirects=True).data
+
+
+def test_join_with_friends_is_all_or_nothing(accounts, client, app):
+    ids = _people(accounts, app, "Host", "Maya", "Jordan", "Sam")
+    _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])
+    _as(accounts, "Host")
+    game = event_id_from(client.post("/events/new", data=event_form(sport="tennis", location="IMA South Tennis Courts",
+                                                                     max_players="3")))
+    _as(accounts, "Maya")   # a non-host who isn't in yet: joins and brings friends in one go
+    assert b"Join with friends" in client.get(f"/events/{game}").data
+    too_many = client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"], ids["Sam"]]}, follow_redirects=True)
+    assert b"Only 1 spot left for friends" in too_many.data
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (game,)).fetchone()[0] == 1
+        assert get_db().execute("SELECT COUNT(*) FROM invites").fetchone()[0] == 0   # nothing half-done
+    client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"]]})
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (game,)).fetchone()[0] == 2
+    assert b"You&#39;re already going" not in client.get(f"/events/{game}").data
+
+
+def test_only_friends_can_be_invited(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan")
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form()))
+    assert b"only invite your friends" in client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"]]},
+                                                       follow_redirects=True).data
+    _friends(app, ids["Maya"], ids["Jordan"])
+    client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"]]})
+    assert b"only invite your friends" in client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"]]},
+                                                       follow_redirects=True).data   # already invited
+    client.post(f"/events/{game}/invite/{ids['Jordan']}/cancel")
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM invites").fetchone()[0] == "canceled"
+
+
+def test_private_game_needs_the_password_unless_invited(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan", "Sam")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _as(accounts, "Maya")
+    assert b"Pick a password" in client.post("/events/new", data=event_form(is_private="1", password="ab"),
+                                              follow_redirects=True).data
+    game = event_id_from(client.post("/events/new", data=event_form(is_private="1", password="dawgs26")))
+    assert "dawgs26" in client.get(f"/events/{game}").data.decode()          # the host sees it to share it
+    _as(accounts, "Sam")
+    page = client.get(f"/events/{game}").data.decode()
+    assert "🔒 Private" in page and "dawgs26" not in page and 'name="password"' in page
+    feed = client.get("/?scope=all").data.decode()
+    assert "🔒 Private" in feed and f"/events/{game}/join" not in feed       # no one-tap Join on the card
+    assert b"Enter the password" in client.post(f"/events/{game}/join", follow_redirects=True).data
+    assert b"not the password" in client.post(f"/events/{game}/join", data={"password": "nope"},
+                                               follow_redirects=True).data
+    assert b"You&#39;re in" in client.post(f"/events/{game}/join", data={"password": "dawgs26"},
+                                            follow_redirects=True).data
+    assert "dawgs26" in client.get(f"/events/{game}").data.decode()          # players see it too
+    _as(accounts, "Maya")
+    client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"]]})
+    _as(accounts, "Jordan")                                                  # invited: no password needed
+    assert b"You&#39;re in" in client.post(f"/events/{game}/invite/answer", data={"answer": "yes"},
+                                            follow_redirects=True).data
+
+
+def test_private_game_passwords_cant_be_guessed(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Sam")
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(is_private="1", password="dawgs26")))
+    _as(accounts, "Sam")
+    for n in range(10):
+        client.post(f"/events/{game}/join", data={"password": f"guess{n}"})
+    blocked = client.post(f"/events/{game}/join", data={"password": "dawgs26"}, follow_redirects=True)
+    assert b"Too many wrong passwords" in blocked.data                        # even the right one, for an hour
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rsvps WHERE user_id = ?", (ids["Sam"],)).fetchone()[0] == 0
+
+
+def test_team_vs_team(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Mo", "Jordan", "Jay", "Sam", "Solo")
+    _friends(app, ids["Maya"], ids["Mo"])
+    _friends(app, ids["Jordan"], ids["Jay"], ids["Sam"])
+    _as(accounts, "Maya")
+    assert b"teams can have 2 to 5 players" in client.post("/events/new", data=event_form(team_size="6"),
+                                                           follow_redirects=True).data
+    game = event_id_from(client.post("/events/new", data=event_form(team_size="2", title="2v2 run")))
+    client.post(f"/events/{game}/party", data={"friend": [ids["Mo"]]})       # Maya brings Mo to team 1
+    _as(accounts, "Mo")
+    client.post(f"/events/{game}/invite/answer", data={"answer": "yes"})
+    # Someone alone can't just walk into a team game.
+    _as(accounts, "Solo")
+    assert b"invite-only" in client.post(f"/events/{game}/join", follow_redirects=True).data
+    # Jordan challenges with one friend (team size 2); too many friends doesn't fit.
+    _as(accounts, "Jordan")
+    page = client.get(f"/events/{game}").data.decode()
+    assert "Challenge with your team" in page and "Maya&#39;s team" in page and "Challengers" in page
+    assert b"Only 1 spot left" in client.post(f"/events/{game}/party", data={"friend": [ids["Jay"], ids["Sam"]]},
+                                              follow_redirects=True).data
+    client.post(f"/events/{game}/party", data={"friend": [ids["Jay"]]})
+    _as(accounts, "Solo")                                                    # team 2 is claimed now
+    assert "Teams are set" in client.get(f"/events/{game}").data.decode()
+    _as(accounts, "Jay")
+    client.post(f"/events/{game}/invite/answer", data={"answer": "yes"})
+    with app.app_context():
+        teams = dict(get_db().execute("SELECT user_id, team FROM rsvps WHERE event_id = ?", (game,)).fetchall())
+    assert teams == {ids["Maya"]: 1, ids["Mo"]: 1, ids["Jordan"]: 2, ids["Jay"]: 2}
+
+
+def test_open_spots_filter(accounts, client, app):
+    _people(accounts, app, "Maya", "Me")
+    _as(accounts, "Maya")
+    client.post("/events/new", data=event_form(title="Big run", max_players="10"))
+    client.post("/events/new", data=event_form(title="Small run", max_players="3"))
+    _as(accounts, "Me")
+    five = client.get("/?scope=all&open=5").data.decode()
+    assert "Big run" in five and "Small run" not in five
+    assert "Small run" in client.get("/?scope=all&open=2").data.decode()
+    assert "Small run" in client.get("/?scope=all&open=junk").data.decode()   # nonsense = no filter
+
+
+def test_blocked_people_cant_party_into_your_game(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan")
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form()))
+    client.post(f"/block/{ids['Jordan']}")
+    _as(accounts, "Jordan")
+    assert b"can&#39;t join" in client.get(f"/events/{game}/party", follow_redirects=True).data
+    assert b"Join with friends" not in client.get(f"/events/{game}").data

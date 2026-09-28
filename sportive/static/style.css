@@ -92,6 +92,22 @@ small { font-size: .82rem; }
 .band > h2:first-child, .band > .section-head:first-child { margin-top: 0; }
 .band > h2:first-child { font-size: 1.05rem; }
 section.band > .section-title:first-child { margin-top: 0; }
+/* Parties, private games, team vs team */
+.invite-box { display: grid; gap: 8px; padding: 14px; border-radius: var(--radius); background: var(--accent-soft); }
+.invite-box .action-pair { margin-top: 4px; }
+.password { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; margin-right: 8px; }
+.password-join { display: grid; gap: 10px; }
+.fact-note { display: block; }
+.team-columns { display: grid; gap: 14px; }
+@media (min-width: 560px) { .team-columns { grid-template-columns: 1fr 1fr; } }
+.team-column { padding: 12px; border-radius: var(--radius); background: var(--surface); }
+.team-column.is-mine { box-shadow: inset 0 0 0 2px var(--accent); }
+.team-column h3 { margin: 0 0 6px; font-size: 1rem; }
+.pick-list { list-style: none; margin: 0; padding: 0; }
+.pick-list li + li { border-top: 1px solid var(--line); }
+.pick-row { display: flex; align-items: center; gap: 12px; padding: 10px 2px; cursor: pointer; font-weight: 600; }
+.pick-row input { width: 20px; height: 20px; flex: none; accent-color: var(--accent); }
+
 /* The bell page */
 .bell-list { list-style: none; margin: 0; padding: 0; }
 .bell-list li + li { border-top: 1px solid var(--line); }
@@ -323,7 +339,7 @@ section.card h2, details.card h2 { margin-top: 0; }
 .filter-more > summary::-webkit-details-marker { display: none; }
 .filter-more[open] > summary { background: var(--text); color: var(--bg); }
 .filter-row { flex-basis: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
-@media (min-width: 640px) { .filter-row { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 640px) { .filter-row { grid-template-columns: repeat(3, 1fr); } }
 .filters { display: grid; gap: 10px; margin-bottom: 12px; padding: 0; border: 0; }
 .clear-filters { font-size: .88rem; }
 .club-picks { margin-top: 8px; }

@@ -6,12 +6,12 @@ from datetime import timedelta
 from flask import Flask, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from . import (auth, clubs, db, events, feedback, mail, moderation, notifications, pages, profile, reminders,
-               social, stats)
+from . import (auth, clubs, db, events, feedback, mail, moderation, notifications, pages, parties, profile,
+               reminders, social, stats)
 from .constants import (LOCATIONS, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS, SPORT_MAX_PLAYERS,
                         SPORTS)
 from .photos import MAX_UPLOAD_MB
-from .timeutil import fmt_clock, fmt_relative, fmt_when, same_day
+from .timeutil import fmt_clock, fmt_relative, fmt_when, now_local, same_day, to_db
 
 DEV_SECRET_KEY = "dev-only-change-me"
 
@@ -81,8 +81,8 @@ def create_app(test_config=None):
     logging.basicConfig(level=logging.INFO)
 
     db.init_app(app)
-    for blueprint in (auth.bp, events.bp, profile.bp, social.bp, clubs.bp, moderation.bp, notifications.bp,
-                      reminders.bp, feedback.bp):
+    for blueprint in (auth.bp, events.bp, parties.bp, profile.bp, social.bp, clubs.bp, moderation.bp,
+                      notifications.bp, reminders.bp, feedback.bp):
         app.register_blueprint(blueprint)
     pages.register(app)
     app.add_url_rule("/", endpoint="index", view_func=events.feed)
@@ -111,6 +111,8 @@ def _add_template_helpers(app):
         place_tip=lambda sport, place: PLACE_TIPS.get((sport, place)),
         # events
         spots_left=events.spots_left, event_title=events.event_title, place_map=events.place_map, same_day=same_day,
+        can_quick_join=events.can_quick_join, can_party_up=parties.can_party_up,
+        OPEN_SPOT_CHOICES=events.OPEN_SPOT_CHOICES, now_db=lambda: to_db(now_local()),
         # menu counters
         tab_badges=notifications.tab_badges, badge_text=notifications.badge_text, bell_count=notifications.bell_count,
         chat_unread=social.event_chat_unread, is_admin=moderation.is_admin,

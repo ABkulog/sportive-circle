@@ -63,6 +63,10 @@ ADDED_COLUMNS = [
     ("users", "snapchat", "TEXT NOT NULL DEFAULT ''"),
     ("users", "tiktok", "TEXT NOT NULL DEFAULT ''"),
     ("users", "x_handle", "TEXT NOT NULL DEFAULT ''"),
+    ("events", "is_private", "INTEGER NOT NULL DEFAULT 0"),
+    ("events", "password", "TEXT NOT NULL DEFAULT ''"),
+    ("events", "team_size", "INTEGER"),
+    ("rsvps", "team", "INTEGER"),
 ]
 
 

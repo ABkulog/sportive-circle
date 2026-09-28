@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS events (
     note          TEXT NOT NULL DEFAULT '',
     is_quick      INTEGER NOT NULL DEFAULT 0,      -- 1 = "Need players" quick post
     club_id       INTEGER REFERENCES clubs(id) ON DELETE SET NULL,  -- a club's event (always all levels)
+    is_private    INTEGER NOT NULL DEFAULT 0,      -- 1 = joining needs the password (or an invite)
+    password      TEXT NOT NULL DEFAULT '',        -- a private game's password, shown to the host and players
+    team_size     INTEGER,                         -- team vs team: players per team (NULL = a regular game)
     cancelled     INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -70,10 +73,37 @@ CREATE TABLE IF NOT EXISTS rsvps (
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),  -- the app always passes Seattle time
     reminder_sent INTEGER NOT NULL DEFAULT 0,
+    team          INTEGER,                         -- team vs team: 1 = the host's team, 2 = the challengers
     PRIMARY KEY (event_id, user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_rsvps_user ON rsvps(user_id);
+
+-- Invites to a game, from anyone going (a "party"). While `expires_at` hasn't passed, a pending invite
+-- holds a spot for that friend, so a group can join together without strangers taking their spots.
+-- After that the invite still works if there's room. status: pending / accepted / declined / canceled.
+CREATE TABLE IF NOT EXISTS invites (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id    INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    inviter_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    guest_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    team        INTEGER,                        -- team vs team: which team the spot is on
+    status      TEXT NOT NULL DEFAULT 'pending',
+    created_at  TEXT NOT NULL,
+    expires_at  TEXT NOT NULL,                  -- the held spot is free again after this
+    UNIQUE (event_id, guest_id)
+);
+CREATE INDEX IF NOT EXISTS idx_invites_event ON invites(event_id, status, expires_at);
+CREATE INDEX IF NOT EXISTS idx_invites_guest ON invites(guest_id, status);
+
+-- Wrong passwords for private games, so nobody can guess one by trying thousands.
+CREATE TABLE IF NOT EXISTS password_tries (
+    event_id   INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tries      INTEGER NOT NULL DEFAULT 0,
+    first_try  TEXT NOT NULL,
+    PRIMARY KEY (event_id, user_id)
+);
 
 -- ---------------------------------------------------------------- badges
 -- Badges are saved when earned, so they (and the date) stay forever, even limited ones.

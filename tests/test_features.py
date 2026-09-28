@@ -416,6 +416,68 @@ def open_chat(world, name, host):
     world.saw(person.client.get(f"/events/{world.games[host]}/chat", follow_redirects=True), person.client)
 
 
+# ------------------------------------------------------------------ parties, private games, teams
+
+def the_game(world):
+    """The one game in this scenario (every party scenario has exactly one)."""
+    return next(iter(world.games.values()))
+
+
+@given(parsers.parse('"{name}" parties up with "{friend}"'))
+@when(parsers.parse('"{name}" parties up with "{friend}"'))
+def party_up(world, name, friend):
+    person = world.person(name)
+    world.saw(person.client.post(f"/events/{the_game(world)}/party", data={"friend": world.person(friend).id},
+                                 follow_redirects=True), person.client)
+
+
+@when(parsers.parse('"{name}" challenges {host}\'s game with "{friend}"'))
+def challenge(world, name, host, friend):
+    person = world.person(name)
+    world.saw(person.client.post(f"/events/{world.games[host]}/party", data={"friend": world.person(friend).id},
+                                 follow_redirects=True), person.client)
+
+
+@when(parsers.re(r'"(?P<name>[^"]+)" says (?P<answer>yes|no) to the invite'))
+def answer_invite(world, name, answer):
+    person = world.person(name)
+    world.saw(person.client.post(f"/events/{the_game(world)}/invite/answer", data={"answer": answer},
+                                 follow_redirects=True), person.client)
+
+
+@given(parsers.parse('"{host}" hosts a private basketball game with the password "{password}"'))
+def host_private(world, host, password):
+    host_game(world, host, is_private="1", password=password)
+
+
+@given(parsers.parse('"{host}" hosts a 2v2 team game tomorrow'))
+def host_team_game(world, host):
+    host_game(world, host, team_size="2", title="2v2")
+
+
+@when(parsers.parse('"{name}" tries to join {host}\'s game with the password "{password}"'))
+def join_with_password(world, name, host, password):
+    person = world.person(name)
+    world.saw(person.client.post(f"/events/{world.games[host]}/join", data={"password": password},
+                                 follow_redirects=True), person.client)
+
+
+@then(parsers.parse('"{name}" is on team {team:d} in {host}\'s game'))
+def on_team(world, name, team, host):
+    rows = world.db("SELECT team FROM rsvps WHERE event_id = ? AND user_id = ?",
+                    (world.games[host], world.person(name).id))
+    assert rows and rows[0]["team"] == team
+
+
+@then(parsers.parse('"{name}" doesn\'t see "{text}" in the feed filtered to {n:d} open spots'))
+def not_in_filtered_feed(world, name, text, n):
+    person = world.person(name)
+    world.saw(person.client.get("/", query_string={"scope": "all", "open": str(n)}), person.client)
+    assert text not in world.text()
+    everything = person.client.get("/", query_string={"scope": "all"}).get_data(as_text=True)
+    assert text in everything  # it's there without the filter
+
+
 # ------------------------------------------------------------------ When: clubs
 
 @when(parsers.parse('"{name}" registers a club with the official page "{url}"'))

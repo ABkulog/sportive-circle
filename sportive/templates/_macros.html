@@ -50,10 +50,13 @@
       <div class="event-meta">{{ e.location }}</div>
       <div class="badges">
         {% if e.club_name %}<span class="badge badge-club">🏛️ {{ e.club_name }}</span>{% endif %}
+        {% if e.is_private %}<span class="badge">🔒 Private</span>{% endif %}
+        {% if e.team_size %}<span class="badge">{{ e.team_size }}v{{ e.team_size }} teams</span>{% endif %}
         {% if e.skill_level in ('Intermediate', 'Competitive') %}<span class="badge badge-level">{{ e.skill_level }}</span>{% endif %}
         {% if e.cancelled %}<span class="badge badge-danger">Canceled</span>
         {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Hosting</span>
         {% elif e.i_am_going %}<span class="badge badge-success">You're going</span>
+        {% elif e.i_am_invited %}<span class="badge badge-gold">Invited</span>
         {% elif left == 0 %}<span class="badge badge-muted">Full</span>{% endif %}
       </div>
     </div>
@@ -67,7 +70,7 @@
         <strong>{{ e.going_count + e.extra_players }}</strong>{% if e.max_players %}/{{ e.max_players }}{% endif %}
         <small>going</small>
       </div>
-      {% if not e.cancelled and not e.i_am_going and left != 0 %}
+      {% if can_quick_join(e) %}
         <form method="post" action="{{ url_for('events.join', event_id=e.id) }}" class="card-join">
           {{ csrf_field() }}
           <input type="hidden" name="next" value="{{ request.full_path }}">

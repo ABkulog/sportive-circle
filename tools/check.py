@@ -62,7 +62,7 @@ def logged_in(app, password, email=None):
 
 START = ["/", "/how-it-works", "/faq", "/privacy", "/terms", "/clubs", "/create", "/me/events", "/friends",
          "/friends?q=ma", "/messages", "/profile/edit", "/profile/badges", "/profile/notifications", "/notifications", "/profile/photo",
-         "/clubs/updates", "/admin/reports", "/admin/clubs", "/u/1", "/u/2", "/events/new", "/need-players",
+         "/clubs/updates", "/admin/reports", "/admin/clubs", "/u/1", "/u/2", "/events/new", "/need-players", "/events/1/party", "/events/2/party",
          "/clubs/new", "/signup", "/login", "/forgot", "/suggestions", "/admin/suggestions",
          "/admin/suggestions?kind=bug"]
 SKIP = ("/logout", "/static/", "/u/", "photo")
@@ -130,7 +130,11 @@ FIELDS = {
     "/login": ["email", "password", "next"],
     "/forgot": ["email"],
     "/events/new": ["title", "sport", "location", "skill_level", "starts_at", "ends_at", "max_players", "note",
-                    "club"],
+                    "club", "is_private", "password", "team_size"],
+    "/events/2/join": ["password", "next"],
+    "/events/2/party": ["friend"],
+    "/events/2/invite/answer": ["answer"],
+    "/events/2/invite/3/cancel": [],
     "/need-players": ["sport", "location", "skill_level", "starts_in", "duration", "needed", "have", "note"],
     "/events/2/edit": ["title", "sport", "location", "skill_level", "starts_at", "ends_at", "max_players", "note"],
     "/profile/edit": ["full_name", "grad_year", "bio", "sports", "pronouns", "gender", "instagram", "snapchat",
@@ -154,7 +158,7 @@ FIELDS = {
     "/admin/users/3/suspend": [],
 }
 
-GETS = ["/?sport={}", "/?when={}", "/?location={}", "/?skill={}&scope={}", "/clubs?q={}&sport={}&easy={}",
+GETS = ["/?sport={}", "/?when={}", "/?location={}", "/?skill={}&scope={}", "/?open={}", "/clubs?q={}&sport={}&easy={}",
         "/friends?q={}", "/friends?q={}@uw.edu", "/messages/2/poll?after={}", "/events/2/chat/poll?after={}",
         "/login?next={}", "/signup?next={}", "/clubs/new?sport={}", "/events/new?sport={}&club={}"]
 
