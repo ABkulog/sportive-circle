@@ -9,7 +9,8 @@ Safety rules:
 """
 from datetime import timedelta
 
-from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
+from flask import (Blueprint, abort, current_app, flash, g, jsonify, redirect, render_template, request,
+                   url_for)
 
 from .auth import login_required, safe_next
 from .db import get_db
@@ -197,22 +198,43 @@ MAX_SEARCH_RESULTS = 20
 
 
 def search_people(me, q):
-    """Huskies whose name matches the search (first name, last name, or both), for "Add friend".
+    """Huskies whose name matches the search (first name, last name, or both), or whose UW NetID is exactly
+    what was typed ("mchen7" or "mchen7@uw.edu"), for "Add friend".
 
-    Only names, photos and class years are shown. People who blocked you (or you blocked) never appear.
+    Only whole NetIDs match, so nobody can discover emails letter by letter. Each result carries clues to
+    tell people with the same name apart: class year, mutual friends, and whether you've played together.
+    People who blocked you (or you blocked) never appear.
     """
     if len(q) < MIN_SEARCH_LENGTH:
         return []
     words = q.lower().split()[:3]
-    where = " AND ".join("LOWER(u.full_name) LIKE ? ESCAPE '\\'" for _ in words)
-    like = ["%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%" for word in words]
+    params = {"me": me, "starts": words[0] + "%", "limit": MAX_SEARCH_RESULTS}
+    for n, word in enumerate(words):
+        params[f"w{n}"] = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    name_match = " AND ".join(f"LOWER(u.full_name) LIKE :w{n} ESCAPE '\\'" for n in range(len(words)))
+    netid_match = "0"
+    if len(words) == 1:
+        netid = words[0].split("@")[0]
+        domains = current_app.config["ALLOWED_EMAIL_DOMAINS"]
+        params.update({f"e{n}": f"{netid}@{domain}" for n, domain in enumerate(domains)})
+        netid_match = f"LOWER(u.email) IN ({', '.join(f':e{n}' for n in range(len(domains)))})"
     rows = get_db().execute(
-        f"""SELECT u.id, u.full_name, u.avatar_updated, u.grad_year FROM users u
-            WHERE u.verified = 1 AND u.suspended = 0 AND u.id != ? AND {where}
-              AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
-              AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = ?)
-            ORDER BY LOWER(u.full_name) LIKE ? DESC, u.full_name LIMIT ?""",
-        (me, *like, me, me, words[0] + "%", MAX_SEARCH_RESULTS)).fetchall()
+        f"""SELECT u.id, u.full_name, u.avatar_updated, u.grad_year, {netid_match} AS by_netid,
+                   (SELECT COUNT(*) FROM friendships a JOIN friendships b
+                      ON (CASE WHEN a.requester_id = :me THEN a.addressee_id ELSE a.requester_id END)
+                       = (CASE WHEN b.requester_id = u.id THEN b.addressee_id ELSE b.requester_id END)
+                    WHERE a.status = 'accepted' AND b.status = 'accepted'
+                      AND (a.requester_id = :me OR a.addressee_id = :me)
+                      AND (b.requester_id = u.id OR b.addressee_id = u.id)) AS mutual,
+                   EXISTS (SELECT 1 FROM rsvps mine JOIN rsvps theirs ON mine.event_id = theirs.event_id
+                           JOIN events e ON e.id = mine.event_id
+                           WHERE mine.user_id = :me AND theirs.user_id = u.id AND e.cancelled = 0) AS played
+            FROM users u
+            WHERE u.verified = 1 AND u.suspended = 0 AND u.id != :me AND (({name_match}) OR {netid_match})
+              AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = :me)
+              AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = :me)
+            ORDER BY by_netid DESC, played DESC, mutual DESC, LOWER(u.full_name) LIKE :starts DESC, u.full_name
+            LIMIT :limit""", params).fetchall()
     return [{**dict(row), "status": friendship_status(me, row["id"])} for row in rows]
 
 

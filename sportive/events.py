@@ -13,7 +13,7 @@ from .constants import (LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START
                         SPORT_LOCATIONS, SPORT_MAX_PLAYERS, SPORTS)
 from .db import get_db, user_sports
 from .links import public_url
-from .notifications import mark_seen, on_screen
+from .notifications import mark_seen, notify
 from .mail import compose, send_email
 from .social import is_blocked_between
 from .spirit import greeting, top_dawgs
@@ -190,11 +190,10 @@ def feed():
 
     celebrate_progress(g.user["id"])
     hello, spirit_line = greeting(g.user["full_name"].split()[0], now)
-    whats_new = on_screen()   # before marking Need players as seen: you're looking at them right now
     mark_seen("need_players")
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
-                           hello=hello, spirit_line=spirit_line, top_dawgs=top_dawgs(now=now), whats_new=whats_new,
+                           hello=hello, spirit_line=spirit_line, top_dawgs=top_dawgs(now=now),
                            club_picks=suggested_clubs(g.user["id"], my_sports))
 
 
@@ -331,8 +330,9 @@ def edit(event_id):
                    WHERE id = :id""",
                 {**data, "id": event_id},
             )
+            told = tell_players_it_changed(event, data)
             db.commit()
-            flash("Event updated.", "success")
+            flash("Saved. Everyone going got a heads-up." if told else "Saved.", "success")
             return redirect(url_for("events.detail", event_id=event_id))
         flash(error, "error")
     else:
@@ -359,12 +359,63 @@ def cancel(event_id):
     return redirect(url_for("events.my_events"))
 
 
-def tell_players_it_was_cancelled(event):
-    """Email everyone who joined (except the host), so nobody shows up to an empty field."""
-    players = get_db().execute(
-        """SELECT u.email, u.full_name FROM rsvps r JOIN users u ON u.id = r.user_id
+def players_except_host(event):
+    return get_db().execute(
+        """SELECT u.id, u.email, u.full_name FROM rsvps r JOIN users u ON u.id = r.user_id
            WHERE r.event_id = ? AND r.user_id != ?""", (event["id"], event["host_id"])).fetchall()
+
+
+def what_changed(event, data):
+    """Plain words for what the host changed that players need to know ("new time: Sat, Oct 3 · 3:00 PM")."""
+    changes = []
+    if (data["starts_at"], data["ends_at"]) != (event["starts_at"], event["ends_at"]):
+        changes.append(f"new time: {fmt_when(data['starts_at'])}")
+    if data["location"] != event["location"]:
+        changes.append(f"new place: {data['location']}")
+    if data["sport"] != event["sport"]:
+        changes.append(f"now {SPORTS[data['sport']]}")
+    if data["note"] != event["note"]:
+        changes.append("new note")
+    return changes
+
+
+def tell_players_it_changed(event, data):
+    """The host changed something important: a notice in everyone's bell, plus an email when the time or
+    place changed (so nobody shows up at the old one). Returns True if anyone was told. Caller commits."""
+    changes = what_changed(event, data)
+    players = players_except_host(event)
+    if not changes or not players:
+        return False
+    title, host = data["title"] if not event["is_quick"] else event_title(event), event["host_name"].split()[0]
+    link = url_for("events.detail", event_id=event["id"])
+    for player in players:
+        notify(player["id"], "game_updates", f"{host} changed {title}: {', '.join(changes)}", link)
+    if any(change.startswith(("new time", "new place")) for change in changes):
+        for player in players:
+            try:
+                subject = f"Changed: {title}"
+                body, html = compose(
+                    subject, f"{title} changed",
+                    [f"Hey {player['full_name'].split()[0]}, {host} changed this game.",
+                     f"🕐 {fmt_when(data['starts_at'])}", f"📍 {data['location']}"],
+                    button=("See the game", public_url("events.detail", event_id=event["id"])),
+                    reason="You're getting this because you joined this game.",
+                    preheader=f"{host} changed {title}.")
+                send_email(player["email"], subject, body, html=html)
+            except Exception:  # one bad address shouldn't stop the others
+                log.exception("Couldn't email %s about a changed event", player["email"])
+    return True
+
+
+def tell_players_it_was_cancelled(event):
+    """Tell everyone who joined (except the host), so nobody shows up to an empty field."""
+    players = players_except_host(event)
     title, when = event_title(event), fmt_when(event["starts_at"])
+    for player in players:
+        # Links to the feed: if the host deleted their account, the game's page is gone too.
+        notify(player["id"], "game_updates", f"{event['host_name'].split()[0]} canceled {title} ({when})",
+               url_for("events.feed"))
+    get_db().commit()
     for player in players:
         try:
             subject = f"Canceled: {title} ({when})"

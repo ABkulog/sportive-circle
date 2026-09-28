@@ -1,17 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Notifications{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('profile.edit') }}">← Edit profile</a>
+<a class="back-link" href="{{ url_for('profile.edit') }}" data-back>← Back</a>
 <div class="card form-card">
   <h1>Notifications</h1>
-  <p class="muted">Pick what you want to hear about, and where. <strong>Tab icon</strong> puts a number on the
-    matching tab. <strong>On my screen</strong> lists it in the "What's new" box at the top of Home.
-    Nothing here sends emails or pop-ups.</p>
+  <p class="muted">Pick what you hear about. No pop-ups, no emails.</p>
   <form method="post" class="form">
     {{ csrf_field() }}
     <table class="notif-table">
       <thead>
-        <tr><th scope="col">What</th><th scope="col">Tab icon</th><th scope="col">On my screen</th></tr>
+        <tr><th scope="col">What</th><th scope="col">Tab icon</th><th scope="col">🔔 Bell</th></tr>
       </thead>
       <tbody>
         {% for kind in kinds %}
@@ -20,7 +18,7 @@
             <td><input type="checkbox" name="{{ kind.key }}_badge" value="1" {% if chosen[kind.key].badge %}checked{% endif %}
                        aria-label="{{ kind.label }}: number on the tab icon"></td>
             <td><input type="checkbox" name="{{ kind.key }}_screen" value="1" {% if chosen[kind.key].screen %}checked{% endif %}
-                       aria-label="{{ kind.label }}: show on my screen"></td>
+                       aria-label="{{ kind.label }}: show in the bell"></td>
           </tr>
         {% endfor %}
       </tbody>

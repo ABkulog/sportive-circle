@@ -61,7 +61,7 @@ def logged_in(app, password, email=None):
 # ------------------------------------------------------------------ 3. link crawl
 
 START = ["/", "/how-it-works", "/faq", "/privacy", "/terms", "/clubs", "/create", "/me/events", "/friends",
-         "/friends?q=ma", "/messages", "/profile/edit", "/profile/badges", "/profile/notifications", "/profile/photo",
+         "/friends?q=ma", "/messages", "/profile/edit", "/profile/badges", "/profile/notifications", "/notifications", "/profile/photo",
          "/clubs/updates", "/admin/reports", "/admin/clubs", "/u/1", "/u/2", "/events/new", "/need-players",
          "/clubs/new", "/signup", "/login", "/forgot", "/suggestions", "/admin/suggestions",
          "/admin/suggestions?kind=bug"]
@@ -153,7 +153,7 @@ FIELDS = {
 }
 
 GETS = ["/?sport={}", "/?when={}", "/?location={}", "/?skill={}&scope={}", "/clubs?q={}&sport={}&easy={}",
-        "/friends?q={}", "/messages/2/poll?after={}", "/events/2/chat/poll?after={}",
+        "/friends?q={}", "/friends?q={}@uw.edu", "/messages/2/poll?after={}", "/events/2/chat/poll?after={}",
         "/login?next={}", "/signup?next={}", "/clubs/new?sport={}", "/events/new?sport={}&club={}"]
 
 ODD_URLS = ["/events/999999", "/events/0/join", "/clubs/999999", "/u/999999", "/u/999999/photo", "/messages/999999",

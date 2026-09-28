@@ -112,7 +112,7 @@ def _add_template_helpers(app):
         # events
         spots_left=events.spots_left, event_title=events.event_title, place_map=events.place_map, same_day=same_day,
         # menu counters
-        tab_badges=notifications.tab_badges, badge_text=notifications.badge_text,
+        tab_badges=notifications.tab_badges, badge_text=notifications.badge_text, bell_count=notifications.bell_count,
         chat_unread=social.event_chat_unread, is_admin=moderation.is_admin,
         open_report_count=moderation.open_report_count, pending_club_count=clubs.pending_club_count,
         is_team=moderation.is_team,

@@ -652,6 +652,14 @@ def test_add_photo_later(accounts, client):
     assert feed.status_code == 200 and b"photo-nudge" not in feed.data  # no banner following you around
 
 
+def test_add_later_leaves_one_reminder_in_the_bell(accounts, client):
+    accounts.signup(photo=False)
+    client.post("/profile/photo/skip")
+    assert "Add a profile photo" in client.get("/notifications").data.decode()
+    accounts.upload_photo()
+    assert "Add a profile photo" not in client.get("/notifications").data.decode()  # done: gone
+
+
 def test_add_later_is_remembered(accounts, client, app):
     accounts.signup(photo=False)
     client.post("/profile/photo/skip")
@@ -1546,6 +1554,36 @@ def test_signup_cant_flood_an_inbox(accounts, client):
 
 # ------------------------------------------------------------ launch-readiness checks
 
+def test_same_names_can_be_told_apart(accounts, client, app):
+    """Two Maya Chens: search by NetID finds the right one; results show clues (class, mutual friends)."""
+    accounts.signup(email="mchen7@uw.edu", name="Maya Chen")
+    accounts.logout()
+    accounts.signup(email="mchen22@uw.edu", name="Maya Chen")
+    accounts.logout()
+    accounts.signup(email="friend@uw.edu", name="Fran Friend")
+    fran, maya7 = _user_id(app, "friend@uw.edu"), _user_id(app, "mchen7@uw.edu")
+    client.post(f"/friends/request/{maya7}")
+    accounts.logout()
+    accounts.login(email="mchen7@uw.edu")
+    client.post(f"/friends/accept/{fran}")
+    accounts.logout()
+    accounts.signup(email="me@uw.edu", name="Me Myself")
+    client.post(f"/friends/request/{fran}")
+    accounts.logout()
+    accounts.login(email="friend@uw.edu")
+    client.post(f"/friends/accept/{_user_id(app, 'me@uw.edu')}")
+    accounts.logout()
+    accounts.login(email="me@uw.edu")
+    by_name = client.get("/friends?q=maya+chen").data.decode()
+    assert by_name.count("<strong>Maya Chen</strong>") == 2
+    assert "1 mutual friend" in by_name                                   # the one Fran knows
+    by_netid = client.get("/friends?q=mchen22").data.decode()
+    assert by_netid.count("<strong>Maya Chen</strong>") == 1 and f"/u/{maya7}" not in by_netid
+    assert client.get("/friends?q=mchen22@uw.edu").data.decode().count("<strong>Maya Chen</strong>") == 1
+    assert "<strong>Maya Chen</strong>" not in client.get("/friends?q=mchen2").data.decode()  # whole NetIDs only
+    assert "mchen22@uw.edu" not in by_netid                                 # emails stay private
+
+
 def test_people_search_treats_wildcards_as_text(accounts, client):
     accounts.signup(email="maya@uw.edu", name="Maya Chen")
     accounts.logout()
@@ -2026,13 +2064,13 @@ def test_admins_are_only_notified_about_topics_3_people_mention(accounts, client
                 client.post("/suggestions", data={"kind": "idea", "body": "more pickleball times"})
         accounts.logout()
         accounts.login(email="boss@uw.edu")
-        page = client.get("/").data.decode()
+        page = client.get("/notifications").data.decode()
         assert ("1 suggestion topic is trending" in page) == (i == 2), i   # quiet until the third person
         accounts.logout()
     accounts.login(email="boss@uw.edu")
     admin_page = client.get("/admin/suggestions").data.decode()
     assert "<strong>badminton</strong> · 3 people" in admin_page and "<strong>pickleball</strong>" not in admin_page
-    assert "1 suggestion topic is trending" not in client.get("/").data.decode()   # seen: no more notification
+    assert "1 suggestion topic is trending" not in client.get("/notifications").data.decode()   # seen: no more
     topic_page = client.get("/admin/suggestions?topic=badminton").data.decode()
     assert "Can we get badminton" in topic_page and "more pickleball" not in topic_page
     assert "Suggestions</a>" in client.get("/terms").data.decode()      # footer link on every page

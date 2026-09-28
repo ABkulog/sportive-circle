@@ -14,7 +14,7 @@ from .photos import make_avatar
 from .badges import (ROLE_BADGES, SHOWCASE_SLOTS, catalog, earned_badges, is_retired, rarity,
                      set_showcase, showcase, sync_badges)
 from .moderation import is_admin
-from .notifications import mark_seen
+from .notifications import mark_seen, notify
 from .textutil import one_line
 from .social import can_message, friendship_status, i_blocked, is_blocked_between
 from .timeutil import now_local, to_db
@@ -60,6 +60,8 @@ def photo_upload():
                 # A new value every time, so browsers show the new picture instead of a cached old one.
                 version = f"{now_local().strftime('%Y%m%d%H%M')}-{secrets.token_hex(3)}"
                 db.execute("UPDATE users SET avatar_updated = ? WHERE id = ?", (version, g.user["id"]))
+                db.execute("DELETE FROM notices WHERE user_id = ? AND kind = 'account' AND url = ?",
+                           (g.user["id"], url_for("profile.photo_upload")))  # the photo reminder is done
                 db.commit()
                 if first_time:
                     flash("Looking good. You're all set!", "celebrate")
@@ -88,6 +90,9 @@ def photo_skip():
     """'Add later': the page already said "No problem" in a pop-up. Remembered, so they aren't asked again."""
     db = get_db()
     db.execute("UPDATE users SET photo_skipped = 1 WHERE id = ?", (g.user["id"],))
+    # One reminder in the bell, instead of a banner on every page.
+    notify(g.user["id"], "account", "Add a profile photo so people know who they're playing with.",
+           url_for("profile.photo_upload"))
     db.commit()
     destination = session.pop("after_photo", None)
     return redirect(safe_next(destination) if destination else url_for("events.feed"))

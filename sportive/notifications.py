@@ -1,13 +1,19 @@
-"""Notifications: numbers on the tab icons, and a "What's new" card at the top of Home.
+"""Notifications: numbers on the tab icons, and the 🔔 bell at the top.
 
-People choose, for each kind of notification, whether it shows on the tab icons, on their screen,
-both, or neither (Profile -> Edit profile -> Notifications). Nothing is ever pushed or emailed from
-here, so nobody gets spammed.
+People choose, for each kind of notification, whether it shows on the tab icons, in the bell,
+both, or neither (Profile -> Edit profile -> Notifications). Nothing is ever pushed from here, so
+nobody gets spammed.
+
+Two sorts of things show up:
+- counts worked out from the data (unread messages, new club updates...), and
+- notices: one-off messages saved for one person ("Maya changed the time of Sunday soccer",
+  an invite, a reminder to add a photo). Opening the bell marks them as read.
 
 "New" means newer than the last time you looked: opening Club updates clears the club number, opening
 your badges clears the badge number, and so on. Those "last looked" markers live in the seen_markers table.
 """
 from collections import namedtuple
+from datetime import timedelta
 
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
@@ -18,10 +24,13 @@ from .timeutil import now_local, to_db
 
 bp = Blueprint("notifications", __name__)
 
-# key, emoji, what it's about, which tab/icon shows the number, default for (tab icon, screen), link text
+# key, emoji, what it's about, which tab/icon shows the number, default for (tab icon, bell), link text.
+# (The bell setting is stored in the "screen" column.)
 Kind = namedtuple("Kind", "key emoji label tab badge screen link")
 
 KINDS = [
+    Kind("invites", "🙌", "Invites from friends", "home", True, True, "invite"),
+    Kind("game_updates", "📅", "Changes to games you're going to", "home", True, True, "game update"),
     Kind("messages", "✉️", "Direct messages", "messages", True, True, "new message"),
     Kind("friend_requests", "👥", "Friend requests", "friends", True, True, "friend request"),
     Kind("game_chat", "💬", "Group chats of games you're going to", "home", True, True, "new message in your games' chats"),
@@ -31,7 +40,10 @@ KINDS = [
     Kind("badges", "🏅", "New badges you earned", "profile", True, True, "new badge"),
     Kind("suggestion_trends", "💡", "Suggestion topics 3+ people asked for (admins)", "admin", True, True,
          "suggestion topic trending"),
+    Kind("account", "👤", "Tips about your account", "profile", False, True, "tip"),
 ]
+NOTICE_KINDS = ("invites", "game_updates", "account")  # saved as notices (the rest are counted)
+NOTICE_DAYS = 30  # the bell shows notices from the last month
 KIND_BY_KEY = {kind.key: kind for kind in KINDS}
 TABS = ("home", "clubs", "profile", "messages", "friends", "admin")
 
@@ -116,11 +128,29 @@ def _since(user_id, kind):
     return value
 
 
+# ---------------------------------------------------------------- notices
+
+def notify(user_id, kind, text, url):
+    """Save a notice for one person (shown in their bell). The caller commits."""
+    assert kind in NOTICE_KINDS, kind
+    get_db().execute("INSERT INTO notices (user_id, kind, text, url, created_at) VALUES (?, ?, ?, ?, ?)",
+                     (user_id, kind, text, url, to_db(now_local())))
+
+
+def recent_notices(user_id):
+    since = to_db(now_local() - timedelta(days=NOTICE_DAYS))
+    return get_db().execute("SELECT * FROM notices WHERE user_id = ? AND created_at >= ? ORDER BY id DESC LIMIT 50",
+                            (user_id, since)).fetchall()
+
+
 # ---------------------------------------------------------------- counting
 
 def _count(kind, me):
     db = get_db()
     now = to_db(now_local())
+    if kind in NOTICE_KINDS:
+        return db.execute("SELECT COUNT(*) FROM notices WHERE user_id = ? AND kind = ? AND read_at IS NULL",
+                          (me, kind)).fetchone()[0]
     if kind == "messages":
         return db.execute(
             """SELECT COUNT(*) FROM direct_messages WHERE recipient_id = ? AND read_at IS NULL
@@ -197,13 +227,14 @@ LINKS = {
 }
 
 
-def on_screen():
-    """[(emoji, text, url)] for the "What's new" card: kinds this person wants on their screen."""
+def bell_items():
+    """[(emoji, text, url)] for the bell: counted kinds this person wants in the bell (notices are listed
+    one by one on the bell page instead)."""
     items = []
     found = counts()
     for kind in KINDS:
         n = found.get(kind.key)
-        if n and g.notification_settings[kind.key]["screen"]:
+        if n and g.notification_settings[kind.key]["screen"] and kind.key not in NOTICE_KINDS:
             endpoint, values = LINKS[kind.key]
             text = f"{n} {kind.link}{'' if n == 1 else 's'}".replace("persons", "people")
             if kind.key == "game_chat" and n != 1:
@@ -214,8 +245,30 @@ def on_screen():
     return items
 
 
+def bell_count():
+    """The number on the bell: everything new this person wants in the bell."""
+    found = counts()
+    return sum(n for key, n in found.items() if g.notification_settings[key]["screen"])
+
+
 def badge_text(n):
     return "9+" if n > 9 else str(n)
+
+
+# ---------------------------------------------------------------- the bell page
+
+@bp.route("/notifications")
+@login_required
+def bell():
+    me = g.user["id"]
+    items, notices = bell_items(), recent_notices(me)
+    chosen = settings(me)
+    notices = [notice for notice in notices if chosen[notice["kind"]]["screen"]]
+    db = get_db()
+    db.execute("UPDATE notices SET read_at = ? WHERE user_id = ? AND read_at IS NULL", (to_db(now_local()), me))
+    db.commit()
+    g.pop("notification_counts", None)  # the bell in the top bar shows 0 on this page
+    return render_template("notifications/bell.html", items=items, notices=notices, kinds=KIND_BY_KEY)
 
 
 # ---------------------------------------------------------------- settings page

@@ -12,19 +12,6 @@
   <p class="spirit-line">{{ spirit_line }}</p>
 </header>
 
-{% if whats_new %}
-  <section class="whats-new" aria-label="What's new">
-    <div class="whats-new-head">
-      <h2>What's new</h2>
-      <a href="{{ url_for('notifications.notification_settings') }}">Choose what shows here</a>
-    </div>
-    <ul>
-      {% for emoji, text, url in whats_new %}
-        <li><a href="{{ url }}"><span aria-hidden="true">{{ emoji }}</span> {{ text }}<span class="whats-new-go" aria-hidden="true">›</span></a></li>
-      {% endfor %}
-    </ul>
-  </section>
-{% endif %}
 
 {# "Now" row, like Instagram Stories: what's happening soon, one swipe away. #}
 {% if up_next or need_players %}

@@ -16,7 +16,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 from conftest import make_image
 from sportive.db import get_db
 from sportive.reminders import send_due_reminders
-from sportive.timeutil import now_local, to_db
+from sportive.timeutil import from_db, now_local, to_db
 
 scenarios("features")
 
@@ -375,6 +375,29 @@ def cancel_game(world, host):
               person.client)
 
 
+def edit_game(world, host_name, **changes):
+    host = world.person(host_name)
+    event_id = world.games[host.first]
+    row = world.db("SELECT * FROM events WHERE id = ?", (event_id,))[0]
+    form = {"title": row["title"], "sport": row["sport"], "location": row["location"],
+            "skill_level": row["skill_level"], "starts_at": row["starts_at"].replace(" ", "T"),
+            "ends_at": row["ends_at"].replace(" ", "T"), "max_players": str(row["max_players"] or ""),
+            "note": row["note"], **changes}
+    world.saw(host.client.post(f"/events/{event_id}/edit", data=form, follow_redirects=True), host.client)
+
+
+@when(parsers.parse('"{host}" moves her game an hour later'))
+def move_game(world, host):
+    row = world.db("SELECT starts_at, ends_at FROM events WHERE id = ?", (world.games[host],))[0]
+    later = lambda value: (from_db(value) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
+    edit_game(world, host, starts_at=later(row["starts_at"]), ends_at=later(row["ends_at"]))
+
+
+@when(parsers.parse('"{host}" changes the note of her game to "{note}"'))
+def change_note(world, host, note):
+    edit_game(world, host, note=note)
+
+
 @when(parsers.parse('"{guest}" downloads the calendar file for {host}\'s game'))
 def download_calendar(world, guest, host):
     person = world.person(guest)
@@ -547,6 +570,11 @@ def game_has_players(world, host, n):
     assert world.db("SELECT COUNT(*) AS n FROM rsvps WHERE event_id = ?", (world.games[host],))[0]["n"] == int(n)
 
 
+@then(parsers.parse('"{email}" gets no email about "{text}"'))
+def gets_no_email(world, email, text):
+    assert not any(m["to"] == email and text in m["subject"] for m in world.outbox())
+
+
 @then(parsers.parse('"{email}" gets an email about "{text}"'))
 def gets_email(world, email, text):
     assert any(m["to"] == email and text in m["subject"] for m in world.outbox())
@@ -646,8 +674,8 @@ def refused(world):
 
 # ------------------------------------------------------------------ notifications
 
-TAB_LABELS = {"Messages": "Messages", "Clubs": "Clubs", "Home": "Home", "News": "News", "Profile": "Profile",
-              "Friends": "Friends"}
+TAB_LABELS = {"Messages": "Messages", "Clubs": "Clubs", "Home": "Home", "Profile": "Profile",
+              "Friends": "Friends", "Bell": "Notifications"}
 
 
 def tab_number(world, name, label):
@@ -671,17 +699,21 @@ def has_tab_number(world, name, n, label):
     assert tab_number(world, name, TAB_LABELS[label]) == int(n)
 
 
-@then(parsers.parse('"{name}" sees "{text}" in What\'s new'))
-def sees_whats_new(world, name, text):
-    page = html.unescape(world.person(name).client.get("/").get_data(as_text=True))
-    assert "What's new" in page
-    box = page[page.index('class="whats-new"'):page.index("</section>", page.index('class="whats-new"'))]
-    assert text in box, box
+def bell_text(world, name):
+    page = html.unescape(world.person(name).client.get("/notifications").get_data(as_text=True))
+    if 'class="bell-list"' not in page:
+        return ""
+    return page[page.index('class="bell-list"'):page.index("</ul>", page.index('class="bell-list"'))]
 
 
-@then(parsers.parse('"{name}" doesn\'t see What\'s new'))
-def no_whats_new(world, name):
-    assert 'class="whats-new"' not in world.person(name).client.get("/").get_data(as_text=True)
+@then(parsers.parse('"{name}" sees "{text}" in the bell'))
+def sees_in_bell(world, name, text):
+    assert text in bell_text(world, name)
+
+
+@then(parsers.parse('"{name}" has nothing in the bell'))
+def nothing_in_bell(world, name):
+    assert bell_text(world, name) == ""
 
 
 @when(parsers.parse('"{name}" turns off the tab icon for "{kind}"'))

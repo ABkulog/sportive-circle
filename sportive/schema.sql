@@ -199,7 +199,7 @@ CREATE TABLE IF NOT EXISTS notification_settings (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     kind    TEXT NOT NULL,
     badge   INTEGER NOT NULL,   -- 1 = show a number on the tab icon
-    screen  INTEGER NOT NULL,   -- 1 = show it in the "What's new" card on Home
+    screen  INTEGER NOT NULL,   -- 1 = show it in the bell
     PRIMARY KEY (user_id, kind)
 );
 
@@ -211,6 +211,19 @@ CREATE TABLE IF NOT EXISTS seen_markers (
     value   TEXT NOT NULL,
     PRIMARY KEY (user_id, kind)
 );
+
+-- One-off notices for one person, shown in their bell: "Maya changed the time of Sunday soccer",
+-- invites, "Add a profile photo". kind is one of notifications.NOTICE_KINDS.
+CREATE TABLE IF NOT EXISTS notices (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind       TEXT NOT NULL,
+    text       TEXT NOT NULL,
+    url        TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    read_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_notices_user ON notices(user_id, read_at);
 
 -- ---------------------------------------------------------------- suggestions
 -- Ideas and problems people send from the footer link. Only admins can read them.

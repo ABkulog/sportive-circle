@@ -8,7 +8,7 @@
 <h1 class="page-title">Friends</h1>
 
 <form method="get" class="people-search" role="search" aria-label="Find people">
-  <input type="search" name="q" value="{{ q }}" placeholder="Search Huskies by name" aria-label="Search by name"
+  <input type="search" name="q" value="{{ q }}" placeholder="Name or UW NetID" aria-label="Search by name or UW NetID"
          minlength="2" maxlength="60" autocomplete="off" {% if not friends and not q %}autofocus{% endif %}>
   <button class="btn">Search</button>
 </form>
@@ -18,7 +18,10 @@
     {% if results %}
       <ul class="people">
         {% for p in results %}
-          <li class="post-game-row">{{ person_row(p, "Class of " ~ p.grad_year if p.grad_year else "") }}
+          {% set clues = [("Class of " ~ p.grad_year) if p.grad_year else "",
+                          ("%d mutual friend%s"|format(p.mutual, "" if p.mutual == 1 else "s")) if p.mutual else "",
+                          "Played together" if p.played else ""]|select|join(" · ") %}
+          <li class="post-game-row">{{ person_row(p, clues) }}
             {% if p.status == 'friends' %}<span class="done-pill">✅ Friends</span>
             {% elif p.status == 'sent' %}<span class="done-pill">Request sent</span>
             {% elif p.status == 'received' %}
@@ -34,7 +37,7 @@
         {% endfor %}
       </ul>
     {% elif q|length >= 2 %}
-      <p class="muted">Check the spelling, or ask them to sign up with their UW email.</p>
+      <p class="muted">Check the spelling, or try their UW NetID.</p>
     {% endif %}
     <p><a href="{{ url_for('social.friends') }}">Clear search</a></p>
   </section>

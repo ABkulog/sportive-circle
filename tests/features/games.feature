@@ -41,7 +41,7 @@ Feature: Games
     When "Maya" posts that she needs 2 more for soccer in 15 minutes
     Then "Jordan" sees "Need 2 more for Soccer" in the feed
 
-  @FR-EVT-10
+  @FR-EVT-14
   Scenario: Skill level is only a label, so anyone can join
     Given "Maya" hosts a Competitive basketball game tomorrow
     When "Jordan" joins Maya's game
@@ -71,11 +71,29 @@ Feature: Games
     And Maya's game has 2 players
 
   @FR-EVT-7
-  Scenario: Canceling a game emails everyone who joined
+  Scenario: Canceling a game tells everyone who joined
     Given "Maya" hosts a basketball game tomorrow
     And "Jordan" joins Maya's game
     When "Maya" cancels her game
     Then "jordan@uw.edu" gets an email about "Canceled"
+    And "Jordan" sees "Maya canceled Pickup 5v5" in the bell
+
+  @FR-EVT-13
+  Scenario: Changing the time tells everyone who joined
+    Given "Maya" hosts a basketball game tomorrow
+    And "Jordan" joins Maya's game
+    When "Maya" moves her game an hour later
+    Then "Jordan" has 1 on the Bell icon
+    And "Jordan" sees "Maya changed Pickup 5v5: new time" in the bell
+    And "jordan@uw.edu" gets an email about "Changed: Pickup 5v5"
+
+  @FR-EVT-13
+  Scenario: A small change doesn't send an email
+    Given "Maya" hosts a basketball game tomorrow
+    And "Jordan" joins Maya's game
+    When "Maya" changes the note of her game to "Bring water"
+    Then "Jordan" sees "Maya changed Pickup 5v5: new note" in the bell
+    And "jordan@uw.edu" gets no email about "Changed"
 
   @FR-EVT-9
   Scenario: Add a game to your calendar

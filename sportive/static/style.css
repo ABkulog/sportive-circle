@@ -94,16 +94,15 @@ small { font-size: .82rem; }
 .band > h2:first-child, .band > .section-head:first-child { margin-top: 0; }
 .band > h2:first-child { font-size: 1.05rem; }
 section.band > .section-title:first-child { margin-top: 0; }
-/* What's new (notifications on your screen) */
-.whats-new { margin: 0 0 14px; padding: 12px 14px; border-radius: var(--radius); background: var(--accent-soft); }
-.whats-new-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-.whats-new-head h2 { margin: 0; font-size: .95rem; }
-.whats-new-head a { font-size: .8rem; font-weight: 600; padding: 8px 0; }
-.whats-new ul { list-style: none; margin: 6px 0 0; padding: 0; }
-.whats-new li + li { border-top: 1px solid var(--line); }
-.whats-new li a { display: flex; align-items: center; gap: 8px; padding: 9px 0; color: var(--text); font-weight: 600; }
-.whats-new li a:hover { text-decoration: none; }
-.whats-new-go { margin-left: auto; color: var(--muted); font-size: 1.2rem; }
+/* The bell page */
+.bell-list { list-style: none; margin: 0; padding: 0; }
+.bell-list li + li { border-top: 1px solid var(--line); }
+.bell-item { display: flex; gap: 12px; align-items: flex-start; padding: 13px 4px; color: var(--muted); }
+.bell-item:hover { text-decoration: none; }
+.bell-item.is-new { color: var(--text); font-weight: 600; }
+.bell-emoji { flex: none; width: 24px; text-align: center; }
+.bell-text { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.bell-text small { font-weight: 400; font-size: .8rem; }
 /* Notification settings */
 .notif-table { width: 100%; border-collapse: collapse; }
 .notif-table th, .notif-table td { padding: 11px 4px; border-bottom: 1px solid var(--line); text-align: center; }
@@ -135,6 +134,9 @@ body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: 
   border-radius: 50%; color: var(--text); }
 .top-icons a:hover { background: var(--surface); text-decoration: none; }
 .top-icons .count-dot { position: absolute; top: 4px; right: 2px; }
+/* On narrow phones the icons need the room: show just the paw logo (4 icons below 370px, 5 for admins below 412px). */
+@media (max-width: 370px) { body.has-app-nav .topbar .brand > span { display: none; } }
+@media (max-width: 412px) { .topbar-inner.five-icons .brand > span { display: none; } }
 .nav { display: flex; align-items: center; gap: 16px; }
 .nav a, .nav .link-button { color: var(--text); font-weight: 600; font-size: .95rem; }
 .nav form { margin: 0; }
