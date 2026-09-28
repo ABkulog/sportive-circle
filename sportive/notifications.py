@@ -167,7 +167,8 @@ def _count(kind, me):
         marks = ", ".join("?" for _ in sports)
         return db.execute(
             f"""SELECT COUNT(*) FROM events e
-                WHERE e.is_quick = 1 AND e.cancelled = 0 AND e.ends_at >= ? AND e.host_id != ? AND e.id > ?
+                WHERE e.is_quick = 1 AND e.is_private = 0 AND e.cancelled = 0 AND e.ends_at >= ? AND e.host_id != ?
+                  AND e.id > ?
                   AND (e.max_players IS NULL
                        OR e.extra_players + (SELECT COUNT(*) FROM rsvps x WHERE x.event_id = e.id) < e.max_players)
                   AND e.sport IN ({marks})

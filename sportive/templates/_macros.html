@@ -25,42 +25,56 @@
   </fieldset>
 {% endmacro %}
 
-{% macro game_options(form, event=None, friends=None) %}
-  {# Private game, format (regular / team vs team) and reserved spots: the same on New event and Need players.
-     forms.js shows the password only for private games and the sizes that fit the chosen sport. #}
-  <label class="toggle">
-    <input type="checkbox" name="is_private" value="1" {% if form.get('is_private') %}checked{% endif %} data-private-toggle>
-    <span>Private game <em>(joining needs a password; friends you reserve spots for don't)</em></span>
-  </label>
-  <label class="field" data-private-field {% if not form.get('is_private') %}hidden{% endif %}><span>Password</span>
-    <input name="password" maxlength="30" value="{{ form.get('password', '') }}" placeholder="4 to 30 characters"
-           autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-  {% if event %}
-    {% if event.team_size %}<p class="muted">Format: {{ event.team_size }}v{{ event.team_size }} team vs team.</p>{% endif %}
-  {% else %}
-    {% set sizes = SPORT_TEAM_SIZES.get(form.get('sport', ''), []) %}
-    <label class="field" data-team-field {% if not sizes %}hidden{% endif %}><span>Format</span>
-      <select name="team_size" data-team-size>
-        <option value="">Regular game</option>
-        {% for n in sizes %}<option value="{{ n }}" {% if form.get('team_size')|string == n|string %}selected{% endif %}>{{ n }}v{{ n }} team vs team</option>{% endfor %}
-      </select>
-      <small class="muted">Team vs team: you bring your team, another group challenges you.</small></label>
-    <details class="fold reserve-fold" {% if form.getlist('reserve') %}open{% endif %}>
-      <summary>Reserve spots for friends <span class="muted">· held 30 min while they say yes</span></summary>
-      {% if friends %}
-        <ul class="pick-list">
-          {% for f in friends %}
-            <li><label class="pick-row">
-              <input type="checkbox" name="reserve" value="{{ f.id }}" {% if f.id|string in form.getlist('reserve') %}checked{% endif %}>
-              {{ avatar(f.id, f.full_name, f.avatar_updated, 32) }}<span>{{ f.full_name }}</span>
-            </label></li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="muted"><a href="{{ url_for('social.friends') }}">Add friends</a> first, then you can reserve spots for them.</p>
-      {% endif %}
-    </details>
-  {% endif %}
+{# ---- Create / edit a game. forms.js shows each part only when it makes sense:
+   data-show="public"  -> "Anyone can join" games      data-show="private" -> private games
+   data-show="crowd"   -> public, regular games (Need players: "we have / we need")
+   data-show="regular" -> not team vs team (max players)
+   Hidden parts are also switched off, so they're never sent. ---- #}
+{% macro who_can_join(form) %}
+  {% set private = form.get('is_private') %}
+  <fieldset class="field">
+    <legend>Who can join?</legend>
+    <div class="segmented" role="radiogroup" aria-label="Who can join">
+      <label><input type="radio" name="is_private" value="" {% if not private %}checked{% endif %}><span>Anyone</span></label>
+      <label><input type="radio" name="is_private" value="1" {% if private %}checked{% endif %}><span>🔒 Private</span></label>
+    </div>
+  </fieldset>
+  <label class="field" data-show="private" {% if not private %}hidden{% endif %}><span>Password</span>
+    <input name="password" maxlength="30" value="{{ form.get('password', '') }}" autocomplete="off" autocapitalize="off"
+           spellcheck="false" {% if not private %}disabled{% endif %}>
+    <small class="muted">Friends you invite don't need it. You can share it after.</small></label>
+{% endmacro %}
+
+{% macro format_field(form) %}
+  {% set sizes = SPORT_TEAM_SIZES.get(form.get('sport', ''), []) %}
+  <label class="field" data-show="public" data-team-field {% if not sizes or form.get('is_private') %}hidden{% endif %}><span>Format</span>
+    <select name="team_size" data-team-size>
+      <option value="">Regular game</option>
+      {% for n in sizes %}<option value="{{ n }}" {% if form.get('team_size')|string == n|string %}selected{% endif %}>{{ n }}v{{ n }} team vs team</option>{% endfor %}
+    </select>
+    <small class="muted">Team vs team: your team plays a group that challenges you.</small></label>
+{% endmacro %}
+
+{% macro friends_picker(form, friends) %}
+  {% set private = form.get('is_private') %}
+  <details class="fold reserve-fold" {% if form.getlist('reserve') %}open{% endif %}>
+    <summary>
+      <span data-show="public" {% if private %}hidden{% endif %}>Reserve spots for friends <span class="muted">· held 30 min</span></span>
+      <span data-show="private" {% if not private %}hidden{% endif %}>Invite friends <span class="muted">· no password needed</span></span>
+    </summary>
+    {% if friends %}
+      <ul class="pick-list">
+        {% for f in friends %}
+          <li><label class="pick-row">
+            <input type="checkbox" name="reserve" value="{{ f.id }}" {% if f.id|string in form.getlist('reserve') %}checked{% endif %}>
+            {{ avatar(f.id, f.full_name, f.avatar_updated, 32) }}<span>{{ f.full_name }}</span>
+          </label></li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted"><a href="{{ url_for('social.friends') }}">Add friends</a> first.</p>
+    {% endif %}
+  </details>
 {% endmacro %}
 
 {% macro select(name, label, options, current, placeholder=None) %}

@@ -80,6 +80,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-PRIV-1 | New events and Need players posts can be private: a lock in the list, and joining needs the host's password (shown to the host and players). Wrong passwords are limited to 10 an hour. | Must | ✅ |
 | FR-PRIV-2 | Friends the host invites to a private game don't need the password. | Must | ✅ |
 | FR-PRIV-3 | In a private game, friends other players want to bring are requests with a note; the host approves or declines. | Should | ✅ |
+| FR-PRIV-4 | Creating a game asks "Who can join? Anyone / Private". Private shows a ready-made password and "Invite friends", and hides what doesn't fit (we have / we need, skill level, team vs team, reserving). Its game page has a Share invite button (link + password) and Invite friends. Private Need players posts don't go to the top of everyone's feed. | Must | ✅ |
 | FR-TEAM-1 | Team vs team ("Format", on New event and Need players), only in sizes that fit the sport (e.g. basketball 2v2-5v5, none for running): the host's party is one team, another group challenges as the other team. Nobody walks in alone. | Should | ✅ |
 
 ### Badges (BADGE)

@@ -57,41 +57,50 @@
   updateTip();
 })();
 
-// Private game: the password box shows only when "Private game" is on.
-// Format: only the team sizes that make sense for the chosen sport (none for running, hiking...). A team
-// game's size sets the number of players, so "Max players" hides.
+// Who can join / Format: show only what makes sense (see the data-show notes in _macros.html).
+// Hidden parts are switched off too, so their values are never sent and can't block the form.
 (function () {
   const form = document.querySelector("form[data-sport-form]");
   if (!form) return;
-  const privateToggle = form.querySelector("[data-private-toggle]");
-  const passwordField = form.querySelector("[data-private-field]");
-  if (privateToggle && passwordField) {
-    const update = () => {
-      passwordField.hidden = !privateToggle.checked;
-      passwordField.querySelector("input").required = privateToggle.checked;
-    };
-    privateToggle.addEventListener("change", update);
-    update();
-  }
+  const card = form.closest(".card") || document;
+  const privateRadio = form.querySelector('input[name="is_private"][value="1"]');
   const teamSize = form.querySelector("[data-team-size]");
-  const regularOnly = form.querySelectorAll("[data-regular-only]");  // max players / "we have, we need"
+  const teamField = form.querySelector("[data-team-field]");
+  const sport = form.querySelector('select[name="sport"]');
   const rulesElement = document.getElementById("sport-rules");
-  if (teamSize && rulesElement) {
-    const rules = JSON.parse(rulesElement.textContent);
-    const sport = form.querySelector('select[name="sport"]');
-    const field = form.querySelector("[data-team-field]");
-    const regular = teamSize.options[0];
-    const updateSizes = () => {
-      const sizes = (rules[sport.value] && rules[sport.value].teams) || [];
-      const current = teamSize.value;
-      teamSize.replaceChildren(regular, ...sizes.map((n) => new Option(`${n}v${n} team vs team`, n, false, String(n) === current)));
-      if (!sizes.map(String).includes(current)) teamSize.value = "";
-      if (field) field.hidden = sizes.length === 0;
-      updateMax();
-    };
-    const updateMax = () => regularOnly.forEach((element) => { element.hidden = Boolean(teamSize.value); });
-    sport.addEventListener("change", updateSizes);
-    teamSize.addEventListener("change", updateMax);
-    updateSizes();
+  const rules = rulesElement ? JSON.parse(rulesElement.textContent) : {};
+  const regularOption = teamSize ? teamSize.options[0] : null;
+
+  function updateSizes() {
+    if (!teamSize) return;
+    const sizes = (rules[sport.value] && rules[sport.value].teams) || [];
+    const current = teamSize.value;
+    teamSize.replaceChildren(regularOption,
+      ...sizes.map((n) => new Option(`${n}v${n} team vs team`, n, false, String(n) === current)));
+    if (!sizes.map(String).includes(current)) teamSize.value = "";
   }
+
+  function apply() {
+    const isPrivate = Boolean(privateRadio && privateRadio.checked);
+    if (isPrivate && teamSize) teamSize.value = "";  // team vs team is for open games
+    const isTeam = teamSize ? Boolean(teamSize.value) : form.hasAttribute("data-team-game");
+    const on = { public: !isPrivate, private: isPrivate, crowd: !isPrivate && !isTeam, regular: !isTeam };
+    card.querySelectorAll("[data-show]").forEach((element) => {
+      const show = element.dataset.show.split(" ").every((rule) => on[rule]);
+      element.hidden = !show;
+      element.querySelectorAll("input, select, textarea").forEach((input) => { input.disabled = !show; });
+    });
+    if (teamField) {
+      const sizes = (rules[sport.value] && rules[sport.value].teams) || [];
+      if (!sizes.length) { teamField.hidden = true; teamSize.disabled = true; }
+    }
+    const password = form.querySelector('input[name="password"]');
+    if (password) password.required = isPrivate;
+  }
+
+  form.querySelectorAll('input[name="is_private"]').forEach((radio) => radio.addEventListener("change", apply));
+  if (teamSize) teamSize.addEventListener("change", apply);
+  if (sport) sport.addEventListener("change", () => { updateSizes(); apply(); });
+  updateSizes();
+  apply();
 })();

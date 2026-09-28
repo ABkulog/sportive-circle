@@ -109,7 +109,8 @@ def party_up(event_id):
                     flash(f"Asked {event['host_name'].split()[0]}. Your friends get the invite once they say yes.",
                           "success")
                 else:
-                    flash(f"Reserved! Their spot{'s are' if len(chosen) > 1 else ' is'} held for 30 minutes.",
+                    flash("Invites sent." if event["is_private"] else
+                          f"Reserved! Their spot{'s are' if len(chosen) > 1 else ' is'} held for 30 minutes.",
                           "celebrate")
                 return redirect(url_for("events.detail", event_id=event_id))
             flash(error, "error")

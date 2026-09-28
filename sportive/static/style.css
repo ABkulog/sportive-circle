@@ -93,6 +93,8 @@ small { font-size: .82rem; }
 .band > h2:first-child { font-size: 1.05rem; }
 section.band > .section-title:first-child { margin-top: 0; }
 /* Parties, private games, team vs team */
+.share-box { display: grid; gap: 10px; margin-top: 10px; padding: 14px; border-radius: var(--radius); background: var(--accent-soft); }
+.share-box p { margin: 0; }
 .invite-box { display: grid; gap: 8px; padding: 14px; border-radius: var(--radius); background: var(--accent-soft); }
 .invite-box .action-pair { margin-top: 4px; }
 .password { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; margin-right: 8px; }

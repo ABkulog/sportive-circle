@@ -86,6 +86,8 @@ def event_title(event):
     sport = SPORTS[event["sport"]]
     if event["cancelled"] or from_db(event["ends_at"]) < now_local():
         return f"{sport} pickup game"
+    if event["is_private"]:
+        return f"Private {sport.lower()} game"
     if event["team_size"]:
         return f"{sport} {event['team_size']}v{event['team_size']}: challenge us"
     left = spots_left(event)
@@ -157,7 +159,21 @@ def read_game_options(form, sport, event=None):
         team_size = int(team_raw)
     if event is not None and team_size and team_size not in sizes:
         return 0, "", None, f"A {team_size}v{team_size} game can't be changed to {SPORTS[sport]}."
+    if is_private and team_size:
+        return 0, "", None, "Team vs team is for games anyone can join. Pick Anyone, or a regular game."
     return is_private, password, team_size, None
+
+
+def suggested_password():
+    """A private game's password, filled in for the host (they can change it): easy to say out loud."""
+    return f"dawgs{secrets.randbelow(9000) + 1000}"
+
+
+def created_message(is_private, reserve, public_text):
+    if is_private:
+        return "Your private game is up! Share the invite or invite friends below." if not reserve else \
+            "Your private game is up! Your friends got an invite. Share it with anyone else below."
+    return public_text + (" Your friends' spots are held for 30 minutes." if reserve else "")
 
 
 def read_reservations(form, room):
@@ -238,7 +254,10 @@ def feed():
     # "Need players" posts starting soon (any sport) go in their own strip at the top.
     need_players = [
         e for e in query_events(
-            ["e.cancelled = 0", "e.is_quick = 1", "e.ends_at >= :now", "e.starts_at <= :soon", NOT_BLOCKED],
+            ["e.cancelled = 0", "e.is_quick = 1", "e.ends_at >= :now", "e.starts_at <= :soon", NOT_BLOCKED,
+             # a private post isn't a call to everyone: only its players and invited friends see it up top
+             "(e.is_private = 0 OR EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"
+             " OR EXISTS (SELECT 1 FROM invites i WHERE i.event_id = e.id AND i.guest_id = :me AND i.status = 'pending'))"],
             {"now": to_db(now), "soon": to_db(now + QUICK_WINDOW)},
             limit=10,
         )
@@ -267,7 +286,7 @@ def read_event_form(form, event=None):
     title = one_line(form.get("title"))
     sport = form.get("sport", "")
     location = form.get("location", "")
-    skill_level = form.get("skill_level", "")
+    skill_level = form.get("skill_level") or "All levels"  # not asked for private games
     note = form.get("note", "").strip()
     max_raw = form.get("max_players", "").strip()
     now = now_local()
@@ -360,13 +379,13 @@ def create():
             reserve, error = read_reservations(form, room)
         if error is None:
             event_id = insert_event(data, reserve)
-            flash("Your game is up!" + (" Your friends' spots are held for 30 minutes." if reserve else ""),
-                  "celebrate")
+            flash(created_message(data["is_private"], reserve, "Your game is up!"), "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))
         flash(error, "error")
     else:
         starts, ends = default_times()
         form = MultiDict({"starts_at": starts, "ends_at": ends, "skill_level": "All levels",
+                          "password": suggested_password(),
                           "sport": request.args.get("sport", "") or (club["sport"] if club else "")})
     return render_template("events/form.html", form=form, event=None, club=club, friends=friends_of(g.user["id"]),
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"))
@@ -514,12 +533,13 @@ def tell_players_it_was_cancelled(event):
 @login_required
 def quick():
     form = request.form if request.method == "POST" else MultiDict(
-        {"starts_in": "30", "duration": "60", "needed": "2", "have": "1", "skill_level": "All levels"})
+        {"starts_in": "30", "duration": "60", "needed": "2", "have": "1", "skill_level": "All levels",
+         "password": suggested_password()})
     if request.method == "POST":
         error = None
         sport = form.get("sport", "")
         location = form.get("location", "")
-        skill_level = form.get("skill_level", "")
+        skill_level = form.get("skill_level") or "All levels"  # not asked for private games
         note = form.get("note", "").strip()
         starts_in = dict(QUICK_START_OPTIONS).get(_int(form.get("starts_in")))
         duration = dict(QUICK_DURATIONS).get(_int(form.get("duration")))
@@ -529,6 +549,8 @@ def quick():
             read_game_options(form, sport) if sport in SPORTS else (0, "", None, None))
         if team_size:  # team vs team: your team against a group that challenges you
             have, needed = 1, 2 * team_size - 1
+        elif is_private and sport in SPORTS:  # friends only: no "we have / we need", just the sport's max
+            have, needed = 1, SPORT_MAX_PLAYERS[sport] - 1
 
         if sport not in SPORTS:
             error = "Please choose a sport."
@@ -554,6 +576,8 @@ def quick():
         reserve = []
         if error is None:
             reserve, error = read_reservations(form, team_size - 1 if team_size else needed)
+            if error and is_private:
+                error = error.replace("reserve", "invite")
 
         if error is None:
             starts = round_up_5(now_local() + timedelta(minutes=_int(form.get("starts_in"))))
@@ -566,8 +590,7 @@ def quick():
                 "max_players": have + needed, "extra_players": have - 1, "note": note, "is_quick": 1,
                 "is_private": is_private, "password": password, "team_size": team_size,
             }, reserve)
-            flash("Posted! It's at the top of everyone's feed."
-                  + (" Your friends' spots are held for 30 minutes." if reserve else ""), "celebrate")
+            flash(created_message(is_private, reserve, "Posted! It's at the top of everyone's feed."), "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))
         flash(error, "error")
     return render_template("events/quick.html", form=form, start_options=QUICK_START_OPTIONS,

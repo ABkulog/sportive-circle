@@ -110,23 +110,27 @@
   });
 
   // Share: the phone's share sheet (GroupMe, iMessage, Instagram...), or copy the link on a laptop.
+  // data-share-text (e.g. a private game's invite with its password) is sent along with the link.
   document.querySelectorAll("[data-share-url]").forEach((button) => {
     const label = button.querySelector("[data-share-label]");
+    const original = label ? label.textContent : "";
     button.addEventListener("click", async () => {
       const url = button.dataset.shareUrl;
       const title = button.dataset.shareTitle || document.title;
+      const text = button.dataset.shareText || `${title} on Sportive Circle`;
       if (navigator.share) {
-        try { await navigator.share({ title, text: `${title} on Sportive Circle`, url }); } catch (e) { /* closed */ }
+        try { await navigator.share({ title, text, url }); } catch (e) { /* closed */ }
         return;
       }
+      const copy = button.dataset.shareText ? `${text}\n${url}` : url;
       try {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(copy);
         if (label) {
           label.textContent = "Copied!";
-          setTimeout(() => { label.textContent = "Share"; }, 2000);
+          setTimeout(() => { label.textContent = original; }, 2000);
         }
       } catch (e) {
-        window.prompt("Copy this link:", url);
+        window.prompt("Copy this:", copy);
       }
     });
   });

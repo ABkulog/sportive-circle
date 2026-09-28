@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% from "_macros.html" import select, game_options %}
+{% from "_macros.html" import select, who_can_join, format_field, friends_picker %}
 {% block title %}{{ 'Edit event' if event else 'New event' }}{% endblock %}
 {% block content %}
 <div class="card form-card">
   <h1>{{ 'Edit event' if event else 'Create event' }}</h1>
   {% if club %}<p class="club-banner">For <strong>{{ club.name }}</strong>. Open to all levels.</p>{% endif %}
-  <form method="post" class="form" data-sport-form>
+  <form method="post" class="form" data-sport-form {% if event and event.team_size %}data-team-game{% endif %}>
     {{ csrf_field() }}
     {% if club %}<input type="hidden" name="club" value="{{ club.id }}">{% endif %}
     <label class="field"><span>Event name</span>
@@ -13,7 +13,7 @@
     <div class="row">
       {{ select('sport', 'Sport', SPORTS.items(), form.get('sport', ''), 'Choose a sport') }}
       {% if not club and not (event and event.club_id) %}
-      <label class="field"><span>Skill level</span>
+      <label class="field" data-show="public" {% if form.get('is_private') %}hidden{% endif %}><span>Skill level</span>
         <select name="skill_level">
           {% for level in SKILL_LEVELS %}<option value="{{ level }}" {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
         </select>
@@ -33,13 +33,19 @@
       <label class="field"><span>Ends</span>
         <input name="ends_at" type="datetime-local" value="{{ form.get('ends_at', '') }}" required></label>
     </div>
-    {{ game_options(form, event, friends) }}
+    {{ who_can_join(form) }}
+    {% if event %}
+      {% if event.team_size %}<p class="muted">Format: {{ event.team_size }}v{{ event.team_size }} team vs team.</p>{% endif %}
+    {% else %}
+      {{ format_field(form) }}
+      {{ friends_picker(form, friends) }}
+    {% endif %}
     {% set team_game = event.team_size if event else form.get('team_size') %}
     {% set has_extras = form.get('max_players') or form.get('note') %}
     <details class="fold more-options" {% if has_extras %}open{% endif %}>
       <summary>More options <span class="muted">· max players, note</span></summary>
       <div class="form">
-      <label class="field" {% if team_game %}hidden{% endif %} data-regular-only><span>Max players, including you</span>
+      <label class="field" {% if team_game %}hidden{% endif %} data-show="regular"><span>Max players, including you</span>
         <input name="max_players" type="number" min="2" value="{{ form.get('max_players', '') }}" placeholder="Pick a sport first">
         <small class="muted" data-max-hint></small></label>
       <label class="field"><span>Note</span>

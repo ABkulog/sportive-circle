@@ -1,13 +1,15 @@
 {% extends "base.html" %}
 {% from "_macros.html" import avatar %}
-{% block title %}{{ 'Challenge' if challenge else 'Reserve spots' }}{% endblock %}
+{% block title %}{{ 'Challenge' if challenge else ('Invite friends' if event.is_private else 'Reserve spots') }}{% endblock %}
 {% block content %}
 <a class="back-link" href="{{ url_for('events.detail', event_id=event.id) }}">← Back</a>
 <div class="card form-card">
-  <h1>{{ 'Challenge with your team' if challenge else 'Reserve spots for friends' }}</h1>
+  <h1>{{ 'Challenge with your team' if challenge else ('Invite friends' if event.is_private else 'Reserve spots for friends') }}</h1>
   <p class="muted">{{ event_title(event) }} · {{ event.starts_at|when }}</p>
   {% if host_ok %}
-    <p class="muted">Pick friends to bring. {{ event.host_name.split()[0] }} says yes first, then their spots are held for 30 min.</p>
+    <p class="muted">Pick friends to bring. {{ event.host_name.split()[0] }} says yes first.</p>
+  {% elif event.is_private %}
+    <p class="muted">They get an invite and join without the password.</p>
   {% else %}
   <p class="muted">
     {% if joining_now %}You join now, and{% else %}Pick friends.{% endif %}
@@ -30,7 +32,7 @@
         <label class="field"><span>Note for {{ event.host_name.split()[0] }} <em>(it's a private game, so they say yes first)</em></span>
           <input name="note" maxlength="{{ max_note }}" placeholder="My roommate, he's good"></label>
       {% endif %}
-      <button class="btn btn-block btn-large">{{ 'Ask ' ~ event.host_name.split()[0] if host_ok and not joining_now else ('Join + reserve' if joining_now else 'Reserve') }}</button>
+      <button class="btn btn-block btn-large">{{ 'Ask ' ~ event.host_name.split()[0] if host_ok and not joining_now else ('Join + reserve' if joining_now else ('Invite' if event.is_private else 'Reserve')) }}</button>
     </form>
   {% else %}
     <p>None of your friends can be invited to this one yet.</p>

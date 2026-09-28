@@ -2489,7 +2489,7 @@ def test_private_game_host_approves_friends_players_bring(accounts, client, app)
     assert client.post(f"/events/{game}/requests/{ids['Kim']}/approve").status_code == 403
 
 
-def test_team_invites_go_to_the_right_team_and_private_teams_cant_be_challenged(accounts, client, app):
+def test_team_invites_go_to_the_right_team_and_private_games_arent_team_games(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Mo", "Max", "Solo")
     _friends(app, ids["Maya"], ids["Mo"])
     _friends(app, ids["Mo"], ids["Max"])
@@ -2503,11 +2503,10 @@ def test_team_invites_go_to_the_right_team_and_private_teams_cant_be_challenged(
     with app.app_context():
         teams = dict(get_db().execute("SELECT user_id, team FROM rsvps WHERE event_id = ?", (game,)).fetchall())
     assert teams == {ids["Maya"]: 1, ids["Mo"]: 1, ids["Max"]: 1}
-    _as(accounts, "Maya")
-    private = event_id_from(client.post("/events/new", data=event_form(team_size="2", is_private="1",
-                                                                        password="secret1", title="Private 2v2")))
-    _as(accounts, "Solo")
-    assert b"Ask the host to invite you" in client.get(f"/events/{private}/party", follow_redirects=True).data
+    _as(accounts, "Maya")   # private + team vs team made no sense (nobody could be the other team)
+    private_team = client.post("/events/new", data=event_form(team_size="2", is_private="1", password="secret1",
+                                                               title="Private 2v2"), follow_redirects=True).data
+    assert b"Team vs team is for games anyone can join" in private_team
 
 
 def test_host_reserves_spots_while_creating_a_game(accounts, client, app):
@@ -2579,3 +2578,46 @@ def test_players_and_hosts_both_see_reserve_spots(accounts, client, app):
     assert "Join + reserve spots for friends" in client.get(f"/events/{game}").data.decode()  # not in yet
     client.post(f"/events/{game}/join")
     assert ">Reserve spots</a>" in client.get(f"/events/{game}").data.decode()        # a player
+
+
+def test_create_page_only_shows_what_makes_sense(accounts, client, app):
+    """Feedback: "why do I need Reserve spots or 'We have' for a private game?" Private hides them."""
+    ids = _people(accounts, app, "Maya", "Jordan", "Sam")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _as(accounts, "Maya")
+    for page in ("/events/new", "/need-players"):
+        html = client.get(page).data.decode()
+        assert "Who can join?" in html and ">Anyone<" in html and "🔒 Private" in html
+        assert re.search(r'name="password"[^>]*disabled|value="dawgs\d{4}"', html)   # ready-made, off until Private
+        assert 'data-show="private"' in html and "Invite friends" in html and "Reserve spots for friends" in html
+    quick = client.get("/need-players").data.decode()
+    assert re.search(r'data-show="crowd"[^>]*>\s*<label class="field"><span>We have', quick)
+    # A private Need players post: no "we have / we need" or skill level sent, and that's fine.
+    game = event_id_from(client.post("/need-players", data={
+        "sport": "soccer", "location": "Denny Field", "starts_in": "15", "duration": "60",
+        "is_private": "1", "password": "dawgs1234", "reserve": [ids["Jordan"]]}))
+    with app.app_context():
+        row = get_db().execute("SELECT max_players, extra_players, skill_level FROM events WHERE id = ?", (game,)).fetchone()
+        assert tuple(row) == (22, 0, "All levels")
+    page = client.get(f"/events/{game}").data.decode()
+    assert "Private soccer game" in page and "Share invite" in page and "Password: dawgs1234" in page  # in the invite text
+    # Not a call to everyone: strangers don't get it up top or as a Need players notification.
+    _as(accounts, "Sam")
+    feed = client.get("/?scope=all").data.decode()
+    happening_soon = feed.split('id="now"')[1].split("</nav>")[0] if 'id="now"' in feed else ""
+    assert f"/events/{game}" not in happening_soon
+    assert f"/events/{game}" in feed and "🔒 Private" in feed                           # listed, with a lock
+    assert "Need players" not in client.get("/notifications").data.decode()
+    assert "Share invite" not in client.get(f"/events/{game}").data.decode()              # not a player
+    # Jordan was invited: joins with one tap, no password.
+    _as(accounts, "Jordan")
+    assert b"You&#39;re in" in client.post(f"/events/{game}/invite/answer", data={"answer": "yes"},
+                                            follow_redirects=True).data
+
+
+def test_new_private_event_needs_no_skill_level(accounts, client):
+    accounts.signup()
+    data = event_form(is_private="1", password="dawgs1234")
+    del data["skill_level"]                     # hidden (and switched off) for private games
+    response = client.post("/events/new", data=data, follow_redirects=True).data.decode()
+    assert "Your private game is up!" in response and "Share invite" in response
