@@ -2163,3 +2163,29 @@ def test_legal_pages_never_show_an_admins_personal_email(client, app):
         assert "someone.personal@uw.edu" not in client.get(path).data.decode()
     app.config["CONTACT_EMAIL"] = "sportivecircle.app@gmail.com"
     assert "sportivecircle.app@gmail.com" in client.get("/privacy").data.decode()
+
+
+def test_signup_survives_the_email_service_failing(client, app, monkeypatch):
+    """Brevo down or misconfigured: a clear message and an immediate retry, never a crash."""
+    from sportive import auth
+
+    def broken(*args, **kwargs):
+        raise OSError("535 Authentication failed")
+    monkeypatch.setattr(auth, "send_email", broken)
+    app.config["CONTACT_EMAIL"] = "sportivecircle@gmail.com"
+    response = client.post("/signup", data={
+        "full_name": "Dubs Husky", "email": "dubs@uw.edu", "password": "purple-and-gold",
+        "password2": "purple-and-gold", "birth_date": "2005-01-15"}, follow_redirects=True)
+    page = response.data.decode()
+    assert response.status_code == 200 and "couldn&#39;t send the email" in page and "sportivecircle@gmail.com" in page
+    monkeypatch.setattr(auth, "send_email", lambda *a, **k: True)          # email works again
+    page = client.post("/verify/resend", follow_redirects=True).data.decode()
+    assert "We sent you a new code" in page                                # no 1-minute wait to retry
+
+
+def test_forgot_password_survives_the_email_service_failing(accounts, client, monkeypatch):
+    from sportive import auth
+    accounts.signup()
+    accounts.logout()
+    monkeypatch.setattr(auth, "send_email", lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
+    assert client.post("/forgot", data={"email": "dubs@uw.edu"}, follow_redirects=True).status_code == 200

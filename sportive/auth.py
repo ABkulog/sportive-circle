@@ -122,9 +122,21 @@ def send_verification_email(email, code, purpose="signup"):
         body = (f"Welcome, Husky! Your Sportive Circle verification code is {code}.\n"
                 f"It expires in {minutes} minutes.\n\n"
                 "If you didn't sign up, you can ignore this email.")
-    if not send_email(email, subject, body):
+    try:
+        sent = send_email(email, subject, body)
+    except Exception:  # the email service refused or is down: say so instead of crashing
+        log.exception("Couldn't send a code email to %s", email)
+        # Let them ask for a new code right away (no 1-minute wait for an email that never went out).
+        get_db().execute("UPDATE users SET verify_sent_at = NULL WHERE email = ?", (email,))
+        get_db().commit()
+        contact = current_app.config.get("CONTACT_EMAIL")
+        flash("We couldn't send the email just now. Wait a minute, then ask for a new code."
+              + (f" If it keeps happening, email {contact}." if contact else ""), "error")
+        return False
+    if not sent:
         # Local development: no email server, so show the code instead.
         flash(f"Dev mode (no email server set up): your code is {code}", "info")
+    return True
 
 
 def code_recently_sent(email):
