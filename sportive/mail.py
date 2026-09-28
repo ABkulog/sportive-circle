@@ -107,12 +107,14 @@ def describe_settings(cfg):
 
 @click.command("check-email")
 @click.argument("to", required=False)
+@click.option("--admins", is_flag=True, help="Send a test email to every address in ADMIN_EMAILS.")
 @with_appcontext
-def check_email_command(to):
-    """Test the email settings: log in to the email service, and optionally send a test email.
+def check_email_command(to, admins):
+    """Test the email settings: log in to the email service, and optionally send test emails.
 
         flask --app wsgi check-email                 # just test the login
-        flask --app wsgi check-email you@uw.edu      # also send a test email
+        flask --app wsgi check-email you@uw.edu      # also send a test email to you@uw.edu
+        flask --app wsgi check-email --admins        # send a test email to every admin
     """
     cfg = current_app.config
     for line in describe_settings(cfg):
@@ -132,8 +134,19 @@ def check_email_command(to):
     except OSError as error:
         click.echo(f"COULDN'T CONNECT: {error}")
         return
-    if to:
-        send_designed(to, "Sportive Circle test email", "It works! 🎉",
-                      ["Emails from Sportive Circle can be sent. This is what they look like."],
-                      reason="You're getting this because an admin tested the email settings.")
-        click.echo(f"TEST EMAIL SENT to {to} (check Junk too).")
+    recipients = [to] if to else []
+    if admins:
+        from .moderation import admin_emails  # imported here: moderation.py imports the app's blueprints
+        recipients += sorted(admin_emails())
+        if not recipients:
+            click.echo("ADMIN_EMAILS is empty, so there's nobody to send to.")
+    for address in recipients:
+        is_admin = admins and address.lower() in (a.lower() for a in recipients[1 if to else 0:])
+        send_designed(address, "Sportive Circle test email", "Emails are working! 🎉",
+                      ["This is a test from Sportive Circle. If you can read this, the app's emails (sign-up "
+                       "codes, reminders and club notices) reach your inbox."]
+                      + (["You're an admin, so you'll also see the 🛡️ icon for reports, club requests and "
+                          "suggestions."] if is_admin else []),
+                      button=("Open Sportive Circle", cfg["PUBLIC_URL"].rstrip("/")),
+                      reason="You're getting this because a Sportive Circle admin tested the email settings.")
+        click.echo(f"TEST EMAIL SENT to {address} (check Junk too).")

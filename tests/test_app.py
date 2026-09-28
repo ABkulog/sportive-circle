@@ -2372,3 +2372,32 @@ def test_every_log_out_button_asks_first(accounts, client):
         page = client.get(path).data.decode()
         forms = re.findall(r'<form[^>]*action="/logout"[^>]*>', page)
         assert forms and all('data-confirm="Log out of Sportive Circle?"' in form for form in forms), path
+
+
+def test_check_email_can_send_a_test_to_every_admin(app, monkeypatch):
+    import smtplib
+
+    class OkSMTP:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def starttls(self):
+            pass
+
+        def login(self, *args):
+            pass
+
+    monkeypatch.setattr(smtplib, "SMTP", OkSMTP)
+    app.config.update(MAIL_SERVER="smtp-relay.brevo.com", MAIL_USERNAME="x@smtp-brevo.com",
+                      MAIL_PASSWORD="xsmtpsib-" + "a" * 81, ADMIN_EMAILS="akulog@uw.edu, teammate@uw.edu")
+    output = app.test_cli_runner().invoke(args=["check-email", "--admins"]).output
+    assert "LOGIN OK" in output
+    assert "TEST EMAIL SENT to akulog@uw.edu" in output and "TEST EMAIL SENT to teammate@uw.edu" in output
+    sent = {m["to"]: m for m in app.extensions["outbox"]}
+    assert "You're an admin" in sent["teammate@uw.edu"]["body"]
