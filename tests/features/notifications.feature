@@ -7,28 +7,35 @@ Feature: Notifications
     And "Maya" and "Jordan" are friends
 
   @FR-NOTIF-1
-  Scenario: A new message shows on the Messages icon and in the bell
+  Scenario: A new message shows on the Messages icon only, not again in the bell
     When "Jordan" messages "Maya" "game tonight?"
     Then "Maya" has 1 on the Messages icon
-    And "Maya" has 1 on the Bell icon
-    And "Maya" sees "1 new message" in the bell
+    And "Maya" has 0 on the Bell icon
     When "Maya" opens her messages from "Jordan"
     Then "Maya" has 0 on the Messages icon
 
   @FR-NOTIF-2
-  Scenario: Turning off the tab icon keeps it in the bell only
-    When "Maya" turns off the tab icon for "messages"
+  Scenario: Switching off direct messages
+    When "Maya" switches off "messages" notifications
     And "Jordan" messages "Maya" "you up?"
     Then "Maya" has 0 on the Messages icon
-    And "Maya" sees "1 new message" in the bell
 
   @FR-NOTIF-2
-  Scenario: Turning everything off means no numbers and an empty bell
-    When "Maya" turns off every notification
+  Scenario: Switching everything off means no numbers and an empty bell
+    When "Maya" switches off every notification
     And "Jordan" messages "Maya" "hello"
     Then "Maya" has 0 on the Messages icon
     And "Maya" has 0 on the Bell icon
     And "Maya" has nothing in the bell
+
+  @FR-NOTIF-1
+  Scenario: A host changing a game three times is one notice, not three
+    Given "Maya" hosts a basketball game tomorrow
+    And "Jordan" joins Maya's game
+    When "Maya" changes the note of her game to "Bring water"
+    And "Maya" changes the note of her game to "Bring a ball"
+    And "Maya" changes the note of her game to "Court 3"
+    Then "Jordan" has 1 on the Bell icon
 
   @FR-NOTIF-1
   Scenario: Club updates show on the Clubs tab until you read them
@@ -48,7 +55,7 @@ Feature: Notifications
     Then "Riley" has 1 on the Clubs tab
 
   @FR-NOTIF-3
-  Scenario: New Need players posts show in the bell, not the tab, by default
+  Scenario: New Need players posts show in the bell
     When "Jordan" posts that she needs 2 more for soccer in 15 minutes
     Then "Maya" has 0 on the Home tab
     And "Maya" sees "1 new Need players post" in the bell

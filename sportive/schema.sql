@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_updated  TEXT,                          -- when the profile picture changed (NULL = none yet)
     showcase        TEXT,                          -- up to 3 badge keys shown on the profile, comma-separated
     photo_skipped   INTEGER NOT NULL DEFAULT 0,    -- 1 = chose "Add later" (don't ask again)
+    theme           TEXT NOT NULL DEFAULT 'light', -- light / dark / system (settings.THEMES)
     suspended       INTEGER NOT NULL DEFAULT 0,    -- 1 = an admin suspended the account (can't log in)
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -270,7 +271,8 @@ CREATE TABLE IF NOT EXISTS notices (
     text       TEXT NOT NULL,
     url        TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    read_at    TEXT
+    read_at    TEXT,
+    key        TEXT                   -- a newer notice with the same key replaces the older one
 );
 CREATE INDEX IF NOT EXISTS idx_notices_user ON notices(user_id, read_at);
 

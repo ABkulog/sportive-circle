@@ -7,7 +7,7 @@ from flask import Flask, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from . import (auth, clubs, db, events, feedback, mail, moderation, notifications, pages, parties, profile,
-               reminders, social, stats)
+               reminders, settings, social, stats)
 from .constants import (DEFAULT_PLAYERS, LOCATIONS, OPEN_TO, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS,
                         SPORT_MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .photos import MAX_UPLOAD_MB
@@ -81,7 +81,7 @@ def create_app(test_config=None):
     logging.basicConfig(level=logging.INFO)
 
     db.init_app(app)
-    for blueprint in (auth.bp, events.bp, parties.bp, profile.bp, social.bp, clubs.bp, moderation.bp,
+    for blueprint in (auth.bp, events.bp, parties.bp, profile.bp, settings.bp, social.bp, clubs.bp, moderation.bp,
                       notifications.bp, reminders.bp, feedback.bp):
         app.register_blueprint(blueprint)
     pages.register(app)
@@ -120,7 +120,7 @@ def _add_template_helpers(app):
         tab_badges=notifications.tab_badges, badge_text=notifications.badge_text, bell_count=notifications.bell_count,
         chat_unread=social.event_chat_unread, is_admin=moderation.is_admin,
         open_report_count=moderation.open_report_count, pending_club_count=clubs.pending_club_count,
-        is_team=moderation.is_team,
+        is_team=moderation.is_team, current_theme=settings.current_theme,
     )
     app.jinja_env.filters.update(when=fmt_when, clock=fmt_clock, relative=fmt_relative)
 

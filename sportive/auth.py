@@ -218,6 +218,8 @@ def signup():
         grad_year = form.get("grad_year", "").strip()
         birth_date = form.get("birth_date", "").strip()
         sports = [s for s in form.getlist("sports") if s in SPORTS]
+        from .settings import THEMES  # imported here: settings.py imports this module
+        theme = form.get("theme") if form.get("theme") in THEMES else "light"
 
         error = validate_signup(full_name, email, password, password2, grad_year, birth_date)
         if error is None and code_recently_sent(email):
@@ -228,11 +230,12 @@ def signup():
             db.execute("DELETE FROM users WHERE email = ? AND verified = 0", (email,))
             try:
                 cur = db.execute(
-                    "INSERT INTO users (email, password_hash, full_name, grad_year, birth_date)"
-                    " VALUES (?, ?, ?, ?, ?)",
+                    "INSERT INTO users (email, password_hash, full_name, grad_year, birth_date, theme)"
+                    " VALUES (?, ?, ?, ?, ?, ?)",
                     (email, hash_password(password), full_name,
-                     int(grad_year) if grad_year else None, birth_date),
+                     int(grad_year) if grad_year else None, birth_date, theme),
                 )
+                session["theme"] = theme  # the code page already looks the way they picked
                 set_user_sports(cur.lastrowid, sports)
                 db.commit()
             except sqlite3.IntegrityError:

@@ -822,21 +822,15 @@ def nothing_in_bell(world, name):
     assert bell_text(world, name) == ""
 
 
-@when(parsers.parse('"{name}" turns off the tab icon for "{kind}"'))
-def turn_off_badge(world, name, kind):
+@when(parsers.parse('"{name}" switches off "{kind}" notifications'))
+def switch_off(world, name, kind):
     from sportive.notifications import KINDS
-    form = {}
-    for k in KINDS:
-        if k.badge and k.key != kind:
-            form[f"{k.key}_badge"] = "1"
-        if k.screen:
-            form[f"{k.key}_screen"] = "1"
-    world.person(name).client.post("/profile/notifications", data=form)
+    world.person(name).client.post("/settings/notifications", data={k.key: "1" for k in KINDS if k.key != kind})
 
 
-@when(parsers.parse('"{name}" turns off every notification'))
-def turn_off_all(world, name):
-    world.person(name).client.post("/profile/notifications", data={})
+@when(parsers.parse('"{name}" switches off every notification'))
+def switch_off_all(world, name):
+    world.person(name).client.post("/settings/notifications", data={})
 
 
 @when(parsers.parse('"{name}" opens her messages from "{other}"'))

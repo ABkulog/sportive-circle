@@ -2,13 +2,12 @@
 {% from "_macros.html" import sport_checkboxes, avatar %}
 {% block title %}Edit profile{% endblock %}
 {% block content %}
+<a class="back-link" href="{{ url_for('profile.view', user_id=g.user.id) }}" data-back>← Profile</a>
 <div class="card form-card">
   <h1>Edit profile</h1>
   <a class="edit-photo" href="{{ url_for('profile.photo_upload') }}">
     {{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 72) }}
     <span>{{ 'Change photo' if g.user.avatar_updated else 'Add photo' }}</span></a>
-  <a class="settings-row" href="{{ url_for('notifications.notification_settings') }}">
-    <span>Notifications</span><span class="muted">›</span></a>
   <form method="post" class="form">
     {{ csrf_field() }}
     <label class="field"><span>Full name</span>
@@ -35,34 +34,9 @@
       </div>
     </fieldset>
     {{ sport_checkboxes(form) }}
-    <label class="toggle">
-      <input type="checkbox" name="email_reminders" value="1" {% if form.get('email_reminders') %}checked{% endif %}>
-      <span>Email me an hour before my games</span>
-    </label>
     <button class="btn btn-block">Save</button>
   </form>
 </div>
 
-<details class="card form-card fold" id="password">
-  <summary><strong>Change password</strong></summary>
-  <form method="post" action="{{ url_for('profile.change_password') }}" class="form">
-    {{ csrf_field() }}
-    <label class="field"><span>Current password</span>
-      <input name="current_password" type="password" autocomplete="current-password" required></label>
-    <label class="field"><span>New password <em>(at least 8 characters)</em></span>
-      <input name="password" type="password" minlength="8" autocomplete="new-password" required></label>
-    <label class="field"><span>New password (again)</span>
-      <input name="password2" type="password" minlength="8" autocomplete="new-password" required></label>
-    <button class="btn btn-block">Change password</button>
-  </form>
-</details>
-
-<form method="post" action="{{ url_for('auth.logout') }}" data-confirm="Log out of Sportive Circle?" class="card form-card center">
-  {{ csrf_field() }}<button class="btn btn-ghost btn-block">Log out</button>
-</form>
-
-<div class="card form-card danger-zone">
-  <h2>Delete my account</h2>
-  <a class="btn btn-danger-ghost" href="{{ url_for('profile.delete_account') }}">Delete my account…</a>
-</div>
+<p class="center"><a href="{{ url_for('settings.home') }}">Notifications, look, password and your account are in Settings</a></p>
 {% endblock %}

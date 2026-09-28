@@ -1,16 +1,16 @@
-"""Notifications: numbers on the tab icons, and the 🔔 bell at the top.
+"""Notifications: the 🔔 bell, and numbers on the icons.
 
-People choose, for each kind of notification, whether it shows on the tab icons, in the bell,
-both, or neither (Profile -> Edit profile -> Notifications). Nothing is ever pushed from here, so
-nobody gets spammed.
+Everything new shows up in exactly ONE place, so nothing is counted twice:
+- on its own icon when it has a home there: messages (✉️), friend requests (👥), club news (Clubs tab);
+- in the bell for everything else: invites, changes to your games, game chats, Need players posts, badges.
+
+Each kind can be switched on or off in Settings -> Notifications. Nothing is pushed or emailed from here.
 
 Two sorts of things show up:
 - counts worked out from the data (unread messages, new club updates...), and
-- notices: one-off messages saved for one person ("Maya changed the time of Sunday soccer",
-  an invite, a reminder to add a photo). Opening the bell marks them as read.
-
-"New" means newer than the last time you looked: opening Club updates clears the club number, opening
-your badges clears the badge number, and so on. Those "last looked" markers live in the seen_markers table.
+- notices: one-off messages saved for one person ("Maya changed the time of Sunday soccer", an invite,
+  a reminder to add a photo). A newer notice about the same thing replaces the older one (the `key`),
+  so a host editing a game three times means one notice, not three. Opening the bell marks them as read.
 """
 from collections import namedtuple
 from datetime import timedelta
@@ -24,24 +24,24 @@ from .timeutil import now_local, to_db
 
 bp = Blueprint("notifications", __name__)
 
-# key, emoji, what it's about, which tab/icon shows the number, default for (tab icon, bell), link text.
-# (The bell setting is stored in the "screen" column.)
-Kind = namedtuple("Kind", "key emoji label tab badge screen link")
+# key, emoji, its name in Settings, where it shows up ("bell" or an icon/tab), who it's for.
+Kind = namedtuple("Kind", "key emoji label place audience")
 
 KINDS = [
-    Kind("invites", "🙌", "Invites from friends", "home", True, True, "invite"),
-    Kind("game_updates", "📅", "Changes to games you're going to", "home", True, True, "game update"),
-    Kind("messages", "✉️", "Direct messages", "messages", True, True, "new message"),
-    Kind("friend_requests", "👥", "Friend requests", "friends", True, True, "friend request"),
-    Kind("game_chat", "💬", "Group chats of games you're going to", "home", True, True, "new message in your games' chats"),
-    Kind("need_players", "⚡", "New \"Need players\" posts for your sports", "home", False, True, "new Need players post"),
-    Kind("club_updates", "📣", "Updates from clubs you follow or joined", "clubs", True, True, "new club update"),
-    Kind("club_requests", "🙋", "People asking to join a club you run", "clubs", True, True, "person waiting to join your club"),
-    Kind("badges", "🏅", "New badges you earned", "profile", True, True, "new badge"),
-    Kind("suggestion_trends", "💡", "Suggestion topics 3+ people asked for (admins)", "admin", True, True,
-         "suggestion topic trending"),
-    Kind("account", "👤", "Tips about your account", "profile", False, True, "tip"),
+    Kind("invites", "🙌", "Invites to games", "bell", "everyone"),
+    Kind("game_updates", "📅", "Changes to games you joined", "bell", "everyone"),
+    Kind("game_chat", "💬", "New messages in your games' group chats", "bell", "everyone"),
+    Kind("need_players", "⚡", "Need players posts for your sports", "bell", "everyone"),
+    Kind("badges", "🏅", "Badges you earn", "bell", "everyone"),
+    Kind("account", "👤", "Tips about your account", "bell", "everyone"),
+    Kind("messages", "✉️", "Direct messages", "messages", "everyone"),
+    Kind("friend_requests", "👥", "Friend requests", "friends", "everyone"),
+    Kind("club_updates", "📣", "Updates from your clubs", "clubs", "everyone"),
+    Kind("club_requests", "🙋", "People asking to join your club", "clubs", "officers"),
+    Kind("suggestion_trends", "💡", "Suggestion topics 3+ people bring up", "admin", "admins"),
 ]
+PLACE_NAMES = {"bell": "the 🔔 bell", "messages": "the ✉️ icon", "friends": "the 👥 icon", "clubs": "the Clubs tab",
+               "admin": "the 🛡️ icon"}
 NOTICE_KINDS = ("invites", "game_updates", "account")  # saved as notices (the rest are counted)
 NOTICE_DAYS = 30  # the bell shows notices from the last month
 KIND_BY_KEY = {kind.key: kind for kind in KINDS}
@@ -51,20 +51,18 @@ TABS = ("home", "clubs", "profile", "messages", "friends", "admin")
 # ---------------------------------------------------------------- settings
 
 def settings(user_id):
-    """{kind: {"badge": bool, "screen": bool}}: the defaults, plus whatever this person changed."""
-    chosen = {row["kind"]: row for row in get_db().execute(
+    """{kind: on?} Everything is on unless this person switched it off. (Older rows stored two switches,
+    "badge" and "screen"; either one on counts as on.)"""
+    chosen = {row["kind"]: bool(row["badge"] or row["screen"]) for row in get_db().execute(
         "SELECT kind, badge, screen FROM notification_settings WHERE user_id = ?", (user_id,))}
-    return {kind.key: {"badge": bool(chosen[kind.key]["badge"]) if kind.key in chosen else kind.badge,
-                       "screen": bool(chosen[kind.key]["screen"]) if kind.key in chosen else kind.screen}
-            for kind in KINDS}
+    return {kind.key: chosen.get(kind.key, True) for kind in KINDS}
 
 
 def save_settings(user_id, form):
     db = get_db()
     db.executemany(
         "INSERT OR REPLACE INTO notification_settings (user_id, kind, badge, screen) VALUES (?, ?, ?, ?)",
-        [(user_id, kind.key, 1 if form.get(f"{kind.key}_badge") else 0, 1 if form.get(f"{kind.key}_screen") else 0)
-         for kind in KINDS])
+        [(user_id, kind.key, 1 if form.get(kind.key) else 0, 1 if form.get(kind.key) else 0) for kind in KINDS])
     db.commit()
 
 
@@ -130,11 +128,15 @@ def _since(user_id, kind):
 
 # ---------------------------------------------------------------- notices
 
-def notify(user_id, kind, text, url):
-    """Save a notice for one person (shown in their bell). The caller commits."""
+def notify(user_id, kind, text, url, key=None):
+    """Save a notice for one person (shown in their bell). A notice with the same `key` (e.g. "change:7" for
+    game 7) replaces the older one, so the bell never repeats itself. The caller commits."""
     assert kind in NOTICE_KINDS, kind
-    get_db().execute("INSERT INTO notices (user_id, kind, text, url, created_at) VALUES (?, ?, ?, ?, ?)",
-                     (user_id, kind, text, url, to_db(now_local())))
+    db = get_db()
+    if key:
+        db.execute("DELETE FROM notices WHERE user_id = ? AND key = ?", (user_id, key))
+    db.execute("INSERT INTO notices (user_id, kind, text, url, created_at, key) VALUES (?, ?, ?, ?, ?, ?)",
+               (user_id, kind, text, url, to_db(now_local()), key))
 
 
 def recent_notices(user_id):
@@ -198,59 +200,52 @@ def _count(kind, me):
 
 
 def counts():
-    """{kind: how many new} for the logged-in person (computed once per page)."""
+    """{kind: how many new} for the logged-in person, for the kinds they have on (once per page)."""
     if "notification_counts" not in g:
         g.notification_counts = {}
         if g.get("user") is not None:
             chosen = settings(g.user["id"])
-            for kind in KINDS:
-                if chosen[kind.key]["badge"] or chosen[kind.key]["screen"]:
-                    g.notification_counts[kind.key] = _count(kind.key, g.user["id"])
-            g.notification_settings = chosen
+            g.notification_counts = {kind.key: _count(kind.key, g.user["id"]) for kind in KINDS if chosen[kind.key]}
     return g.notification_counts
 
 
 def tab_badges():
-    """{tab: number to show on its icon}, only counting the kinds this person wants on their icons."""
+    """{tab: number on its icon}: only the kinds that live on that icon (never the bell's)."""
     totals = dict.fromkeys(TABS, 0)
-    found = counts()
-    for kind in KINDS:
-        if found.get(kind.key) and g.notification_settings[kind.key]["badge"]:
-            totals[kind.tab] += found[kind.key]
+    for key, n in counts().items():
+        place = KIND_BY_KEY[key].place
+        if place != "bell":
+            totals[place] += n
     return totals
 
 
-LINKS = {
-    "messages": ("social.inbox", {}), "friend_requests": ("social.friends", {}),
-    "game_chat": ("events.my_events", {}), "need_players": ("events.feed", {"_anchor": "now"}),
-    "club_updates": ("clubs.updates", {}), "club_requests": ("clubs.directory", {"mine": 1}),  # officers' club cards show who's waiting
-    "badges": ("profile.badge_locker", {}),
-    "suggestion_trends": ("feedback.admin_suggestions", {}),
-}
+def bell_count():
+    """The number on the bell: only the kinds that live in the bell."""
+    return sum(n for key, n in counts().items() if KIND_BY_KEY[key].place == "bell")
 
 
 def bell_items():
-    """[(emoji, text, url)] for the bell: counted kinds this person wants in the bell (notices are listed
-    one by one on the bell page instead)."""
+    """[(emoji, text, url)] for what's counted rather than saved as notices: game chats (one line per game),
+    Need players posts and badges. Written as sentences."""
+    found = counts()
     items = []
-    found = counts()
-    for kind in KINDS:
-        n = found.get(kind.key)
-        if n and g.notification_settings[kind.key]["screen"] and kind.key not in NOTICE_KINDS:
-            endpoint, values = LINKS[kind.key]
-            text = f"{n} {kind.link}{'' if n == 1 else 's'}".replace("persons", "people")
-            if kind.key == "game_chat" and n != 1:
-                text = f"{n} new messages in your games' chats"
-            if kind.key == "suggestion_trends":
-                text = "1 suggestion topic is trending" if n == 1 else f"{n} suggestion topics are trending"
-            items.append((kind.emoji, text, url_for(endpoint, **values)))
+    if found.get("game_chat"):
+        from .events import event_title, query_events  # imported here because events.py imports this module
+        unread = event_chat_unread()
+        games = {e["id"]: e for e in query_events([f"e.id IN ({', '.join(str(int(i)) for i in unread)})"])} if unread else {}
+        for event_id, n in sorted(unread.items(), key=lambda item: -item[1]):
+            if event_id in games and n:
+                items.append(("💬", f"{n} new message{'s' if n != 1 else ''} in {event_title(games[event_id])}",
+                              url_for("social.event_chat", event_id=event_id)))
+    if found.get("need_players"):
+        n = found["need_players"]
+        items.append(("⚡", f"{n} new Need players post{'s' if n != 1 else ''} for your sports",
+                      url_for("events.feed", _anchor="now")))
+    if found.get("badges"):
+        n = found["badges"]
+        items.append(("🏅", "You earned a new badge" if n == 1 else f"You earned {n} new badges",
+                      url_for("profile.badge_locker")))
     return items
-
-
-def bell_count():
-    """The number on the bell: everything new this person wants in the bell."""
-    found = counts()
-    return sum(n for key, n in found.items() if g.notification_settings[key]["screen"])
 
 
 def badge_text(n):
@@ -263,9 +258,9 @@ def badge_text(n):
 @login_required
 def bell():
     me = g.user["id"]
-    items, notices = bell_items(), recent_notices(me)
     chosen = settings(me)
-    notices = [notice for notice in notices if chosen[notice["kind"]]["screen"]]
+    items = bell_items()
+    notices = [notice for notice in recent_notices(me) if chosen[notice["kind"]]]
     db = get_db()
     db.execute("UPDATE notices SET read_at = ? WHERE user_id = ? AND read_at IS NULL", (to_db(now_local()), me))
     db.commit()
@@ -273,19 +268,30 @@ def bell():
     return render_template("notifications/bell.html", items=items, notices=notices, kinds=KIND_BY_KEY)
 
 
-# ---------------------------------------------------------------- settings page
+# ---------------------------------------------------------------- Settings -> Notifications
 
-@bp.route("/profile/notifications", methods=("GET", "POST"))
+def kinds_for(user_id):
+    """The kinds this person can get (club requests only for officers, trends only for admins)."""
+    from .moderation import is_admin
+    is_officer = get_db().execute(
+        "SELECT 1 FROM club_members WHERE user_id = ? AND role = 'officer' LIMIT 1", (user_id,)).fetchone() is not None
+    return [kind for kind in KINDS if kind.audience == "everyone" or (kind.audience == "officers" and is_officer)
+            or (kind.audience == "admins" and is_admin())]
+
+
+@bp.route("/settings/notifications", methods=("GET", "POST"))
 @login_required
 def notification_settings():
     me = g.user["id"]
     if request.method == "POST":
         save_settings(me, request.form)
-        flash("Notification settings saved.", "success")
-        return redirect(url_for("notifications.notification_settings"))
-    is_officer = get_db().execute(
-        "SELECT 1 FROM club_members WHERE user_id = ? AND role = 'officer' LIMIT 1", (me,)).fetchone() is not None
-    from .moderation import is_admin
-    kinds = [kind for kind in KINDS
-             if (kind.key != "club_requests" or is_officer) and (kind.key != "suggestion_trends" or is_admin())]
-    return render_template("profile/notifications.html", kinds=kinds, chosen=settings(me))
+        flash("Saved.", "success")
+        return redirect(url_for("settings.home"))
+    return render_template("settings/notifications.html", kinds=kinds_for(me), chosen=settings(me),
+                           places=PLACE_NAMES)
+
+
+@bp.route("/profile/notifications")
+@login_required
+def old_notification_settings():
+    return redirect(url_for("notifications.notification_settings"))

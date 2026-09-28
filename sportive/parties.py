@@ -144,7 +144,7 @@ def send_party(event, chosen, team, joining_now, note=""):
             if mine:  # I was invited myself: that invite is answered now
                 db.execute("UPDATE invites SET status = 'accepted' WHERE id = ?", (mine["id"],))
                 notify(mine["inviter_id"], "invites", f"{first} is in for {title}.",
-                       url_for("events.detail", event_id=event["id"]))
+                       url_for("events.detail", event_id=event["id"]), key=f"reply:{event['id']}:{me}")
         link = url_for("events.detail", event_id=event["id"])
         if not ask_host:
             hold_spots(event["id"], me, chosen, team,
@@ -159,7 +159,7 @@ def send_party(event, chosen, team, joining_now, note=""):
                 f"SELECT full_name FROM users WHERE id IN ({', '.join('?' for _ in chosen)})", chosen)]
             notify(event["host_id"], "invites",
                    f"{first} wants to bring {', '.join(names)} to {title}" + (f": “{note}”" if note else "."),
-                   url_for("events.detail", event_id=event["id"]) + "#requests")
+                   url_for("events.detail", event_id=event["id"]) + "#requests", key=f"request:{event['id']}:{me}")
         db.commit()
     except Exception:
         db.rollback()
@@ -183,7 +183,7 @@ def answer_invite(event_id):
         db.execute("UPDATE invites SET status = 'declined' WHERE id = ?", (invite["id"],))
         notify(invite["inviter_id"], "invites",
                f"{g.user['full_name'].split()[0]} can't make {event_title(event)}.",
-               url_for("events.detail", event_id=event_id))
+               url_for("events.detail", event_id=event_id), key=f"reply:{event_id}:{g.user['id']}")
         db.commit()
         flash("No worries. Your spot is free for someone else.", "info")
     return redirect(url_for("events.detail", event_id=event_id))
@@ -206,7 +206,8 @@ def answer_request(event_id, guest_id, action):
     link = url_for("events.detail", event_id=event_id)
     if action == "decline":
         db.execute("UPDATE invites SET status = 'declined' WHERE id = ?", (request_row["id"],))
-        notify(request_row["inviter_id"], "invites", f"{host_first} can't fit {guest_first} into {title}.", link)
+        notify(request_row["inviter_id"], "invites", f"{host_first} can't fit {guest_first} into {title}.", link,
+               key=f"reply:{event_id}:{guest_id}")
         db.commit()
         flash("Declined.", "info")
         return redirect(link + "#requests")
@@ -222,8 +223,10 @@ def answer_request(event_id, guest_id, action):
                    (to_db(now_local() + HOLD_TIME), request_row["id"]))
         inviter = db.execute("SELECT full_name FROM users WHERE id = ?", (request_row["inviter_id"],)).fetchone()
         notify(guest_id, "invites",
-               f"{inviter['full_name'].split()[0]} wants you in {title} ({fmt_when(event['starts_at'])}). You down?", link)
-        notify(request_row["inviter_id"], "invites", f"{host_first} said yes to {guest_first} for {title}.", link)
+               f"{inviter['full_name'].split()[0]} wants you in {title} ({fmt_when(event['starts_at'])}). You down?", link,
+               key=f"invite:{event_id}")
+        notify(request_row["inviter_id"], "invites", f"{host_first} said yes to {guest_first} for {title}.", link,
+               key=f"reply:{event_id}:{guest_id}")
         db.commit()
     except Exception:
         db.rollback()

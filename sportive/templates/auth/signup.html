@@ -24,6 +24,15 @@
         <input name="grad_year" type="number" min="1950" max="{{ current_year + 8 }}" value="{{ form.get('grad_year', '') }}" placeholder="{{ current_year + 3 }}"></label>
     </div>
     {{ sport_checkboxes(form) }}
+    <fieldset class="field">
+      <legend>Look <em>(change it anytime in Settings)</em></legend>
+      <div class="segmented" role="radiogroup" aria-label="Look">
+        {% for key, label in [('light', 'Light'), ('dark', 'Dark'), ('system', 'Match my phone')] %}
+          <label><input type="radio" name="theme" value="{{ key }}" data-theme-choice
+                        {% if form.get('theme', 'light') == key %}checked{% endif %}><span>{{ label }}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
     <p class="muted fine-print">By signing up you agree to the <a href="{{ url_for('terms') }}" target="_blank">Terms</a>
       and <a href="{{ url_for('privacy') }}" target="_blank">Privacy</a> page.</p>
     <button class="btn btn-block">Sign up</button>

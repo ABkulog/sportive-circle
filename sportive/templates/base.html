@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="en">
+{% set theme = current_theme() %}
+<html lang="en" data-theme="{{ theme }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -11,7 +12,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml">
   <meta name="theme-color" content="#4b2e83">
-  <meta name="color-scheme" content="light only">
+  <meta name="color-scheme" content="{{ {'light': 'light', 'dark': 'dark', 'system': 'light dark'}[theme] }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
   <meta name="apple-mobile-web-app-title" content="Sportive Circle">
   {# Search engines and link previews (iMessage, Instagram, GroupMe). The canonical link keeps Google on the
@@ -79,12 +80,13 @@
       {{ tab(url_for('events.feed'), 'home', 'Home', ep in ('events.feed', 'index', 'events.my_events', 'events.detail'), nav_badges.home) }}
       {{ tab(url_for('clubs.directory'), 'clubs', 'Clubs', ep.startswith('clubs.') and ep not in ('clubs.create', 'clubs.review_queue'), nav_badges.clubs) }}
       {{ tab(url_for('create_menu'), 'plus', 'Create', ep in ('create_menu', 'events.create', 'events.quick', 'clubs.create'), extra_class='tab-create') }}
-      {{ tab(url_for('profile.view', user_id=g.user.id), 'user', 'Profile', (ep.startswith('profile.') or ep == 'notifications.notification_settings') and (ep != 'profile.view' or request.view_args.get('user_id') == g.user.id), nav_badges.profile) }}
+      {{ tab(url_for('profile.view', user_id=g.user.id), 'user', 'Profile', (ep.startswith('profile.') or ep.startswith('settings.') or ep == 'notifications.notification_settings') and (ep != 'profile.view' or request.view_args.get('user_id') == g.user.id), nav_badges.profile) }}
       <div class="side-only side-extra">
         {{ tab(url_for('notifications.bell'), 'bell', 'Notifications', ep == 'notifications.bell', bell_count()) }}
         {{ tab(url_for('social.inbox'), 'send', 'Messages', ep == 'social.inbox' or ep == 'social.thread', nav_badges.messages) }}
         {{ tab(url_for('social.friends'), 'friends', 'Friends', ep == 'social.friends', nav_badges.friends) }}
         {{ tab(url_for('faq'), 'help', 'FAQ', ep in ('faq', 'how_it_works')) }}
+        {{ tab(url_for('settings.home'), 'sliders', 'Settings', ep.startswith('settings.') or ep == 'notifications.notification_settings') }}
         {% if is_admin() %}
           {{ tab(url_for('moderation.admin_reports'), 'shield', 'Reports', ep.startswith('moderation.admin'), open_report_count()) }}
           {{ tab(url_for('clubs.review_queue'), 'flag', 'Club requests', ep == 'clubs.review_queue', pending_club_count()) }}

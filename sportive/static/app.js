@@ -150,6 +150,11 @@
     });
   });
 
+  // Look (light / dark / match my phone): try it right away, before saving.
+  document.querySelectorAll("input[data-theme-choice]").forEach((radio) => {
+    radio.addEventListener("change", () => { document.documentElement.dataset.theme = radio.value; });
+  });
+
   // <button data-print>: print the page (e.g. a club's QR code for a flyer).
   document.querySelectorAll("[data-print]").forEach((button) => button.addEventListener("click", () => window.print()));
 

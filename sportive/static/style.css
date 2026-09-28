@@ -27,10 +27,61 @@
 
   --success: #1f7a4a;
   --danger: #c0352b;
+  --header: #4b2e83;           /* the top bar and the landing band */
+  --heading: #1e1e1e;
+  --on-accent: #ffffff;        /* text on a purple button */
 
   --radius: 10px;
   --display: "Encode Sans Condensed", "Arial Narrow", system-ui, sans-serif;
   --font: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+/* Dark mode (Settings -> Look). "Match my phone" follows the phone's own setting. The header stays Husky Purple. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --purple: #b9a3e8;           /* purple text and links need to be lighter on a dark page */
+  --purple-strong: #d9ccf5;
+  --gold-light: #2e2918;
+  --gold-text: #cdbd92;
+  --accent: #b9a3e8;
+  --accent-soft: #262035;
+  --bg: #15121c;
+  --surface: #211c2b;
+  --line: #342d42;
+  --band: #0f0d14;
+  --tile: #1b1724;
+  --text: #ece9f2;
+  --muted: #a8a2b4;
+  --faint: #6f687c;
+  --success: #6fd49c;
+  --danger: #ff8a80;
+  --header: #32006e;
+  --heading: #f4f1f9;
+  --on-accent: #1a0f33;       /* text on a (light purple) button */
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    color-scheme: dark;
+    --purple: #b9a3e8;           /* purple text and links need to be lighter on a dark page */
+    --purple-strong: #d9ccf5;
+    --gold-light: #2e2918;
+    --gold-text: #cdbd92;
+    --accent: #b9a3e8;
+    --accent-soft: #262035;
+    --bg: #15121c;
+    --surface: #211c2b;
+    --line: #342d42;
+    --band: #0f0d14;
+    --tile: #1b1724;
+    --text: #ece9f2;
+    --muted: #a8a2b4;
+    --faint: #6f687c;
+    --success: #6fd49c;
+    --danger: #ff8a80;
+    --header: #32006e;
+    --heading: #f4f1f9;
+    --on-accent: #1a0f33;       /* text on a (light purple) button */
+  }
 }
 
 /* ============================== Base ============================== */
@@ -46,7 +97,7 @@ body {
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 h1, h2, h3 { line-height: 1.2; margin: 0 0 .5rem; }
-h1 { font-family: var(--display); font-weight: 800; font-size: 1.6rem; letter-spacing: .005em; color: #1e1e1e; }
+h1 { font-family: var(--display); font-weight: 800; font-size: 1.6rem; letter-spacing: .005em; color: var(--heading); }
 h2 { font-size: 1.05rem; font-weight: 700; }
 h3 { font-size: .95rem; font-weight: 700; }
 p { margin: 0 0 .75rem; }
@@ -93,7 +144,7 @@ section.band > .section-title:first-child { margin-top: 0; }
 .outside-field { max-width: 200px; }
 .player-math { margin: 0; padding: 10px 12px; border-radius: var(--radius); background: var(--gold-light);
   font-weight: 600; font-size: .92rem; color: var(--purple-strong); }
-.player-math.is-over { background: #fbe9e7; color: var(--danger); }
+.player-math.is-over { background: color-mix(in srgb, var(--danger) 14%, var(--bg)); color: var(--danger); }
 .remove-player { display: inline; margin-left: auto; }
 .remove-player .link-button { color: var(--muted); font-size: .85rem; padding: 6px 0; }
 .share-box { display: grid; gap: 10px; margin-top: 10px; padding: 14px; border-radius: var(--radius); background: var(--accent-soft); }
@@ -114,6 +165,27 @@ section.band > .section-title:first-child { margin-top: 0; }
 .pick-row input { width: 20px; height: 20px; flex: none; accent-color: var(--accent); }
 
 /* The bell page */
+.bell-dot { flex: none; width: 9px; height: 9px; margin: 6px 0 0 auto; border-radius: 50%; background: var(--purple); }
+/* Settings */
+.settings-list { margin-bottom: 18px; }
+.settings-list .settings-row { margin: 0; border-top: 0; }
+.settings-list .settings-row:first-child { border-top: 1px solid var(--line); }
+.settings-row small { display: block; font-weight: 400; }
+.settings-group { padding: 16px 0; border-top: 1px solid var(--line); }
+.settings-group h2 { margin: 0 0 10px; }
+/* On/off switches (Settings -> Notifications): a real checkbox, drawn as a switch. */
+.switch-list { list-style: none; margin: 0; padding: 0; }
+.switch-list li + li { border-top: 1px solid var(--line); }
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; cursor: pointer; }
+.switch-text { display: grid; gap: 1px; font-weight: 600; }
+.switch-text small { font-weight: 400; }
+.switch { appearance: none; -webkit-appearance: none; flex: none; width: 46px; height: 28px; margin: 0; border-radius: 999px;
+  background: var(--line); position: relative; cursor: pointer; transition: background .15s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / .3); transition: transform .15s; }
+.switch:checked { background: var(--purple); }
+.switch:checked::after { transform: translateX(18px); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bell-list { list-style: none; margin: 0; padding: 0; }
 .bell-list li + li { border-top: 1px solid var(--line); }
 .bell-item { display: flex; gap: 12px; align-items: flex-start; padding: 13px 4px; color: var(--muted); }
@@ -137,7 +209,7 @@ section.band > .section-title:first-child { margin-top: 0; }
 
 /* ============================== Top bar (phones) & logo ============================== */
 /* Like washington.edu: a purple header with a Husky Gold line under it. */
-.topbar { position: sticky; top: 0; z-index: 30; background: var(--purple); border-bottom: 4px solid var(--gold); }
+.topbar { position: sticky; top: 0; z-index: 30; background: var(--header); border-bottom: 4px solid var(--gold); }
 .topbar-inner { max-width: 640px; margin: 0 auto; padding: 0 12px 0 16px; height: 56px;
   display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .brand { font-family: var(--display); font-weight: 800; font-size: 1.3rem; letter-spacing: .01em;
@@ -211,7 +283,7 @@ body.hide-tabs { padding-bottom: 0; }
 /* ============================== Buttons & small controls ============================== */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 9px 16px; border: 0; border-radius: 10px; background: var(--purple); color: #fff;
+  padding: 9px 16px; border: 0; border-radius: 10px; background: var(--purple); color: var(--on-accent);
   font: 650 .95rem/1.2 var(--font); text-decoration: none; cursor: pointer; white-space: nowrap;
 }
 .btn:hover { background: var(--purple-strong); text-decoration: none; }
@@ -242,7 +314,7 @@ body.hide-tabs { padding-bottom: 0; }
 /* chips & tags: quiet, neutral */
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
   background: var(--surface); color: var(--text); font-size: .88rem; border: 0; }
-.chip.is-on { background: var(--purple); color: #fff; }
+.chip.is-on { background: var(--purple); color: var(--on-accent); }
 .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .badge { display: inline-block; font-size: .72rem; font-weight: 600; padding: 2px 8px; border-radius: 6px;
   background: var(--surface); color: var(--muted); white-space: nowrap; }
@@ -381,7 +453,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: .85; }
   position: absolute; left: 0; top: 0; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
 .chip-check span, .choice-pill span { display: inline-block; padding: 8px 13px; border-radius: 999px; cursor: pointer;
   background: var(--surface); border: 1px solid var(--line); font-size: .9rem; user-select: none; }
-.chip-check input:checked + span, .choice-pill input:checked + span { background: var(--purple); border-color: var(--purple); color: #fff; }
+.chip-check input:checked + span, .choice-pill input:checked + span { background: var(--purple); border-color: var(--purple); color: var(--on-accent); }
 .chip-check input:focus-visible + span, .choice-pill input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .social-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 .hint { margin: 0; font-size: .85rem; color: var(--muted); text-align: center; }
@@ -614,7 +686,7 @@ form[data-wizard] .form-step { display: none; }
   display: grid; place-items: center; color: var(--accent); font-weight: 700; font-size: .8rem; }
 .chat-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .chat-bubble { background: var(--surface); border-radius: 18px; padding: 8px 12px; min-width: 0; }
-.chat-msg.is-mine .chat-bubble { background: var(--purple); color: #fff; }
+.chat-msg.is-mine .chat-bubble { background: var(--purple); color: var(--on-accent); }
 .chat-bubble p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .chat-name { display: block; font-size: .72rem; font-weight: 600; color: var(--muted); }
 .chat-bubble time { display: block; font-size: .66rem; opacity: .65; margin-top: 2px; text-align: right; }
@@ -644,7 +716,7 @@ form[data-wizard] .form-step { display: none; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0 10px; }
 /* Landing hero: UW purple with gold, the one big splash of color in the app. */
 .husky-hero { margin: -16px -16px 0; padding: 36px 20px 28px; color: #fff; border-radius: 0;
-  background: var(--purple); border-bottom: 6px solid var(--gold); }
+  background: var(--header); border-bottom: 6px solid var(--gold); }
 .husky-hero .eyebrow { color: var(--gold); }
 .husky-hero h1 { color: #fff; text-transform: uppercase; letter-spacing: .01em; }
 .husky-hero .gold { color: var(--gold); }
@@ -659,7 +731,7 @@ form[data-wizard] .form-step { display: none; }
 .how-strip li { display: grid; justify-items: center; text-align: center; gap: 2px; padding: 14px 6px;
   border-radius: var(--radius); background: var(--surface); }
 .how-strip li span { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
-  background: var(--purple); color: #fff; font-weight: 800; margin-bottom: 4px; }
+  background: var(--purple); color: var(--on-accent); font-weight: 800; margin-bottom: 4px; }
 .how-strip strong { font-size: .92rem; }
 .how-strip small { color: var(--muted); font-size: .76rem; line-height: 1.25; }
 .features { display: grid; gap: 0; margin: 28px 0; }
@@ -678,7 +750,7 @@ form[data-wizard] .form-step { display: none; }
 .faq summary { font-weight: 600; }
 .faq details p { margin: 8px 0 0; color: var(--muted); }
 .how-cta { text-align: center; padding: 28px 0 8px; }
-.step-number { background: var(--purple); color: #fff; }
+.step-number { background: var(--purple); color: var(--on-accent); }
 .step, .step:hover { color: var(--text); text-decoration: none; }
 .how-cta p { margin-top: 14px; }
 /* Privacy & Terms */

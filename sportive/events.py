@@ -596,7 +596,8 @@ def tell_players_it_changed(event, data):
     title, host = data["title"] if not event["is_quick"] else event_title(event), event["host_name"].split()[0]
     link = url_for("events.detail", event_id=event["id"])
     for player in players:
-        notify(player["id"], "game_updates", f"{host} changed {title}: {', '.join(changes)}", link)
+        notify(player["id"], "game_updates", f"{host} changed {title}: {', '.join(changes)}", link,
+               key=f"change:{event['id']}")
     if any(change.startswith(("new time", "new place")) for change in changes):
         for player in players:
             try:
@@ -621,7 +622,7 @@ def tell_players_it_was_cancelled(event):
     for player in players:
         # Links to the feed: if the host deleted their account, the game's page is gone too.
         notify(player["id"], "game_updates", f"{event['host_name'].split()[0]} canceled {title} ({when})",
-               url_for("events.feed"))
+               url_for("events.feed"), key=f"change:{event['id']}")
     get_db().commit()
     for player in players:
         try:
@@ -799,7 +800,7 @@ def try_join(event, password=None, team=None):
     if invite:
         db.execute("UPDATE invites SET status = 'accepted' WHERE id = ?", (invite["id"],))
         notify(invite["inviter_id"], "invites", f"{g.user['full_name'].split()[0]} is in for {event_title(event)}.",
-               url_for("events.detail", event_id=event["id"]))
+               url_for("events.detail", event_id=event["id"]), key=f"reply:{event['id']}:{me}")
     db.commit()
     return True, "You're in! See you there."
 
@@ -915,7 +916,7 @@ def remove_player(event_id, user_id):
     cur = db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, user_id))
     if cur.rowcount:
         notify(user_id, "game_updates", f"{g.user['full_name'].split()[0]} took you off {event_title(event)}.",
-               url_for("events.feed"))
+               url_for("events.feed"), key=f"change:{event_id}")
     db.commit()
     flash("Removed from the game." if cur.rowcount else "They're not in this game.", "info")
     return redirect(url_for("events.detail", event_id=event_id))

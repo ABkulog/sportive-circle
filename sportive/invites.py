@@ -49,7 +49,7 @@ def hold_spots(event_id, inviter, friend_ids, team, message, link):
                                                             expires_at)
                             VALUES (?, ?, ?, ?, 'pending', ?, ?)""",
                          (event_id, inviter, friend_id, team, now_param(), expires))
-        notify(friend_id, "invites", message, link)
+        notify(friend_id, "invites", message, link, key=f"invite:{event_id}")
 
 
 def pending_invites(event_id):

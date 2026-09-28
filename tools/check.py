@@ -61,7 +61,8 @@ def logged_in(app, password, email=None):
 # ------------------------------------------------------------------ 3. link crawl
 
 START = ["/", "/how-it-works", "/faq", "/privacy", "/terms", "/clubs", "/create", "/me/events", "/friends",
-         "/friends?q=ma", "/messages", "/profile/edit", "/profile/badges", "/profile/notifications", "/notifications", "/profile/photo",
+         "/friends?q=ma", "/messages", "/profile/edit", "/profile/badges", "/profile/notifications", "/settings/notifications", "/settings", "/settings/password", "/notifications",
+         "/profile/photo",
          "/clubs/updates", "/admin/reports", "/admin/clubs", "/u/1", "/u/2", "/events/new", "/need-players", "/events/1/party", "/events/2/party", "/clubs/1/share", "/clubs/1/qr.svg",
          "/clubs/new", "/signup", "/login", "/forgot", "/suggestions", "/admin/suggestions",
          "/admin/suggestions?kind=bug"]
@@ -158,7 +159,9 @@ FIELDS = {
     "/admin/clubs/1/reject": ["note"],
     "/profile/photo/remove": [],
     "/suggestions": ["kind", "body", "anonymous"],
-    "/profile/notifications": ["messages_badge", "messages_screen", "badges_badge", "club_updates_screen", "bogus_kind_badge"],
+    "/settings/notifications": ["messages", "invites", "badges", "club_updates", "bogus_kind"],
+    "/settings/look": ["theme"],
+    "/settings/reminders": ["email_reminders"],
     "/admin/users/3/suspend": [],
 }
 

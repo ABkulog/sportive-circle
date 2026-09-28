@@ -45,4 +45,3 @@ Feature: Suggestions
     Then "Admin" has 0 on the Admin icon
     When "Sam" sends the suggestion "We need badminton"
     Then "Admin" has 1 on the Admin icon
-    And "Admin" sees "1 suggestion topic is trending" in the bell

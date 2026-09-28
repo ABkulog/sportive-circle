@@ -445,7 +445,7 @@ def test_reminder_opt_out(accounts, client, app, monkeypatch):
     sent = []
     monkeypatch.setattr(reminders, "send_email", lambda to, subject, body, **kwargs: sent.append(to))
     _reminder_setup(accounts, client, app, joined_minutes_before=120)
-    client.post("/profile/edit", data={"full_name": "Player"})  # reminders box left unchecked
+    client.post("/settings/reminders", data={})  # Settings: the reminders switch turned off
     with app.app_context():
         reminders.send_due_reminders()
     assert sent == ["host@uw.edu"]
@@ -2125,13 +2125,15 @@ def test_admins_are_only_notified_about_topics_3_people_mention(accounts, client
                 client.post("/suggestions", data={"kind": "idea", "body": "more pickleball times"})
         accounts.logout()
         accounts.login(email="boss@uw.edu")
-        page = client.get("/notifications").data.decode()
-        assert ("1 suggestion topic is trending" in page) == (i == 2), i   # quiet until the third person
+        page = client.get("/faq").data.decode()   # the number is on the admin (shield) icon
+        shield = re.search(r'title="Admin">.*?</a>', page, re.S).group(0)
+        assert ('<span class="count-dot">1</span>' in shield) == (i == 2), i   # quiet until the third person
         accounts.logout()
     accounts.login(email="boss@uw.edu")
     admin_page = client.get("/admin/suggestions").data.decode()
     assert "<strong>badminton</strong> · 3 people" in admin_page and "<strong>pickleball</strong>" not in admin_page
-    assert "1 suggestion topic is trending" not in client.get("/notifications").data.decode()   # seen: no more
+    shield = re.search(r'title="Admin">.*?</a>', client.get("/faq").data.decode(), re.S).group(0)
+    assert "count-dot" not in shield                                                            # seen: no more
     topic_page = client.get("/admin/suggestions?topic=badminton").data.decode()
     assert "Can we get badminton" in topic_page and "more pickleball" not in topic_page
     assert "Suggestions</a>" in client.get("/terms").data.decode()      # footer link on every page
@@ -2487,7 +2489,9 @@ def test_private_game_host_approves_friends_players_bring(accounts, client, app)
     assert "You down?" not in client.get(f"/events/{game}").data.decode()
     _as(accounts, "Sam")
     bell = client.get("/notifications").data.decode()
-    assert "Maya said yes to John" in bell and "Maya can&#39;t fit Kim into Hoops" in bell
+    # About John: "Maya said yes" was replaced by the newer "John is in" (one line per person, no repeats).
+    assert "John is in for Hoops" in bell and "Maya said yes to John" not in bell
+    assert "Maya can&#39;t fit Kim into Hoops" in bell
     _as(accounts, "Kim")                                    # only the host answers requests
     assert client.post(f"/events/{game}/requests/{ids['Kim']}/approve").status_code == 403
 
@@ -2827,3 +2831,49 @@ def test_search_engines_and_link_previews(client, app):
     sitemap = client.get("/sitemap.xml")
     assert sitemap.mimetype == "application/xml"
     assert b"<loc>https://sportivecircle.com/clubs</loc>" in sitemap.data and b"/faq</loc>" in sitemap.data
+
+
+def test_settings_page_is_separate_from_edit_profile(accounts, client, app):
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    assert ">Settings</a>" in client.get(f"/u/{me}").data.decode()
+    page = client.get("/settings").data.decode()
+    for part in ("Edit profile", "Notifications", "Change password", "Look", "Email me an hour before", "Log out",
+                 "Delete my account"):
+        assert part in page, part
+    edit = client.get("/profile/edit").data.decode()
+    assert "Change password" not in edit and "email_reminders" not in edit and "Delete my account" not in edit
+    client.post("/settings/reminders", data={})                       # switch reminder emails off
+    client.post("/profile/edit", data={"full_name": "Dubs Husky"})    # editing the profile doesn't touch them
+    with app.app_context():
+        assert get_db().execute("SELECT email_reminders FROM users WHERE id = ?", (me,)).fetchone()[0] == 0
+    assert client.get("/profile/notifications").headers["Location"].endswith("/settings/notifications")
+
+
+def test_dark_mode_from_sign_up_and_settings(accounts, client, app):
+    page = client.get("/signup").data.decode()
+    assert 'name="theme" value="dark"' in page and "Match my phone" in page
+    accounts.signup()                                       # signed up with the default look
+    assert 'data-theme="light"' in client.get("/").data.decode()
+    client.post("/settings/look", data={"theme": "dark"})
+    assert 'data-theme="dark"' in client.get("/").data.decode()
+    client.post("/settings/look", data={"theme": "neon"})   # nonsense is ignored
+    assert 'data-theme="dark"' in client.get("/").data.decode()
+    accounts.logout()
+    client.post("/signup", data={"full_name": "Night Owl", "email": "owl@uw.edu", "password": "purple-and-gold",
+                                 "password2": "purple-and-gold", "birth_date": "2005-01-15", "theme": "system"})
+    with app.app_context():
+        assert get_db().execute("SELECT theme FROM users WHERE email = 'owl@uw.edu'").fetchone()[0] == "system"
+    assert 'data-theme="system"' in client.get("/verify").data.decode()   # the code page already matches
+
+
+def test_each_notification_shows_in_one_place(accounts, client, app):
+    """Feedback: notifications repeated (a message on the Messages icon AND in the bell)."""
+    from sportive.notifications import KINDS
+    places = {kind.key: kind.place for kind in KINDS}
+    assert places["messages"] == "messages" and places["friend_requests"] == "friends"
+    assert places["invites"] == "bell" and places["club_updates"] == "clubs"
+    accounts.signup()
+    settings = client.get("/settings/notifications").data.decode()
+    assert settings.count('class="switch"') == 9          # club requests (officers) and trends (admins) hidden
+    assert "Shows on the ✉️ icon" in settings and "Shows on the 🔔 bell" in settings

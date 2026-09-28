@@ -105,7 +105,7 @@ def photo_skip():
     db.execute("UPDATE users SET photo_skipped = 1 WHERE id = ?", (g.user["id"],))
     # One reminder in the bell, instead of a banner on every page.
     notify(g.user["id"], "account", "Add a profile photo so people know who they're playing with.",
-           url_for("profile.photo_upload"))
+           url_for("profile.photo_upload"), key="tip:photo")
     db.commit()
     destination = session.pop("after_photo", None)
     return redirect(safe_next(destination) if destination else url_for("events.feed"))
@@ -206,7 +206,6 @@ def edit():
         grad_year = form.get("grad_year", "").strip()
         bio = form.get("bio", "").strip()
         sports = [s for s in form.getlist("sports") if s in SPORTS]
-        email_reminders = 1 if form.get("email_reminders") else 0
         pronouns = one_line(form.get("pronouns"))
         gender = form.get("gender", "")
         socials = {key: one_line(form.get(key)).lstrip("@") for key in PERSON_SOCIALS}
@@ -232,11 +231,11 @@ def edit():
         if error is None:
             db = get_db()
             db.execute("""UPDATE users SET full_name = :full_name, grad_year = :grad_year, bio = :bio,
-                              email_reminders = :email_reminders, pronouns = :pronouns, gender = :gender,
+                              pronouns = :pronouns, gender = :gender,
                               instagram = :instagram, snapchat = :snapchat, tiktok = :tiktok, x_handle = :x_handle
                           WHERE id = :id""",
                        {"full_name": full_name, "grad_year": int(grad_year) if grad_year else None, "bio": bio,
-                        "email_reminders": email_reminders, "pronouns": pronouns, "gender": gender, **socials,
+                        "pronouns": pronouns, "gender": gender, **socials,
                         "id": me["id"]})
             set_user_sports(me["id"], sports)
             db.commit()
@@ -247,8 +246,7 @@ def edit():
         form = MultiDict([("full_name", me["full_name"]), ("grad_year", me["grad_year"] or ""), ("bio", me["bio"]),
                           ("pronouns", me["pronouns"]), ("gender", me["gender"])]
                          + [(key, me[key]) for key in PERSON_SOCIALS]
-                         + [("sports", s) for s in user_sports(me["id"])]
-                         + ([("email_reminders", "1")] if me["email_reminders"] else []))
+                         + [("sports", s) for s in user_sports(me["id"])])
     return render_template("profile/edit.html", form=form, max_grad_year=now_local().year + 8, genders=GENDERS,
                            socials={key: SOCIALS[key][0] for key in PERSON_SOCIALS})
 
@@ -268,7 +266,7 @@ def change_password():
         db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(form["password"]), g.user["id"]))
         db.commit()
         flash("Password changed.", "success")
-    return redirect(url_for("profile.edit") + "#password")
+    return redirect(url_for("settings.password") if error else url_for("settings.home"))
 
 
 CONFIRM_WORD = "DELETE"

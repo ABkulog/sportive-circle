@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('profile.view', user_id=g.user.id) }}" data-back>← Profile</a>
+<h1 class="page-title">Settings</h1>
+
+<nav class="settings-list" aria-label="Settings">
+  <a class="settings-row" href="{{ url_for('profile.edit') }}"><span>Edit profile <small class="muted">photo, bio, socials, sports</small></span><span aria-hidden="true">›</span></a>
+  <a class="settings-row" href="{{ url_for('notifications.notification_settings') }}"><span>Notifications <small class="muted">what you hear about</small></span><span aria-hidden="true">›</span></a>
+  <a class="settings-row" href="{{ url_for('settings.password') }}"><span>Change password</span><span aria-hidden="true">›</span></a>
+</nav>
+
+<section class="settings-group">
+  <h2>Look</h2>
+  <form method="post" action="{{ url_for('settings.look') }}">
+    {{ csrf_field() }}
+    <div class="segmented" role="radiogroup" aria-label="Look">
+      {% for key, label in themes.items() %}
+        <label><input type="radio" name="theme" value="{{ key }}" {% if g.user.theme == key %}checked{% endif %} data-autosubmit data-theme-choice><span>{{ label }}</span></label>
+      {% endfor %}
+    </div>
+    <noscript><button class="btn btn-small">Save</button></noscript>
+  </form>
+</section>
+
+<section class="settings-group">
+  <h2>Email</h2>
+  <form method="post" action="{{ url_for('settings.reminders') }}">
+    {{ csrf_field() }}
+    <label class="toggle">
+      <input type="checkbox" name="email_reminders" value="1" {% if g.user.email_reminders %}checked{% endif %} data-autosubmit>
+      <span>Email me an hour before my games</span>
+    </label>
+    <noscript><button class="btn btn-small">Save</button></noscript>
+  </form>
+</section>
+
+<section class="settings-group">
+  <form method="post" action="{{ url_for('auth.logout') }}" data-confirm="Log out of Sportive Circle?">
+    {{ csrf_field() }}<button class="btn btn-ghost btn-block">Log out</button>
+  </form>
+  <p class="center"><a class="danger-link" href="{{ url_for('profile.delete_account') }}">Delete my account</a></p>
+</section>
+{% endblock %}
