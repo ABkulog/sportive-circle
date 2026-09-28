@@ -6,7 +6,7 @@
 Makes:
   marketing/qr-code.png        just the code (1200 x 1200), purple on white, gold paw in the middle
   marketing/qr-code.svg        the same code as a vector, for printing at any size
-  marketing/qr-flyer.png       the code with a "Scan to play" caption, ready to print or post
+  marketing/qr-flyer.png       the code with a "Scan to join" caption, ready to print or post
 
 If the site's address ever changes (e.g. a custom domain), run this again and replace printed flyers.
 """
@@ -75,9 +75,9 @@ def flyer(code):
     draw.rectangle([0, 0, width, 22], fill=PURPLE)
     draw.rectangle([int(width * .6), 0, width, 22], fill=GOLD)
     draw.text((width / 2, 130), "Sportive Circle", font=font(96), fill=PURPLE, anchor="mm")
-    draw.text((width / 2, 225), "Find people to play with. Go Dawgs!", font=font(46, bold=False), fill="#333333", anchor="mm")
+    draw.text((width / 2, 225), "Find people to play sports with at UW.", font=font(46, bold=False), fill="#333333", anchor="mm")
     image.paste(code.resize((900, 900), Image.NEAREST), (150, 300))
-    draw.text((width / 2, 1290), "Scan to play", font=font(84), fill=PURPLE, anchor="mm")
+    draw.text((width / 2, 1290), "Scan to join", font=font(84), fill=PURPLE, anchor="mm")
     draw.text((width / 2, 1380), URL.replace("https://", ""), font=font(40, bold=False), fill="#333333", anchor="mm")
     draw.text((width / 2, 1480), "For UW students. A student project, not an official UW service.",
               font=font(30, bold=False), fill="#666666", anchor="mm")
