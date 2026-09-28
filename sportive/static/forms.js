@@ -1,4 +1,4 @@
-// Keeps the "Location" list and player limits in sync with the chosen sport.
+// Keeps the "Location" list and the "Players" dropdown in sync with the chosen sport.
 // The server checks the same rules (constants.py), so this is only for convenience.
 (function () {
   const rulesElement = document.getElementById("sport-rules");
@@ -10,12 +10,10 @@
   const location = form.querySelector('select[name="location"]');
   const placeholder = location.options[0];
   const everyPlace = Array.from(location.options).slice(1).map((option) => option.value);
-
-  const totalInput = form.querySelector('input[name="max_players"]');  // New event form
-  const haveInput = form.querySelector('input[name="have"]');          // Need players form
-  const neededInput = form.querySelector('input[name="needed"]');
-  const hint = form.querySelector("[data-max-hint]");
+  const players = form.querySelector("[data-players]");
+  const outside = form.querySelector('input[name="outside"]');
   const placeTip = form.querySelector("[data-place-tip]");
+  let lastSport = sport.value;
 
   function updatePlaces() {
     const rule = rules[sport.value];
@@ -26,20 +24,17 @@
     else if (!allowed.includes(current)) location.value = "";
   }
 
-  function updateLimits() {
+  // "Players": 2 up to the sport's most; a new sport starts at its usual size (5v5 basketball = 10).
+  function updatePlayers() {
     const rule = rules[sport.value];
-    if (hint) hint.textContent = rule ? `${rule.label}: up to ${rule.max} players` : "";
-    if (totalInput) {
-      totalInput.max = rule ? rule.max : "";
-      totalInput.placeholder = rule ? `${rule.max} (the most for ${rule.label.toLowerCase()})` : "Pick a sport first";
-    }
-    if (neededInput && haveInput) {
-      const have = parseInt(haveInput.value, 10) || 1;
-      if (rule) {
-        haveInput.max = rule.max - 1;
-        neededInput.max = Math.max(rule.max - have, 1);
-      }
-    }
+    if (!players || !rule) return;
+    const keep = sport.value === lastSport ? players.value : String(rule.default);
+    const options = [];
+    for (let n = 2; n <= rule.max; n += 1) options.push(new Option(String(n), String(n), false, String(n) === keep));
+    players.replaceChildren(...options);
+    if (!players.value) players.value = String(rule.default);
+    if (outside) outside.max = rule.max;
+    lastSport = sport.value;
   }
 
   // Good-to-know details for this sport at this place (e.g. "Indoor pickleball is in Gym B, Thursdays 2-5 PM").
@@ -49,12 +44,47 @@
     placeTip.textContent = (rule && rule.tips[location.value]) || "";
   }
 
-  sport.addEventListener("change", () => { updatePlaces(); updateLimits(); updateTip(); });
+  sport.addEventListener("change", () => { updatePlaces(); updatePlayers(); updateTip(); });
   location.addEventListener("change", updateTip);
-  if (haveInput) haveInput.addEventListener("input", updateLimits);
   updatePlaces();
-  updateLimits();
+  updatePlayers();
   updateTip();
+})();
+
+// "You + 2 friends = 3 of 10 · need 7 more": the math for the "Who's coming?" part, as you tick friends.
+(function () {
+  const form = document.querySelector("form[data-sport-form]");
+  const math = form && form.querySelector("[data-player-math]");
+  if (!math) return;
+  const players = form.querySelector("[data-players]");
+  const outside = form.querySelector('input[name="outside"]');
+  const teamSize = form.querySelector("[data-team-size]");
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+  function update() {
+    const friends = form.querySelectorAll('input[name="reserve"]:checked').length;
+    const team = teamSize && !teamSize.disabled ? parseInt(teamSize.value, 10) : 0;
+    if (team) {
+      const mine = 1 + friends;
+      math.textContent = `Your team: you${friends ? ` + ${plural(friends, "friend")}` : ""} = ${mine} of ${team}`
+        + (mine > team ? ` · that's ${mine - team} too many` : "");
+      return;
+    }
+    const extra = outside && !outside.disabled ? Math.max(parseInt(outside.value, 10) || 0, 0) : 0;
+    const total = parseInt(players && players.value, 10) || 0;
+    const coming = 1 + friends + extra;
+    let text = "You";
+    if (friends) text += ` + ${plural(friends, "friend")}`;
+    if (extra) text += ` + ${extra} not on the app`;
+    text += ` = ${coming} of ${total}`;
+    const need = total - coming;
+    text += need > 0 ? ` · need ${need} more` : need === 0 ? " · full" : ` · that's ${-need} too many`;
+    math.textContent = text;
+    math.classList.toggle("is-over", need < 0);
+  }
+  form.addEventListener("change", update);
+  form.addEventListener("input", update);
+  update();
 })();
 
 // Who can join / Format: show only what makes sense (see the data-show notes in _macros.html).

@@ -105,7 +105,7 @@ def event_data(**overrides):
     tomorrow = now_local() + timedelta(days=1)
     data = {"title": "Pickup 5v5", "sport": "basketball", "location": IMA, "skill_level": "All levels",
             "starts_at": tomorrow.strftime("%Y-%m-%dT%H:%M"),
-            "ends_at": (tomorrow + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M"), "max_players": "", "note": ""}
+            "ends_at": (tomorrow + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M"), "players": "", "note": ""}
     data.update(overrides)
     return data
 
@@ -167,7 +167,7 @@ def hosts_game(world, host):
 
 @given(parsers.parse('"{host}" hosts a tennis game for {n:d} players tomorrow'))
 def hosts_tennis(world, host, n):
-    host_game(world, host, sport="tennis", location="IMA South Tennis Courts", max_players=str(n), title="Doubles")
+    host_game(world, host, sport="tennis", location="IMA South Tennis Courts", players=str(n), title="Doubles")
 
 
 @given(parsers.parse('"{guest}" joins {host}\'s game'))
@@ -339,7 +339,7 @@ def try_host_pickleball(world, host, place):
 
 @when(parsers.parse('"{host}" tries to host basketball for {n:d} players'))
 def host_too_big(world, host, n):
-    host_game(world, host, max_players=str(n))
+    host_game(world, host, players=str(n))
 
 
 @given(parsers.parse('"{host}" hosts a Competitive basketball game tomorrow'))
@@ -353,7 +353,7 @@ def need_players(world, host, n):
     person = world.person(host)
     world.saw(person.client.post("/need-players", data={
         "sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
-        "starts_in": "15", "duration": "60", "needed": str(n), "have": "4"}), person.client)
+        "starts_in": "15", "duration": "60", "players": str(4 + n), "outside": "3"}), person.client)
 
 
 @when(parsers.re(r'"(?P<viewer>[^"]+)" opens (?P<host>\w+)\'s game'))
@@ -381,7 +381,7 @@ def edit_game(world, host_name, **changes):
     row = world.db("SELECT * FROM events WHERE id = ?", (event_id,))[0]
     form = {"title": row["title"], "sport": row["sport"], "location": row["location"],
             "skill_level": row["skill_level"], "starts_at": row["starts_at"].replace(" ", "T"),
-            "ends_at": row["ends_at"].replace(" ", "T"), "max_players": str(row["max_players"] or ""),
+            "ends_at": row["ends_at"].replace(" ", "T"), "players": str(row["max_players"] or ""),
             "note": row["note"], **changes}
     world.saw(host.client.post(f"/events/{event_id}/edit", data=form, follow_redirects=True), host.client)
 

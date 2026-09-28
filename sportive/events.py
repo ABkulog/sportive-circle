@@ -10,7 +10,7 @@ from werkzeug.datastructures import MultiDict
 from .auth import login_required, safe_next
 from .badges import sync_badges
 from .clubs import featured_clubs, suggested_clubs
-from .constants import (DEFAULT_MAX_HOURS, LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
+from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
                         SKILL_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, SPORT_MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .db import get_db, user_sports
 from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots, my_invite,
@@ -288,7 +288,6 @@ def read_event_form(form, event=None):
     location = form.get("location", "")
     skill_level = form.get("skill_level") or "All levels"  # not asked for private games
     note = form.get("note", "").strip()
-    max_raw = form.get("max_players", "").strip()
     now = now_local()
 
     if not title:
@@ -325,32 +324,45 @@ def read_event_form(form, event=None):
     if starts > now + timedelta(days=MAX_DAYS_AHEAD):
         return None, "Event date can't be more than a year away."
 
-    cap = SPORT_MAX_PLAYERS[sport]
-    max_players = cap  # left blank = the most this sport allows
-    if max_raw:
-        if not max_raw.isdigit() or int(max_raw) < 2:
-            return None, "Max players must be at least 2."
-        max_players = int(max_raw)
-        if max_players > cap:
-            return None, f"{SPORTS[sport]} events can have at most {cap} players."
-    if event is not None:
-        taken = event["going_count"] + event["extra_players"]
-        if max_players < taken:
-            return None, f"{taken} people are already in, so max players can't be lower than that."
     if len(note) > 500:
         return None, "Note is too long (500 characters max)."
 
     is_private, password, team_size, error = read_game_options(form, sport, event)
     if error:
         return None, error
-    if team_size:
-        max_players = 2 * team_size
+    max_players, extra_players, error = read_players(form, sport, team_size, event)
+    if error:
+        return None, error
 
     return {
         "title": title, "sport": sport, "location": location, "skill_level": skill_level,
-        "starts_at": to_db(starts), "ends_at": to_db(ends), "max_players": max_players, "note": note,
+        "starts_at": to_db(starts), "ends_at": to_db(ends), "max_players": max_players,
+        "extra_players": extra_players, "note": note,
         "is_private": is_private, "password": password, "team_size": team_size,
     }, None
+
+
+def read_players(form, sport, team_size, event=None):
+    """How many can play, and how many friends not on the app are already coming.
+    Returns (max_players, extra_players, error). "Players" includes the host; in team vs team it's both teams."""
+    cap = SPORT_MAX_PLAYERS[sport]
+    extra = event["extra_players"] if event is not None else 0
+    if event is None and not team_size:
+        outside = form.get("outside", "").strip() or "0"
+        if not outside.isdigit() or int(outside) > cap:
+            return None, 0, "How many friends not on the app are coming?"
+        extra = int(outside)
+    if team_size:
+        return 2 * team_size, 0, None
+    raw = form.get("players", "").strip()
+    players = int(raw) if raw.isdigit() else (DEFAULT_PLAYERS.get(sport, cap) if not raw else 0)
+    if not 2 <= players <= cap:
+        return None, 0, f"{SPORTS[sport]} games can have 2 to {cap} players."
+    taken = (event["going_count"] + event["extra_players"]) if event is not None else 1 + extra
+    if players < taken:
+        return None, 0, (f"{taken} people are already in, so it can't be fewer players than that." if event
+                         else "That's more people than players. Pick more players, or fewer friends.")
+    return players, extra, None
 
 
 def default_times():
@@ -375,7 +387,7 @@ def create():
             if duplicate:
                 error = "This event has already been created."
         if error is None:
-            room = data["team_size"] - 1 if data["team_size"] else data["max_players"] - 1
+            room = data["team_size"] - 1 if data["team_size"] else data["max_players"] - 1 - data["extra_players"]
             reserve, error = read_reservations(form, room)
         if error is None:
             event_id = insert_event(data, reserve)
@@ -435,7 +447,7 @@ def edit(event_id):
             "title": event["title"], "sport": event["sport"], "location": event["location"],
             "skill_level": event["skill_level"], "starts_at": to_form(event["starts_at"]),
             "ends_at": to_form(event["ends_at"]), "note": event["note"],
-            "max_players": event["max_players"] or "",
+            "players": event["max_players"] or "",
             "is_private": "1" if event["is_private"] else "", "password": event["password"],
         })
     return render_template("events/form.html", form=form, event=event, min_start="")
@@ -533,8 +545,7 @@ def tell_players_it_was_cancelled(event):
 @login_required
 def quick():
     form = request.form if request.method == "POST" else MultiDict(
-        {"starts_in": "30", "duration": "60", "needed": "2", "have": "1", "skill_level": "All levels",
-         "password": suggested_password()})
+        {"starts_in": "30", "duration": "60", "skill_level": "All levels", "password": suggested_password()})
     if request.method == "POST":
         error = None
         sport = form.get("sport", "")
@@ -543,14 +554,7 @@ def quick():
         note = form.get("note", "").strip()
         starts_in = dict(QUICK_START_OPTIONS).get(_int(form.get("starts_in")))
         duration = dict(QUICK_DURATIONS).get(_int(form.get("duration")))
-        needed = _int(form.get("needed"))
-        have = _int(form.get("have"))
-        is_private, password, team_size, options_error = (
-            read_game_options(form, sport) if sport in SPORTS else (0, "", None, None))
-        if team_size:  # team vs team: your team against a group that challenges you
-            have, needed = 1, 2 * team_size - 1
-        elif is_private and sport in SPORTS:  # friends only: no "we have / we need", just the sport's max
-            have, needed = 1, SPORT_MAX_PLAYERS[sport] - 1
+        is_private, password, team_size, max_players, extra, reserve = 0, "", None, 0, 0, []
 
         if sport not in SPORTS:
             error = "Please choose a sport."
@@ -562,22 +566,20 @@ def quick():
             error = "Please choose a skill level."
         elif starts_in is None or duration is None:
             error = "Please choose when you're playing."
-        elif needed is None or not 1 <= needed <= 30:
-            error = "How many more players do you need? (1 to 30)"
-        elif have is None or not 1 <= have <= 50:
-            error = "How many are already playing, including you? (1 to 50)"
-        elif have + needed > SPORT_MAX_PLAYERS[sport]:
-            error = (f"{SPORTS[sport]} games max out at {SPORT_MAX_PLAYERS[sport]} players, "
-                     f"and {have} + {needed} is {have + needed}.")
         elif len(note) > 500:
             error = "Note is too long (500 characters max)."
-        elif options_error:
-            error = options_error
-        reserve = []
         if error is None:
-            reserve, error = read_reservations(form, team_size - 1 if team_size else needed)
+            is_private, password, team_size, error = read_game_options(form, sport)
+        if error is None:
+            max_players, extra, error = read_players(form, sport, team_size)
+        if error is None:
+            room = team_size - 1 if team_size else max_players - 1 - extra
+            reserve, error = read_reservations(form, room)
             if error and is_private:
                 error = error.replace("reserve", "invite")
+        needed = (max_players or 0) - 1 - extra - len(reserve)
+        if error is None and needed < 1 and not team_size:
+            error = "Everyone's already coming, so there's no one to find. Pick more players."
 
         if error is None:
             starts = round_up_5(now_local() + timedelta(minutes=_int(form.get("starts_in"))))
@@ -586,8 +588,7 @@ def quick():
                 "title": f"{team_size}v{team_size} {SPORTS[sport]}" if team_size else f"Need {needed} for {SPORTS[sport]}",
                 "sport": sport, "location": location,
                 "skill_level": skill_level, "starts_at": to_db(starts), "ends_at": to_db(ends),
-                # `have` includes the host, who is counted through their RSVP.
-                "max_players": have + needed, "extra_players": have - 1, "note": note, "is_quick": 1,
+                "max_players": max_players, "extra_players": extra, "note": note, "is_quick": 1,
                 "is_private": is_private, "password": password, "team_size": team_size,
             }, reserve)
             flash(created_message(is_private, reserve, "Posted! It's at the top of everyone's feed."), "celebrate")

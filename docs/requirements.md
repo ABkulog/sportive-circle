@@ -52,10 +52,10 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
-| FR-EVT-1 | Create an event with a name, sport, place, start/end time, level, optional player limit and note. | Must | ✅ |
+| FR-EVT-1 | Create an event with a name, sport, place, start/end time, level, a player count (a dropdown that starts at the sport's usual size and stops at its max) and an optional note. | Must | ✅ |
 | FR-EVT-2 | Each sport can only use places where it can really be played (e.g. rowing only at the WAC, pickleball at the IMA courts, IMA Gym B or Green Lake), with good-to-know tips such as court numbers and drop-in hours. | Must | ✅ |
 | FR-EVT-3 | Each sport has a player cap (e.g. basketball 10); an event can't exceed it. | Must | ✅ |
-| FR-EVT-4 | "Need players": post a game that starts within 2 hours in a few taps; it goes to the top of every feed. | Must | ✅ |
+| FR-EVT-4 | "Need players": post a game that starts within 2 hours in a few taps; it goes to the top of every feed. Both create forms ask "Players" and "Who's coming?" (friends from the app, friends not on the app) and show the math: "You + 2 friends = 3 of 10 · need 7 more". Friends picked are counted once, inside the player count. | Must | ✅ |
 | FR-EVT-5 | Join and leave games. A full game can't be overbooked, even when two people tap Join at once. | Must | ✅ |
 | FR-EVT-6 | Games that are over stay in your history: you can't leave them. | Should | ✅ |
 | FR-EVT-7 | Hosts can edit or cancel. Canceling tells everyone who joined (email + bell). | Must | ✅ |

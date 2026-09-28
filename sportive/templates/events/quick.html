@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import select, who_can_join, format_field, friends_picker %}
+{% from "_macros.html" import select, who_can_join, format_field, players_block %}
 {% block title %}Need players{% endblock %}
 {% block content %}
 <div class="card form-card">
@@ -24,20 +24,12 @@
     </div>
     {{ who_can_join(form) }}
     {{ format_field(form) }}
-    {% set crowd = not form.get('is_private') and not form.get('team_size') %}
-    <div class="row" data-show="crowd" {% if not crowd %}hidden{% endif %}>
-      <label class="field"><span>We have (including you)</span>
-        <input name="have" type="number" min="1" max="50" value="{{ form.get('have', '1') }}" required></label>
-      <label class="field"><span>We need</span>
-        <input name="needed" type="number" min="1" max="30" value="{{ form.get('needed', '2') }}" required></label>
-    </div>
-    <small class="muted" data-max-hint data-show="crowd" {% if not crowd %}hidden{% endif %}></small>
+    {{ players_block(form, friends) }}
     <label class="field" data-show="public" {% if form.get('is_private') %}hidden{% endif %}><span>Skill level</span>
       <select name="skill_level">
         {% for level in SKILL_LEVELS %}<option value="{{ level }}" {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
       </select>
     </label>
-    {{ friends_picker(form, friends) }}
     <label class="field"><span>Note <em>(optional)</em></span>
       <textarea name="note" maxlength="500" rows="2" placeholder="Court 2, look for the blue shirts">{{ form.get('note', '') }}</textarea></label>
     <button class="btn btn-gold btn-block">Post it</button>

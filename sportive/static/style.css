@@ -85,6 +85,15 @@ small { font-size: .82rem; }
 .band > h2:first-child { font-size: 1.05rem; }
 section.band > .section-title:first-child { margin-top: 0; }
 /* Parties, private games, team vs team */
+/* Create a game: "Who's coming?" */
+.who-coming { display: grid; gap: 8px; }
+.who-note { margin: 0; font-size: .85rem; }
+.friend-picks { max-height: 232px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 0 10px; }
+.outside-field { max-width: 200px; }
+.player-math { margin: 0; padding: 10px 12px; border-radius: var(--radius); background: var(--gold-light);
+  font-weight: 600; font-size: .92rem; color: var(--purple-strong); }
+.player-math.is-over { background: #fbe9e7; color: var(--danger); }
 .share-box { display: grid; gap: 10px; margin-top: 10px; padding: 14px; border-radius: var(--radius); background: var(--accent-soft); }
 .share-box p { margin: 0; }
 .invite-box { display: grid; gap: 8px; padding: 14px; border-radius: var(--radius); background: var(--accent-soft); }

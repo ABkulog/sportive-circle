@@ -55,26 +55,43 @@
     <small class="muted">Team vs team: your team plays a group that challenges you.</small></label>
 {% endmacro %}
 
-{% macro friends_picker(form, friends) %}
-  {% set private = form.get('is_private') %}
-  <details class="fold reserve-fold" {% if form.getlist('reserve') %}open{% endif %}>
-    <summary>
-      <span data-show="public" {% if private %}hidden{% endif %}>Reserve spots for friends <span class="muted">· held 30 min</span></span>
-      <span data-show="private" {% if not private %}hidden{% endif %}>Invite friends <span class="muted">· no password needed</span></span>
-    </summary>
-    {% if friends %}
-      <ul class="pick-list">
-        {% for f in friends %}
-          <li><label class="pick-row">
-            <input type="checkbox" name="reserve" value="{{ f.id }}" {% if f.id|string in form.getlist('reserve') %}checked{% endif %}>
-            {{ avatar(f.id, f.full_name, f.avatar_updated, 32) }}<span>{{ f.full_name }}</span>
-          </label></li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p class="muted"><a href="{{ url_for('social.friends') }}">Add friends</a> first.</p>
-    {% endif %}
-  </details>
+{% macro players_block(form, friends=None, event=None) %}
+  {# Players = everyone who can play, you included. "Who's coming?" = the friends already in: picked from the
+     app (their spots are held, or they're invited if it's private) or just counted if they aren't on the app.
+     forms.js keeps the dropdown to the sport's limit and writes "You + 2 friends = 3 of 10 · need 7 more". #}
+  {% set sport = form.get('sport', '') %}
+  {% set cap = SPORT_MAX_PLAYERS.get(sport, 30) %}
+  {% set chosen = (form.get('players') or DEFAULT_PLAYERS.get(sport, 10))|string %}
+  {% set team_game = event.team_size if event else form.get('team_size') %}
+  <label class="field" data-show="regular" {% if team_game %}hidden{% endif %}><span>Players <em>(including you)</em></span>
+    <select name="players" data-players>
+      {% for n in range(2, cap + 1) %}<option value="{{ n }}" {% if chosen == n|string %}selected{% endif %}>{{ n }}</option>{% endfor %}
+    </select></label>
+  {% if not event %}
+    {% set private = form.get('is_private') %}
+    <fieldset class="field who-coming">
+      <legend>Who's coming? <em>(optional)</em></legend>
+      {% if friends %}
+        <p class="muted who-note">
+          <span data-show="public" {% if private %}hidden{% endif %}>Friends you tick get their spot held for 30 min.</span>
+          <span data-show="private" {% if not private %}hidden{% endif %}>Friends you tick get an invite, no password needed.</span>
+        </p>
+        <ul class="pick-list friend-picks">
+          {% for f in friends %}
+            <li><label class="pick-row">
+              <input type="checkbox" name="reserve" value="{{ f.id }}" {% if f.id|string in form.getlist('reserve') %}checked{% endif %}>
+              {{ avatar(f.id, f.full_name, f.avatar_updated, 32) }}<span>{{ f.full_name }}</span>
+            </label></li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted who-note"><a href="{{ url_for('social.friends') }}">Add friends</a> to pick them here.</p>
+      {% endif %}
+      <label class="field outside-field" data-show="regular" {% if team_game %}hidden{% endif %}><span>Friends not on the app</span>
+        <input name="outside" type="number" min="0" max="{{ cap }}" value="{{ form.get('outside', '0') }}" inputmode="numeric"></label>
+      <p class="player-math" data-player-math aria-live="polite"></p>
+    </fieldset>
+  {% endif %}
 {% endmacro %}
 
 {% macro select(name, label, options, current, placeholder=None) %}

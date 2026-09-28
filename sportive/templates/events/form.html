@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import select, who_can_join, format_field, friends_picker %}
+{% from "_macros.html" import select, who_can_join, format_field, players_block %}
 {% block title %}{{ 'Edit event' if event else 'New event' }}{% endblock %}
 {% block content %}
 <div class="card form-card">
@@ -38,20 +38,10 @@
       {% if event.team_size %}<p class="muted">Format: {{ event.team_size }}v{{ event.team_size }} team vs team.</p>{% endif %}
     {% else %}
       {{ format_field(form) }}
-      {{ friends_picker(form, friends) }}
     {% endif %}
-    {% set team_game = event.team_size if event else form.get('team_size') %}
-    {% set has_extras = form.get('max_players') or form.get('note') %}
-    <details class="fold more-options" {% if has_extras %}open{% endif %}>
-      <summary>More options <span class="muted">· max players, note</span></summary>
-      <div class="form">
-      <label class="field" {% if team_game %}hidden{% endif %} data-show="regular"><span>Max players, including you</span>
-        <input name="max_players" type="number" min="2" value="{{ form.get('max_players', '') }}" placeholder="Pick a sport first">
-        <small class="muted" data-max-hint></small></label>
-      <label class="field"><span>Note</span>
-        <textarea name="note" maxlength="500" rows="3" placeholder="Court 3, bring a light and a dark shirt">{{ form.get('note', '') }}</textarea></label>
-      </div>
-    </details>
+    {{ players_block(form, friends, event) }}
+    <label class="field"><span>Note <em>(optional)</em></span>
+      <textarea name="note" maxlength="500" rows="2" placeholder="Court 3, bring a light and a dark shirt">{{ form.get('note', '') }}</textarea></label>
     <button class="btn btn-block">{{ 'Save changes' if event else 'Create event' }}</button>
   </form>
 </div>

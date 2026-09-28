@@ -34,7 +34,7 @@ Feature: Games
   @FR-EVT-3
   Scenario: A game can't be bigger than the sport allows
     When "Maya" tries to host basketball for 30 players
-    Then they see "at most 10 players"
+    Then they see "Basketball games can have 2 to 10 players."
 
   @FR-EVT-4
   Scenario: Need players goes to the top of the feed
