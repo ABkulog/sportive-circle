@@ -34,7 +34,8 @@ def send_email(to, subject, body):
 def failure_reason(error):
     """A short, safe explanation of why an email didn't go out (never includes passwords or server replies)."""
     if isinstance(error, smtplib.SMTPAuthenticationError):
-        return "the email service rejected our login (check MAIL_USERNAME and MAIL_PASSWORD)"
+        # The code tells them apart: 535 = wrong username/key, 525 = the email service blocked this server's IP.
+        return f"the email service rejected our login, error {error.smtp_code} (check MAIL_USERNAME and MAIL_PASSWORD)"
     if isinstance(error, smtplib.SMTPSenderRefused):
         return "the email service didn't accept our sender address (check MAIL_FROM)"
     if isinstance(error, smtplib.SMTPRecipientsRefused):

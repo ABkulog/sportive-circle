@@ -2203,7 +2203,7 @@ def test_resend_doesnt_claim_success_when_email_fails(client, app, monkeypatch):
 def test_email_failure_reasons_are_specific_and_safe():
     import smtplib
     from sportive.mail import failure_reason
-    assert "rejected our login" in failure_reason(smtplib.SMTPAuthenticationError(535, b"5.7.8 bad key xsmtpsib-SECRET"))
+    assert "rejected our login, error 535" in failure_reason(smtplib.SMTPAuthenticationError(535, b"5.7.8 bad key xsmtpsib-SECRET"))
     assert "SECRET" not in failure_reason(smtplib.SMTPAuthenticationError(535, b"xsmtpsib-SECRET"))
     assert "sender" in failure_reason(smtplib.SMTPSenderRefused(550, b"no", "a@b.c"))
     assert "can't receive" in failure_reason(smtplib.SMTPRecipientsRefused({"x@uw.edu": (550, b"no")}))
