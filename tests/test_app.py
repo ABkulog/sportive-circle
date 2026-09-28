@@ -2219,3 +2219,32 @@ def test_email_settings_ignore_pasted_spaces_and_line_breaks(monkeypatch, tmp_pa
     assert app.config["MAIL_USERNAME"] == "9a1b2c001@smtp-brevo.com"
     assert app.config["MAIL_PASSWORD"] == "xsmtpsib-key123"
     assert app.config["MAIL_SERVER"] == "smtp-relay.brevo.com"
+
+
+def test_check_email_command_explains_without_revealing_the_key(app, monkeypatch):
+    import smtplib
+
+    class RefusingSMTP:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def starttls(self):
+            pass
+
+        def login(self, user, key):
+            raise smtplib.SMTPAuthenticationError(535, b"5.7.8 Authentication failed")
+
+    monkeypatch.setattr(smtplib, "SMTP", RefusingSMTP)
+    app.config.update(MAIL_SERVER="smtp-relay.brevo.com", MAIL_USERNAME="sportivecircle@gmail.com",
+                      MAIL_PASSWORD="1bfd87-secret-part")
+    output = app.test_cli_runner().invoke(args=["check-email"]).output
+    assert "should end in @smtp-brevo.com" in output
+    assert "doesn't start with xsmtpsib-" in output
+    assert "LOGIN REFUSED: 535 5.7.8 Authentication failed" in output
+    assert "secret" not in output                                  # the key itself is never printed

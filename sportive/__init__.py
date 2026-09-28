@@ -6,8 +6,8 @@ from datetime import timedelta
 from flask import Flask, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from . import (auth, clubs, db, events, moderation, news, notifications, pages, profile, ranks, reminders, social,
-               stats)
+from . import (auth, clubs, db, events, mail, moderation, news, notifications, pages, profile, ranks, reminders,
+               social, stats)
 from .constants import (LOCATIONS, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS, SPORT_MAX_PLAYERS,
                         SPORTS)
 from .photos import MAX_UPLOAD_MB
@@ -88,6 +88,7 @@ def create_app(test_config=None):
     app.add_url_rule("/", endpoint="index", view_func=events.feed)
     app.cli.add_command(reminders.send_reminders_command)
     app.cli.add_command(stats.sport_stats_command)
+    app.cli.add_command(mail.check_email_command)
 
     _add_template_helpers(app)
     for code, message in ERRORS.items():
