@@ -29,3 +29,21 @@ def send_email(to, subject, body):
         smtp.login(cfg["MAIL_USERNAME"], cfg["MAIL_PASSWORD"])
         smtp.send_message(msg)
     return True
+
+
+def failure_reason(error):
+    """A short, safe explanation of why an email didn't go out (never includes passwords or server replies)."""
+    if isinstance(error, smtplib.SMTPAuthenticationError):
+        return "the email service rejected our login (check MAIL_USERNAME and MAIL_PASSWORD)"
+    if isinstance(error, smtplib.SMTPSenderRefused):
+        return "the email service didn't accept our sender address (check MAIL_FROM)"
+    if isinstance(error, smtplib.SMTPRecipientsRefused):
+        return "that address can't receive email"
+    if isinstance(error, (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, ConnectionError, TimeoutError,
+                          OSError)) and not isinstance(error, smtplib.SMTPResponseException):
+        return "we couldn't reach the email service (check MAIL_SERVER and MAIL_PORT)"
+    if isinstance(error, smtplib.SMTPResponseException):
+        return f"the email service answered with error {error.smtp_code}"
+    if isinstance(error, RuntimeError):
+        return "email isn't set up on this server yet (MAIL_SERVER is missing)"
+    return "an unexpected email error"

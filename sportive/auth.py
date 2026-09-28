@@ -13,7 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from .constants import SPORTS
 from .db import get_db, set_user_sports
-from .mail import send_email
+from .mail import failure_reason, send_email
 from .textutil import one_line
 from .timeutil import from_db, now_local, to_db
 
@@ -124,14 +124,15 @@ def send_verification_email(email, code, purpose="signup"):
                 "If you didn't sign up, you can ignore this email.")
     try:
         sent = send_email(email, subject, body)
-    except Exception:  # the email service refused or is down: say so instead of crashing
+    except Exception as error:  # the email service refused or is down: say so instead of crashing
         log.exception("Couldn't send a code email to %s", email)
         # Let them ask for a new code right away (no 1-minute wait for an email that never went out).
         get_db().execute("UPDATE users SET verify_sent_at = NULL WHERE email = ?", (email,))
         get_db().commit()
         contact = current_app.config.get("CONTACT_EMAIL")
         flash("We couldn't send the email just now. Wait a minute, then ask for a new code."
-              + (f" If it keeps happening, email {contact}." if contact else ""), "error")
+              + (f" If it keeps happening, email {contact}." if contact else "")
+              + f" (Reason: {failure_reason(error)}.)", "error")
         return False
     if not sent:
         # Local development: no email server, so show the code instead.
