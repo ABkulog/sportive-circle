@@ -13,7 +13,7 @@
     <div class="row">
       {{ select('sport', 'Sport', SPORTS.items(), form.get('sport', ''), 'Choose a sport') }}
       {% if not club and not (event and event.club_id) %}
-      <label class="field" data-show="public" {% if form.get('is_private') %}hidden{% endif %}><span>Skill level</span>
+      <label class="field" data-show="public" {% if form.get('is_private') == '1' %}hidden{% endif %}><span>Skill level</span>
         <select name="skill_level">
           {% for level in SKILL_LEVELS %}<option value="{{ level }}" {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
         </select>
@@ -33,7 +33,15 @@
       <label class="field"><span>Ends</span>
         <input name="ends_at" type="datetime-local" value="{{ form.get('ends_at', '') }}" required></label>
     </div>
-    {{ who_can_join(form) }}
+    {{ who_can_join(form, club=club or (event and event.club_id)) }}
+    {% if club %}
+      <label class="field"><span>Repeat</span>
+        <select name="repeat">
+          <option value="1">Just once</option>
+          {% for n in range(2, 13) %}<option value="{{ n }}" {% if form.get('repeat')|string == n|string %}selected{% endif %}>Every week, {{ n }} weeks</option>{% endfor %}
+        </select>
+        <small class="muted">For weekly practices: one tap instead of making each one.</small></label>
+    {% endif %}
     {% if event %}
       {% if event.team_size %}<p class="muted">Format: {{ event.team_size }}v{{ event.team_size }} team vs team.</p>{% endif %}
     {% else %}

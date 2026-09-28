@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import club_logo %}
 {% block title %}Play sports with Huskies{% endblock %}
 {% block content %}
 <section class="hero husky-hero">
@@ -43,7 +44,7 @@
     <div class="club-grid">
       {% for c in clubs %}
         <a class="card club-card" href="{{ url_for('clubs.view', club_id=c.id) }}">
-          <span class="club-emoji" aria-hidden="true">{{ SPORT_EMOJI[c.sport] }}</span>
+          {{ club_logo(c) }}
           <strong class="club-name">{{ c.name }}</strong>
           <span class="club-desc muted">{{ c.description|truncate(90) }}</span>
           <span class="badges"><span class="badge badge-verified">Verified</span>

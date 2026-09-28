@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS events (
     password      TEXT NOT NULL DEFAULT '',        -- a private game's password, shown to the host and players
     team_size     INTEGER,                         -- team vs team: players per team (NULL = a regular game)
     open_to       TEXT NOT NULL DEFAULT 'everyone', -- everyone / women / men / women_nb (constants.OPEN_TO)
+    members_only  INTEGER NOT NULL DEFAULT 0,      -- a club event only its members can join
     cancelled     INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -199,10 +200,17 @@ CREATE TABLE IF NOT EXISTS clubs (
     youtube          TEXT NOT NULL DEFAULT '',
     club_email       TEXT NOT NULL DEFAULT '',
     instagram        TEXT NOT NULL DEFAULT '',  -- handle without the @
+    logo_updated     TEXT,                      -- when the officers last changed the club's logo (NULL = none)
     review_note      TEXT NOT NULL DEFAULT '',  -- admin's note (e.g. why it was rejected)
     reviewed_at      TEXT,
     created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at  TEXT NOT NULL
+);
+
+-- Club logos: 256x256 JPEGs (like profile pictures), uploaded by officers.
+CREATE TABLE IF NOT EXISTS club_logos (
+    club_id INTEGER PRIMARY KEY REFERENCES clubs(id) ON DELETE CASCADE,
+    image   BLOB NOT NULL
 );
 
 -- role:
@@ -228,7 +236,8 @@ CREATE TABLE IF NOT EXISTS club_posts (
     club_id    INTEGER NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
     author_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
     body       TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    event_id   INTEGER REFERENCES events(id) ON DELETE SET NULL  -- posted automatically for a new club event
 );
 CREATE INDEX IF NOT EXISTS idx_club_posts ON club_posts(club_id, id);
 

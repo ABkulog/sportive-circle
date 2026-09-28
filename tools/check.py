@@ -62,7 +62,7 @@ def logged_in(app, password, email=None):
 
 START = ["/", "/how-it-works", "/faq", "/privacy", "/terms", "/clubs", "/create", "/me/events", "/friends",
          "/friends?q=ma", "/messages", "/profile/edit", "/profile/badges", "/profile/notifications", "/notifications", "/profile/photo",
-         "/clubs/updates", "/admin/reports", "/admin/clubs", "/u/1", "/u/2", "/events/new", "/need-players", "/events/1/party", "/events/2/party",
+         "/clubs/updates", "/admin/reports", "/admin/clubs", "/u/1", "/u/2", "/events/new", "/need-players", "/events/1/party", "/events/2/party", "/clubs/1/share", "/clubs/1/qr.svg",
          "/clubs/new", "/signup", "/login", "/forgot", "/suggestions", "/admin/suggestions",
          "/admin/suggestions?kind=bug"]
 SKIP = ("/logout", "/static/", "/u/", "photo")
@@ -130,7 +130,8 @@ FIELDS = {
     "/login": ["email", "password", "next"],
     "/forgot": ["email"],
     "/events/new": ["title", "sport", "location", "skill_level", "starts_at", "ends_at", "players", "outside", "note",
-                    "club", "is_private", "password", "team_size", "reserve"],
+                    "club", "is_private", "password", "team_size", "reserve", "repeat", "open_to"],
+    "/clubs/1/logo/edit": ["logo", "remove"],
     "/events/2/join": ["password", "next"],
     "/events/2/party": ["friend"],
     "/events/2/invite/answer": ["answer"],
@@ -169,7 +170,8 @@ ODD_URLS = ["/events/999999", "/events/0/join", "/clubs/999999", "/u/999999", "/
             "/report/nothing/1", "/report/dm/999999", "/admin/users/999999/suspend", "/clubs/1/members/999999/approve",
             "/friends/request/999999",
             "/block/999999", "/reset", "/verify", "/profile/notifications",
-            "/admin/users/1/explode", "/admin/users/1/tester/explode", "/events/1/requests/3/explode", "/admin/users/999999/tester/give", "/admin/users/99999999999999999999/suspend"]
+            "/admin/users/1/explode", "/admin/users/1/tester/explode", "/clubs/999999/share", "/clubs/999999/qr.svg", "/clubs/999999/roster.csv",
+            "/clubs/999999/logo", "/clubs/1/logo/edit", "/clubs/1/roster.csv", "/events/new?club=1", "/events/1/requests/3/explode", "/admin/users/999999/tester/give", "/admin/users/99999999999999999999/suspend"]
 
 
 def junk_test(app, password):

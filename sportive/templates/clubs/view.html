@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import avatar, icon %}
+{% from "_macros.html" import avatar, icon, club_logo %}
 {% block title %}{{ club.name }}{% endblock %}
 {% block content %}
 <a class="back-link" href="{{ url_for('clubs.directory') }}">← Clubs</a>
@@ -14,7 +14,10 @@
 {# ---------- Header: who they are + the one main action (like an Instagram profile) ---------- #}
 <article class="card club-hero">
   <div class="club-profile">
-    <div class="event-emoji big" aria-hidden="true">{{ SPORT_EMOJI[club.sport] }}</div>
+    <div class="club-logo-wrap">
+      {{ club_logo(club, 72) }}
+      {% if role == 'officer' %}<a class="logo-edit" href="{{ url_for('clubs.edit_logo', club_id=club.id) }}">{{ 'Change logo' if club.logo_updated else 'Add logo' }}</a>{% endif %}
+    </div>
     <div class="club-profile-main">
       <h1>{{ club.name }}</h1>
       <p class="club-sub">{% if club.status == 'approved' %}<span class="verified">Verified</span> · {% endif %}{{ SPORTS[club.sport] }} · {{ focus.get(club.focus, '') }}</p>
@@ -26,6 +29,9 @@
     <li><strong>{{ events|length }}</strong><span>event{{ 's' if events|length != 1 }}</span></li>
   </ul>
   <p class="club-about clamp" id="club-about" title="Tap to read more" data-expand>{{ club.description }}</p>
+  {% if club.status == 'approved' %}
+    <p class="club-share-row"><a href="{{ url_for('clubs.share', club_id=club.id) }}">{{ icon('share') }} {{ 'Share / QR code for flyers' if role == 'officer' else 'Share this club' }}</a></p>
+  {% endif %}
 
   <div class="club-actions" id="join">
     {% set cta = {'tryouts': 'Sign up for tryouts', 'application': 'Apply to join'}.get(club.joining, 'Request to join') %}
@@ -151,7 +157,7 @@
     <ul class="club-posts">
       {% for p in posts %}
         <li>
-          <p>{{ p.body }}</p>
+          <p>{{ p.body }}{% if p.event_id and g.user %} <a href="{{ url_for('events.detail', event_id=p.event_id) }}">See it →</a>{% endif %}</p>
           <small class="muted">{{ p.full_name or 'An officer' }} · {{ p.created_at|when }}</small>
           {% if role == 'officer' %}
             <form method="post" action="{{ url_for('clubs.delete_post', club_id=club.id, post_id=p.id) }}" class="inline-form">
@@ -170,7 +176,7 @@
     <ul class="people">
       {% for e in events %}
         <li class="post-game-row">
-          <span>{{ SPORT_EMOJI[e.sport] }} <strong>{{ e.title }}</strong><br><small class="muted">{{ e.starts_at|when }} · {{ e.location }}</small></span>
+          <span>{{ SPORT_EMOJI[e.sport] }} <strong>{{ e.title }}</strong>{% if e.members_only %} <span class="badge">Members only</span>{% endif %}<br><small class="muted">{{ e.starts_at|when }} · {{ e.location }}</small></span>
           {% if g.user %}<a class="btn btn-small" href="{{ url_for('events.detail', event_id=e.id) }}">View</a>{% endif %}
         </li>
       {% else %}
@@ -207,11 +213,18 @@
       </div>
     {% endif %}
     <h2 class="section-title">Members ({{ club.member_count }})</h2>
+    {% if role == 'officer' and members %}
+      <div class="roster-tools">
+        <button type="button" class="btn btn-small btn-ghost" data-copy="{{ members|map(attribute='email')|join(', ') }}">
+          <span data-copy-label>Copy all emails</span></button>
+        <a class="btn btn-small btn-ghost" href="{{ url_for('clubs.roster_csv', club_id=club.id) }}">Download roster</a>
+      </div>
+    {% endif %}
     {% if g.user %}
       <ul class="people">
         {% for m in members %}
           <li class="post-game-row">
-            <a class="person" href="{{ url_for('profile.view', user_id=m.id) }}">{{ avatar(m.id, m.full_name, m.avatar_updated, 32) }}{{ m.full_name }}</a>
+            <a class="person" href="{{ url_for('profile.view', user_id=m.id) }}">{{ avatar(m.id, m.full_name, m.avatar_updated, 32) }}<span>{{ m.full_name }}{% if role == 'officer' %}<small class="muted person-extra">{{ m.email }}</small>{% endif %}</span></a>
             {% if m.role == 'officer' %}<span class="badge badge-purple">Officer</span>
             {% elif role == 'officer' %}
               <details class="more-menu">

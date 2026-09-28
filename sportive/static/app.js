@@ -135,6 +135,24 @@
     });
   });
 
+  // <button data-copy="text">: copy it (e.g. a club roster's emails), then say "Copied!".
+  document.querySelectorAll("[data-copy]").forEach((button) => {
+    const label = button.querySelector("[data-copy-label]") || button;
+    const original = label.textContent;
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copy);
+        label.textContent = "Copied!";
+        setTimeout(() => { label.textContent = original; }, 2000);
+      } catch (e) {
+        window.prompt("Copy this:", button.dataset.copy);
+      }
+    });
+  });
+
+  // <button data-print>: print the page (e.g. a club's QR code for a flyer).
+  document.querySelectorAll("[data-print]").forEach((button) => button.addEventListener("click", () => window.print()));
+
   // Badge locker: once the showcase is full, the other checkboxes wait until you uncheck one.
   const picks = [...document.querySelectorAll(".showcase-pick")];
   const count = document.getElementById("picked-count");

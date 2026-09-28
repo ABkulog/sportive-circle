@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Clubs{% endblock %}
 {% block content %}
-{% from "_macros.html" import clubs_tabs %}
+{% from "_macros.html" import clubs_tabs, club_logo %}
 {{ clubs_tabs('find') }}
 <header class="feed-hello">
   <h1 class="page-title">Clubs</h1>
@@ -34,7 +34,7 @@
 <div class="club-grid">
   {% for c in clubs %}
     <a class="card club-card" href="{{ url_for('clubs.view', club_id=c.id) }}">
-      <span class="club-emoji" aria-hidden="true">{{ SPORT_EMOJI[c.sport] }}</span>
+      {{ club_logo(c) }}
       <strong class="club-name">{{ c.name }}</strong>
       <span class="club-desc muted">{{ c.description|truncate(110) }}</span>
       <span class="badges">

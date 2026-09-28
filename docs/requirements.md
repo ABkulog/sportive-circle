@@ -104,6 +104,11 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-CLUB-4 | Students can follow a club, or request to join / apply / sign up for tryouts. They're a member only after an officer confirms them. | Must | ✅ |
 | FR-CLUB-5 | Officers can post updates, create club events, confirm or decline people, remove members and add officers. | Must | ✅ |
 | FR-CLUB-6 | Students can message a club's officers before joining. | Should | ✅ |
+| FR-CLUB-7 | Officers upload the club's logo (square, 256 px); it shows on the club page, in the club list, on Home and in Club updates. | Should | ✅ |
+| FR-CLUB-8 | Every verified club has a Share page with its link and a printable QR code ("Scan to join") for flyers and the involvement fair. | Should | ✅ |
+| FR-CLUB-9 | Club events can repeat weekly (up to 12 weeks, for practices) and can be for members only (only members see them in their feed or can join; others see "Join the club"). | Must | ✅ |
+| FR-CLUB-10 | A new club event is posted to the club's updates automatically, with a link, so followers and members hear about it. | Should | ✅ |
+| FR-CLUB-11 | Officers see members' UW emails, can copy them all and download the roster as a spreadsheet (CSV). Members don't see each other's emails. | Should | ✅ |
 
 ### Friends and messages (SOC)
 

@@ -2,7 +2,7 @@ import re
 from datetime import timedelta
 from io import BytesIO
 
-from conftest import event_id_from
+from conftest import event_id_from, make_image
 from sportive import create_app
 from sportive.db import get_db
 from sportive.timeutil import now_local
@@ -2722,3 +2722,95 @@ def test_a_game_without_a_name_gets_one(accounts, client, app):
         assert default_title("soccer", "Denny Field") == "Soccer at Denny Field"
         assert default_title("esports", "Online") == "Esports online"
         assert default_title("hiking", "Off campus (see note)") == "Hiking off campus"
+
+
+# ------------------------------------------------ clubs, for real club officers
+
+def _club_with_member(accounts, client, app):
+    """An approved club run by captain@uw.edu, with member@uw.edu confirmed and fan@uw.edu following."""
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="member@uw.edu", name="Mem Ber")
+    client.post(f"/clubs/{club}/join", data={"message": "Yes!"})
+    accounts.logout()
+    accounts.signup(email="fan@uw.edu", name="Fan Follower")
+    client.post(f"/clubs/{club}/follow")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    client.post(f"/clubs/{club}/members/{_user_id(app, 'member@uw.edu')}/approve")
+    return club
+
+
+def test_officers_add_their_club_logo(accounts, client, app):
+    club = _club_with_member(accounts, client, app)
+    assert "Add logo" in client.get(f"/clubs/{club}").data.decode()
+    client.post(f"/clubs/{club}/logo/edit", data={"logo": (BytesIO(make_image()), "logo.png")},
+                content_type="multipart/form-data")
+    page = client.get(f"/clubs/{club}").data.decode()
+    logo_url = re.search(r'src="(/clubs/\d+/logo\?v=[^"]+)"', page).group(1)
+    image = client.get(logo_url)
+    assert image.status_code == 200 and image.mimetype == "image/jpeg"
+    assert logo_url in client.get("/clubs").data.decode()               # in the club list too
+    accounts.logout()
+    accounts.login(email="member@uw.edu")
+    assert client.get(f"/clubs/{club}/logo/edit").status_code == 403   # only officers
+
+
+def test_club_share_page_has_a_qr_code_for_flyers(accounts, client, app):
+    club = _club_with_member(accounts, client, app)
+    page = client.get(f"/clubs/{club}/share").data.decode()
+    assert f"/clubs/{club}/qr.svg" in page and "Scan to join" in page and "data-print" in page
+    qr = client.get(f"/clubs/{club}/qr.svg")
+    assert qr.status_code == 200 and qr.data.startswith(b'<svg xmlns="http://www.w3.org/2000/svg"')
+    client.post("/clubs/new", data={**CLUB, "name": "Pending Club"})
+    assert client.get(f"/clubs/{_club_id(app, 'Pending Club')}/share").status_code == 404   # not verified yet
+
+
+def test_weekly_practices_in_one_go_and_followers_hear_about_it(accounts, client, app):
+    club = _club_with_member(accounts, client, app)
+    form = event_form(title="Tuesday practice", sport="spikeball", location="The Quad", repeat="4", club=str(club))
+    first = event_id_from(client.post(f"/events/new?club={club}", data=form))
+    with app.app_context():
+        rows = get_db().execute("SELECT starts_at FROM events WHERE club_id = ? ORDER BY starts_at", (club,)).fetchall()
+        post = get_db().execute("SELECT body, event_id FROM club_posts WHERE club_id = ?", (club,)).fetchone()
+    from sportive.timeutil import from_db
+    days = [from_db(row["starts_at"]) for row in rows]
+    assert len(days) == 4 and all((b - a).days == 7 for a, b in zip(days, days[1:]))
+    assert post["event_id"] == first and "for 4 weeks" in post["body"]
+    accounts.logout()
+    accounts.login(email="fan@uw.edu")
+    updates = client.get("/clubs/updates").data.decode()
+    assert "Tuesday practice" in updates and f"/events/{first}" in updates
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    assert b"up to 12 weeks" in client.post(f"/events/new?club={club}", data={**form, "repeat": "40"},
+                                            follow_redirects=True).data
+
+
+def test_members_only_club_events(accounts, client, app):
+    club = _club_with_member(accounts, client, app)
+    event = event_id_from(client.post(f"/events/new?club={club}", data=event_form(
+        title="Members scrimmage", sport="spikeball", location="The Quad", is_private="members", club=str(club))))
+    accounts.logout()
+    accounts.login(email="fan@uw.edu")                     # following isn't membership
+    assert "Members scrimmage" not in client.get("/?scope=all").data.decode()
+    page = client.get(f"/events/{event}").data.decode()
+    assert "Members only" in page and "Join the club" in page
+    assert b"is for UW Spikeball Club members" in client.post(f"/events/{event}/join", follow_redirects=True).data
+    accounts.logout()
+    accounts.login(email="member@uw.edu")
+    assert "Members scrimmage" in client.get("/?scope=all").data.decode()
+    assert b"You&#39;re in" in client.post(f"/events/{event}/join", follow_redirects=True).data
+
+
+def test_officers_get_a_roster_members_dont(accounts, client, app):
+    club = _club_with_member(accounts, client, app)
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "member@uw.edu" in page and "Copy all emails" in page and "Download roster" in page
+    csv_file = client.get(f"/clubs/{club}/roster.csv")
+    assert csv_file.mimetype == "text/csv" and b"Mem Ber,member@uw.edu" in csv_file.data
+    assert "uw-spikeball-club-roster.csv" in csv_file.headers["Content-Disposition"]
+    accounts.logout()
+    accounts.login(email="member@uw.edu")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "captain@uw.edu" not in page and "Copy all emails" not in page
+    assert client.get(f"/clubs/{club}/roster.csv").status_code == 403

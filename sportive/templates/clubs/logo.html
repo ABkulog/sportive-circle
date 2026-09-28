@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "_macros.html" import club_logo %}
+{% block title %}Club logo{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('clubs.view', club_id=club.id) }}">← {{ club.name }}</a>
+<div class="card form-card center">
+  <h1>Club logo</h1>
+  <p class="muted">A square image works best. It shows on your club page and in the club list.</p>
+  <form method="post" enctype="multipart/form-data" class="form photo-form">
+    {{ csrf_field() }}
+    <label class="photo-picker">
+      <span class="photo-preview" id="photo-preview">{{ club_logo(club, 150) }}</span>
+      <span class="btn btn-ghost">Choose an image</span>
+      <input type="file" name="logo" id="photo-input" accept="image/*" class="file-input" required>
+    </label>
+    <button class="btn btn-block">Save</button>
+  </form>
+  {% if club.logo_updated %}
+    <form method="post" data-confirm="Remove the club's logo?">
+      {{ csrf_field() }}<input type="hidden" name="remove" value="1">
+      <button class="btn btn-danger-ghost">Remove logo</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

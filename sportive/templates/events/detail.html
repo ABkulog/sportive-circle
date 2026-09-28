@@ -28,6 +28,7 @@
         {% if event.is_quick %}<span class="badge badge-gold">Need players</span>{% endif %}
         {% if event.is_private %}<span class="badge">🔒 Private</span>{% endif %}
         {% if event.team_size %}<span class="badge badge-purple">Team vs team · {{ event.team_size }}v{{ event.team_size }}</span>{% endif %}
+        {% if event.members_only %}<span class="badge badge-gold">Members only</span>{% endif %}
         {% if event.open_to != 'everyone' %}<span class="badge badge-gold">{{ OPEN_TO[event.open_to] }}{% if event.open_to != 'women_nb' %} only{% endif %}</span>{% endif %}
         {% if event.club_id %}<a class="badge badge-club" href="{{ url_for('clubs.view', club_id=event.club_id) }}">🏛️ {{ event.club_name }}</a>{% endif %}
         {% if event.cancelled %}<span class="badge badge-danger">Canceled</span>{% elif ended %}<span class="badge badge-muted">Ended</span>{% endif %}
@@ -99,6 +100,9 @@
           <button class="btn btn-large btn-block" disabled>Teams are set</button>
           <p class="hint">Ask a player to invite you.</p>
         {% endif %}
+      {% elif event.members_only and not event.i_am_member %}
+        <button class="btn btn-large btn-block" disabled>Members only</button>
+        <p class="hint">For {{ event.club_name }} members. <a href="{{ url_for('clubs.view', club_id=event.club_id) }}#join">Join the club</a></p>
       {% elif spots_for_me == 0 %}
         <button class="btn btn-large btn-block" disabled>Full</button>
       {% elif event.is_private %}

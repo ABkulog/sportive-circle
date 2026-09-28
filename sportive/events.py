@@ -49,7 +49,9 @@ def query_events(where, params=None, order="e.starts_at", limit=100):
                EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me) AS i_am_going,
                {HELD} AS held_count,
                EXISTS (SELECT 1 FROM invites i WHERE i.event_id = e.id AND i.guest_id = :me
-                       AND i.status = 'pending') AS i_am_invited
+                       AND i.status = 'pending') AS i_am_invited,
+               EXISTS (SELECT 1 FROM club_members cm WHERE cm.club_id = e.club_id AND cm.user_id = :me
+                       AND cm.role IN ('member', 'officer')) AS i_am_member
         FROM events e JOIN users u ON u.id = e.host_id LEFT JOIN clubs cl ON cl.id = e.club_id
         WHERE {" AND ".join(where)}
         ORDER BY {order}
@@ -77,6 +79,7 @@ def spots_left(event):
 def can_quick_join(event):
     """For the Join button on feed cards: private and team games need their page (password, teams)."""
     return (not event["cancelled"] and not event["i_am_going"] and not event["team_size"] and not not_for_me(event)
+            and (not event["members_only"] or event["i_am_member"])
             and (event["i_am_invited"] or (not event["is_private"] and spots_left(event) != 0)))
 
 
@@ -125,12 +128,12 @@ def insert_event(data, reserve=()):
     cur = db.execute(
         """INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level,
                                max_players, extra_players, note, is_quick, club_id, is_private, password, team_size,
-                               open_to)
+                               open_to, members_only)
            VALUES (:host_id, :title, :sport, :location, :starts_at, :ends_at, :skill_level,
                    :max_players, :extra_players, :note, :is_quick, :club_id, :is_private, :password, :team_size,
-                   :open_to)""",
+                   :open_to, :members_only)""",
         {"host_id": g.user["id"], "extra_players": 0, "is_quick": 0, "club_id": None, "is_private": 0,
-         "password": "", "team_size": None, "open_to": "everyone", **data},
+         "password": "", "team_size": None, "open_to": "everyone", "members_only": 0, **data},
     )
     # The host is automatically going to their own event (on team 1 in a team vs team game).
     db.execute("INSERT INTO rsvps (event_id, user_id, created_at, team) VALUES (?, ?, ?, ?)",
@@ -147,7 +150,7 @@ def insert_event(data, reserve=()):
 def read_game_options(form, sport, event=None):
     """Private game (password) and format (regular or team vs team), from the New event and Need players forms.
     Returns (is_private, password, team_size, error). The format can't change after the game is made."""
-    is_private = 1 if form.get("is_private") else 0
+    is_private = 1 if form.get("is_private") == "1" else 0   # club events can also say "members"
     password = one_line(form.get("password")) if is_private else ""
     if is_private and not MIN_PASSWORD <= len(password) <= MAX_PASSWORD:
         return 0, "", None, f"Pick a password for your private game ({MIN_PASSWORD} to {MAX_PASSWORD} characters)."
@@ -194,6 +197,10 @@ def read_reservations(form, room):
 
 # -------------------------------------------------------------------- feed
 
+# A club's members-only events only show up for its members (and on the club's own page).
+MEMBERS_ONLY_FOR_MEMBERS = """(e.members_only = 0 OR EXISTS (SELECT 1 FROM club_members cm WHERE cm.club_id = e.club_id
+                                                              AND cm.user_id = :me AND cm.role IN ('member', 'officer')))"""
+
 # Games from someone I blocked (or who blocked me) never show up in my feed.
 NOT_BLOCKED = """NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :me AND b.blocked_id = e.host_id)
                                               OR (b.blocker_id = e.host_id AND b.blocked_id = :me))"""
@@ -218,7 +225,7 @@ def feed():
         filters["scope"] = "interests" if my_sports else "all"
 
     now = now_local()
-    where = ["e.cancelled = 0", "e.ends_at >= :now", NOT_BLOCKED, games_open_to_me()]
+    where = ["e.cancelled = 0", "e.ends_at >= :now", NOT_BLOCKED, games_open_to_me(), MEMBERS_ONLY_FOR_MEMBERS]
     params = {"now": to_db(now)}
 
     if filters["sport"] in SPORTS:
@@ -430,8 +437,15 @@ def create():
     if request.method == "POST":
         form = request.form
         data, error = read_event_form(form)
+        repeat = _int(form.get("repeat")) or 1
         if error is None and club is not None:
-            data.update(club_id=club["id"], skill_level="All levels")  # club events are for everyone
+            # Club events are open to all levels; they can be for members only, and repeat weekly (practices).
+            data.update(club_id=club["id"], skill_level="All levels",
+                        members_only=1 if form.get("is_private") == "members" else 0)
+            if not 1 <= repeat <= MAX_REPEAT_WEEKS:
+                error = f"A club event can repeat for up to {MAX_REPEAT_WEEKS} weeks."
+        elif error is None:
+            repeat = 1
         if error is None:
             duplicate = get_db().execute(
                 "SELECT 1 FROM events WHERE host_id = ? AND title = ? AND starts_at = ? AND cancelled = 0",
@@ -444,7 +458,16 @@ def create():
             reserve, error = read_reservations(form, room)
         if error is None:
             event_id = insert_event(data, reserve)
-            flash(created_message(data["is_private"], reserve, "Your game is up!"), "celebrate")
+            for week in range(1, repeat):  # the same practice every week after the first
+                later = dict(data, starts_at=to_db(from_db(data["starts_at"]) + timedelta(weeks=week)),
+                             ends_at=to_db(from_db(data["ends_at"]) + timedelta(weeks=week)))
+                insert_event(later)
+            if club is not None:
+                post_club_event(club, event_id, data, repeat)
+                flash(f"Posted {repeat} weekly events. Your followers see it in Club updates." if repeat > 1 else
+                      "Posted! Your followers see it in Club updates.", "celebrate")
+            else:
+                flash(created_message(data["is_private"], reserve, "Your game is up!"), "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))
         flash(error, "error")
     else:
@@ -454,6 +477,25 @@ def create():
                           "sport": request.args.get("sport", "") or (club["sport"] if club else "")})
     return render_template("events/form.html", form=form, event=None, club=club, friends=friends_of(g.user["id"]),
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"))
+
+
+MAX_REPEAT_WEEKS = 12  # about a quarter of weekly practices
+
+
+def post_club_event(club, event_id, data, repeat):
+    """A new club event goes in the club's updates, so followers and members hear about it (Clubs tab)."""
+    when = fmt_when(data["starts_at"])
+    if repeat > 1:
+        starts = from_db(data["starts_at"])
+        text = (f"New: {data['title']}, every {starts.strftime('%A')} at {fmt_clock(data['starts_at'])} "
+                f"for {repeat} weeks, starting {when} · {data['location']}")
+    else:
+        text = f"New event: {data['title']} · {when} · {data['location']}"
+    if data.get("members_only"):
+        text += " (members only)"
+    get_db().execute("INSERT INTO club_posts (club_id, author_id, body, created_at, event_id) VALUES (?, ?, ?, ?, ?)",
+                     (club["id"], g.user["id"], text, to_db(now_local()), event_id))
+    get_db().commit()
 
 
 def club_for_new_event(club_id):
@@ -480,14 +522,16 @@ def edit(event_id):
         form = request.form
         data, error = read_event_form(form, event)
         if error is None and event["club_id"]:
-            data.update(skill_level="All levels")
+            data.update(skill_level="All levels", members_only=1 if form.get("is_private") == "members" else 0)
+        elif error is None:
+            data.update(members_only=0)
         if error is None:
             db = get_db()
             db.execute(
                 """UPDATE events SET title = :title, sport = :sport, location = :location,
                        starts_at = :starts_at, ends_at = :ends_at, skill_level = :skill_level,
                        max_players = :max_players, note = :note, is_private = :is_private, password = :password,
-                       open_to = :open_to
+                       open_to = :open_to, members_only = :members_only
                    WHERE id = :id""",
                 {**data, "id": event_id},
             )
@@ -502,8 +546,8 @@ def edit(event_id):
             "skill_level": event["skill_level"], "starts_at": to_form(event["starts_at"]),
             "ends_at": to_form(event["ends_at"]), "note": event["note"],
             "players": event["max_players"] or "",
-            "is_private": "1" if event["is_private"] else "", "password": event["password"],
-            "open_to": event["open_to"],
+            "is_private": "1" if event["is_private"] else ("members" if event["members_only"] else ""),
+            "password": event["password"], "open_to": event["open_to"],
         })
     return render_template("events/form.html", form=form, event=event, min_start="")
 
@@ -713,6 +757,8 @@ def join_problem(event, password=None):
         return "You can't join this game."
     if not_for_me(event):
         return not_for_me(event)
+    if event["members_only"] and not event["i_am_member"]:
+        return f"This event is for {event['club_name']} members."
     if event["team_size"] and invite is None:
         return "Team games are invite-only. Challenge them with your own team, or ask a player to invite you."
     if event["is_private"] and invite is None:

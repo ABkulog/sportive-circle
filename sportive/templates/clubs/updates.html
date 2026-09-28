@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import clubs_tabs, avatar %}
+{% from "_macros.html" import clubs_tabs, avatar, club_logo %}
 {% block title %}Club updates{% endblock %}
 {% block content %}
 {{ clubs_tabs('updates') }}
@@ -32,12 +32,13 @@
     <article class="card club-update">
       <header class="club-update-head">
         <a class="club-update-club" href="{{ url_for('clubs.view', club_id=p.club_id) }}">
-          <span class="club-emoji small" aria-hidden="true">{{ SPORT_EMOJI[p.sport] }}</span>
+          {{ club_logo(p, 36, logo=p.club_logo or '', club_id=p.club_id) }}
           <span><strong>{{ p.club_name }}</strong>
             <small class="muted">{{ p.full_name or 'An officer' }}{% if p.author_role == 'officer' %} · Officer{% endif %} · {{ p.created_at|when }}</small></span>
         </a>
       </header>
       <p class="club-update-body">{{ p.body }}</p>
+      {% if p.event_id %}<a class="btn btn-small btn-ghost" href="{{ url_for('events.detail', event_id=p.event_id) }}">See the event</a>{% endif %}
     </article>
   {% else %}
     <div class="card empty">

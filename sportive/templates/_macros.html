@@ -30,12 +30,14 @@
    data-show="crowd"   -> public, regular games (Need players: "we have / we need")
    data-show="regular" -> not team vs team (max players)
    Hidden parts are also switched off, so they're never sent. ---- #}
-{% macro who_can_join(form) %}
-  {% set private = form.get('is_private') %}
+{% macro who_can_join(form, club=False) %}
+  {% set choice = form.get('is_private', '') %}
+  {% set private = choice == '1' %}
   <fieldset class="field">
     <legend>Who can join?</legend>
     <div class="segmented" role="radiogroup" aria-label="Who can join">
-      <label><input type="radio" name="is_private" value="" {% if not private %}checked{% endif %}><span>Anyone</span></label>
+      <label><input type="radio" name="is_private" value="" {% if not choice %}checked{% endif %}><span>Anyone</span></label>
+      {% if club %}<label><input type="radio" name="is_private" value="members" {% if choice == 'members' %}checked{% endif %}><span>Members</span></label>{% endif %}
       <label><input type="radio" name="is_private" value="1" {% if private %}checked{% endif %}><span>🔒 Private</span></label>
     </div>
   </fieldset>
@@ -46,7 +48,7 @@
 {% endmacro %}
 
 {% macro open_to_field(form) %}
-  <label class="field" data-show="public" {% if form.get('is_private') %}hidden{% endif %}><span>Open to</span>
+  <label class="field" data-show="public" {% if form.get('is_private') == '1' %}hidden{% endif %}><span>Open to</span>
     <select name="open_to">
       {% for key, label in OPEN_TO.items() %}<option value="{{ key }}" {% if form.get('open_to', 'everyone') == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
     </select></label>
@@ -54,7 +56,7 @@
 
 {% macro format_field(form) %}
   {% set sizes = SPORT_TEAM_SIZES.get(form.get('sport', ''), []) %}
-  <label class="field" data-show="public" data-team-field {% if not sizes or form.get('is_private') %}hidden{% endif %}><span>Format</span>
+  <label class="field" data-show="public" data-team-field {% if not sizes or form.get('is_private') == '1' %}hidden{% endif %}><span>Format</span>
     <select name="team_size" data-team-size>
       <option value="">Regular game</option>
       {% for n in sizes %}<option value="{{ n }}" {% if form.get('team_size')|string == n|string %}selected{% endif %}>{{ n }}v{{ n }} team vs team</option>{% endfor %}
@@ -75,7 +77,7 @@
       {% for n in range(2, cap + 1) %}<option value="{{ n }}" {% if chosen == n|string %}selected{% endif %}>{{ n }}</option>{% endfor %}
     </select></label>
   {% if not event %}
-    {% set private = form.get('is_private') %}
+    {% set private = form.get('is_private') == '1' %}
     <fieldset class="field who-coming">
       <legend>Who's coming? <em>(optional)</em></legend>
       {% if friends %}
@@ -128,6 +130,7 @@
         {% if e.club_name %}<span class="badge badge-club">🏛️ {{ e.club_name }}</span>{% endif %}
         {% if e.is_private %}<span class="badge">🔒 Private</span>{% endif %}
         {% if e.team_size %}<span class="badge">{{ e.team_size }}v{{ e.team_size }} teams</span>{% endif %}
+        {% if e.members_only %}<span class="badge">Members only</span>{% endif %}
         {% if e.open_to != 'everyone' %}<span class="badge">{{ OPEN_TO[e.open_to] }}{% if e.open_to != 'women_nb' %} only{% endif %}</span>{% endif %}
         {% if e.skill_level in ('Intermediate', 'Competitive') %}<span class="badge badge-level">{{ e.skill_level }}</span>{% endif %}
         {% if e.cancelled %}<span class="badge badge-danger">Canceled</span>
@@ -164,6 +167,17 @@
          alt="" width="{{ size }}" height="{{ size }}" style="--size: {{ size }}px" loading="lazy">
   {%- else -%}
     <span class="avatar-img avatar-initial" style="--size: {{ size }}px" aria-hidden="true">{{ name[:1]|upper }}</span>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro club_logo(club, size=44, logo=None, club_id=None, sport=None) %}
+  {# A club's logo if the officers added one, otherwise its sport's emoji in a circle. #}
+  {%- set version = logo if logo is not none else club.logo_updated -%}
+  {%- if version -%}
+    <img class="club-logo" src="{{ url_for('clubs.logo', club_id=club_id or club.id, v=version) }}" alt=""
+         width="{{ size }}" height="{{ size }}" style="--size: {{ size }}px" loading="lazy">
+  {%- else -%}
+    <span class="club-emoji" style="--size: {{ size }}px" aria-hidden="true">{{ SPORT_EMOJI[sport or club.sport] }}</span>
   {%- endif -%}
 {% endmacro %}
 

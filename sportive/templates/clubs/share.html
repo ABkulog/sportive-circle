@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "_macros.html" import club_logo %}
+{% block title %}Share {{ club.name }}{% endblock %}
+{% block content %}
+<a class="back-link no-print" href="{{ url_for('clubs.view', club_id=club.id) }}">← {{ club.name }}</a>
+<div class="card form-card center share-club">
+  {{ club_logo(club, 64) }}
+  <h1>{{ club.name }}</h1>
+  <p class="muted">Scan to join on Sportive Circle</p>
+  <img class="club-qr" src="{{ url_for('clubs.qr_code', club_id=club.id) }}" alt="QR code for {{ club.name }}" width="260" height="260">
+  <p class="share-link">{{ link }}</p>
+  <div class="action-pair no-print">
+    <button type="button" class="btn" data-share-title="{{ club.name }}" data-share-url="{{ link }}"
+            data-share-text="Join {{ club.name }} on Sportive Circle"><span data-share-label>Share link</span></button>
+    <button type="button" class="btn btn-ghost" data-print>Print</button>
+  </div>
+  <p class="muted fine-print no-print">Put it on your flyer, or show it on a laptop at the involvement fair.</p>
+</div>
+{% endblock %}

@@ -5,10 +5,12 @@ official HuskyLink or UW Recreation page) and an admin approves it before it goe
 The registration form also captures what each club is actually like (tryouts? dues?
 experience? gear?), so students know exactly what they're signing up for.
 """
+import io
 import logging
 import re
+import secrets
 
-from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
 
 from .auth import login_required
@@ -18,6 +20,7 @@ from .links import public_url
 from .mail import compose, send_email
 from .moderation import is_admin
 from .notifications import mark_seen
+from .photos import make_avatar
 from .textutil import one_line
 from .timeutil import now_local, to_db
 
@@ -255,10 +258,7 @@ def view(club_id):
     members, requests = [], []
     role = my_role(club_id)
     if g.get("user") is not None:
-        members = db.execute(
-            """SELECT u.id, u.full_name, u.avatar_updated, m.role FROM club_members m JOIN users u ON u.id = m.user_id
-               WHERE m.club_id = ? AND m.role IN ('member', 'officer')
-               ORDER BY m.role = 'officer' DESC, u.full_name""", (club_id,)).fetchall()
+        members = roster(club_id)
     if role == "officer":
         requests = db.execute(
             """SELECT u.id, u.full_name, u.avatar_updated, m.role, m.message, m.joined_at
@@ -267,7 +267,7 @@ def view(club_id):
     followers = db.execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'follower'",
                            (club_id,)).fetchone()[0]
     events = db.execute(
-        """SELECT e.id, e.title, e.sport, e.starts_at, e.location FROM events e
+        """SELECT e.id, e.title, e.sport, e.starts_at, e.location, e.members_only FROM events e
            WHERE e.club_id = ? AND e.cancelled = 0 AND e.ends_at >= ? ORDER BY e.starts_at LIMIT 10""",
         (club_id, to_db(now_local()))).fetchall()
     return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
@@ -275,6 +275,111 @@ def view(club_id):
                            socials=social_links(club),
                            joining=JOINING,
                            experience=EXPERIENCE, who=WHO_CAN_JOIN)
+
+
+# ---------------------------------------------------- roster (officers)
+
+def roster(club_id):
+    """Members and officers, officers first. Emails are only shown to the club's officers (see the template)."""
+    return get_db().execute(
+        """SELECT u.id, u.full_name, u.email, u.grad_year, u.avatar_updated, m.role, m.joined_at
+           FROM club_members m JOIN users u ON u.id = m.user_id
+           WHERE m.club_id = ? AND m.role IN ('member', 'officer')
+           ORDER BY m.role = 'officer' DESC, u.full_name""", (club_id,)).fetchall()
+
+
+@bp.route("/clubs/<int:club_id>/roster.csv")
+@login_required
+def roster_csv(club_id):
+    """For officers: the member list as a spreadsheet (dues, waivers, the club's own group chat)."""
+    import csv  # only needed here
+    club = require_officer(club_id)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Name", "UW email", "Class of", "Role", "Joined"])
+    for person in roster(club_id):
+        writer.writerow([person["full_name"], person["email"], person["grad_year"] or "", person["role"].title(),
+                         person["joined_at"][:10]])
+    filename = re.sub(r"[^A-Za-z0-9]+", "-", club["name"]).strip("-").lower() or "club"
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename={filename}-roster.csv"})
+
+
+# ---------------------------------------------------- logo
+
+def require_officer(club_id):
+    club = get_club(club_id)
+    if my_role(club_id) != "officer":
+        abort(403)
+    return club
+
+
+@bp.route("/clubs/<int:club_id>/logo")
+def logo(club_id):
+    club = get_club(club_id)
+    row = get_db().execute("SELECT image FROM club_logos WHERE club_id = ?", (club_id,)).fetchone()
+    if row is None or not can_see(club):
+        abort(404)
+    response = Response(row["image"], mimetype="image/jpeg")
+    # The URL changes whenever the logo does (?v=...), so browsers can keep it.
+    response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
+
+
+@bp.route("/clubs/<int:club_id>/logo/edit", methods=("GET", "POST"))
+@login_required
+def edit_logo(club_id):
+    """Officers add the club's real logo, so it looks like their club (not just a sport emoji)."""
+    club = require_officer(club_id)
+    if request.method == "POST":
+        db = get_db()
+        if request.form.get("remove"):
+            db.execute("DELETE FROM club_logos WHERE club_id = ?", (club_id,))
+            db.execute("UPDATE clubs SET logo_updated = NULL WHERE id = ?", (club_id,))
+            db.commit()
+            flash("Logo removed.", "info")
+            return redirect(url_for("clubs.view", club_id=club_id))
+        upload = request.files.get("logo")
+        if upload is None or not upload.filename:
+            flash("Choose an image first.", "error")
+        else:
+            try:
+                image = make_avatar(upload.read())
+            except ValueError as error:
+                flash(str(error), "error")
+            else:
+                db.execute("INSERT OR REPLACE INTO club_logos (club_id, image) VALUES (?, ?)", (club_id, image))
+                db.execute("UPDATE clubs SET logo_updated = ? WHERE id = ?",
+                           (f"{now_local().strftime('%Y%m%d%H%M')}-{secrets.token_hex(3)}", club_id))
+                db.commit()
+                flash("Logo saved.", "success")
+                return redirect(url_for("clubs.view", club_id=club_id))
+    return render_template("clubs/logo.html", club=club)
+
+
+# ---------------------------------------------------- share (link + QR code for flyers and the involvement fair)
+
+@bp.route("/clubs/<int:club_id>/share")
+def share(club_id):
+    club = get_club(club_id)
+    if club["status"] != "approved":
+        abort(404)
+    return render_template("clubs/share.html", club=club, link=public_url("clubs.view", club_id=club_id))
+
+
+@bp.route("/clubs/<int:club_id>/qr.svg")
+def qr_code(club_id):
+    """A QR code that opens the club's page: purple on white, ready to print on a flyer."""
+    import segno  # only needed here
+    club = get_club(club_id)
+    if club["status"] != "approved":
+        abort(404)
+    code = segno.make(public_url("clubs.view", club_id=club_id), error="m")
+    output = io.BytesIO()
+    code.save(output, kind="svg", scale=8, dark="#4b2e83", light="#ffffff", border=2, xmldecl=False)
+    response = Response(output.getvalue(), mimetype="image/svg+xml")
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return response
 
 
 # ---------------------------------------------------- register / edit
@@ -516,7 +621,7 @@ def updates():
             flash("Posted. Your followers will see it.", "success")
         return redirect(url_for("clubs.updates"))
     posts = db.execute(
-        """SELECT p.*, c.name AS club_name, c.sport, u.full_name, u.avatar_updated,
+        """SELECT p.*, c.name AS club_name, c.sport, c.logo_updated AS club_logo, u.full_name, u.avatar_updated,
                   (SELECT m2.role FROM club_members m2 WHERE m2.club_id = c.id AND m2.user_id = u.id) AS author_role
            FROM club_posts p JOIN clubs c ON c.id = p.club_id LEFT JOIN users u ON u.id = p.author_id
            WHERE c.status = 'approved'

@@ -523,8 +523,24 @@ form[data-wizard] .form-step { display: none; }
 .club-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .club-card { display: grid; gap: 6px; align-content: start; color: var(--text); }
 .club-card:hover { text-decoration: none; border-color: var(--faint); }
-.club-emoji { width: 44px; height: 44px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; font-size: 1.4rem; }
-.club-emoji.small { width: 36px; height: 36px; font-size: 1.1rem; flex: none; }
+.club-emoji { --size: 44px; width: var(--size); height: var(--size); flex: none; border-radius: 50%; background: var(--surface);
+  display: grid; place-items: center; font-size: calc(var(--size) * .5); }
+.club-logo { --size: 44px; width: var(--size); height: var(--size); flex: none; border-radius: 50%; object-fit: cover;
+  background: var(--surface); box-shadow: 0 0 0 1px var(--line); }
+.share-club { display: grid; justify-items: center; gap: 8px; }
+.share-club h1 { margin: 4px 0 0; }
+.club-qr { width: min(260px, 70vw); height: auto; border: 1px solid var(--line); border-radius: 8px; }
+.share-link { font-size: .85rem; color: var(--muted); overflow-wrap: anywhere; }
+@media print {
+  .topbar, .appnav, .site-footer, .no-print, .flash { display: none !important; }
+  body { padding: 0 !important; }
+  .share-club { border: 0; box-shadow: none; }
+}
+.roster-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+.club-share-row { margin: 0 0 10px; font-size: .9rem; font-weight: 600; }
+.club-share-row .icon { width: 18px; height: 18px; vertical-align: -3px; }
+.club-logo-wrap { display: grid; justify-items: center; gap: 4px; flex: none; }
+.logo-edit { display: inline-block; padding: 8px 6px; font-size: .8rem; font-weight: 600; }
 .club-name { font-weight: 700; }
 .club-desc { font-size: .88rem; }
 .club-search { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }

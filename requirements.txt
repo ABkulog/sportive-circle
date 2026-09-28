@@ -1,5 +1,6 @@
 Flask>=3.0
 Pillow          # profile pictures
+segno           # QR codes for clubs (and tools/make_qr.py)
 tzdata          # timezone data on Windows
 gunicorn        # production web server (see wsgi.py)
 pytest          # tests
