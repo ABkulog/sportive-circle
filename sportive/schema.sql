@@ -9,6 +9,12 @@ CREATE TABLE IF NOT EXISTS users (
     grad_year       INTEGER,
     birth_date      TEXT,                          -- YYYY-MM-DD (age check, birthday greeting)
     bio             TEXT NOT NULL DEFAULT '',
+    pronouns        TEXT NOT NULL DEFAULT '',      -- optional, e.g. "she/her"
+    gender          TEXT NOT NULL DEFAULT '',      -- optional: '' / woman / man / nonbinary / other (profile.GENDERS)
+    instagram       TEXT NOT NULL DEFAULT '',      -- optional socials: usernames without the @
+    snapchat        TEXT NOT NULL DEFAULT '',
+    tiktok          TEXT NOT NULL DEFAULT '',
+    x_handle        TEXT NOT NULL DEFAULT '',
     verified        INTEGER NOT NULL DEFAULT 0,    -- 1 once the email code is confirmed
     verify_code     TEXT,                          -- 6-digit code for signing up or resetting a password
     verify_expires  TEXT,

@@ -1585,6 +1585,50 @@ def test_same_names_can_be_told_apart(accounts, client, app):
     assert "mchen22@uw.edu" not in by_netid                                 # emails stay private
 
 
+def test_profile_pronouns_gender_and_socials(accounts, client, app):
+    accounts.signup(name="Maya Chen")
+    me = _user_id(app, "dubs@uw.edu")
+    form = {"full_name": "Maya Chen", "grad_year": "2028", "bio": "", "sports": ["soccer"], "pronouns": "she/her",
+            "gender": "woman", "instagram": "@maya.hoops", "snapchat": "", "tiktok": "", "x_handle": ""}
+    client.post("/profile/edit", data=form)
+    page = client.get(f"/u/{me}").data.decode()
+    assert "Class of 2028 · she/her · Woman" in page
+    assert 'href="https://instagram.com/maya.hoops"' in page and "@maya.hoops" in page
+    bad = client.post("/profile/edit", data={**form, "instagram": "not a handle!"}, follow_redirects=True).data
+    assert b"Instagram username doesn" in bad
+    assert b"pick an option for gender" in client.post("/profile/edit", data={**form, "gender": "robot"},
+                                                          follow_redirects=True).data
+    client.post("/profile/edit", data={**form, "pronouns": "", "gender": "", "instagram": ""})
+    page = client.get(f"/u/{me}").data.decode()
+    assert "she/her" not in page and "Woman" not in page and "instagram.com" not in page   # all optional
+
+
+def test_admins_give_the_tester_badge(accounts, client, app):
+    accounts.signup(email="tester@uw.edu", name="Tess Tester")
+    tess = _user_id(app, "tester@uw.edu")
+    assert client.post(f"/admin/users/{tess}/tester/give").status_code == 404   # not an admin: no such page
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM user_badges WHERE badge = 'tester'").fetchone()[0] == 0
+    accounts.logout()
+    accounts.signup(email="boss@uw.edu", name="Bo Boss")
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    assert "Give Tester badge" in client.get(f"/u/{tess}").data.decode()
+    client.post(f"/admin/users/{tess}/tester/give")
+    with app.app_context():
+        from sportive.badges import earned_badges, sync_badges
+        sync_badges(tess)                                  # daily badge syncing doesn't remove it
+        assert "tester" in earned_badges(tess)
+    assert "Take back Tester badge" in client.get(f"/u/{tess}").data.decode()
+    accounts.logout()
+    accounts.login(email="tester@uw.edu")
+    locker = client.get("/profile/badges").data.decode()
+    assert "Tester" in locker
+    accounts.logout()
+    accounts.signup(email="other@uw.edu")
+    still_to_earn = client.get("/profile/badges").data.decode()
+    assert "Helped test Sportive Circle" not in still_to_earn   # nobody can "earn" it
+
+
 def test_people_search_treats_wildcards_as_text(accounts, client):
     accounts.signup(email="maya@uw.edu", name="Maya Chen")
     accounts.logout()

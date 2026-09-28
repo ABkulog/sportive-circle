@@ -1,4 +1,5 @@
 """Public profiles, editing your own, and profile pictures."""
+import re
 import secrets
 
 from flask import (Blueprint, Response, abort, flash, g, redirect, render_template, request, session,
@@ -11,15 +12,27 @@ from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
 from .events import celebrate_progress, query_events, tell_players_it_was_cancelled
 from .photos import make_avatar
-from .badges import (ROLE_BADGES, SHOWCASE_SLOTS, catalog, earned_badges, is_retired, rarity,
-                     set_showcase, showcase, sync_badges)
-from .moderation import is_admin
+from .badges import (GIVEN_BADGES, ROLE_BADGES, SHOWCASE_SLOTS, TESTER, catalog, earned_badges, is_retired,
+                     give_badge, rarity, set_showcase, showcase, sync_badges)
+from .clubs import SOCIALS
+from .moderation import admin_required, is_admin
 from .notifications import mark_seen, notify
 from .textutil import one_line
 from .social import can_message, friendship_status, i_blocked, is_blocked_between
 from .timeutil import now_local, to_db
 
 bp = Blueprint("profile", __name__)
+
+# Optional profile details. Gender is shown only if someone picks one.
+GENDERS = {"": "Prefer not to say", "woman": "Woman", "man": "Man", "nonbinary": "Nonbinary", "other": "Another identity"}
+MAX_PRONOUNS = 20
+PERSON_SOCIALS = ("instagram", "snapchat", "tiktok", "x_handle")  # same checks as club socials (clubs.SOCIALS)
+
+
+def person_socials(user):
+    """[(label, url, "@handle")] for the socials someone added, so people can DM them where they already are."""
+    return [(SOCIALS[key][0], SOCIALS[key][3].format(user[key]), f"@{user[key]}")
+            for key in PERSON_SOCIALS if user[key]]
 
 # Pages you can still open before adding a profile picture.
 ALLOWED_WITHOUT_PHOTO = {"profile.photo_upload", "profile.photo_skip", "profile.photo", "profile.delete_account",
@@ -114,7 +127,8 @@ def photo(user_id):
 @login_required
 def view(user_id):
     user = get_db().execute(
-        "SELECT id, full_name, email, grad_year, bio, avatar_updated, suspended, created_at FROM users"
+        "SELECT id, full_name, email, grad_year, bio, pronouns, gender, instagram, snapchat, tiktok, x_handle,"
+        " avatar_updated, suspended, created_at FROM users"
         " WHERE id = ? AND verified = 1",
         (user_id,),
     ).fetchone()
@@ -140,9 +154,26 @@ def view(user_id):
                     "i_blocked": i_blocked(me, user_id), "blocked_me": is_blocked_between(me, user_id)
                     and not i_blocked(me, user_id)}
     return render_template("profile/view.html", user=user, sports=user_sports(user_id), hosting=hosting,
-                           show_email=show_email,
+                           show_email=show_email, socials=person_socials(user), genders=GENDERS,
+                           is_tester=TESTER.key in earned_badges(user_id),
                            showcase=showcase(user_id), earned=earned_badges(user_id), rarity=rarity(),
                            is_retired=is_retired, relation=relation)
+
+
+@bp.route("/admin/users/<int:user_id>/tester/<action>", methods=("POST",))
+@admin_required
+def tester_badge(user_id, action):
+    """Admins give the 🧪 Tester badge to the people who tested the app (or take it back)."""
+    if action not in ("give", "take"):
+        abort(404)
+    user = get_db().execute("SELECT full_name FROM users WHERE id = ? AND verified = 1", (user_id,)).fetchone()
+    if user is None:
+        abort(404)
+    give_badge(user_id, TESTER.key, give=action == "give")
+    first = user["full_name"].split()[0]
+    flash(f"{first} has the Tester badge now." if action == "give" else f"Took the Tester badge from {first}.",
+          "success")
+    return redirect(url_for("profile.view", user_id=user_id))
 
 
 @bp.route("/profile/badges", methods=("GET", "POST"))
@@ -159,7 +190,8 @@ def badge_locker():
             return redirect(url_for("profile.view", user_id=me))
     sync_badges(me)
     mark_seen("badges")
-    return render_template("profile/badges.html", badges=catalog(), earned=earned_badges(me), role_badges=ROLE_BADGES,
+    return render_template("profile/badges.html", badges=catalog(), earned=earned_badges(me),
+                           role_badges=ROLE_BADGES | GIVEN_BADGES,
                            shown=[badge.key for badge in showcase(me)], rarity=rarity(),
                            is_retired=is_retired, slots=SHOWCASE_SLOTS)
 
@@ -175,6 +207,11 @@ def edit():
         bio = form.get("bio", "").strip()
         sports = [s for s in form.getlist("sports") if s in SPORTS]
         email_reminders = 1 if form.get("email_reminders") else 0
+        pronouns = one_line(form.get("pronouns"))
+        gender = form.get("gender", "")
+        socials = {key: one_line(form.get(key)).lstrip("@") for key in PERSON_SOCIALS}
+        bad_social = next((key for key, value in socials.items()
+                           if value and not re.fullmatch(SOCIALS[key][2], value)), None)
 
         error = None
         if not full_name:
@@ -185,21 +222,36 @@ def edit():
             error = "Please enter a valid graduation year."
         elif len(bio) > 300:
             error = "Bio is too long (300 characters max)."
+        elif len(pronouns) > MAX_PRONOUNS:
+            error = f"Keep pronouns under {MAX_PRONOUNS} characters."
+        elif gender not in GENDERS:
+            error = "Please pick an option for gender."
+        elif bad_social:
+            error = f"That {SOCIALS[bad_social][0]} username doesn't look right. Just the username, like @dubs."
 
         if error is None:
             db = get_db()
-            db.execute("UPDATE users SET full_name = ?, grad_year = ?, bio = ?, email_reminders = ? WHERE id = ?",
-                       (full_name, int(grad_year) if grad_year else None, bio, email_reminders, me["id"]))
+            db.execute("""UPDATE users SET full_name = :full_name, grad_year = :grad_year, bio = :bio,
+                              email_reminders = :email_reminders, pronouns = :pronouns, gender = :gender,
+                              instagram = :instagram, snapchat = :snapchat, tiktok = :tiktok, x_handle = :x_handle
+                          WHERE id = :id""",
+                       {"full_name": full_name, "grad_year": int(grad_year) if grad_year else None, "bio": bio,
+                        "email_reminders": email_reminders, "pronouns": pronouns, "gender": gender, **socials,
+                        "id": me["id"]})
             set_user_sports(me["id"], sports)
             db.commit()
             flash("Profile saved.", "success")
             return redirect(url_for("profile.view", user_id=me["id"]))
         flash(error, "error")
     else:
-        form = MultiDict([("full_name", me["full_name"]), ("grad_year", me["grad_year"] or ""), ("bio", me["bio"])]
+        form = MultiDict([("full_name", me["full_name"]), ("grad_year", me["grad_year"] or ""), ("bio", me["bio"]),
+                          ("pronouns", me["pronouns"]), ("gender", me["gender"])]
+                         + [(key, me[key]) for key in PERSON_SOCIALS]
                          + [("sports", s) for s in user_sports(me["id"])]
                          + ([("email_reminders", "1")] if me["email_reminders"] else []))
-    return render_template("profile/edit.html", form=form, max_grad_year=now_local().year + 8)
+    return render_template("profile/edit.html", form=form, max_grad_year=now_local().year + 8, genders=GENDERS,
+                           socials={key: SOCIALS[key][0] for key in PERSON_SOCIALS},
+                           has_socials=any(form.get(key) for key in PERSON_SOCIALS))
 
 
 @bp.route("/profile/password", methods=("POST",))

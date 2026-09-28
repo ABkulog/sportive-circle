@@ -57,6 +57,12 @@ ADDED_COLUMNS = [
     ("clubs", "youtube", "TEXT NOT NULL DEFAULT ''"),
     ("users", "suspended", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "photo_skipped", "INTEGER NOT NULL DEFAULT 0"),
+    ("users", "pronouns", "TEXT NOT NULL DEFAULT ''"),
+    ("users", "gender", "TEXT NOT NULL DEFAULT ''"),
+    ("users", "instagram", "TEXT NOT NULL DEFAULT ''"),
+    ("users", "snapchat", "TEXT NOT NULL DEFAULT ''"),
+    ("users", "tiktok", "TEXT NOT NULL DEFAULT ''"),
+    ("users", "x_handle", "TEXT NOT NULL DEFAULT ''"),
 ]
 
 

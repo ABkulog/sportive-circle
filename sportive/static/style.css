@@ -433,6 +433,8 @@ form[data-wizard] .form-step { display: none; }
 .profile-photo .avatar-initial { display: grid; }
 .profile-photo:hover { text-decoration: none; }
 .profile-name { min-width: 0; }
+.profile-socials { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .92rem; }
+.profile-socials a { display: inline-block; padding: 4px 0; font-weight: 600; }
 .profile-name h1 { margin: 0 0 2px; overflow-wrap: anywhere; }
 .profile-name p { margin: 0; font-size: .92rem; overflow-wrap: anywhere; }
 .profile-bio { margin: 0; overflow-wrap: anywhere; }
@@ -462,6 +464,7 @@ form[data-wizard] .form-step { display: none; }
 .more-menu-panel.right { left: auto; right: 0; }
 .more-menu-panel form { margin: 0; }
 .more-menu-panel a { font-weight: 600; }
+.more-menu-panel .link-button { text-align: left; white-space: nowrap; font-weight: 600; }
 .locker-link { font-weight: 600; font-size: .9rem; }
 .husky-badges { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 .husky-badges.showcase { width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); }

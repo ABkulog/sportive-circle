@@ -27,6 +27,9 @@ SEASONS = [
 # someone stops being an admin: it describes a role, not something they did.
 TEAM = Badge("team", "💜", "Sportive Circle Team", "Runs Sportive Circle", None)
 ROLE_BADGES = {TEAM.key}
+# Given by an admin (the button on someone's profile), never earned: for the first group who tested the app.
+TESTER = Badge("tester", "🧪", "Tester", "Helped test Sportive Circle before launch", None)
+GIVEN_BADGES = {TESTER.key}
 
 PERMANENT = [
     Badge("first_game", "🐾", "First Game", "Play your first game", None),
@@ -70,7 +73,7 @@ def season_badges(today=None):
 def catalog(today=None):
     """Every badge that exists so far: limited ones first (newest first), then permanent."""
     limited = [Badge("founding_dawg", "✨", "Founding Dawg", "Join Sportive Circle before 2027", FOUNDING_DEADLINE)]
-    return [TEAM] + list(reversed(season_badges(today))) + limited + PERMANENT
+    return [TEAM, TESTER] + list(reversed(season_badges(today))) + limited + PERMANENT
 
 
 def is_retired(badge, today=None):
@@ -135,6 +138,18 @@ def sync_badges(user_id):
                    [(user_id, badge.key, today) for badge in new])
     db.commit()
     return new
+
+
+def give_badge(user_id, key, give=True):
+    """Admins give (or take back) a badge nobody can earn, like Tester."""
+    assert key in GIVEN_BADGES, key
+    db = get_db()
+    if give:
+        db.execute("INSERT OR IGNORE INTO user_badges (user_id, badge, earned_at) VALUES (?, ?, ?)",
+                   (user_id, key, to_db(now_local())))
+    else:
+        db.execute("DELETE FROM user_badges WHERE user_id = ? AND badge = ?", (user_id, key))
+    db.commit()
 
 
 def earned_badges(user_id):

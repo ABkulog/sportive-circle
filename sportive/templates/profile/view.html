@@ -13,12 +13,20 @@
     {% endif %}
     <div class="profile-name">
       <h1>{{ user.full_name }} {% if is_team(user.id) %}<span class="team-pill" title="Runs Sportive Circle">🐾 Team</span>{% endif %}</h1>
-      <p class="muted">{% if user.grad_year %}Class of {{ user.grad_year }}{% else %}Husky{% endif %}
+      <p class="muted">{{ [("Class of " ~ user.grad_year) if user.grad_year else "Husky", user.pronouns,
+                          genders[user.gender] if user.gender else ""]|select|join(" · ") }}
         {% if show_email %}<br><a href="mailto:{{ user.email }}">{{ user.email }}</a>{% endif %}</p>
     </div>
   </div>
 
   {% if user.bio %}<p class="profile-bio">{{ user.bio }}</p>{% endif %}
+  {% if socials %}
+    <ul class="profile-socials" aria-label="Socials">
+      {% for label, url, handle in socials %}
+        <li><a href="{{ url }}" target="_blank" rel="noopener nofollow"><span class="muted">{{ label }}</span> {{ handle }}</a></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
 
   {% if me %}
     <div class="profile-buttons">
@@ -59,6 +67,11 @@
                 data-confirm="Remove {{ user.full_name.split()[0] }} as a friend?">
             {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.path }}">
             <button class="link-button">Unfriend</button>
+          </form>
+        {% endif %}
+        {% if is_admin() %}
+          <form method="post" action="{{ url_for('profile.tester_badge', user_id=user.id, action='take' if is_tester else 'give') }}">
+            {{ csrf_field() }}<button class="link-button">{{ 'Take back Tester badge' if is_tester else 'Give Tester badge' }}</button>
           </form>
         {% endif %}
         <form method="post" action="{{ url_for('social.block', user_id=user.id) }}"
