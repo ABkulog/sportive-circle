@@ -23,11 +23,11 @@ A checklist for launching to UW students. It takes about an hour the first time.
 
 ## 3. Put it online (Render, one Blueprint)
 
-The repository has a [`render.yaml`](../render.yaml) Blueprint that sets up everything: the website, a disk for
-the database, a random secret key, and the reminder job that runs every 10 minutes.
+The repository has a [`render.yaml`](../render.yaml) Blueprint that sets up the website, a disk for the
+database, and random secret keys.
 
 1. Sign up at [render.com](https://render.com) with **GitHub**, and add a payment method (the disk needs a
-   paid plan: about $7/month for the website plus about $1/month for the reminder job).
+   paid plan: about $7/month for the website plus about $0.25/month for the 1 GB disk).
 2. **New → Blueprint →** pick `sportive-circle` → Render reads `render.yaml`.
 3. It asks for the email settings from step 2:
 
@@ -46,10 +46,20 @@ the database, a random secret key, and the reminder job that runs every 10 minut
 
 Every push to `main` on GitHub redeploys automatically. The database stays on the disk.
 
-## 4. Reminders
+## 4. Reminders (free, with cron-job.org)
 
-Already done by the Blueprint: the `sportive-circle-reminders` cron job calls the site every 10 minutes
-(`POST /tasks/send-reminders` with a secret token) and it emails everyone whose game starts within the hour.
+Every 10 minutes something has to ask the site to send "your game starts in an hour" emails. A free
+scheduler does it:
+
+1. In Render, open the **sportive-circle** service → **Environment** → copy the value of **TASK_TOKEN**.
+2. Sign up at [cron-job.org](https://cron-job.org) (free) → **Create cronjob**:
+   - **URL:** `https://<your-app>.onrender.com/tasks/send-reminders`
+   - **Schedule:** every 10 minutes
+   - **Advanced → Request method:** `POST`
+   - **Advanced → Headers:** `X-Task-Token` = the TASK_TOKEN you copied
+3. Save, then use **Test run**: it should answer `{"sent": 0}` (or how many reminders it sent).
+
+Keep the token private: it's the password for that link. Without it, the link answers "not found".
 
 ## 5. Backups
 

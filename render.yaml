@@ -1,5 +1,9 @@
 # Render Blueprint: Render reads this file from GitHub and sets everything up.
 # Render dashboard -> New -> Blueprint -> pick this repository -> fill in the email settings -> Apply.
+#
+# Reminders: a free scheduler (cron-job.org) calls POST /tasks/send-reminders every 10 minutes with the
+# header "X-Task-Token: <TASK_TOKEN>" (copy TASK_TOKEN from the service's Environment tab).
+# See docs/deployment.md, step 4.
 services:
   # The website.
   - type: web
@@ -39,24 +43,3 @@ services:
         sync: false
       - key: MAIL_FROM
         sync: false
-
-  # Game reminders: every 10 minutes, ask the website to email people whose game starts within the hour.
-  - type: cron
-    name: sportive-circle-reminders
-    runtime: python
-    plan: starter
-    region: oregon
-    schedule: "*/10 * * * *"
-    buildCommand: "true"
-    startCommand: 'curl -fsS -X POST -H "X-Task-Token: $TASK_TOKEN" "https://$APP_HOST/tasks/send-reminders"'
-    envVars:
-      - key: TASK_TOKEN
-        fromService:
-          type: web
-          name: sportive-circle
-          envVarKey: TASK_TOKEN
-      - key: APP_HOST
-        fromService:
-          type: web
-          name: sportive-circle
-          property: host
