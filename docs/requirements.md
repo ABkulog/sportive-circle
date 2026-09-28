@@ -15,8 +15,8 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 
 | User | Goal |
 |---|---|
-| **Student (Husky)** | Find a game or a club for their sport and level, and show up without awkwardness. |
-| **Host** | Fill a game quickly ("need 2 more") or plan one ahead. |
+| **Student (Husky)** | Find a game or a club for their sport, alone or with friends, and show up without awkwardness. |
+| **Host** | Fill a game quickly ("need 2 more"), plan one ahead, or run a private or team vs team game. |
 | **Club officer** | Get their verified club found, manage who joins, and post updates. |
 | **Admin** | Keep the community safe (reports, suspensions) and only list real, active UW clubs. |
 
@@ -41,11 +41,12 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
-| FR-PROF-1 | Every user is asked for a profile photo after signing up ("Add later" allowed; they're reminded). | Must | ✅ |
+| FR-PROF-1 | New users are asked for a profile photo once. "Add later" shows a "No problem" pop-up, is remembered (no asking at every login, no banner), and leaves one reminder in the bell. | Must | ✅ |
 | FR-PROF-2 | Photos are cropped to a square, shrunk to 256 px, and stripped of hidden metadata (like GPS). | Must | ✅ |
-| FR-PROF-3 | Users can edit name, class year, bio, sports, photo, reminder emails and chill mode (hide ranks). Edit and Change photo buttons are on their own profile. | Must | ✅ |
+| FR-PROF-3 | Users can edit name, class year, bio, sports, photo and reminder emails. Their own profile has one Edit profile button, plus Add photo only when there's no photo; initials sit centered when there's no photo. | Must | ✅ |
 | FR-PROF-4 | A user's email is shown only to themselves and people they've played a game with. | Must | ✅ |
 | FR-PROF-5 | On the photo page, Save without picking a new photo goes back to the profile, and users can remove their photo (with an "Are you sure?"). | Should | ✅ |
+| FR-PROF-6 | Optional pronouns, gender, and Instagram / Snapchat / TikTok / X usernames, shown only if filled in (so people can DM where they already are). | Should | ✅ |
 
 ### Games and events (EVT)
 
@@ -57,23 +58,39 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-EVT-4 | "Need players": post a game that starts within 2 hours in a few taps; it goes to the top of every feed. | Must | ✅ |
 | FR-EVT-5 | Join and leave games. A full game can't be overbooked, even when two people tap Join at once. | Must | ✅ |
 | FR-EVT-6 | Games that are over stay in your history: you can't leave them. | Should | ✅ |
-| FR-EVT-7 | Hosts can edit or cancel. Canceling emails everyone who joined. | Must | ✅ |
-| FR-EVT-8 | The feed shows upcoming games for your sports, with filters for sport, day (today / week / month), place and level. | Must | ✅ |
+| FR-EVT-7 | Hosts can edit or cancel. Canceling tells everyone who joined (email + bell). | Must | ✅ |
+| FR-EVT-8 | The feed shows upcoming games for your sports, with filters for sport, day (today / week / month), place, level and open spots. Sports and places are listed alphabetically. | Must | ✅ |
 | FR-EVT-9 | Event pages have a map, walking directions (Google or Apple Maps), "Where am I?" with distance, share, and "Add to calendar" (.ics). | Should | ✅ |
 | FR-EVT-10 | "Where am I?" explains how to turn location on when the browser blocks it, retries with rough location if precise location times out, and still works if the map can't load. | Should | ✅ |
 | FR-EVT-11 | Everyone going to a game gets an email reminder an hour before (can be turned off). | Should | ✅ |
 | FR-EVT-12 | Everyone going to a game can use its group chat. | Should | ✅ |
+| FR-EVT-13 | When the host changes the time, place, sport or note, everyone who joined gets a notice in the bell; a time or place change also sends an email. | Must | ✅ |
+| FR-EVT-14 | The skill level is a label chosen by the host, not a gate: anyone can join any game. The note says what the host is looking for. | Must | ✅ |
+| FR-EVT-15 | "N+ open spots" filter, for groups looking for a game together. | Should | ✅ |
+| FR-EVT-16 | Games have a sensible maximum length: 6 hours for court and field sports, 12 for running, rowing and esports, 3 days for trips. | Should | ✅ |
+| FR-EVT-17 | Game pages have a Back button that returns to where you came from (never into the game's own chat). | Should | ✅ |
 
-### Ranks and badges (RANK)
+### Parties, private games, team vs team (PARTY, PRIV, TEAM)
 
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
-| FR-RANK-1 | Each sport has a rank: Casual → Intermediate → Competitive → Legend. Everyone starts at Casual. | Should | ✅ |
-| FR-RANK-2 | Intermediate and Competitive games are only for players at that rank or higher. | Should | ✅ |
-| FR-RANK-3 | After a game (for 7 days), players can give teammates 🤝 props and ⬆️ vouches. | Should | ✅ |
-| FR-RANK-4 | Tryout spots let lower-ranked players into harder games; 3 vouches from players at a level move you up (placement). | Should | ✅ |
-| FR-RANK-5 | Ranked players can bring one friend as a +1 (max 2 per game). | Could | ✅ |
-| FR-RANK-6 | Badges are earned by playing; limited (seasonal) badges retire forever. Users pick 3 to show. | Could | ✅ |
+| FR-PARTY-1 | "Party up": anyone going to a game invites friends; each gets a "You down?" notice. Someone not in yet can join together with their friends in one step (all or nothing). | Must | ✅ |
+| FR-PARTY-2 | Each invite holds a spot for 30 minutes, so strangers can't take it. "I'm in" takes it; "Can't make it" frees it and tells the inviter. Holds end by themselves. | Must | ✅ |
+| FR-PARTY-3 | Not just the host: any player can invite friends. Only friends can be invited. | Must | ✅ |
+| FR-PRIV-1 | Private games show a lock and need the host's password to join (shown to the host and players). Wrong passwords are limited to 10 an hour. | Must | ✅ |
+| FR-PRIV-2 | Friends the host invites to a private game don't need the password. | Must | ✅ |
+| FR-PRIV-3 | In a private game, friends other players want to bring are requests with a note; the host approves or declines. | Should | ✅ |
+| FR-TEAM-1 | Team vs team games (2v2 up to half the sport's cap): the host's party is one team, another group challenges as the other team. Nobody walks in alone. | Should | ✅ |
+
+### Badges (BADGE)
+
+| ID | Requirement | Priority | Status |
+|---|---|---|---|
+| FR-BADGE-1 | Badges are earned by playing; limited (seasonal) badges retire forever. Users pick 3 to show. | Could | ✅ |
+| FR-BADGE-2 | Admins can give the 🧪 Tester badge to the people who tested the app. It can't be earned. | Could | ✅ |
+
+Ranks, props, vouches, tryout spots and +1s were removed after the first tester session ("ranks should go
+until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 
 ### Clubs (CLUB)
 
@@ -90,7 +107,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
-| FR-SOC-1 | Search for people by name and send a friend request. | Must | ✅ |
+| FR-SOC-1 | Search for people by name, or by their exact UW NetID, and send a friend request. Results show class year, mutual friends and "Played together", so people with the same name can be told apart. | Must | ✅ |
 | FR-SOC-2 | Accept, decline, cancel requests and unfriend. People you've played with are suggested. | Must | ✅ |
 | FR-SOC-3 | Direct messages are allowed only between friends, people who played together, a student and a club officer, or when replying to someone who wrote first. | Must | ✅ |
 | FR-SOC-4 | Blocking stops messages, friend requests and joining each other's games, both ways, and hides you from their search and feed. | Must | ✅ |
@@ -99,9 +116,9 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
-| FR-NOTIF-1 | Tabs and icons show how many new things are waiting: messages, friend requests, game chats (Home), club updates and join requests (Clubs), badges (Profile), news (News). A number clears when you open that place. | Must | ✅ |
-| FR-NOTIF-2 | For each kind, users choose "Tab icon", "On my screen" (the What's new box on Home), both or neither. No pop-ups or extra emails. | Must | ✅ |
-| FR-NOTIF-3 | Sensible, quiet defaults: news is off, Need players posts show on the screen but not the tab. New accounts start with nothing to catch up on. | Should | ✅ |
+| FR-NOTIF-1 | Tabs and icons show how many new things are waiting: messages, friend requests, game chats and invites (Home), club updates and join requests (Clubs), badges (Profile). A number clears when you open that place. | Must | ✅ |
+| FR-NOTIF-2 | A 🔔 bell at the top lists what's new, including notices like invites and game changes. For each kind, users choose "Tab icon", "Bell", both or neither. No pop-ups. | Must | ✅ |
+| FR-NOTIF-3 | Sensible, quiet defaults: Need players posts show in the bell but not on the tab. New accounts start with nothing to catch up on. | Should | ✅ |
 
 ### Safety and admin (SAFE)
 
@@ -116,9 +133,8 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
-| FR-INFO-1 | A How it works page explains the app in plain words, with a glossary. | Must | ✅ |
+| FR-INFO-1 | How it works is 3 steps (Find a game, Start your own, Join a club); the FAQ has its own page behind the ? icon. | Must | ✅ |
 | FR-INFO-2 | Privacy and Terms pages, linked from every page and from sign-up. | Must | ✅ |
-| FR-INFO-3 | Husky news from GoHuskies.com, filtered to your sports or any team. | Could | ✅ |
 | FR-INFO-4 | A Suggestions link in the footer: logged-in students send ideas or problems (optionally anonymous, max 5 an hour); only admins can read them. Suggestions are scanned for keywords, and admins are notified only when 3+ different people bring up the same topic within 30 days. | Should | ✅ |
 
 ---
@@ -134,7 +150,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | NFR-SEC-3 | Text people type can never run as code (XSS). | Jinja escapes everything; no inline JavaScript at all; Content-Security-Policy allows scripts only from our files and cdnjs. | ✅ |
 | NFR-SEC-4 | No SQL injection. | Every user value goes through query parameters, never string building. | ✅ |
 | NFR-SEC-5 | Login cookies are HttpOnly, SameSite=Lax, and HTTPS-only when the site uses HTTPS. The app refuses to start publicly without a real `SECRET_KEY`. | Config in `create_app`. | ✅ |
-| NFR-SEC-6 | Limits against abuse: code attempts, resend cooldown, login lockout, 20 messages/minute, 10 reports/hour, 3 pending clubs per person, length limits on every text field and search, and double-tap protection on forms. | Checked on the server (and in the browser for double taps). | ✅ |
+| NFR-SEC-6 | Limits against abuse: code attempts, resend cooldown (with a countdown), login lockout, 10 wrong private-game passwords/hour, 20 messages/minute, 10 reports/hour, 3 pending clubs per person, length limits on every text field and search, and double-tap protection on forms. | Checked on the server (and in the browser for double taps). | ✅ |
 | NFR-SEC-7 | Security headers on every response. | CSP, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors 'none'`. | ✅ |
 | NFR-SEC-8 | Redirects after login only go to pages on this site. | `safe_next()` blocks `//evil.com`. | ✅ |
 
@@ -152,21 +168,22 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 
 | ID | Requirement | Status |
 |---|---|---|
-| NFR-UX-1 | Works on phones (bottom tabs), tablets and laptops (sidebar), with the same 5 sections everywhere. | ✅ |
-| NFR-UX-2 | Plain words: short sentences, no unexplained jargon (glossary on How it works). | ✅ |
+| NFR-UX-1 | Phone first: bottom tabs on phones and tablets, a sidebar on laptops, the same sections everywhere. CSS/JS links carry a version so phones never show an old look after an update. | ✅ |
+| NFR-UX-2 | Plain, casual words: about 30 words a screen, decorative emojis only where they work as icons, no corporate tone. | ✅ |
 | NFR-UX-7 | Long pages are split into clear sections by soft full-width bands; items inside a section are split by thin lines. | ✅ |
 | NFR-UX-3 | Keyboard and screen-reader friendly: labels on every field, skip link, visible focus, `aria-current` on tabs, alt text rules, and text contrast of at least 4.5:1 (WCAG AA). | ✅ |
 | NFR-UX-4 | Light and dark mode; animations are skipped for "reduce motion". | ✅ |
 | NFR-UX-5 | Error messages say what went wrong and how to fix it. Friendly pages for 400/403/404/405/413/500. | ✅ |
-| NFR-UX-6 | Husky look and feel: UW purple and gold, paw logo, Husky wording, without using UW's trademarked logos. | ✅ |
+| NFR-UX-6 | Husky look and feel: UW purple and gold, paw logo, without using UW's trademarked logos or corny slogans. | ✅ |
+| NFR-UX-8 | Feedback from real student testers is turned into requirements (tester session, Sept 28, 2026: FR-EVT-13 to 17, PARTY, PRIV, TEAM, PROF-6, BADGE-2, NOTIF-2). | ✅ |
 
 ### Performance and reliability (NFR-PERF)
 
 | ID | Requirement | Status |
 |---|---|---|
 | NFR-PERF-1 | Pages load fast on campus Wi-Fi: no frontend framework, one small stylesheet; the map library loads only on event pages that have a map. | ✅ |
-| NFR-PERF-2 | Database indexes on the common lookups (events by time, RSVPs by person, messages, club members, friendships, vouches). | ✅ |
-| NFR-PERF-3 | GoHuskies news is cached for 30 minutes and the page still works if their site is down. | ✅ |
+| NFR-PERF-2 | Database indexes on the common lookups (events by time, RSVPs by person, messages, club members, friendships, invites, notices). | ✅ |
+| NFR-PERF-3 | No overbooking under load: joining checks capacity, held spots and team size in one statement; a party's join and holds happen in one locked transaction. | ✅ |
 | NFR-PERF-4 | One failed email never blocks an action or anyone else's reminder (errors are logged). Bad input never crashes the server: 1,000+ junk requests return friendly errors. | ✅ |
 | NFR-PERF-5 | SQLite is fine for thousands of students; move to PostgreSQL if the app grows well beyond one UW campus. | 🟡 |
 
@@ -192,7 +209,6 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 |---|---|---|
 | NFR-LEGAL-1 | Says clearly on every page that it's a student project, not an official UW service. | ✅ |
 | NFR-LEGAL-2 | Uses no UW logos (the "W", Husky dog marks). Only UW colors and place names. | ✅ |
-| NFR-LEGAL-3 | GoHuskies content: only headlines and links, credited, opening on their site. | ✅ |
 | NFR-LEGAL-4 | Have someone review the Privacy and Terms pages before a large public launch. | ⬜ |
 
 ---

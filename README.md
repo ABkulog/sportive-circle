@@ -10,12 +10,16 @@ It is a student project, not an official University of Washington service.
 ## Features
 
 **Playing**
-- **Home feed** of games for your sports, with filters (sport, day, place, level) and a
+- **Home feed** of games for your sports, with filters (sport, day, place, level, open spots) and a
   "happening soon" row at the top.
 - **Need players:** "we have 8, need 2 for soccer in 15 minutes" becomes a post in seconds.
-- **Events:** create, edit or cancel (everyone who joined gets an email); join or leave; player limits
+- **Events:** create, edit or cancel (everyone who joined is told); join or leave; player limits
   that can't be overbooked; campus places per sport with a map, "Where am I?", walking directions and
-  calendar export.
+  calendar export. The skill level is a label, so anyone can join.
+- **Party up:** invite friends to a game; each gets "You down?" and their spot is held for 30 minutes,
+  so a group gets in together. Any player can invite, not just the host.
+- **Private games** with a password (invited friends skip it; the host approves friends others bring),
+  and **team vs team** games where another group challenges the host's team.
 - **Group chat** for everyone going to a game, and **email reminders** an hour before.
 
 **Clubs**
@@ -29,14 +33,18 @@ It is a student project, not an official University of Washington service.
 **People**
 - **UW-only accounts** (`@uw.edu`, or older `@u.washington.edu` addresses), verified with a 6-digit code.
   Forgot-password and change-password flows.
-- Profiles with photos (cropped, shrunk, and stripped of location data).
-- **Friends:** search by name, or add people you've played with. Direct messages with anti-spam rules.
-- **Notifications you control:** numbers on the tabs and a "What's new" box on Home; each person picks
-  which kinds show where (no pop-ups, no spam).
-- **Ranks per sport** (Casual → Intermediate → Competitive → Legend) earned by playing and by
-  teammate vouches; tryout spots and "+1" invites so skill levels can mix; chill mode hides ranks.
+- Profiles with photos (cropped, shrunk, and stripped of location data), optional pronouns, gender and
+  social media usernames.
+- **Friends:** search by name or UW NetID (results show mutual friends, so same names can be told apart),
+  or add people you've played with. Direct messages with anti-spam rules.
+- **Notifications you control:** numbers on the tabs and a 🔔 bell (invites, game changes, messages);
+  each person picks which kinds show where (no pop-ups, no spam).
 - **Badges**, including limited ones that retire each quarter; show your top 3.
-- **Husky news** from every UW Division I team (headlines link to GoHuskies.com).
+
+**Shaped by testers.** After the first session with 7 student testers, ranks, props, the News tab and
+most emojis were removed, every screen was cut to about 30 words, and parties, private games, team vs
+team, the bell and the back button were added (see `docs/requirements.md`, and the git tag
+`ranks-and-news-v1` for the earlier version).
 
 **Safety**
 - Report profiles and messages (with a saved copy), block people, and an admin page to review
@@ -111,14 +119,17 @@ sportive/
   schema.sql          database tables
   db.py               database helpers and automatic column upgrades
   auth.py             sign up, email codes, log in/out, forgot password, CSRF
-  events.py           feed, events, Need players, joining, tryouts, +1s, props & vouches, calendar
+  events.py           feed, events (private, team vs team), Need players, joining, change notices, calendar
+  invites.py          invites and spots held for 30 minutes
+  parties.py          Party up, "You down?", host approval, team challenges
+  notifications.py    tab numbers, the bell, notices, notification settings
+  feedback.py         suggestions and trending topics for admins
   clubs.py            club directory, registration, membership, updates, admin review
-  social.py           friends and name search, blocking, direct messages, event chats
-  profile.py          profiles, photos, badge showcase, settings, account deletion
+  social.py           friends and name/NetID search, blocking, direct messages, event chats
+  profile.py          profiles, photos, socials, badge showcase, Tester badge, settings, account deletion
   moderation.py       reports, the admin reports page, suspending accounts
-  ranks.py, badges.py per-sport ranks and badges
-  news.py             Husky news from GoHuskies.com feeds
-  pages.py            How it works, Privacy, Terms, the Create menu
+  badges.py           badges (earned, seasonal, given)
+  pages.py            How it works, FAQ, Privacy, Terms, the Create menu
   reminders.py        "send-reminders" command (run every 10 minutes)
   stats.py            "sport-stats" command (to tune player limits)
   links.py, mail.py, photos.py, spirit.py, timeutil.py   helpers

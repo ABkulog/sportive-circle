@@ -341,7 +341,7 @@ section.card h2, details.card h2 { margin-top: 0; }
 .filter-row { flex-basis: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
 @media (min-width: 640px) { .filter-row { grid-template-columns: repeat(3, 1fr); } }
 .filters { display: grid; gap: 10px; margin-bottom: 12px; padding: 0; border: 0; }
-.clear-filters { font-size: .88rem; }
+.clear-filters { font-size: .88rem; display: inline-block; padding: 10px 0; }
 .club-picks { margin-top: 8px; }
 .club-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(180px, 1fr); gap: 10px;
   overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }

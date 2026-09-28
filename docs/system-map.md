@@ -16,15 +16,14 @@ flowchart LR
     subgraph Server["Flask app (Python)"]
         direction TB
         MW["Before every request:<br/>CSRF check · load user · photo check"]
-        BP["Blueprints<br/>auth · events · profile · social<br/>clubs · moderation · news · pages"]
-        LOGIC["Logic<br/>ranks · badges · spirit · photos<br/>timeutil · links · mail"]
+        BP["Blueprints<br/>auth · events · parties · profile · social<br/>clubs · moderation · notifications · feedback · pages"]
+        LOGIC["Logic<br/>invites · badges · spirit · photos<br/>timeutil · links · mail"]
         HDR["After every request:<br/>security headers (CSP...)"]
         CLI["Scheduled commands<br/>send-reminders · sport-stats"]
     end
 
     DB[("SQLite database<br/>schema.sql")]
     SMTP["Email provider (SMTP)"]
-    GH["GoHuskies.com RSS"]
     OSM["OpenStreetMap tiles + cdnjs (Leaflet)"]
     MAPS["Google / Apple Maps"]
 
@@ -33,8 +32,7 @@ flowchart LR
     JS -- "chat polling (JSON)" --> BP
     LOGIC --> DB
     CLI --> DB
-    LOGIC -- "codes, reminders, club notices" --> SMTP
-    BP -- "headlines (cached 30 min)" --> GH
+    LOGIC -- "codes, reminders, game changes, club notices" --> SMTP
     JS -- "map images" --> OSM
     UI -- "Directions link" --> MAPS
     GPS -.-> JS
@@ -52,14 +50,16 @@ small enough for one student to maintain. Each area of the app is its own module
 | `sportive/constants.py` | Sports, campus places, map pins, player caps. **Edit this to add a sport or place.** |
 | `sportive/schema.sql`, `db.py` | Database tables and automatic upgrades for existing databases. |
 | `sportive/auth.py` | Sign up, email codes, log in/out, forgot password, CSRF. |
-| `sportive/events.py` | Feed, events, Need players, joining, props, vouches, +1s, tryouts, calendar files. |
-| `sportive/ranks.py`, `badges.py` | Rank math and badges. |
+| `sportive/events.py` | Feed and filters, events (private, team vs team), Need players, joining, change notices, calendar files. |
+| `sportive/invites.py`, `parties.py` | Invites and held spots (30 min), Party up, "You down?", host approval in private games, team challenges. |
+| `sportive/notifications.py` | Tab numbers, the bell, notices (invites, game changes), notification settings. |
+| `sportive/badges.py` | Badges (earned, seasonal, and given ones like Tester). |
 | `sportive/clubs.py` | Club directory, registration, membership, updates, admin review. |
-| `sportive/social.py` | Friends, name search, blocking, direct messages, event chats. |
-| `sportive/profile.py` | Profiles, photos, badge locker, settings, change password, delete account. |
+| `sportive/social.py` | Friends, name/NetID search, blocking, direct messages, event chats. |
+| `sportive/profile.py` | Profiles (pronouns, gender, socials), photos, badge locker, settings, change password, delete account. |
 | `sportive/moderation.py` | Reports and the admin page (review, suspend). |
-| `sportive/news.py` | GoHuskies headlines. |
-| `sportive/pages.py` | How it works, Privacy, Terms, the Create menu. |
+| `sportive/feedback.py` | Suggestions and trending topics for admins. |
+| `sportive/pages.py` | How it works, FAQ, Privacy, Terms, the Create menu. |
 | `sportive/reminders.py`, `stats.py` | Commands run on a schedule. |
 | `sportive/templates/` | Pages. `base.html` has the navigation; `_macros.html` has shared pieces. |
 | `sportive/static/` | Stylesheet, icons, and the small scripts. |
@@ -67,11 +67,11 @@ small enough for one student to maintain. Each area of the app is its own module
 
 ## 3. Screen map
 
-The same five tabs everywhere: a bottom bar on phones and a sidebar on laptops.
+The same four tabs everywhere: a bottom bar on phones and a sidebar on laptops.
 
 ```mermaid
 flowchart TB
-    Landing["Landing (logged out)"] --> Signup["Sign up"] --> Verify["Email code"] --> Photo["Add photo<br/>(or Add later)"] --> How["How it works"]
+    Landing["Landing (logged out)"] --> Signup["Sign up"] --> Verify["Email code<br/>resend countdown"] --> Photo["Add photo<br/>(or Add later → pop-up)"] --> Home
     Landing --> Login["Log in"] --> Forgot["Forgot password"] --> Reset["Code + new password"]
     Landing --> ClubsPublic["Clubs (browse without an account)"]
 
@@ -79,14 +79,13 @@ flowchart TB
         Home["🏠 Home<br/>For you · My events"]
         Clubs["🏛️ Clubs<br/>Find clubs · Updates"]
         Create["➕ Create"]
-        News["📰 News"]
         Profile["👤 Profile"]
     end
-    How --> Home
 
-    Home --> Event["Event page<br/>join · map · share · calendar"]
+    Home --> Event["Event page<br/>join (password if private) · You down? · teams · map · share · calendar"]
     Event --> Chat["Group chat"]
-    Event --> Edit["Edit / cancel (host)"]
+    Event --> Party["Party up / Challenge<br/>pick friends, spots held 30 min"]
+    Event --> Edit["Edit / cancel (host)<br/>players get a notice"]
     Create --> Quick["Need players"]
     Create --> NewEvent["New event"]
     Create --> RegisterClub["Register a club (5 steps)"]
@@ -95,8 +94,10 @@ flowchart TB
     Profile --> EditProfile["Edit profile<br/>photo · sports · password · log out · delete"]
     Profile --> Locker["Badge locker"]
 
-    TopIcons["Top icons: ❓ How it works · 👥 Friends · ✉️ Messages"]
-    TopIcons --> Friends["Friends<br/>search by name · requests"]
+    TopIcons["Top icons: ❓ FAQ · 🔔 Bell · 👥 Friends · ✉️ Messages"]
+    TopIcons --> FAQ["FAQ"]
+    TopIcons --> Bell["Notifications<br/>invites · game changes · new messages"]
+    TopIcons --> Friends["Friends<br/>search by name or NetID · requests"]
     TopIcons --> Inbox["Messages"] --> Thread["Conversation"]
     Thread --> Report["Report"]
     Admin["🛡️ Admin (only ADMIN_EMAILS)"] --> Reports["Reports + suspend"]
@@ -113,14 +114,13 @@ erDiagram
     users ||--o{ rsvps : joins
     events ||--o{ rsvps : has
     events ||--o{ event_messages : chat
-    users ||--o{ props : "gives/gets"
-    users ||--o{ vouches : "gives/gets"
     users ||--o{ user_badges : earns
-    users ||--o{ ranks_seen : "last seen rank"
+    events ||--o{ invites : "held spots"
+    users ||--o{ invites : "invites / is invited"
+    users ||--o{ notices : "bell"
     users ||--o{ friendships : "requests/accepts"
     users ||--o{ blocks : blocks
     users ||--o{ direct_messages : "sends/receives"
-    events ||--o{ plus_one_invites : "+1 invites"
     clubs ||--o{ club_members : "followers, waiting, members, officers"
     users ||--o{ club_members : "is in"
     clubs ||--o{ club_posts : posts
@@ -136,7 +136,8 @@ erDiagram
         text birth_date
         int verified
         int suspended
-        int show_ranks "0 = chill mode"
+        text pronouns "optional"
+        text instagram "optional socials"
     }
     events {
         int id PK
@@ -150,6 +151,19 @@ erDiagram
         int is_quick "Need players"
         int cancelled
         int club_id FK
+        int is_private
+        text password "private games"
+        int team_size "team vs team"
+    }
+    invites {
+        int id PK
+        int event_id FK
+        int inviter_id FK
+        int guest_id FK
+        int team
+        text status "pending / requested / accepted / declined / canceled"
+        text expires_at "spot held until"
+        text note "for the host"
     }
     clubs {
         int id PK
@@ -178,16 +192,44 @@ sequenceDiagram
     participant A as Flask app
     participant D as Database
     S->>A: POST /events/7/join (with CSRF token)
-    A->>A: Logged in? Game not canceled or over? Rank allows it (or tryout / +1)?
-    A->>D: INSERT rsvp ... WHERE going + extra < max_players (one statement)
+    A->>A: Logged in? Game not canceled or over? Private: invited or right password? Team game: invited?
+    A->>D: INSERT rsvp ... WHERE going + extra + spots held for others < max_players (and team not full), one statement
     alt a spot was free
         D-->>A: 1 row
         A-->>S: "You're in!" + confetti, warns about time clashes
     else someone took the last spot first
         D-->>A: 0 rows
-        A-->>S: "Sorry, this event is full"
+        A-->>S: "Sorry, this game is full"
     end
 ```
+
+### Party up (playing with friends)
+
+```mermaid
+sequenceDiagram
+    actor M as Maya (player)
+    participant A as Flask app
+    participant D as Database
+    actor J as Jordan (friend)
+    M->>A: Party up: pick Jordan and Sam
+    A->>D: BEGIN IMMEDIATE (lock)
+    A->>D: enough room for Maya (if not in yet) + 2? then add Maya, invites held 30 min
+    A->>D: COMMIT
+    A-->>J: 🔔 "Maya wants you in Sunday hoops. You down?"
+    alt I'm in
+        J->>A: yes → takes the held spot
+        A-->>M: 🔔 "Jordan is in"
+    else Can't make it
+        J->>A: no → spot free for anyone
+        A-->>M: 🔔 "Jordan can't make it"
+    else no answer in 30 min
+        Note over D: the hold ends by itself; the invite still works if there's room
+    end
+```
+
+In a private game, friends that a player (not the host) brings start as *requests* with a note; the
+host approves (then the spot is held) or declines. In team vs team, the host's party is team 1 and a
+second group claims team 2 with the same flow ("Challenge").
 
 ### Club verification
 

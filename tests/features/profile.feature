@@ -32,3 +32,28 @@ Feature: Profiles
     And "Jordan" joins Maya's game
     When "Jordan" opens Maya's profile
     Then they see "maya@uw.edu"
+
+  @FR-PROF-6
+  Scenario: People can add their Instagram so others can DM them there
+    Given "Maya" is a Husky
+    And "Jordan" is a Husky
+    When "Maya" adds her Instagram "maya.hoops" and the pronouns "she/her"
+    And "Jordan" opens Maya's profile
+    Then they see "@maya.hoops"
+    And they see "she/her"
+
+  @FR-BADGE-2
+  Scenario: Admins give the Tester badge to the people who tested the app
+    Given "Maya" is a Husky
+    And "Admin" is an admin
+    When "Admin" gives "Maya" the Tester badge
+    And "Maya" opens her own profile
+    Then they see "Tester"
+
+  @FR-INFO-1
+  Scenario: How it works is three short steps
+    When a visitor opens How it works
+    Then they see "Find a game"
+    And they see "Start your own"
+    And they see "Join a club"
+    And they don't see "Words you'll see"

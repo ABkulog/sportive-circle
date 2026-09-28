@@ -48,6 +48,11 @@ Feature: Games
     Then they see "You're in"
     And Maya's game has 2 players
 
+  @FR-EVT-16
+  Scenario: A pickup game can't last all day
+    When "Maya" tries to host a 24-hour Spikeball game
+    Then they see "Spikeball events can be at most 6 hours long."
+
   @FR-EVT-5
   Scenario: A full game can't be overbooked
     Given "Maya" hosts a tennis game for 2 players tomorrow

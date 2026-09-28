@@ -582,6 +582,34 @@ def no_csrf_token(world):
     world.saw(person.client.post("/profile/edit", data={"full_name": "Hacked"}), person.client)
 
 
+@when("a visitor opens How it works")
+def visitor_how(world):
+    client = world.app.test_client()
+    world.saw(client.get("/how-it-works"), client)
+
+
+@when(parsers.parse('"{host}" tries to host a 24-hour Spikeball game'))
+def host_day_long(world, host):
+    tomorrow = now_local() + timedelta(days=1)
+    host_game(world, host, sport="spikeball", location="The Quad", starts_at=tomorrow.strftime("%Y-%m-%dT%H:%M"),
+              ends_at=(tomorrow + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M"))
+
+
+@when(parsers.parse('"{name}" adds her Instagram "{handle}" and the pronouns "{pronouns}"'))
+def add_socials(world, name, handle, pronouns):
+    person = world.person(name)
+    world.saw(person.client.post("/profile/edit", data={
+        "full_name": person.name, "grad_year": "", "bio": "", "pronouns": pronouns, "gender": "",
+        "instagram": handle, "snapchat": "", "tiktok": "", "x_handle": ""}, follow_redirects=True), person.client)
+
+
+@when(parsers.parse('"{admin}" gives "{name}" the Tester badge'))
+def give_tester(world, admin, name):
+    person = world.person(admin)
+    world.saw(person.client.post(f"/admin/users/{world.person(name).id}/tester/give", follow_redirects=True),
+              person.client)
+
+
 @when("a visitor opens the home page")
 def visitor_home(world):
     client = world.app.test_client()

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import avatar %}
+{% from "_macros.html" import avatar, icon %}
 {% block title %}{{ club.name }}{% endblock %}
 {% block content %}
 <a class="back-link" href="{{ url_for('clubs.directory') }}">← Clubs</a>
@@ -46,6 +46,10 @@
         <span class="muted">{{ 'An officer marks who makes the team.' if role == 'tryout' else 'An officer will confirm you.' }}</span>
       </div>
     {% else %}
+      <aside class="welcome-help" data-tip="follow-vs-member" hidden>
+        <span><strong>Follow</strong> shows you their updates. You're a <strong>member</strong> once an officer confirms you.</span>
+        <button type="button" class="link-button" aria-label="Dismiss" data-tip-close>{{ icon('x') }}</button>
+      </aside>
       <div class="action-pair">
         <details class="join-panel" {% if request.args.get('ask') %}open{% endif %}>
           <summary class="btn">{{ cta }}</summary>
