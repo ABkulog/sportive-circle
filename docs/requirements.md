@@ -74,13 +74,13 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
-| FR-PARTY-1 | "Party up": anyone going to a game invites friends; each gets a "You down?" notice. Someone not in yet can join together with their friends in one step (all or nothing). | Must | ✅ |
+| FR-PARTY-1 | "Reserve spots for friends": the host can tick friends while creating a New event or Need players post, and anyone in a game can tap Reserve spots later; each friend gets a "You down?" notice. Someone not in yet can "Join + reserve spots for friends" in one step (all or nothing). | Must | ✅ |
 | FR-PARTY-2 | Each invite holds a spot for 30 minutes, so strangers can't take it. "I'm in" takes it; "Can't make it" frees it and tells the inviter. Holds end by themselves. | Must | ✅ |
 | FR-PARTY-3 | Not just the host: any player can invite friends. Only friends can be invited. | Must | ✅ |
-| FR-PRIV-1 | Private games show a lock and need the host's password to join (shown to the host and players). Wrong passwords are limited to 10 an hour. | Must | ✅ |
+| FR-PRIV-1 | New events and Need players posts can be private: a lock in the list, and joining needs the host's password (shown to the host and players). Wrong passwords are limited to 10 an hour. | Must | ✅ |
 | FR-PRIV-2 | Friends the host invites to a private game don't need the password. | Must | ✅ |
 | FR-PRIV-3 | In a private game, friends other players want to bring are requests with a note; the host approves or declines. | Should | ✅ |
-| FR-TEAM-1 | Team vs team games (2v2 up to half the sport's cap): the host's party is one team, another group challenges as the other team. Nobody walks in alone. | Should | ✅ |
+| FR-TEAM-1 | Team vs team ("Format", on New event and Need players), only in sizes that fit the sport (e.g. basketball 2v2-5v5, none for running): the host's party is one team, another group challenges as the other team. Nobody walks in alone. | Should | ✅ |
 
 ### Badges (BADGE)
 

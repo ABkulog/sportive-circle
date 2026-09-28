@@ -13,12 +13,12 @@ from .clubs import featured_clubs, suggested_clubs
 from .constants import (DEFAULT_MAX_HOURS, LOCATION_COORDS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
                         SKILL_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, SPORT_MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .db import get_db, user_sports
-from .invites import (HELD, count_wrong_password, held_spots, hold_minutes_left, my_invite, now_param,
-                      pending_invites, requested_invites, team_counts, too_many_password_tries)
+from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots, my_invite,
+                      now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
 from .links import public_url
 from .notifications import mark_seen, notify
 from .mail import compose, send_email
-from .social import is_blocked_between
+from .social import friends_of, is_blocked_between
 from .spirit import greeting, top_dawgs
 from .textutil import one_line
 from .timeutil import fmt_clock, fmt_when, from_db, now_local, parse_form, to_db, to_form
@@ -86,6 +86,8 @@ def event_title(event):
     sport = SPORTS[event["sport"]]
     if event["cancelled"] or from_db(event["ends_at"]) < now_local():
         return f"{sport} pickup game"
+    if event["team_size"]:
+        return f"{sport} {event['team_size']}v{event['team_size']}: challenge us"
     left = spots_left(event)
     return f"{sport}: full" if left == 0 else f"Need {left} more for {sport}"
 
@@ -113,7 +115,9 @@ def round_up_5(dt):
     return dt + timedelta(minutes=-dt.minute % 5)
 
 
-def insert_event(data):
+def insert_event(data, reserve=()):
+    """Save a new game with its host going, and reserve spots for the friends in `reserve` (the caller has
+    checked they're friends and that they fit). One commit, so nobody can take those spots in between."""
     db = get_db()
     cur = db.execute(
         """INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level,
@@ -126,8 +130,47 @@ def insert_event(data):
     # The host is automatically going to their own event (on team 1 in a team vs team game).
     db.execute("INSERT INTO rsvps (event_id, user_id, created_at, team) VALUES (?, ?, ?, ?)",
                (cur.lastrowid, g.user["id"], to_db(now_local()), 1 if data.get("team_size") else None))
+    if reserve:
+        event = get_event(cur.lastrowid)
+        hold_spots(event["id"], g.user["id"], reserve, 1 if data.get("team_size") else None,
+                   f"{g.user['full_name'].split()[0]} wants you in {event_title(event)} "
+                   f"({fmt_when(event['starts_at'])}). You down?", url_for("events.detail", event_id=event["id"]))
     db.commit()
     return cur.lastrowid
+
+
+def read_game_options(form, sport, event=None):
+    """Private game (password) and format (regular or team vs team), from the New event and Need players forms.
+    Returns (is_private, password, team_size, error). The format can't change after the game is made."""
+    is_private = 1 if form.get("is_private") else 0
+    password = one_line(form.get("password")) if is_private else ""
+    if is_private and not MIN_PASSWORD <= len(password) <= MAX_PASSWORD:
+        return 0, "", None, f"Pick a password for your private game ({MIN_PASSWORD} to {MAX_PASSWORD} characters)."
+    team_size = event["team_size"] if event is not None else None
+    team_raw = form.get("team_size", "").strip()
+    sizes = SPORT_TEAM_SIZES.get(sport, [])
+    if event is None and team_raw:
+        if not sizes:
+            return 0, "", None, f"{SPORTS[sport]} isn't played team vs team. Pick Regular game."
+        if not team_raw.isdigit() or int(team_raw) not in sizes:
+            return 0, "", None, f"{SPORTS[sport]} teams can be {', '.join(f'{n}v{n}' for n in sizes)}."
+        team_size = int(team_raw)
+    if event is not None and team_size and team_size not in sizes:
+        return 0, "", None, f"A {team_size}v{team_size} game can't be changed to {SPORTS[sport]}."
+    return is_private, password, team_size, None
+
+
+def read_reservations(form, room):
+    """Friends the host picked to reserve spots for. Returns (friend ids, error). `room` = spots they can use."""
+    chosen = list(dict.fromkeys(int(value) for value in form.getlist("reserve") if value.isdigit()))
+    friends = {friend["id"] for friend in friends_of(g.user["id"])}
+    if any(friend_id not in friends for friend_id in chosen):
+        return [], "You can only reserve spots for your friends."
+    if len(chosen) > MAX_PARTY:
+        return [], f"You can reserve up to {MAX_PARTY} spots at once."
+    if len(chosen) > room:
+        return [], f"There's only room to reserve {room} spot{'s' if room != 1 else ''} for friends."
+    return chosen, None
 
 
 # -------------------------------------------------------------------- feed
@@ -278,25 +321,11 @@ def read_event_form(form, event=None):
     if len(note) > 500:
         return None, "Note is too long (500 characters max)."
 
-    is_private = 1 if form.get("is_private") else 0
-    password = one_line(form.get("password")) if is_private else ""
-    if is_private and not MIN_PASSWORD <= len(password) <= MAX_PASSWORD:
-        return None, f"Pick a password for your private game ({MIN_PASSWORD} to {MAX_PASSWORD} characters)."
-
-    # Team vs team is chosen when the game is made (people join a team, so it can't change later).
-    team_size = event["team_size"] if event is not None else None
-    team_raw = form.get("team_size", "").strip()
-    sizes = SPORT_TEAM_SIZES.get(sport, [])
-    if event is None and team_raw:
-        if not sizes:
-            return None, f"{SPORTS[sport]} isn't played team vs team. Pick Regular game."
-        if not team_raw.isdigit() or int(team_raw) not in sizes:
-            return None, f"{SPORTS[sport]} teams can be {', '.join(f'{n}v{n}' for n in sizes)}."
-        team_size = int(team_raw)
+    is_private, password, team_size, error = read_game_options(form, sport, event)
+    if error:
+        return None, error
     if team_size:
         max_players = 2 * team_size
-        if event is not None and team_size not in sizes:
-            return None, f"A {team_size}v{team_size} game can't be changed to {SPORTS[sport]}."
 
     return {
         "title": title, "sport": sport, "location": location, "skill_level": skill_level,
@@ -327,15 +356,19 @@ def create():
             if duplicate:
                 error = "This event has already been created."
         if error is None:
-            event_id = insert_event(data)
-            flash("Your game is up!", "celebrate")
+            room = data["team_size"] - 1 if data["team_size"] else data["max_players"] - 1
+            reserve, error = read_reservations(form, room)
+        if error is None:
+            event_id = insert_event(data, reserve)
+            flash("Your game is up!" + (" Your friends' spots are held for 30 minutes." if reserve else ""),
+                  "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))
         flash(error, "error")
     else:
         starts, ends = default_times()
         form = MultiDict({"starts_at": starts, "ends_at": ends, "skill_level": "All levels",
                           "sport": request.args.get("sport", "") or (club["sport"] if club else "")})
-    return render_template("events/form.html", form=form, event=None, club=club,
+    return render_template("events/form.html", form=form, event=None, club=club, friends=friends_of(g.user["id"]),
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"))
 
 
@@ -492,6 +525,10 @@ def quick():
         duration = dict(QUICK_DURATIONS).get(_int(form.get("duration")))
         needed = _int(form.get("needed"))
         have = _int(form.get("have"))
+        is_private, password, team_size, options_error = (
+            read_game_options(form, sport) if sport in SPORTS else (0, "", None, None))
+        if team_size:  # team vs team: your team against a group that challenges you
+            have, needed = 1, 2 * team_size - 1
 
         if sport not in SPORTS:
             error = "Please choose a sport."
@@ -512,21 +549,29 @@ def quick():
                      f"and {have} + {needed} is {have + needed}.")
         elif len(note) > 500:
             error = "Note is too long (500 characters max)."
+        elif options_error:
+            error = options_error
+        reserve = []
+        if error is None:
+            reserve, error = read_reservations(form, team_size - 1 if team_size else needed)
 
         if error is None:
             starts = round_up_5(now_local() + timedelta(minutes=_int(form.get("starts_in"))))
             ends = starts + timedelta(minutes=_int(form.get("duration")))
             event_id = insert_event({
-                "title": f"Need {needed} for {SPORTS[sport]}", "sport": sport, "location": location,
+                "title": f"{team_size}v{team_size} {SPORTS[sport]}" if team_size else f"Need {needed} for {SPORTS[sport]}",
+                "sport": sport, "location": location,
                 "skill_level": skill_level, "starts_at": to_db(starts), "ends_at": to_db(ends),
                 # `have` includes the host, who is counted through their RSVP.
                 "max_players": have + needed, "extra_players": have - 1, "note": note, "is_quick": 1,
-            })
-            flash("Posted! It's at the top of everyone's feed.", "celebrate")
+                "is_private": is_private, "password": password, "team_size": team_size,
+            }, reserve)
+            flash("Posted! It's at the top of everyone's feed."
+                  + (" Your friends' spots are held for 30 minutes." if reserve else ""), "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))
         flash(error, "error")
     return render_template("events/quick.html", form=form, start_options=QUICK_START_OPTIONS,
-                           durations=QUICK_DURATIONS)
+                           durations=QUICK_DURATIONS, friends=friends_of(g.user["id"]))
 
 
 def _int(value):

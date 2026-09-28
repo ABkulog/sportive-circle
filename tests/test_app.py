@@ -2319,7 +2319,7 @@ def test_join_with_friends_is_all_or_nothing(accounts, client, app):
     game = event_id_from(client.post("/events/new", data=event_form(sport="tennis", location="IMA South Tennis Courts",
                                                                      max_players="3")))
     _as(accounts, "Maya")   # a non-host who isn't in yet: joins and brings friends in one go
-    assert b"Join with friends" in client.get(f"/events/{game}").data
+    assert b"Join + reserve spots for friends" in client.get(f"/events/{game}").data
     too_many = client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"], ids["Sam"]]}, follow_redirects=True)
     assert b"Only 1 spot left for friends" in too_many.data
     with app.app_context():
@@ -2450,7 +2450,7 @@ def test_blocked_people_cant_party_into_your_game(accounts, client, app):
     client.post(f"/block/{ids['Jordan']}")
     _as(accounts, "Jordan")
     assert b"can&#39;t join" in client.get(f"/events/{game}/party", follow_redirects=True).data
-    assert b"Join with friends" not in client.get(f"/events/{game}").data
+    assert b"Join + reserve spots for friends" not in client.get(f"/events/{game}").data
 
 
 def test_private_game_host_approves_friends_players_bring(accounts, client, app):
@@ -2508,3 +2508,74 @@ def test_team_invites_go_to_the_right_team_and_private_teams_cant_be_challenged(
                                                                         password="secret1", title="Private 2v2")))
     _as(accounts, "Solo")
     assert b"Ask the host to invite you" in client.get(f"/events/{private}/party", follow_redirects=True).data
+
+
+def test_host_reserves_spots_while_creating_a_game(accounts, client, app):
+    """"Where is the reserve spot part?" Both create forms let the host reserve spots for friends."""
+    ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Stranger")
+    _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])
+    _as(accounts, "Maya")
+    for page in ("/events/new", "/need-players"):
+        html = client.get(page).data.decode()
+        assert "Reserve spots for friends" in html and "Jordan Husky" in html and 'name="is_private"' in html
+        assert 'name="team_size"' in html
+    # New event: tennis for 3, two friends reserved = full for strangers.
+    game = event_id_from(client.post("/events/new", data=event_form(
+        sport="tennis", location="IMA South Tennis Courts", max_players="3", title="Doubles",
+        reserve=[ids["Jordan"], ids["Sam"]])))
+    _as(accounts, "Stranger")
+    assert b"this game is full" in client.post(f"/events/{game}/join", follow_redirects=True).data
+    _as(accounts, "Jordan")
+    assert "Maya wants you in Doubles" in client.get("/notifications").data.decode()
+    assert b"You&#39;re in" in client.post(f"/events/{game}/invite/answer", data={"answer": "yes"},
+                                            follow_redirects=True).data
+    # Need players: "need 2", one reserved for Sam, so the post says Need 1 more.
+    _as(accounts, "Maya")
+    quick = client.post("/need-players", data={"sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
+                                               "starts_in": "15", "duration": "60", "have": "4", "needed": "2",
+                                               "reserve": [ids["Sam"]]})
+    quick_id = event_id_from(quick)
+    assert "Need 1 more for Soccer" in client.get(f"/events/{quick_id}").data.decode()
+    # Can't reserve more than there's room for, or for people who aren't friends.
+    too_many = client.post("/need-players", data={"sport": "soccer", "location": "Denny Field",
+                                                  "skill_level": "All levels", "starts_in": "15", "duration": "60",
+                                                  "have": "4", "needed": "1", "reserve": [ids["Jordan"], ids["Sam"]]},
+                           follow_redirects=True)
+    assert b"only room to reserve 1 spot" in too_many.data
+    stranger = client.post("/events/new", data=event_form(title="Other", reserve=[ids["Stranger"]]),
+                           follow_redirects=True)
+    assert b"only reserve spots for your friends" in stranger.data
+
+
+def test_need_players_can_be_private_or_team_vs_team(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Mo", "Sam")
+    _friends(app, ids["Maya"], ids["Mo"])
+    _as(accounts, "Maya")
+    base = {"sport": "basketball", "location": "IMA (Intramural Activities Building)", "skill_level": "All levels",
+            "starts_in": "15", "duration": "60", "have": "3", "needed": "2"}
+    private = event_id_from(client.post("/need-players", data={**base, "is_private": "1", "password": "hoops4"}))
+    team = event_id_from(client.post("/need-players", data={**base, "team_size": "3", "reserve": [ids["Mo"]]}))
+    _as(accounts, "Sam")
+    assert b"Enter the password" in client.post(f"/events/{private}/join", follow_redirects=True).data
+    page = client.get(f"/events/{team}").data.decode()
+    assert "Basketball 3v3: challenge us" in page and "Challenge with your team" in page
+    with app.app_context():
+        row = get_db().execute("SELECT max_players, extra_players, team_size FROM events WHERE id = ?", (team,)).fetchone()
+        assert tuple(row) == (6, 0, 3)
+        assert get_db().execute("SELECT team FROM invites WHERE guest_id = ?", (ids["Mo"],)).fetchone()[0] == 1
+    _as(accounts, "Maya")
+    bad = client.post("/need-players", data={**base, "team_size": "9"}, follow_redirects=True).data
+    assert b"Basketball teams can be 2v2, 3v3, 4v4, 5v5." in bad
+
+
+def test_players_and_hosts_both_see_reserve_spots(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan", "Sam")
+    _friends(app, ids["Jordan"], ids["Sam"])
+    _friends(app, ids["Maya"], ids["Sam"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form()))
+    assert ">Reserve spots</a>" in client.get(f"/events/{game}").data.decode()        # the host
+    _as(accounts, "Jordan")
+    assert "Join + reserve spots for friends" in client.get(f"/events/{game}").data.decode()  # not in yet
+    client.post(f"/events/{game}/join")
+    assert ">Reserve spots</a>" in client.get(f"/events/{game}").data.decode()        # a player

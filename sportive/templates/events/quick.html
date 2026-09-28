@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import select %}
+{% from "_macros.html" import select, game_options %}
 {% block title %}Need players{% endblock %}
 {% block content %}
 <div class="card form-card">
@@ -17,13 +17,13 @@
         <small class="muted place-tip" data-place-tip></small>
       </label>
     </div>
-    <div class="row">
+    <div class="row" data-regular-only {% if form.get('team_size') %}hidden{% endif %}>
       <label class="field"><span>We have (including you)</span>
         <input name="have" type="number" min="1" max="50" value="{{ form.get('have', '1') }}" required></label>
       <label class="field"><span>We need</span>
         <input name="needed" type="number" min="1" max="30" value="{{ form.get('needed', '2') }}" required></label>
     </div>
-    <small class="muted" data-max-hint></small>
+    <small class="muted" data-max-hint data-regular-only></small>
     <div class="row">
       {{ select('starts_in', 'Starting', start_options, form.get('starts_in', '30')) }}
       {{ select('duration', 'For', durations, form.get('duration', '60')) }}
@@ -33,6 +33,7 @@
         {% for level in SKILL_LEVELS %}<option value="{{ level }}" {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
       </select>
     </label>
+    {{ game_options(form, None, friends) }}
     <label class="field"><span>Note <em>(optional)</em></span>
       <textarea name="note" maxlength="500" rows="2" placeholder="Court 2, look for the blue shirts">{{ form.get('note', '') }}</textarea></label>
     <button class="btn btn-gold btn-block">Post it</button>

@@ -24,7 +24,7 @@
     {% for e in need_players if not up_next or e.id != up_next.id %}
       <a class="now-tile" href="{{ url_for('events.detail', event_id=e.id) }}" aria-label="{{ event_title(e) }}, {{ e.starts_at|relative }}">
         <span class="now-ring is-hot" aria-hidden="true">{{ SPORT_EMOJI[e.sport] }}</span>
-        <strong>{% set left = spots_left(e) %}{% if left %}Need {{ left }}{% else %}{{ SPORTS[e.sport] }}{% endif %}</strong>
+        <strong>{% set left = spots_left(e) %}{% if e.team_size %}{{ e.team_size }}v{{ e.team_size }}{% elif left %}Need {{ left }}{% else %}{{ SPORTS[e.sport] }}{% endif %}</strong>
         <small>{{ e.starts_at|relative }}</small>
       </a>
     {% endfor %}

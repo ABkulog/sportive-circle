@@ -56,6 +56,15 @@ def friendship_status(me, other):
     return "sent" if row["requester_id"] == me else "received"
 
 
+def friends_of(user_id):
+    """Accepted friends (id, name, photo), A to Z. Blocking ends a friendship, so blocked people aren't here."""
+    return get_db().execute(
+        """SELECT u.id, u.full_name, u.avatar_updated FROM friendships f
+           JOIN users u ON u.id = CASE WHEN f.requester_id = :me THEN f.addressee_id ELSE f.requester_id END
+           WHERE (f.requester_id = :me OR f.addressee_id = :me) AND f.status = 'accepted' AND u.suspended = 0
+           ORDER BY u.full_name""", {"me": user_id}).fetchall()
+
+
 def shared_an_event(a, b):
     return get_db().execute(
         """SELECT 1 FROM rsvps r1 JOIN rsvps r2 ON r1.event_id = r2.event_id

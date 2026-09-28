@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import select %}
+{% from "_macros.html" import select, game_options %}
 {% block title %}{{ 'Edit event' if event else 'New event' }}{% endblock %}
 {% block content %}
 <div class="card form-card">
@@ -33,30 +33,13 @@
       <label class="field"><span>Ends</span>
         <input name="ends_at" type="datetime-local" value="{{ form.get('ends_at', '') }}" required></label>
     </div>
-    <label class="toggle">
-      <input type="checkbox" name="is_private" value="1" {% if form.get('is_private') %}checked{% endif %} data-private-toggle>
-      <span>Private game <em>(joining needs a password; friends you invite don't)</em></span>
-    </label>
-    <label class="field" data-private-field {% if not form.get('is_private') %}hidden{% endif %}><span>Password</span>
-      <input name="password" maxlength="30" value="{{ form.get('password', '') }}" placeholder="4 to 30 characters"
-             autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    {{ game_options(form, event, friends) }}
     {% set team_game = event.team_size if event else form.get('team_size') %}
-    {% set has_extras = form.get('max_players') or form.get('note') or team_game %}
+    {% set has_extras = form.get('max_players') or form.get('note') %}
     <details class="fold more-options" {% if has_extras %}open{% endif %}>
-      <summary>More options <span class="muted">· format, max players, note</span></summary>
+      <summary>More options <span class="muted">· max players, note</span></summary>
       <div class="form">
-      {% if event %}
-        {% if event.team_size %}<p class="muted">Team vs team, {{ event.team_size }}v{{ event.team_size }}.</p>{% endif %}
-      {% else %}
-        {% set sizes = SPORT_TEAM_SIZES.get(form.get('sport', ''), []) %}
-        <label class="field" data-team-field {% if not sizes %}hidden{% endif %}><span>Format</span>
-          <select name="team_size" data-team-size>
-            <option value="">Regular game</option>
-            {% for n in sizes %}<option value="{{ n }}" {% if form.get('team_size')|string == n|string %}selected{% endif %}>{{ n }}v{{ n }} team vs team</option>{% endfor %}
-          </select>
-          <small class="muted">Team vs team: you bring your team, another group challenges you.</small></label>
-      {% endif %}
-      <label class="field" {% if team_game %}hidden{% endif %} data-max-field><span>Max players, including you</span>
+      <label class="field" {% if team_game %}hidden{% endif %} data-regular-only><span>Max players, including you</span>
         <input name="max_players" type="number" min="2" value="{{ form.get('max_players', '') }}" placeholder="Pick a sport first">
         <small class="muted" data-max-hint></small></label>
       <label class="field"><span>Note</span>

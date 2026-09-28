@@ -74,7 +74,7 @@
     update();
   }
   const teamSize = form.querySelector("[data-team-size]");
-  const maxField = form.querySelector("[data-max-field]");
+  const regularOnly = form.querySelectorAll("[data-regular-only]");  // max players / "we have, we need"
   const rulesElement = document.getElementById("sport-rules");
   if (teamSize && rulesElement) {
     const rules = JSON.parse(rulesElement.textContent);
@@ -89,7 +89,7 @@
       if (field) field.hidden = sizes.length === 0;
       updateMax();
     };
-    const updateMax = () => { if (maxField) maxField.hidden = Boolean(teamSize.value); };
+    const updateMax = () => regularOnly.forEach((element) => { element.hidden = Boolean(teamSize.value); });
     sport.addEventListener("change", updateSizes);
     teamSize.addEventListener("change", updateMax);
     updateSizes();

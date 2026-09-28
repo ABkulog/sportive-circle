@@ -16,8 +16,8 @@ It is a student project, not an official University of Washington service.
 - **Events:** create, edit or cancel (everyone who joined is told); join or leave; player limits
   that can't be overbooked; campus places per sport with a map, "Where am I?", walking directions and
   calendar export. The skill level is a label, so anyone can join.
-- **Party up:** invite friends to a game; each gets "You down?" and their spot is held for 30 minutes,
-  so a group gets in together. Any player can invite, not just the host.
+- **Reserve spots for friends:** while creating a game or from any game you're in; each friend gets
+  "You down?" and their spot is held for 30 minutes, so a group gets in together. Hosts and players both can.
 - **Private games** with a password (invited friends skip it; the host approves friends others bring),
   and **team vs team** games where another group challenges the host's team.
 - **Group chat** for everyone going to a game, and **email reminders** an hour before.

@@ -10,6 +10,7 @@ from .db import get_db
 from .timeutil import from_db, now_local, to_db
 
 HOLD_TIME = timedelta(minutes=30)
+MAX_PARTY = 10  # friends one person can reserve spots for at once
 MAX_PASSWORD_TRIES = 10              # wrong private-game passwords per person per game...
 PASSWORD_WINDOW = timedelta(hours=1)  # ...per hour
 
@@ -36,6 +37,19 @@ def hold_minutes_left(invite):
         return 0
     left = from_db(invite["expires_at"]) - now_local()
     return max(0, -(-int(left.total_seconds()) // 60))  # round up: "1 min" until it's really over
+
+
+def hold_spots(event_id, inviter, friend_ids, team, message, link):
+    """Reserve a spot for each friend for 30 minutes and send them a "You down?" notice. The caller checks
+    there's room and commits. Used when a host creates a game and by "Reserve spots" on a game page."""
+    from .notifications import notify  # imported here: notifications.py is loaded after this module
+    expires = to_db(now_local() + HOLD_TIME)
+    for friend_id in friend_ids:
+        get_db().execute("""INSERT OR REPLACE INTO invites (event_id, inviter_id, guest_id, team, status, created_at,
+                                                            expires_at)
+                            VALUES (?, ?, ?, ?, 'pending', ?, ?)""",
+                         (event_id, inviter, friend_id, team, now_param(), expires))
+        notify(friend_id, "invites", message, link)
 
 
 def pending_invites(event_id):

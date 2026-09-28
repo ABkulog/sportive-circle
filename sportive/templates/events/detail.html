@@ -100,7 +100,7 @@
           {{ csrf_field() }}<button class="btn btn-large btn-block">Join</button>
         </form>
         {% if can_party_up(event) %}
-          <p class="hint"><a href="{{ url_for('parties.party_up', event_id=event.id) }}">Join with friends</a></p>
+          <a class="btn btn-ghost btn-block" href="{{ url_for('parties.party_up', event_id=event.id) }}">Join + reserve spots for friends</a>
         {% endif %}
       {% endif %}
     </div>
@@ -113,7 +113,7 @@
           <span>{{ icon('chat') }}{% if unread %}<span class="count-dot">{{ unread }}</span>{% endif %}</span>Chat</a>
       {% endif %}
       {% if event.i_am_going and can_party_up(event) %}
-        <a class="icon-action" href="{{ url_for('parties.party_up', event_id=event.id) }}"><span>{{ icon('friends') }}</span>Party up</a>
+        <a class="icon-action" href="{{ url_for('parties.party_up', event_id=event.id) }}"><span>{{ icon('friends') }}</span>Reserve spots</a>
       {% endif %}
       {% if place %}
         <a class="icon-action" href="{{ place.google }}" target="_blank" rel="noopener"><span>{{ icon('directions') }}</span>Directions</a>

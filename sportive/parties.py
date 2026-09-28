@@ -1,7 +1,7 @@
 """Parties: play with your friends.
 
-"Party up" on a game: pick friends, and each gets a notice ("You down?") while their spot is held for
-30 minutes. If you're not in the game yet, you join at the same time, so a whole group gets in at once.
+"Reserve spots" on a game (the host can also do it while creating one): pick friends, and each gets a
+notice ("You down?") while their spot is held for 30 minutes. If you're not in the game yet, you join at the same time, so a whole group gets in at once.
 Yes takes the held spot; No frees it for someone else.
 
 Team vs team: the host's party is team 1. Another group "challenges" them by claiming team 2 the same
@@ -12,7 +12,7 @@ from flask import Blueprint, abort, flash, g, redirect, render_template, request
 from .auth import login_required
 from .db import get_db
 from .events import event_title, get_event, spots_left, try_join
-from .invites import HOLD_TIME, held_spots, my_invite, now_param, team_counts
+from .invites import HOLD_TIME, MAX_PARTY, held_spots, hold_spots, my_invite, now_param, team_counts
 from .notifications import notify
 from .social import is_blocked_between
 from .textutil import one_line
@@ -20,7 +20,6 @@ from .timeutil import fmt_when, from_db, now_local, to_db
 
 bp = Blueprint("parties", __name__)
 
-MAX_PARTY = 10  # friends one person can invite to a game at once
 MAX_NOTE = 150  # "this is my roommate": the note for the host of a private game
 
 
@@ -110,7 +109,7 @@ def party_up(event_id):
                     flash(f"Asked {event['host_name'].split()[0]}. Your friends get the invite once they say yes.",
                           "success")
                 else:
-                    flash(f"Invites sent. Their spot{'s are' if len(chosen) > 1 else ' is'} held for 30 minutes.",
+                    flash(f"Reserved! Their spot{'s are' if len(chosen) > 1 else ' is'} held for 30 minutes.",
                           "celebrate")
                 return redirect(url_for("events.detail", event_id=event_id))
             flash(error, "error")
@@ -145,17 +144,16 @@ def send_party(event, chosen, team, joining_now, note=""):
                 db.execute("UPDATE invites SET status = 'accepted' WHERE id = ?", (mine["id"],))
                 notify(mine["inviter_id"], "invites", f"{first} is in for {title}.",
                        url_for("events.detail", event_id=event["id"]))
-        expires = to_db(now_local() + HOLD_TIME) if not ask_host else now_param()
-        for friend_id in chosen:
-            db.execute("""INSERT OR REPLACE INTO invites (event_id, inviter_id, guest_id, team, status, note,
-                                                          created_at, expires_at)
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                       (event["id"], me, friend_id, team, "requested" if ask_host else "pending", note,
-                        now_param(), expires))
-            if not ask_host:
-                notify(friend_id, "invites", f"{first} wants you in {title} ({fmt_when(event['starts_at'])}). You down?",
-                       url_for("events.detail", event_id=event["id"]))
-        if ask_host:
+        link = url_for("events.detail", event_id=event["id"])
+        if not ask_host:
+            hold_spots(event["id"], me, chosen, team,
+                       f"{first} wants you in {title} ({fmt_when(event['starts_at'])}). You down?", link)
+        else:
+            for friend_id in chosen:  # requests: nothing is held until the host says yes
+                db.execute("""INSERT OR REPLACE INTO invites (event_id, inviter_id, guest_id, team, status, note,
+                                                              created_at, expires_at)
+                              VALUES (?, ?, ?, ?, 'requested', ?, ?, ?)""",
+                           (event["id"], me, friend_id, team, note, now_param(), now_param()))
             names = [row["full_name"].split()[0] for row in db.execute(
                 f"SELECT full_name FROM users WHERE id IN ({', '.join('?' for _ in chosen)})", chosen)]
             notify(event["host_id"], "invites",
