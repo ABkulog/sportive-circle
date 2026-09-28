@@ -10,7 +10,8 @@ from werkzeug.datastructures import MultiDict
 from .auth import login_required, safe_next
 from .badges import sync_badges
 from .clubs import featured_clubs, suggested_clubs
-from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, OPEN_TO, OPEN_TO_GENDERS, STATED_GENDERS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
+from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, OFF_CAMPUS, OPEN_TO, OPEN_TO_GENDERS,
+                        STATED_GENDERS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
                         SKILL_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, SPORT_MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .db import get_db, user_sports
 from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots, my_invite,
@@ -293,8 +294,6 @@ def read_event_form(form, event=None):
     note = form.get("note", "").strip()
     now = now_local()
 
-    if not title:
-        return None, "Event name cannot be empty."
     if len(title) > 80:
         return None, "Event name is too long (80 characters max)."
     if sport not in SPORTS:
@@ -303,8 +302,11 @@ def read_event_form(form, event=None):
         return None, "Please choose a location."
     if location not in SPORT_LOCATIONS[sport]:
         return None, f"{SPORTS[sport]} can't be played at {location}. Choose another place."
+    if location == OFF_CAMPUS and not note:
+        return None, "Off campus: add where in the note, so people can find you."
     if skill_level not in SKILL_LEVELS:
         return None, "Please choose a skill level."
+    title = title or default_title(sport, location)
     try:
         starts = parse_form(form.get("starts_at", ""))
     except ValueError:
@@ -382,6 +384,15 @@ def games_open_to_me():
         return "1"
     fits = ["everyone"] + [key for key, genders in OPEN_TO_GENDERS.items() if gender in genders]
     return f"e.open_to IN ({', '.join(repr(key) for key in fits)})"
+
+
+def default_title(sport, location):
+    """A name for games created without one: "Basketball at the IMA", "Soccer at Denny Field"."""
+    place = location.split(" (")[0]
+    place = {"IMA": "the IMA", "Online": "online"}.get(place, place)
+    if location == OFF_CAMPUS:
+        return f"{SPORTS[sport]} off campus"
+    return f"{SPORTS[sport]} {'' if place == 'online' else 'at '}{place}"
 
 
 def read_players(form, sport, team_size, event=None):
@@ -606,6 +617,8 @@ def quick():
             error = "Please choose a location."
         elif location not in SPORT_LOCATIONS[sport]:
             error = f"{SPORTS[sport]} can't be played at {location}. Choose another place."
+        elif location == OFF_CAMPUS and not note:
+            error = "Off campus: add where in the note, so people can find you."
         elif skill_level not in SKILL_LEVELS:
             error = "Please choose a skill level."
         elif starts_in is None or duration is None:

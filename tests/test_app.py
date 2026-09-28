@@ -110,7 +110,6 @@ def test_create_event_and_host_is_going(accounts, client):
 def test_event_validation(accounts, client):
     accounts.signup()
     cases = {
-        b"Event name cannot be empty.": event_form(title=""),
         b"has to end after it starts": event_form(ends_at=form_time(timedelta(hours=20))),
         b"can&#39;t be before now": event_form(starts_at=form_time(timedelta(hours=-2)),
                                                ends_at=form_time(timedelta(hours=1))),
@@ -127,11 +126,11 @@ def test_games_cant_last_all_day_but_trips_can(accounts, client):
     day = dict(starts_at=form_time(timedelta(days=1)), ends_at=form_time(timedelta(days=2)))
     too_long = client.post("/events/new", data=event_form(sport="spikeball", location="The Quad", **day)).data
     assert b"Spikeball events can be at most 6 hours long." in too_long
-    trip = event_form(title="Rainier day hike", sport="hiking", location="Off campus (see note)", **day)
+    trip = event_form(title="Rainier day hike", sport="hiking", location="Off campus (see note)", note="Paradise lot", **day)
     assert client.post("/events/new", data=trip).status_code == 302
     three_days = dict(starts_at=form_time(timedelta(days=1)), ends_at=form_time(timedelta(days=5)))
     assert b"at most 3 days long" in client.post("/events/new", data=event_form(
-        sport="snow", location="Off campus (see note)", **three_days)).data
+        sport="snow", location="Off campus (see note)", note="Stevens Pass", **three_days)).data
 
 
 def test_duplicate_event_is_rejected(accounts, client):
@@ -749,8 +748,11 @@ def test_off_campus_and_online_have_no_map(accounts, client):
     accounts.signup(sports=("esports",))
     online = client.get(f"/events/{event_id_from(client.post('/events/new', data=event_form(sport='esports', location='Online')))}").data
     assert b"Directions" not in online
-    off = client.get(f"/events/{event_id_from(client.post('/events/new', data=event_form(title='Hike', sport='hiking', location='Off campus (see note)')))}").data
-    assert b"the address is in the note" in off
+    off = client.get(f"/events/{event_id_from(client.post('/events/new', data=event_form(title='Hike', sport='hiking', location='Off campus (see note)', note='Rattlesnake Ledge lot')))}").data
+    assert b"the address is in the note" in off and b"Rattlesnake Ledge lot" in off
+    no_note = client.post("/events/new", data=event_form(title="Hike 2", sport="hiking", location="Off campus (see note)"),
+                          follow_redirects=True).data
+    assert b"Off campus: add where in the note" in no_note
 
 
 def test_this_month_filter(accounts, client, app, monkeypatch):
@@ -2709,3 +2711,14 @@ def test_private_games_are_open_to_whoever_the_host_invites(accounts, client, ap
         assert get_db().execute("SELECT open_to FROM events WHERE id = ?", (game,)).fetchone()[0] == "everyone"
     assert b"pick who the game is open to" in client.post("/events/new", data=event_form(
         title="Weird", open_to="aliens"), follow_redirects=True).data
+
+
+def test_a_game_without_a_name_gets_one(accounts, client, app):
+    accounts.signup()
+    game = event_id_from(client.post("/events/new", data=event_form(title="")))
+    assert "Basketball at the IMA" in client.get(f"/events/{game}").data.decode()
+    with app.app_context():
+        from sportive.events import default_title
+        assert default_title("soccer", "Denny Field") == "Soccer at Denny Field"
+        assert default_title("esports", "Online") == "Esports online"
+        assert default_title("hiking", "Off campus (see note)") == "Hiking off campus"

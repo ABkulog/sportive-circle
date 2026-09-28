@@ -41,7 +41,8 @@
   function updateTip() {
     if (!placeTip) return;
     const rule = rules[sport.value];
-    placeTip.textContent = (rule && rule.tips[location.value]) || "";
+    placeTip.textContent = (rule && rule.tips[location.value])
+      || (location.value.startsWith("Off campus") ? "Add where in the note, so people can find you." : "");
   }
 
   sport.addEventListener("change", () => { updatePlaces(); updatePlayers(); updateTip(); });

@@ -8,8 +8,8 @@
   <form method="post" class="form" data-sport-form {% if event and event.team_size %}data-team-game{% endif %}>
     {{ csrf_field() }}
     {% if club %}<input type="hidden" name="club" value="{{ club.id }}">{% endif %}
-    <label class="field"><span>Event name</span>
-      <input name="title" maxlength="80" value="{{ form.get('title', '') }}" placeholder="Sunday 5v5 at the IMA" required></label>
+    <label class="field"><span>Name <em>(optional)</em></span>
+      <input name="title" maxlength="80" value="{{ form.get('title', '') }}" placeholder="Sunday 5v5 at the IMA"></label>
     <div class="row">
       {{ select('sport', 'Sport', SPORTS.items(), form.get('sport', ''), 'Choose a sport') }}
       {% if not club and not (event and event.club_id) %}
