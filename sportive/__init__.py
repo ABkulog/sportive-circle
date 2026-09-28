@@ -31,6 +31,12 @@ CONTENT_SECURITY_POLICY = "; ".join([
 ])
 
 
+def _setting(name):
+    """An environment setting without stray spaces or line breaks (easy to paste by accident into a
+    hosting dashboard, and enough to make an email login fail). Empty means not set."""
+    return (os.environ.get(name) or "").strip() or None
+
+
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
     # PUBLIC_URL wins; on Render, RENDER_EXTERNAL_URL (e.g. https://sportive-circle.onrender.com) is set for us.
@@ -49,11 +55,11 @@ def create_app(test_config=None):
         PERMANENT_SESSION_LIFETIME=timedelta(days=30),
         MAX_CONTENT_LENGTH=MAX_UPLOAD_MB * 1024 * 1024,  # biggest photo upload
         # Email (codes, reminders). Without MAIL_SERVER, dev mode shows the code on screen.
-        MAIL_SERVER=os.environ.get("MAIL_SERVER"),
+        MAIL_SERVER=_setting("MAIL_SERVER"),
         MAIL_PORT=int(os.environ.get("MAIL_PORT", 587)),
-        MAIL_USERNAME=os.environ.get("MAIL_USERNAME"),
-        MAIL_PASSWORD=os.environ.get("MAIL_PASSWORD"),
-        MAIL_FROM=os.environ.get("MAIL_FROM"),  # defaults to MAIL_USERNAME (never a domain we don't own)
+        MAIL_USERNAME=_setting("MAIL_USERNAME"),
+        MAIL_PASSWORD=_setting("MAIL_PASSWORD"),
+        MAIL_FROM=_setting("MAIL_FROM"),  # defaults to MAIL_USERNAME (never a domain we don't own)
         # The site's public address, used for links in emails, calendar files and share buttons.
         PUBLIC_URL=public_url,
         # Who can review reports and club registrations (comma-separated emails), e.g. "you@uw.edu".

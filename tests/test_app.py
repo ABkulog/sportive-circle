@@ -2209,3 +2209,13 @@ def test_email_failure_reasons_are_specific_and_safe():
     assert "can't receive" in failure_reason(smtplib.SMTPRecipientsRefused({"x@uw.edu": (550, b"no")}))
     assert "reach the email service" in failure_reason(TimeoutError())
     assert "error 452" in failure_reason(smtplib.SMTPDataError(452, b"quota"))
+
+
+def test_email_settings_ignore_pasted_spaces_and_line_breaks(monkeypatch, tmp_path):
+    monkeypatch.setenv("MAIL_USERNAME", "  9a1b2c001@smtp-brevo.com\n")
+    monkeypatch.setenv("MAIL_PASSWORD", "xsmtpsib-key123 \r\n")
+    monkeypatch.setenv("MAIL_SERVER", "smtp-relay.brevo.com ")
+    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "t.db")})
+    assert app.config["MAIL_USERNAME"] == "9a1b2c001@smtp-brevo.com"
+    assert app.config["MAIL_PASSWORD"] == "xsmtpsib-key123"
+    assert app.config["MAIL_SERVER"] == "smtp-relay.brevo.com"
