@@ -733,3 +733,8 @@ details.card.fold { border: 0; border-top: 1px solid var(--line); border-bottom:
 .photo-extra { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .photo-extra form { margin: 0; }
 .event-meta .rel { white-space: nowrap; }  /* keep "in 2 days" together when the date line wraps */
+/* The people who run Sportive Circle (admins): a small gold-on-purple label next to their name. */
+.team-pill { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 999px;
+  background: var(--purple); color: var(--spirit-gold); font: 700 .72rem/1.4 var(--font); letter-spacing: .02em;
+  vertical-align: middle; white-space: nowrap; }
+h1 .team-pill { font-size: .78rem; margin-left: 4px; }

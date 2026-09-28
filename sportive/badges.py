@@ -7,6 +7,7 @@ from collections import namedtuple
 from datetime import date
 
 from .db import get_db
+from .moderation import admin_emails
 from .ranks import FIRST_LEVEL_OF, user_ranks
 from .timeutil import from_db, now_local, to_db
 
@@ -22,6 +23,11 @@ SEASONS = [
     ("Summer", "☀️", (6, 15), (9, 20)),
     ("Autumn", "🍂", (9, 21), (12, 31)),
 ]
+
+# Only for the people who run Sportive Circle (ADMIN_EMAILS). Can't be earned, and it goes away if
+# someone stops being an admin: it describes a role, not something they did.
+TEAM = Badge("team", "💜", "Sportive Circle Team", "Runs Sportive Circle", None)
+ROLE_BADGES = {TEAM.key}
 
 PERMANENT = [
     Badge("first_game", "🐾", "First Game", "Play your first game", None),
@@ -71,7 +77,7 @@ def season_badges(today=None):
 def catalog(today=None):
     """Every badge that exists so far: limited ones first (newest first), then permanent."""
     limited = [Badge("founding_dawg", "✨", "Founding Dawg", "Join Sportive Circle before 2027", FOUNDING_DEADLINE)]
-    return list(reversed(season_badges(today))) + limited + PERMANENT
+    return [TEAM] + list(reversed(season_badges(today))) + limited + PERMANENT
 
 
 def is_retired(badge, today=None):
@@ -115,6 +121,8 @@ def eligible(user_id):
         "founding_dawg": user is not None and date.fromisoformat(user["created_at"][:10]) <= FOUNDING_DEADLINE,
     }
     keys.update(key for key, earned in checks.items() if earned)
+    if user_email(user_id) in admin_emails():
+        keys.add(TEAM.key)
     # Season badges: played a game during that quarter (only quarters since launch count).
     valid_seasons = {badge.key for badge in season_badges()}
     for start in starts:
@@ -124,12 +132,20 @@ def eligible(user_id):
     return keys
 
 
+def user_email(user_id):
+    row = get_db().execute("SELECT email FROM users WHERE id = ?", (user_id,)).fetchone()
+    return row["email"].lower() if row else None
+
+
 def sync_badges(user_id):
     """Save any newly earned badges. Returns the Badge objects that were just unlocked."""
     db = get_db()
     have = {row["badge"] for row in db.execute("SELECT badge FROM user_badges WHERE user_id = ?", (user_id,))}
     by_key = {badge.key: badge for badge in catalog()}
-    new = [by_key[key] for key in eligible(user_id) - have if key in by_key]
+    qualifies = eligible(user_id)
+    new = [by_key[key] for key in qualifies - have if key in by_key]
+    for key in (ROLE_BADGES & have) - qualifies:  # no longer an admin: the Team badge goes
+        db.execute("DELETE FROM user_badges WHERE user_id = ? AND badge = ?", (user_id, key))
     today = to_db(now_local())
     db.executemany("INSERT OR IGNORE INTO user_badges (user_id, badge, earned_at) VALUES (?, ?, ?)",
                    [(user_id, badge.key, today) for badge in new])

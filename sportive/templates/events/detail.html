@@ -133,6 +133,7 @@
     {% for person in attendees %}
       <li>
         <a class="person" href="{{ url_for('profile.view', user_id=person.id) }}">{{ avatar(person.id, person.full_name, person.avatar_updated, 36) }}{{ person.full_name }}</a>
+        {% if is_team(person.id) %}<span class="team-pill" title="Runs Sportive Circle">🐾 Team</span>{% endif %}
         {% if person.grad_year %}<span class="muted">’{{ (person.grad_year|string)[-2:] }}</span>{% endif %}
         {% if person.id == event.host_id %}<span class="badge badge-purple">Host</span>{% endif %}
         {% if person.is_tryout %}<span class="badge badge-gold">🎟️ Tryout</span>{% endif %}

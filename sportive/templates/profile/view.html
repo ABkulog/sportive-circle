@@ -12,7 +12,7 @@
       <span class="profile-photo">{{ avatar(user.id, user.full_name, user.avatar_updated, 84) }}</span>
     {% endif %}
     <div class="profile-name">
-      <h1>{{ user.full_name }}</h1>
+      <h1>{{ user.full_name }} {% if is_team(user.id) %}<span class="team-pill" title="Runs Sportive Circle">🐾 Team</span>{% endif %}</h1>
       <p class="muted">{% if user.grad_year %}Class of {{ user.grad_year }}{% else %}Husky{% endif %}
         {% if show_email %}<br><a href="mailto:{{ user.email }}">{{ user.email }}</a>{% endif %}</p>
     </div>

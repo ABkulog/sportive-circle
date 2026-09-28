@@ -6,6 +6,7 @@
 <a class="back-link" href="{{ url_for('social.inbox') }}">← Messages</a>
 <header class="chat-header">
   <a class="person" href="{{ url_for('profile.view', user_id=other.id) }}">{{ avatar(other.id, other.full_name, other.avatar_updated, 44) }}<h1>{{ other.full_name }}</h1></a>
+  {% if is_team(other.id) %}<span class="team-pill" title="Runs Sportive Circle">🐾 Team</span>{% endif %}
 </header>
 {% if blocked %}
   <p class="card muted">You blocked {{ other.full_name.split()[0] }}. Unblock them from their profile to chat again.</p>

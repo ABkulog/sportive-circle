@@ -21,7 +21,7 @@
 
   <h2 class="band-title">Still to earn</h2>
   <ul class="husky-badges">
-    {% for b in badges if b.key not in earned and not is_retired(b) %}{{ badge_tile(b, earned, rarity, is_retired) }}{% endfor %}
+    {% for b in badges if b.key not in earned and not is_retired(b) and b.key not in role_badges %}{{ badge_tile(b, earned, rarity, is_retired) }}{% endfor %}
   </ul>
 </form>
 {% endblock %}

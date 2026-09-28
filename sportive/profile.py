@@ -11,8 +11,8 @@ from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
 from .events import celebrate_progress, query_events, tell_players_it_was_cancelled
 from .photos import make_avatar
-from .badges import (SHOWCASE_SLOTS, catalog, earned_badges, is_retired, rarity, set_showcase, showcase,
-                     sync_badges)
+from .badges import (ROLE_BADGES, SHOWCASE_SLOTS, catalog, earned_badges, is_retired, rarity,
+                     set_showcase, showcase, sync_badges)
 from .ranks import LEVELS, user_ranks
 from .moderation import is_admin
 from .notifications import mark_seen
@@ -159,7 +159,7 @@ def badge_locker():
             return redirect(url_for("profile.view", user_id=me))
     sync_badges(me)
     mark_seen("badges")
-    return render_template("profile/badges.html", badges=catalog(), earned=earned_badges(me),
+    return render_template("profile/badges.html", badges=catalog(), earned=earned_badges(me), role_badges=ROLE_BADGES,
                            shown=[badge.key for badge in showcase(me)], rarity=rarity(),
                            is_retired=is_retired, slots=SHOWCASE_SLOTS)
 

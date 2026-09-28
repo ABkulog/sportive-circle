@@ -30,12 +30,29 @@ MAX_REPORTS_PER_HOUR = 10  # stops people from spamming reports
 FLAG_THRESHOLD = 3         # reported by this many different people = flagged for admins
 
 
+def admin_emails():
+    """The emails in the ADMIN_EMAILS setting (lowercase)."""
+    return {email.strip().lower() for email in current_app.config["ADMIN_EMAILS"].split(",") if email.strip()}
+
+
 def is_admin(user=None):
     user = user if user is not None else g.get("user")
     if user is None:
         return False
-    admins = {email.strip().lower() for email in current_app.config["ADMIN_EMAILS"].split(",") if email.strip()}
-    return user["email"].lower() in admins
+    return user["email"].lower() in admin_emails()
+
+
+def team_ids():
+    """User ids of the people who run Sportive Circle (the admins), for the 🐾 Team label. Once per page."""
+    if "team_ids" not in g:
+        emails = sorted(admin_emails())
+        g.team_ids = {row["id"] for row in get_db().execute(
+            f"SELECT id FROM users WHERE LOWER(email) IN ({', '.join('?' for _ in emails)})", emails)} if emails else set()
+    return g.team_ids
+
+
+def is_team(user_id):
+    return user_id in team_ids()
 
 
 def resolve_target(target_type, target_id):

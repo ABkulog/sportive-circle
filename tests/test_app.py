@@ -2248,3 +2248,22 @@ def test_check_email_command_explains_without_revealing_the_key(app, monkeypatch
     assert "doesn't start with xsmtpsib-" in output
     assert "LOGIN REFUSED: 535 5.7.8 Authentication failed" in output
     assert "secret" not in output                                  # the key itself is never printed
+
+
+def test_admins_get_the_team_badge_and_label(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    accounts.signup(email="boss@uw.edu", name="Boss Husky")
+    boss = _user_id(app, "boss@uw.edu")
+    page = client.get(f"/u/{boss}").data.decode()
+    assert "🐾 Team" in page and "Sportive Circle Team" in page         # label + badge in the showcase
+    accounts.logout()
+    accounts.signup(email="student@uw.edu")
+    me = _user_id(app, "student@uw.edu")
+    assert "🐾 Team" in client.get(f"/u/{boss}").data.decode()          # everyone sees who runs the app
+    assert "🐾 Team" not in client.get(f"/u/{me}").data.decode()
+    assert "Sportive Circle Team" not in client.get("/profile/badges").data.decode()   # can't be earned
+    app.config["ADMIN_EMAILS"] = ""                                       # no longer an admin
+    accounts.logout()
+    accounts.login(email="boss@uw.edu")
+    page = client.get(f"/u/{boss}").data.decode()
+    assert "🐾 Team" not in page and "Sportive Circle Team" not in page
