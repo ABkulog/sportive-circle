@@ -3132,9 +3132,13 @@ def test_invite_link_for_people_who_already_have_an_account(accounts, client, ap
     game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
     link = _invite_path(client.get(f"/events/{game}").data.decode())
     accounts.logout()
-    accounts.signup(email="old@uw.edu", name="Old Timer")        # logged in: the link just puts them in
-    assert client.get(link).headers["Location"] == f"/events/{game}"
+    accounts.signup(email="old@uw.edu", name="Old Timer")        # logged in: opening the link asks first
     old = _user_id(app, "old@uw.edu")
+    assert b"Join the game" in client.get(link).data
+    with app.app_context():
+        assert not get_db().execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (game, old)).fetchone()
+        assert not get_db().execute("SELECT 1 FROM friendships").fetchone()
+    assert client.post(link).headers["Location"] == f"/events/{game}"
     with app.app_context():
         assert get_db().execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (game, old)).fetchone()
     accounts.logout()

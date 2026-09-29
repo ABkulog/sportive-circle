@@ -302,19 +302,24 @@ def _open_game(event_id):
     return rows[0] if rows else None
 
 
-@bp.route("/join/<token>")
+@bp.route("/join/<token>", methods=("GET", "POST"))
 def open_invite_link(token):
+    """Opening the link only shows what it's for. Joining takes a tap (a POST), so a link hidden in an image or
+    opened by a link preview can't put anyone in a game or make them friends."""
     link = _read_link(token)
     inviter = get_db().execute("SELECT id, full_name FROM users WHERE id = ? AND verified = 1 AND suspended = 0",
                                (link[1],)).fetchone() if link else None
     if inviter is None:
         flash("That invite link doesn't work anymore.", "error")
         return redirect(url_for("index"))
-    if g.get("user") is not None:
+    if g.get("user") is not None and request.method == "POST":
         return redirect(accept_invite_link(g.user, token) or url_for("index"))
     event = _open_game(link[0]) if link[0] else None
-    session["invite_link"] = token  # used right after they sign up or log in (auth.log_in)
-    return render_template("events/invite_link.html", inviter=inviter, event=event)
+    if g.get("user") is None:
+        session["invite_link"] = token  # used right after they sign up or log in (auth.log_in)
+    elif inviter["id"] == g.user["id"]:
+        return redirect(url_for("events.detail", event_id=event["id"]) if event else url_for("social.friends"))
+    return render_template("events/invite_link.html", inviter=inviter, event=event, token=token)
 
 
 def accept_invite_link(user, token):
