@@ -897,7 +897,7 @@ def test_add_later_is_remembered(accounts, client, app):
     assert ">Add photo</a>" not in profile and ">Edit profile</a>" in profile   # one button; the photo is in there
     assert "Add photo" in client.get("/profile/edit").data.decode()
     photo_page = client.get("/profile/photo").data.decode()
-    assert "Add later" not in photo_page and "Last step" not in photo_page
+    assert "Add later" not in photo_page and "Step 3 of 3" not in photo_page
 
 
 def test_add_later_keeps_shared_link(accounts, client):
@@ -3015,6 +3015,13 @@ def test_need_players_host_hears_when_someone_joins(accounts, client, app):
     assert len(texts) == 1 and texts[0].startswith("Pat joined") and "(2 going now)" in texts[0]
 
 
+def test_signup_step_counter_counts_the_photo_step(accounts, client):
+    accounts.signup(photo=False)
+    assert "Step 3 of 3" in client.get("/profile/photo").data.decode()
+    client.post("/profile/photo/skip")
+    assert "Step 1 of 2" in client.get("/profile/edit").data.decode()
+
+
 def test_times_skipped_by_daylight_saving_are_refused(accounts, client, monkeypatch):
     from datetime import datetime
     from sportive import events
@@ -3759,7 +3766,7 @@ def test_invite_friends_to_the_app_makes_you_friends(accounts, client, app):
 def test_sign_up_is_two_short_screens(client, app):
     """Screen 1 checks the details (and emails the code); screen 2 is sports; then the code page."""
     page = client.get("/signup").data.decode()
-    assert "Step 1 of 2" in page and 'name="sports"' not in page and ">Next</button>" in page
+    assert "Step 1 of 3" in page and 'name="sports"' not in page and ">Next</button>" in page
     bad = client.post("/signup", data={"full_name": "Dubs Husky", "email": "dubs@gmail.com", "password": "purple-and-gold",
                                        "password2": "purple-and-gold", "birth_date": "2005-01-15"})
     assert bad.status_code == 200 and b"Please use your UW email" in bad.data  # Next still checks everything
@@ -3768,7 +3775,7 @@ def test_sign_up_is_two_short_screens(client, app):
                                          "password2": "purple-and-gold", "birth_date": "2005-01-15"})
     assert step1.headers["Location"] == "/signup/sports"
     page = client.get("/signup/sports").data.decode()
-    assert "Step 2 of 2" in page and 'value="soccer"' in page
+    assert "Step 2 of 3" in page and 'value="soccer"' in page
     assert client.post("/signup/sports", data={"sports": ["soccer", "tennis", "made-up"]}).headers["Location"] == "/verify"
     with app.app_context():
         sports = {r[0] for r in get_db().execute("SELECT sport FROM user_sports")}

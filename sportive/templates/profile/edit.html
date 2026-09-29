@@ -4,7 +4,7 @@
 {% block content %}
 <a class="back-link" href="{{ url_for('profile.view', user_id=g.user.id) }}" data-back>← Profile</a>
 <div class="card form-card">
-  <p class="step-label">1 of 2</p>
+  <p class="step-label">Step 1 of 2</p>
   <h1>Edit profile</h1>
   <a class="edit-photo" href="{{ url_for('profile.photo_upload') }}">
     {{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 72) }}
