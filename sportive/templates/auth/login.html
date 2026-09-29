@@ -11,7 +11,10 @@
       <input name="email" type="email" placeholder="netid@uw.edu" autocomplete="email" required autofocus></label>
     <label class="field"><span>Password</span>
       <input name="password" type="password" autocomplete="current-password" required></label>
-    <a class="field-link" href="{{ url_for('auth.forgot_password') }}">Forgot password?</a>
+    <div class="login-extras">
+      <label class="check"><input type="checkbox" name="remember" value="1" checked> Remember me</label>
+      <a class="field-link" href="{{ url_for('auth.forgot_password') }}">Forgot password?</a>
+    </div>
     <button class="btn btn-block">Log in</button>
   </form>
   <p class="muted center">New here? <a href="{{ url_for('auth.signup', next=next_url or None) }}">Sign up</a></p>

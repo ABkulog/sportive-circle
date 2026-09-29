@@ -2906,9 +2906,11 @@ def test_settings_page_is_separate_from_edit_profile(accounts, client, app):
 
 
 def test_dark_mode_from_sign_up_and_settings(accounts, client, app):
-    page = client.get("/signup").data.decode()
+    accounts.signup(verify=False)
+    page = client.get("/signup/sports").data.decode()                 # sign-up screen 2
     assert 'name="theme" value="dark"' in page and "Match my phone" in page
-    accounts.signup()                                       # signed up with the default look
+    client.post("/verify", data={"code": accounts.code_for("dubs@uw.edu")})
+    accounts.upload_photo()                                       # signed up with the default look
     assert 'data-theme="light"' in client.get("/").data.decode()
     client.post("/settings/look", data={"theme": "dark"})
     assert 'data-theme="dark"' in client.get("/").data.decode()
@@ -2916,7 +2918,8 @@ def test_dark_mode_from_sign_up_and_settings(accounts, client, app):
     assert 'data-theme="dark"' in client.get("/").data.decode()
     accounts.logout()
     client.post("/signup", data={"full_name": "Night Owl", "email": "owl@uw.edu", "password": "purple-and-gold",
-                                 "password2": "purple-and-gold", "birth_date": "2005-01-15", "theme": "system"})
+                                 "password2": "purple-and-gold", "birth_date": "2005-01-15"})
+    client.post("/signup/sports", data={"theme": "system"})
     with app.app_context():
         assert get_db().execute("SELECT theme FROM users WHERE email = 'owl@uw.edu'").fetchone()[0] == "system"
     assert 'data-theme="system"' in client.get("/verify").data.decode()   # the code page already matches
@@ -2995,3 +2998,35 @@ def test_invite_friends_to_the_app_makes_you_friends(accounts, client, app):
     client.post("/verify", data={"code": accounts.code_for("pal@uw.edu")})
     with app.app_context():
         assert get_db().execute("SELECT status FROM friendships").fetchone()[0] == "accepted"
+
+
+def test_sign_up_is_two_short_screens(client, app):
+    """Screen 1 checks the details (and emails the code); screen 2 is sports; then the code page."""
+    page = client.get("/signup").data.decode()
+    assert "Step 1 of 2" in page and 'name="sports"' not in page and ">Next</button>" in page
+    bad = client.post("/signup", data={"full_name": "Dubs Husky", "email": "dubs@gmail.com", "password": "purple-and-gold",
+                                       "password2": "purple-and-gold", "birth_date": "2005-01-15"})
+    assert bad.status_code == 200 and b"Please use your UW email" in bad.data  # Next still checks everything
+    assert client.get("/signup/sports").headers["Location"] == "/signup"      # can't skip screen 1
+    step1 = client.post("/signup", data={"full_name": "Dubs Husky", "email": "dubs@uw.edu", "password": "purple-and-gold",
+                                         "password2": "purple-and-gold", "birth_date": "2005-01-15"})
+    assert step1.headers["Location"] == "/signup/sports"
+    page = client.get("/signup/sports").data.decode()
+    assert "Step 2 of 2" in page and 'value="soccer"' in page
+    assert client.post("/signup/sports", data={"sports": ["soccer", "tennis", "made-up"]}).headers["Location"] == "/verify"
+    with app.app_context():
+        sports = {r[0] for r in get_db().execute("SELECT sport FROM user_sports")}
+    assert sports == {"soccer", "tennis"}
+
+
+def test_remember_me(accounts, client):
+    accounts.signup()
+    accounts.logout()
+    assert b'name="remember" value="1" checked' in client.get("/login").data
+    client.post("/login", data={"email": "dubs@uw.edu", "password": "purple-and-gold", "remember": "1"})
+    cookie = client.get_cookie("session")
+    assert cookie.expires is not None  # stays logged in after the browser closes
+    accounts.logout()
+    client.post("/login", data={"email": "dubs@uw.edu", "password": "purple-and-gold"})  # box unticked
+    cookie = client.get_cookie("session")
+    assert cookie.expires is None and client.get("/settings").status_code == 200  # logged in until the browser closes

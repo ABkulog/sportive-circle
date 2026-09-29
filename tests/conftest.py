@@ -34,8 +34,10 @@ class Accounts:
                sports=("basketball",), birth_date="2005-01-15", verify=True, photo=True):
         response = self.client.post("/signup", data={
             "full_name": name, "email": email, "password": password, "password2": password,
-            "birth_date": birth_date, "grad_year": "2028", "sports": list(sports),
+            "birth_date": birth_date, "grad_year": "2028",
         })
+        if response.status_code == 302:  # step 2: sports
+            self.client.post("/signup/sports", data={"sports": list(sports)})
         if verify:
             self.client.post("/verify", data={"code": self.code_for(email)})
             if photo:

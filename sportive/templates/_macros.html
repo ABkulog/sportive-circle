@@ -11,9 +11,9 @@
     <a href="{{ url_for('events.my_events') }}" {% if active == 'mine' %}class="is-on" aria-current="page"{% endif %}>My events</a>
   </nav>
 {% endmacro %}
-{% macro sport_checkboxes(form) %}
+{% macro sport_checkboxes(form, legend=True) %}
   <fieldset class="field">
-    <legend>Which sports do you play? <em>(pick any, change later)</em></legend>
+    <legend{% if not legend %} class="visually-hidden"{% endif %}>Which sports do you play? <em>(pick any, change later)</em></legend>
     <div class="chip-grid">
       {% for key, label in SPORTS.items() %}
         <label class="chip-check">

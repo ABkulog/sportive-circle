@@ -9,6 +9,7 @@ from datetime import date, timedelta
 from flask import (Blueprint, abort, current_app, flash, g, redirect, render_template,
                    request, session, url_for)
 from markupsafe import Markup
+from werkzeug.datastructures import MultiDict
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .constants import SPORTS
@@ -93,11 +94,12 @@ def safe_next(target):
     return url_for("index")
 
 
-def log_in(user):
+def log_in(user, remember=True):
+    """remember=False ("Remember me" unticked): the login ends when the browser closes."""
     after = session.get("after_login")  # e.g. a shared event link they opened before signing up
     invite = session.get("invite_link")  # a friend's "you're in my game" link
     session.clear()
-    session.permanent = True  # stay logged in on your phone (see PERMANENT_SESSION_LIFETIME)
+    session.permanent = remember  # stay logged in on your phone (see PERMANENT_SESSION_LIFETIME)
     session["user_id"] = user["id"]
     get_db().execute("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?", (user["id"],))
     get_db().commit()
@@ -223,10 +225,6 @@ def signup():
         password2 = form.get("password2", "")
         grad_year = form.get("grad_year", "").strip()
         birth_date = form.get("birth_date", "").strip()
-        sports = [s for s in form.getlist("sports") if s in SPORTS]
-        from .settings import THEMES  # imported here: settings.py imports this module
-        theme = form.get("theme") if form.get("theme") in THEMES else "light"
-
         error = validate_signup(full_name, email, password, password2, grad_year, birth_date)
         if error is None and code_recently_sent(email):
             error = "We just sent a code to that email. Check your inbox, or wait a minute and try again."
@@ -236,20 +234,18 @@ def signup():
             db.execute("DELETE FROM users WHERE email = ? AND verified = 0", (email,))
             try:
                 cur = db.execute(
-                    "INSERT INTO users (email, password_hash, full_name, grad_year, birth_date, theme)"
-                    " VALUES (?, ?, ?, ?, ?, ?)",
-                    (email, hash_password(password), full_name,
-                     int(grad_year) if grad_year else None, birth_date, theme),
+                    "INSERT INTO users (email, password_hash, full_name, grad_year, birth_date)"
+                    " VALUES (?, ?, ?, ?, ?)",
+                    (email, hash_password(password), full_name, int(grad_year) if grad_year else None, birth_date),
                 )
-                session["theme"] = theme  # the code page already looks the way they picked
-                set_user_sports(cur.lastrowid, sports)
+                set_user_sports(cur.lastrowid, [s for s in form.getlist("sports") if s in SPORTS])
                 db.commit()
             except sqlite3.IntegrityError:
                 db.rollback()
                 error = "This email is already in use."
             else:
-                start_verification(email)
-                return redirect(url_for("auth.verify"))
+                start_verification(email)  # the code arrives while they pick their sports
+                return redirect(url_for("auth.signup_sports"))
         flash(error, "error")
     today = now_local().date()
     try:
@@ -258,6 +254,27 @@ def signup():
         latest_birth_date = today.replace(year=today.year - MIN_AGE, day=28)
     return render_template("auth/signup.html", form=form, current_year=today.year,
                            latest_birth_date=latest_birth_date.isoformat())
+
+
+@bp.route("/signup/sports", methods=("GET", "POST"))
+def signup_sports():
+    """Sign-up step 2: which sports they play (optional) and the look, then on to the code."""
+    email = session.get("pending_email")
+    user = email and get_db().execute("SELECT id FROM users WHERE email = ? AND verified = 0",
+                                      (email,)).fetchone()
+    if not user:
+        return redirect(url_for("auth.signup"))
+    from .settings import THEMES  # imported here: settings.py imports this module
+    if request.method == "POST":
+        theme = request.form.get("theme") if request.form.get("theme") in THEMES else "light"
+        set_user_sports(user["id"], [s for s in request.form.getlist("sports") if s in SPORTS])
+        get_db().execute("UPDATE users SET theme = ? WHERE id = ?", (theme, user["id"]))
+        get_db().commit()
+        session["theme"] = theme  # the code page already looks the way they picked
+        return redirect(url_for("auth.verify"))
+    chosen = [row[0] for row in get_db().execute("SELECT sport FROM user_sports WHERE user_id = ?", (user["id"],))]
+    return render_template("auth/signup_sports.html", form=MultiDict([("sports", s) for s in chosen]),
+                           theme=session.get("theme", "light"))
 
 
 @bp.route("/verify", methods=("GET", "POST"))
@@ -346,7 +363,7 @@ def login():
                 flash("Check your email. We sent you a new code.", "info")
             return redirect(url_for("auth.verify"))
         else:
-            return redirect(log_in(user))
+            return redirect(log_in(user, remember=request.form.get("remember") == "1"))
     return render_template("auth/login.html", next_url=next_url)
 
 

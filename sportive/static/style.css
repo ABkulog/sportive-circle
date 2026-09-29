@@ -443,6 +443,7 @@ section.card h2, details.card h2 { margin-top: 0; }
 .form { display: grid; gap: 14px; margin: 16px 0; }
 .row { display: grid; gap: 14px; }
 @media (min-width: 520px) { .row { grid-template-columns: 1fr 1fr; } }
+.row-pair { grid-template-columns: 1fr 1fr; gap: 10px; }  /* side by side even on phones (sign up fits one screen) */
 .field { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
 .field > span, .field legend { font-weight: 600; font-size: .9rem; padding: 0; margin-bottom: 6px; }
 input, select, textarea {
@@ -829,3 +830,10 @@ h1 .team-pill { font-size: .78rem; margin-left: 4px; }
 .admin-nav a[aria-current] { color: var(--text); text-decoration: underline; text-underline-offset: 4px; }
 .trend-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .trend-list .chip:hover { text-decoration: none; }
+
+/* Log in: "Remember me" and "Forgot password?" on one line. Sign up: "Step 1 of 2". */
+.login-extras { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.login-extras .check { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+.login-extras .check input { width: 20px; height: 20px; accent-color: var(--purple); flex: none; }
+.login-extras .field-link { min-height: 44px; display: inline-flex; align-items: center; }
+.step-label { margin: 0 0 4px; font-size: .8rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
