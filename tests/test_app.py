@@ -1812,8 +1812,6 @@ def test_follow_is_not_membership(accounts, client, app):
     page = client.get(f"/clubs/{club}").data.decode()
     stats = re.findall(r"<strong>(\d+)</strong><span>(\w+)</span>", page)
     assert ">Unfollow<" in page and ("1", "member") in stats and ("1", "follower") in stats   # captain only
-    assert '<li class="is-zero"><strong>0</strong><span>events</span>' in page
-    assert '<li class="is-zero"><strong>1</strong>' not in page
 
 
 def test_tryouts_flow_with_messages(accounts, client, app):

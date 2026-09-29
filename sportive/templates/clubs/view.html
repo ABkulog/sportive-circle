@@ -24,9 +24,9 @@
     </div>
   </div>
   <ul class="stat-row" aria-label="Club stats">
-    {% for count, noun in [(club.member_count, 'member'), (followers, 'follower'), (events|length, 'event')] %}
-      <li {% if not count %}class="is-zero"{% endif %}><strong>{{ count }}</strong><span>{{ noun }}{{ 's' if count != 1 }}</span></li>
-    {% endfor %}
+    <li><strong>{{ club.member_count }}</strong><span>member{{ 's' if club.member_count != 1 }}</span></li>
+    <li><strong>{{ followers }}</strong><span>follower{{ 's' if followers != 1 }}</span></li>
+    <li><strong>{{ events|length }}</strong><span>event{{ 's' if events|length != 1 }}</span></li>
   </ul>
   <p class="club-about clamp" id="club-about" title="Tap to read more" data-expand>{{ club.description }}</p>
   {% if club.status == 'approved' %}
