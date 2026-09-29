@@ -2349,6 +2349,16 @@ def test_fine_print_has_a_style():
     assert _css_classes_used_but_undefined(["fine-print"]) == []
 
 
+def test_a_message_that_cant_be_sent_stays_in_the_box(accounts, client):
+    accounts.signup()
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    too_long = "x" * 990 + " 🐾" * 10
+    page = client.post(f"/events/{event_id}/chat", data={"body": too_long}, follow_redirects=True).data.decode()
+    assert "Messages can be up to 1000 characters." in page
+    assert f"autofocus>{too_long[:1000]}</textarea>" in page
+    assert too_long[:50] not in client.get(f"/events/{event_id}/chat").data.decode()   # only brought back once
+
+
 def test_every_body_font_weight_in_the_css_is_loaded():
     import pathlib
     css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")

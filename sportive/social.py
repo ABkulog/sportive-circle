@@ -7,10 +7,11 @@ Safety rules:
 - Blocking someone stops all messages and friend requests between you, both ways.
 - Event chats are only for people going to that event.
 """
+import json
 from datetime import timedelta
 
 from flask import (Blueprint, abort, current_app, flash, g, jsonify, redirect, render_template, request,
-                   url_for)
+                   session, url_for)
 
 from .auth import login_required, safe_next
 from .db import get_db
@@ -21,6 +22,7 @@ bp = Blueprint("social", __name__)
 
 MAX_MESSAGE_LENGTH = 1000
 MAX_MESSAGES_PER_MINUTE = 20  # stops spam floods
+MAX_DRAFT_COOKIE_BYTES = 2500
 
 
 # ---------------------------------------------------------------- helpers
@@ -138,6 +140,18 @@ def clean_body(text):
     if too_many_messages(g.user["id"]):
         return None, "Whoa, slow down! Wait a minute before sending more messages."
     return body, None
+
+
+def keep_draft(text):
+    """A message that couldn't be sent goes back in the box after the redirect, instead of vanishing."""
+    body = (text or "")[:MAX_MESSAGE_LENGTH]
+    if len(json.dumps(body)) <= MAX_DRAFT_COOKIE_BYTES:  # the session is a cookie (browsers cap them at 4 KB)
+        session["chat_draft"] = {"path": request.path, "body": body}
+
+
+def take_draft():
+    draft = session.pop("chat_draft", None)
+    return draft["body"] if draft and draft.get("path") == request.path else ""
 
 
 def event_chat_unread():
@@ -385,6 +399,7 @@ def thread(user_id):
             body, error = clean_body(request.form.get("body"))
             if error:
                 flash(error, "error")
+                keep_draft(request.form.get("body"))
             else:
                 db = get_db()
                 db.execute("INSERT INTO direct_messages (sender_id, recipient_id, body, created_at) VALUES (?, ?, ?, ?)",
@@ -394,7 +409,7 @@ def thread(user_id):
     _mark_read(me, user_id)
     rows = _thread_rows(me, user_id) if not is_blocked_between(me, user_id) else []
     return render_template("social/thread.html", other=other, messages=[message_json(r, me, 'dm') for r in rows],
-                           allowed=allowed, poll_url=url_for("social.thread_poll", user_id=user_id),
+                           allowed=allowed, poll_url=url_for("social.thread_poll", user_id=user_id), draft=take_draft(),
                            blocked=i_blocked(me, user_id))
 
 
@@ -450,6 +465,7 @@ def event_chat(event_id):
         body, error = clean_body(request.form.get("body"))
         if error:
             flash(error, "error")
+            keep_draft(request.form.get("body"))
         elif event["cancelled"]:
             flash("This game was canceled, so its chat is closed.", "error")
         else:
@@ -464,7 +480,7 @@ def event_chat(event_id):
     return render_template("social/event_chat.html", event=event, people=people,
                            messages=[message_json(r, g.user["id"], 'event_message') for r in rows],
                            poll_url=url_for("social.event_chat_poll", event_id=event_id),
-                           when=fmt_when(event["starts_at"]))
+                           when=fmt_when(event["starts_at"]), draft=take_draft())
 
 
 @bp.route("/events/<int:event_id>/chat/poll")

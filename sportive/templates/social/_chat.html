@@ -1,5 +1,5 @@
 {# Shared chat box: messages + composer. Needs: messages, poll_url, action (form URL), can_send, placeholder #}
-{% macro chat_box(messages, poll_url, action, can_send, placeholder, empty_text) %}
+{% macro chat_box(messages, poll_url, action, can_send, placeholder, empty_text, draft='') %}
   <div class="chat card" data-poll-url="{{ poll_url }}"
        data-last-id="{{ messages[-1].id if messages else 0 }}">
     <ol class="chat-messages" id="chat-messages" aria-live="polite">
@@ -24,7 +24,7 @@
       <form method="post" action="{{ action }}" class="chat-composer" id="composer">
         {{ csrf_field() }}
         <textarea name="body" rows="1" maxlength="1000" placeholder="{{ placeholder }}" required
-                  aria-label="Message"></textarea>
+                  aria-label="Message"{% if draft %} autofocus{% endif %}>{{ draft }}</textarea>
         <button class="btn">Send</button>
       </form>
     {% endif %}
