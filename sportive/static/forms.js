@@ -137,3 +137,34 @@
   updateSizes();
   apply();
 })();
+
+// "Ends" follows "Starts": pick a new start time and the end moves with it, keeping the game's length
+// (1 hour for a new game, or whatever length the host set). The server still checks the times.
+(function () {
+  const form = document.querySelector("form[data-sport-form]");
+  const starts = form && form.querySelector('input[name="starts_at"]');
+  const ends = form && form.querySelector('input[name="ends_at"]');
+  if (!starts || !ends) return;
+  const HOUR = 60 * 60 * 1000;
+  // datetime-local values are wall-clock times ("2026-09-30T18:00"): read and write them as local time.
+  const read = (input) => { const t = new Date(input.value).getTime(); return Number.isNaN(t) ? null : t; };
+  const pad = (n) => String(n).padStart(2, "0");
+  const write = (input, time) => {
+    const d = new Date(time);
+    input.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const gap = () => {
+    const s = read(starts), e = read(ends);
+    return s !== null && e !== null && e > s ? e - s : HOUR;
+  };
+  let length = gap();
+  starts.addEventListener("input", () => {
+    const s = read(starts);
+    if (s === null) return;
+    write(ends, s + length);
+    ends.min = starts.value;
+  });
+  // A host who sets their own end time keeps that length for the next start change.
+  ends.addEventListener("change", () => { length = gap(); });
+  if (starts.value) ends.min = starts.value;
+})();
