@@ -19,7 +19,7 @@
   function show(index) {
     current = index;
     steps.forEach((step, i) => { step.hidden = i !== index; });
-    back.style.visibility = index === 0 ? "hidden" : "visible";
+    back.hidden = index === 0;  // step 1: no Back, so Next is full width (not stuck on the right)
     next.hidden = index === steps.length - 1;
     submit.hidden = index !== steps.length - 1;
     progress.querySelector("span").style.width = `${((index + 1) / steps.length) * 100}%`;
