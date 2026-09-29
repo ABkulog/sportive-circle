@@ -191,10 +191,22 @@ def suspend(user_id, action):
     if action == "suspend" and (user_id == g.user["id"] or is_admin(user)):
         flash("Admins can't be suspended here. Remove them from ADMIN_EMAILS first.", "error")
     elif action == "suspend":
+        from .events import query_events, tell_players_it_was_cancelled
+        now = to_db(now_local())
         db.execute("UPDATE users SET suspended = 1 WHERE id = ?", (user_id,))
+        hosted = query_events(["e.host_id = :host", "e.cancelled = 0", "e.ends_at >= :now"],
+                              {"host": user_id, "now": now})
         db.execute("UPDATE events SET cancelled = 1 WHERE host_id = ? AND cancelled = 0 AND ends_at >= ?",
-                   (user_id, to_db(now_local())))
-        flash(f"{user['full_name']} is suspended. Their upcoming games were canceled.", "info")
+                   (user_id, now))
+        # Free the spots they held in other people's upcoming games.
+        db.execute("""DELETE FROM rsvps WHERE user_id = ? AND event_id IN
+                      (SELECT id FROM events WHERE host_id != ? AND ends_at >= ?)""", (user_id, user_id, now))
+        db.execute("""UPDATE invites SET status = 'canceled' WHERE guest_id = ? AND status IN ('pending', 'requested')
+                      AND event_id IN (SELECT id FROM events WHERE ends_at >= ?)""", (user_id, now))
+        db.commit()
+        for event in hosted:
+            tell_players_it_was_cancelled(event)
+        flash(f"{user['full_name']} is suspended. Their upcoming games were canceled and players were told.", "info")
     else:
         db.execute("UPDATE users SET suspended = 0 WHERE id = ?", (user_id,))
         flash(f"{user['full_name']} can log in again.", "success")

@@ -2051,6 +2051,29 @@ def test_suspending_cancels_their_upcoming_games(accounts, client, app):
         assert get_db().execute("SELECT suspended FROM users WHERE email = 'admin@uw.edu'").fetchone()[0] == 0
 
 
+def test_suspending_tells_players_and_frees_their_spots(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    hosted = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="other@uw.edu")
+    others_game = event_id_from(client.post("/events/new", data=event_form()))
+    client.post(f"/events/{hosted}/join")
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post(f"/events/{others_game}/join")
+    host = _user_id(app, "host@uw.edu")
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    client.post(f"/admin/users/{host}/suspend")
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (others_game, host)).fetchone() is None
+        other = _user_id(app, "other@uw.edu")
+        assert db.execute("SELECT 1 FROM notices WHERE user_id = ? AND text LIKE '%canceled%'",
+                          (other,)).fetchone() is not None
+
+
 def test_club_form_points_at_the_field_with_the_problem(accounts, client):
     accounts.signup()
     page = client.post("/clubs/new", data={**CLUB, "club_email": "not-an-email"}).data
