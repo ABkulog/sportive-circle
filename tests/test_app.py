@@ -3174,6 +3174,13 @@ def test_officers_get_a_roster_members_dont(accounts, client, app):
     assert client.get(f"/clubs/{club}/roster.csv").status_code == 403
 
 
+def test_roster_names_cant_become_spreadsheet_formulas():
+    from sportive.clubs import spreadsheet_safe
+    assert spreadsheet_safe('=HYPERLINK("http://evil","x")').startswith("'=")
+    assert spreadsheet_safe("+1 234") == "'+1 234" and spreadsheet_safe("@me") == "'@me"
+    assert spreadsheet_safe("Mem Ber") == "Mem Ber"
+
+
 def test_search_engines_and_link_previews(client, app):
     """So "sportive circle" can be found on Google, and shared links show a card in iMessage."""
     app.config["PUBLIC_URL"] = "https://sportivecircle.com"

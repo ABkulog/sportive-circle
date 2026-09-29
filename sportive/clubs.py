@@ -293,6 +293,12 @@ def roster(club_id):
            ORDER BY m.role = 'officer' DESC, u.full_name""", (club_id,)).fetchall()
 
 
+def spreadsheet_safe(text):
+    """Excel and Google Sheets run a cell starting with = + - @ (or a tab/CR) as a formula, so a member named
+    '=HYPERLINK(...)' could run one on the officer's computer. A leading ' makes it plain text."""
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
+
 @bp.route("/clubs/<int:club_id>/roster.csv")
 @login_required
 def roster_csv(club_id):
@@ -303,8 +309,8 @@ def roster_csv(club_id):
     writer = csv.writer(output)
     writer.writerow(["Name", "UW email", "Class of", "Role", "Joined"])
     for person in roster(club_id):
-        writer.writerow([person["full_name"], person["email"], person["grad_year"] or "", person["role"].title(),
-                         person["joined_at"][:10]])
+        writer.writerow([spreadsheet_safe(person["full_name"]), person["email"], person["grad_year"] or "",
+                         person["role"].title(), person["joined_at"][:10]])
     filename = re.sub(r"[^A-Za-z0-9]+", "-", club["name"]).strip("-").lower() or "club"
     return Response(output.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename={filename}-roster.csv"})
