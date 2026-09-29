@@ -2999,6 +2999,20 @@ def test_open_spots_filter(accounts, client, app):
     assert "Small run" in client.get("/?scope=all&open=1").data.decode()      # "need just one more" works
 
 
+def test_need_players_host_hears_when_someone_joins(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/need-players", data={
+        "sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
+        "starts_in": "15", "duration": "60", "players": "4"}))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu", name="Pat Player")
+    client.post(f"/events/{event_id}/join")
+    with app.app_context():
+        texts = [r[0] for r in get_db().execute("SELECT text FROM notices WHERE user_id = ?",
+                                                 (_user_id(app, "host@uw.edu"),))]
+    assert len(texts) == 1 and texts[0].startswith("Pat joined") and "(2 going now)" in texts[0]
+
+
 def test_nonsense_filter_values_dont_count_as_filters(accounts, client):
     accounts.signup()
     page = client.get("/?scope=all&sport=zzz&location=Mars&skill=Pro&when=never&open=99").data.decode()

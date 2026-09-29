@@ -852,6 +852,12 @@ def try_join(event, password=None, team=None):
         db.execute("UPDATE invites SET status = 'accepted' WHERE id = ?", (invite["id"],))
         notify(invite["inviter_id"], "invites", f"{g.user['full_name'].split()[0]} is in for {event_title(event)}.",
                url_for("events.detail", event_id=event["id"]), key=f"reply:{event['id']}:{me}")
+    elif event["is_quick"] and event["host_id"] != me:
+        # A "Need players" host is waiting on exactly this; one notice per game, updated as people join.
+        going = db.execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (event["id"],)).fetchone()[0]
+        notify(event["host_id"], "game_updates",
+               f"{g.user['full_name'].split()[0]} joined {event_title(event)} ({going} going now).",
+               url_for("events.detail", event_id=event["id"]), key=f"joined:{event['id']}")
     db.commit()
     return True, "You're in! See you there."
 
