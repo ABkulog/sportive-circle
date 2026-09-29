@@ -2349,6 +2349,15 @@ def test_fine_print_has_a_style():
     assert _css_classes_used_but_undefined(["fine-print"]) == []
 
 
+def test_every_body_font_weight_in_the_css_is_loaded():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    base = pathlib.Path("sportive/templates/base.html").read_text(encoding="utf-8")
+    low, high = map(int, re.search(r"Open\+Sans:wght@(\d+)\.\.(\d+)", base).groups())
+    body_weights = {int(w) for w in re.findall(r"font-weight:\s*(\d+)", css)} - {800}   # 800 = display font
+    assert all(low <= weight <= high for weight in body_weights), body_weights
+
+
 def test_long_unbroken_titles_wrap_instead_of_widening_the_page():
     import pathlib
     css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
