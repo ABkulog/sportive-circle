@@ -161,8 +161,7 @@
       {% if is_host %}
         <a class="icon-action" href="{{ url_for('events.edit', event_id=event.id) }}"><span>{{ icon('edit') }}</span>Edit</a>
       {% elif event.i_am_going %}
-        <form method="post" action="{{ url_for('events.leave', event_id=event.id) }}" class="icon-action-form"
-              data-confirm="Leave this game?{% if spots_left(event) == 0 %} It's full, so someone else may take your spot.{% endif %}">
+        <form method="post" action="{{ url_for('events.leave', event_id=event.id) }}" class="icon-action-form">
           {{ csrf_field() }}<button class="icon-action"><span>{{ icon('logout') }}</span>Leave</button>
         </form>
       {% endif %}
