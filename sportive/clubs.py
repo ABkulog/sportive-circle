@@ -266,10 +266,13 @@ def view(club_id):
                WHERE m.club_id = ? AND m.role IN ('requested', 'tryout') ORDER BY m.joined_at""", (club_id,)).fetchall()
     followers = db.execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'follower'",
                            (club_id,)).fetchone()[0]
+    from .events import SHOWN_UNLESS_FULL  # imported here: events.py imports this module
     events = db.execute(
-        """SELECT e.id, e.title, e.sport, e.starts_at, e.location, e.members_only FROM events e
-           WHERE e.club_id = ? AND e.cancelled = 0 AND e.ends_at >= ? ORDER BY e.starts_at LIMIT 10""",
-        (club_id, to_db(now_local()))).fetchall()
+        f"""SELECT e.id, e.title, e.sport, e.starts_at, e.location, e.members_only FROM events e
+            WHERE e.club_id = :club AND e.cancelled = 0 AND e.ends_at >= :now AND {SHOWN_UNLESS_FULL}
+            ORDER BY e.starts_at LIMIT 10""",
+        {"club": club_id, "now": to_db(now_local()), "me": g.user["id"] if g.get("user") else 0,
+         "hold_now": to_db(now_local())}).fetchall()
     return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
                            role=role, requests=requests, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
                            socials=social_links(club),
