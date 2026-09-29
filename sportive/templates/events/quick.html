@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import select, who_can_join, format_field, players_block, open_to_field %}
+{% from "_macros.html" import select, who_can_join, format_field, players_block, open_to_field, place_check %}
 {% block title %}Need players{% endblock %}
 {% block content %}
 <div class="card form-card">
@@ -24,6 +24,7 @@
       {{ select('starts_in', 'Starting', start_options, form.get('starts_in', '30')) }}
       {{ select('duration', 'For', durations, form.get('duration', '60')) }}
     </div>
+    {{ place_check(form.get('sport', '')) }}
     <label class="field" data-show="public" {% if form.get('is_private') == '1' %}hidden{% endif %}><span>Skill level</span>
       <select name="skill_level">
         {% for level in SKILL_LEVELS %}<option value="{{ level }}" {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}

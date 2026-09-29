@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import select, who_can_join, format_field, players_block, open_to_field %}
+{% from "_macros.html" import select, who_can_join, format_field, players_block, open_to_field, place_check %}
 {% block title %}{{ 'Edit event' if event else 'New event' }}{% endblock %}
 {% block content %}
 <div class="card form-card">
@@ -36,6 +36,7 @@
       <label class="field"><span>Ends</span>
         <input name="ends_at" type="datetime-local" value="{{ form.get('ends_at', '') }}" required></label>
     </div>
+    {{ place_check(form.get('sport', '')) }}
     </section>
     <section class="wizard-step">
     <h2 class="form-step"><span>2</span> Who can join</h2>

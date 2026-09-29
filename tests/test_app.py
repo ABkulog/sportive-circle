@@ -4498,3 +4498,14 @@ def test_texts_announcement_emails_everyone_once(accounts, client, app):
         assert sorted(m["to"] for m in mails) == ["jordan@uw.edu", "maya@uw.edu"]
         assert "/settings/texts" in mails[0]["body"]
         assert announce_texts(send=True) == (0, 0)                                          # never twice
+
+
+def test_hosts_are_told_to_check_the_place_is_free(accounts, client, app):
+    """The user: the host has to make sure the courts, field or trail aren't booked; we don't check."""
+    accounts.signup()
+    for page in ("/events/new", "/need-players"):
+        html = client.get(page).data.decode()
+        assert "Heads up: check the" in html and "doesn't reserve or check places" in html
+    html = client.get("/events/new").data.decode()
+    assert '"space"' in html and '"courts"' in html and '"trail"' in html  # the word follows the sport (forms.js)
+    assert "make sure the place is free" in client.get("/terms").data.decode()

@@ -9,7 +9,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from . import (auth, clubs, db, events, feedback, mail, moderation, notifications, pages, parties, profile,
                phones, reminders, settings, sms, social, stats)
-from .constants import (DEFAULT_PLAYERS, LOCATIONS, OPEN_TO, OPEN_TO_BADGE, OPEN_TO_LABELS, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS,
+from .constants import (SPORT_SPACE, DEFAULT_PLAYERS, LOCATIONS, OPEN_TO, OPEN_TO_BADGE, OPEN_TO_LABELS, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS,
                         MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .photos import MAX_UPLOAD_MB
 from .timeutil import fmt_ago, fmt_clock, fmt_full, fmt_relative, fmt_when, now_local, same_day, to_db
@@ -137,11 +137,12 @@ def _check_secret_key(app):
 def _add_template_helpers(app):
     app.jinja_env.globals.update(
         # forms and lists
-        csrf_field=auth.csrf_field, SPORTS=SPORTS, SPORT_EMOJI=SPORT_EMOJI, LOCATIONS=LOCATIONS,
+        csrf_field=auth.csrf_field, SPORTS=SPORTS, SPORT_EMOJI=SPORT_EMOJI, SPORT_SPACE=SPORT_SPACE, LOCATIONS=LOCATIONS,
         SKILL_LEVELS=SKILL_LEVELS,
         SPORT_TEAM_SIZES=SPORT_TEAM_SIZES, MAX_PLAYERS=MAX_PLAYERS, DEFAULT_PLAYERS=DEFAULT_PLAYERS,
         SPORT_RULES={key: {"label": label, "locations": SPORT_LOCATIONS[key],
                            "teams": SPORT_TEAM_SIZES.get(key, []), "default": DEFAULT_PLAYERS.get(key, 10),
+                           "space": SPORT_SPACE.get(key, "place"),
                            "tips": {place: tip for (sport, place), tip in PLACE_TIPS.items() if sport == key}}
                      for key, label in SPORTS.items()},
         place_tip=lambda sport, place: PLACE_TIPS.get((sport, place)),

@@ -42,11 +42,19 @@
       || (location.value.startsWith("Off campus") ? "Add where in the note, so people can find you." : "");
   }
 
-  sport.addEventListener("change", () => { updatePlaces(); updatePlayers(); updateTip(); });
+  // "Heads up: check the courts/field/trail is free": the word follows the sport.
+  const space = form.querySelector("[data-place-space]");
+  function updateSpace() {
+    const rule = rules[sport.value];
+    if (space) space.textContent = rule ? rule.space : "place";
+  }
+
+  sport.addEventListener("change", () => { updatePlaces(); updatePlayers(); updateTip(); updateSpace(); });
   location.addEventListener("change", updateTip);
   updatePlaces();
   updatePlayers();
   updateTip();
+  updateSpace();
 })();
 
 // "You + 2 friends = 3 of 10 · need 7 more": the math for the "Who's coming?" part, as you tick friends.

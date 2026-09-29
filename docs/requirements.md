@@ -70,6 +70,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-EVT-16 | Games have a sensible maximum length: 6 hours for court and field sports, 12 for running, rowing and esports, 3 days for trips. | Should | ✅ |
 | FR-EVT-17 | Game pages have a Back button that returns to where you came from (never into the game's own chat). | Should | ✅ |
 | FR-EVT-18 | Open games can be "Open to" anyone, women, men, nonbinary players or Other (like UW Recreation's women-only hours). People whose profile gender is outside the group can't join and don't see it in their feed; people who left gender blank confirm instead. Hosts can remove a player (who gets a notice). | Should | ✅ |
+| FR-EVT-19 | Creating a game (New event and Need players) shows a heads-up: check the courts / field / trail (the word follows the sport) is free at that time, since it could be booked, full or closed for an event. Sportive Circle doesn't reserve or check places; the host does. The Terms say the same. | Must | ✅ |
 
 ### Parties, private games, team vs team (PARTY, PRIV, TEAM)
 

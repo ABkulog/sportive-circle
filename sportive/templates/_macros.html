@@ -233,3 +233,12 @@
     {% if hint %}<small class="muted">{{ hint }}</small>{% endif %}
   </div>
 {% endmacro %}
+
+
+{% macro place_check(sport='') %}
+  {# The host checks the place is free, like anyone telling their group chat "let's play here". We don't check. #}
+  <p class="place-check" role="note">
+    <strong>Heads up: check the <span data-place-space>{{ SPORT_SPACE.get(sport, 'place') if sport else 'place' }}</span> is free then.</strong>
+    It could be booked, full, or closed for an event. Sportive Circle doesn't reserve or check places, so that's on the host.
+  </p>
+{% endmacro %}
