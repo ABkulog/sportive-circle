@@ -28,6 +28,31 @@
     const seconds = Number(element.dataset.reloadIn);
     if (seconds >= 0 && seconds < 3600) setTimeout(() => location.reload(), (seconds + 3) * 1000);
   });
+  // <input data-filter-list="#id">: as you type, hide the [data-filter-name] items in #id whose name doesn't
+  // match (any word of the name starting with what's typed), plus sections left empty.
+  document.querySelectorAll("input[data-filter-list]").forEach((input) => {
+    const list = document.querySelector(input.dataset.filterList);
+    if (!list) return;
+    const items = Array.from(list.querySelectorAll("[data-filter-name]"));
+    const empty = list.querySelector("[data-filter-empty]");
+    const words = (text) => text.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const filter = () => {
+      const typed = words(input.value);
+      let shown = 0;
+      items.forEach((item) => {
+        const name = words(item.dataset.filterName);
+        const match = typed.every((t) => name.some((n) => n.startsWith(t)));
+        item.hidden = !match;
+        if (match) shown += 1;
+      });
+      list.querySelectorAll("[data-filter-group]").forEach((group) => {
+        group.hidden = !group.querySelector("[data-filter-name]:not([hidden])");
+      });
+      if (empty) empty.hidden = shown > 0 || !typed.length;
+    };
+    input.addEventListener("input", filter);
+    filter();
+  });
   // Coming back with the Back button shows the page from memory: unlock its forms again.
   window.addEventListener("pageshow", () => {
     document.querySelectorAll("form[data-sending]").forEach((form) => {

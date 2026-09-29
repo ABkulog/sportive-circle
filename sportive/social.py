@@ -16,7 +16,7 @@ from flask import (Blueprint, abort, current_app, flash, g, jsonify, redirect, r
 from .auth import login_required, safe_next
 from .constants import SPORT_EMOJI
 from .db import get_db
-from .textutil import multi_line
+from .textutil import multi_line, one_line
 from .timeutil import fmt_clock, fmt_when, now_local, to_db
 
 bp = Blueprint("social", __name__)
@@ -429,7 +429,17 @@ def inbox():
                           GROUP BY CASE WHEN sender_id = :me THEN recipient_id ELSE sender_id END)
              AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = :me)
            ORDER BY m.id DESC""", {"me": me}).fetchall()
-    return render_template("social/inbox.html", conversations=conversations)
+    # Friends I haven't messaged yet show too ("Start a chat"), so every friend is one tap away.
+    talked = {c["id"] for c in conversations}
+    new_friends = [f for f in friends_of(me) if f["id"] not in talked]
+    q = one_line(request.args.get("q", ""))[:60]
+    results = None
+    if q:
+        # Anyone I can message whose name (or exact UW NetID) matches: friends, people I've played with,
+        # club officers, people who messaged me. Strangers only show up in Friends -> search, to add first.
+        results = [p for p in search_people(me, q) if can_message(me, p["id"])]
+    return render_template("social/inbox.html", conversations=conversations, new_friends=new_friends,
+                           q=q, results=results, min_search=MIN_SEARCH_LENGTH)
 
 
 MAX_SHOWN_MESSAGES = 500  # a chat shows its newest 500 messages, oldest first
