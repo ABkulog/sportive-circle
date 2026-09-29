@@ -1,6 +1,7 @@
 """Sportive Circle @ UW: bring Huskies together through sports."""
 import logging
 import os
+import secrets
 from datetime import timedelta
 
 from flask import Flask, render_template
@@ -13,7 +14,8 @@ from .constants import (DEFAULT_PLAYERS, LOCATIONS, OPEN_TO, PLACE_TIPS, SKILL_L
 from .photos import MAX_UPLOAD_MB
 from .timeutil import fmt_clock, fmt_relative, fmt_when, now_local, same_day, to_db
 
-DEV_SECRET_KEY = "dev-only-change-me"
+DEV_SECRET_KEY = "dev-only-change-me"  # the old shared default: refused everywhere now
+MIN_SECRET_KEY_LENGTH = 32
 SITE_URL = "https://sportivecircle.com"  # the real address (Render also answers at *.onrender.com)
 
 # Where the browser may load things from. Scripts only come from our own files and the one map
@@ -44,7 +46,7 @@ def create_app(test_config=None):
     public_url = (_setting("PUBLIC_URL") or (SITE_URL if os.environ.get("RENDER_EXTERNAL_URL") else None)
                   or "http://localhost:5050")
     app.config.from_mapping(
-        SECRET_KEY=os.environ.get("SECRET_KEY", DEV_SECRET_KEY),
+        SECRET_KEY=_setting("SECRET_KEY"),
         DATABASE=os.environ.get("DATABASE", os.path.join(app.instance_path, "sportive_circle.db")),
         # UW email addresses: @uw.edu is standard; older accounts may still use @u.washington.edu.
         ALLOWED_EMAIL_DOMAINS=("uw.edu", "u.washington.edu"),
@@ -75,13 +77,11 @@ def create_app(test_config=None):
     )
     if test_config:
         app.config.update(test_config)
-    if app.config["SECRET_KEY"] == DEV_SECRET_KEY and not (app.debug or app.testing):
-        # Anyone who knows the key can forge a login cookie, so never run publicly with this one.
-        raise RuntimeError("Set the SECRET_KEY environment variable before running in production.")
+    os.makedirs(app.instance_path, exist_ok=True)
+    _check_secret_key(app)
     if os.environ.get("BEHIND_PROXY") == "1":
         # Hosting services put a proxy in front of the app; trust its "real address / https" headers.
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-    os.makedirs(app.instance_path, exist_ok=True)
     logging.basicConfig(level=logging.INFO)
 
     db.init_app(app)
@@ -104,6 +104,28 @@ def create_app(test_config=None):
     if app.config["REMINDER_LOOP"] and not app.testing:
         reminders.start_reminder_loop(app)
     return app
+
+
+def _check_secret_key(app):
+    """Anyone who knows the key can forge a login cookie for any account. Production needs a long random
+    SECRET_KEY; local development gets its own random key, kept in instance/ so logins survive restarts."""
+    key = app.config.get("SECRET_KEY")
+    if app.testing:
+        app.config["SECRET_KEY"] = key or secrets.token_urlsafe(48)
+        return
+    if not key and app.debug:
+        path = os.path.join(app.instance_path, "dev_secret_key")
+        if not os.path.exists(path):
+            with open(path, "w", encoding="utf-8") as file:
+                file.write(secrets.token_urlsafe(48))
+        with open(path, encoding="utf-8") as file:
+            app.config["SECRET_KEY"] = file.read().strip()
+        return
+    if not key or key == DEV_SECRET_KEY:
+        raise RuntimeError("Set the SECRET_KEY environment variable before running in production.")
+    if len(key) < MIN_SECRET_KEY_LENGTH:
+        raise RuntimeError(f"SECRET_KEY is too short: use at least {MIN_SECRET_KEY_LENGTH} random characters "
+                           "(e.g. python -c \"import secrets; print(secrets.token_urlsafe(48))\").")
 
 
 def _add_template_helpers(app):

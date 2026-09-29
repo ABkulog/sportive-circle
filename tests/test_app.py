@@ -393,6 +393,17 @@ def test_refuses_to_run_publicly_without_secret_key(tmp_path):
     import pytest
     with pytest.raises(RuntimeError):
         create_app({"DATABASE": str(tmp_path / "x.db")})
+    for weak in ("dev-only-change-me", "short-key", ""):
+        with pytest.raises(RuntimeError):
+            create_app({"DATABASE": str(tmp_path / "x.db"), "SECRET_KEY": weak})
+    assert create_app({"DATABASE": str(tmp_path / "x.db"), "SECRET_KEY": "k" * 40}).secret_key == "k" * 40
+
+
+def test_dev_mode_gets_its_own_persistent_secret_key(tmp_path):
+    first = create_app({"DATABASE": str(tmp_path / "x.db"), "DEBUG": True})
+    second = create_app({"DATABASE": str(tmp_path / "x.db"), "DEBUG": True})
+    assert first.secret_key == second.secret_key != "dev-only-change-me"
+    assert len(first.secret_key) >= 32
 
 
 def test_dates_show_year_when_not_this_year(monkeypatch):
@@ -773,7 +784,7 @@ def test_reminder_loop_only_runs_on_the_server(tmp_path, monkeypatch):
     monkeypatch.setattr(reminders, "start_reminder_loop", lambda app: started.append(app))
     monkeypatch.delenv("REMINDER_LOOP", raising=False)
     monkeypatch.delenv("RENDER_EXTERNAL_URL", raising=False)
-    monkeypatch.setenv("SECRET_KEY", "t")
+    monkeypatch.setenv("SECRET_KEY", "t" * 40)
     create_app({"DATABASE": str(tmp_path / "a.db")})
     assert started == []  # a laptop doesn't email anyone
     monkeypatch.setenv("RENDER_EXTERNAL_URL", "https://sportive-circle.onrender.com")
