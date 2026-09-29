@@ -3013,6 +3013,15 @@ def test_need_players_host_hears_when_someone_joins(accounts, client, app):
     assert len(texts) == 1 and texts[0].startswith("Pat joined") and "(2 going now)" in texts[0]
 
 
+def test_one_account_per_uw_inbox(accounts, client):
+    accounts.signup(email="dubs@uw.edu")
+    accounts.logout()
+    plus = accounts.signup(email="dubs+2@uw.edu", verify=False).data.decode()
+    assert "without a +tag" in plus
+    alias = accounts.signup(email="dubs@u.washington.edu", verify=False).data.decode()
+    assert "You already have an account as dubs@uw.edu" in alias
+
+
 def test_names_cant_be_invisible_or_flipped(accounts, client, app):
     blank = accounts.signup(email="ghost@uw.edu", name="\u200b\u200b", verify=False).data.decode()
     assert "Full name cannot be empty." in blank

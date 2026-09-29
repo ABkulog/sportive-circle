@@ -213,6 +213,9 @@ def validate_signup(full_name, email, password, password2, grad_year, birth_date
         return "Please use your UW email address (ending in @uw.edu)."
     if email.count("@") != 1 or email.startswith("@") or email.split("@")[1] not in domains:
         return "Please use your UW email address (ending in @uw.edu)."
+    local = email.split("@")[0]
+    if "+" in local:  # netid+2@uw.edu reaches the same inbox, so it would allow a second account
+        return "Please use your plain UW email (netid@uw.edu), without a +tag."
     problem = password_problem(password, password2)
     if problem:
         return problem
@@ -226,9 +229,14 @@ def validate_signup(full_name, email, password, password2, grad_year, birth_date
         return "Please enter a valid date of birth."
     if not MIN_AGE <= age_on(born, now_local().date()) <= MAX_AGE:
         return "You are not within the age range required to use this app."
-    existing = get_db().execute("SELECT verified FROM users WHERE email = ?", (email,)).fetchone()
-    if existing and existing["verified"]:
-        return "This email is already in use."
+    # netid@uw.edu and netid@u.washington.edu are the same UW mailbox: one account per person.
+    same_inbox = [f"{local}@{domain}" for domain in domains]
+    existing = get_db().execute(
+        f"SELECT email FROM users WHERE verified = 1 AND email IN ({', '.join('?' for _ in same_inbox)})",
+        same_inbox).fetchone()
+    if existing:
+        return ("This email is already in use." if existing["email"] == email
+                else f"You already have an account as {existing['email']}. Log in with that email.")
     return None
 
 
