@@ -148,7 +148,8 @@ def event_chat_unread():
                        JOIN rsvps r ON r.event_id = m.event_id AND r.user_id = ?
                        LEFT JOIN event_chat_seen s ON s.event_id = m.event_id AND s.user_id = ?
                        WHERE m.sender_id != ? AND m.id > COALESCE(s.last_id, 0)
-                       GROUP BY m.event_id""", (recent, me, me, me)):
+                         AND m.sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
+                       GROUP BY m.event_id""", (recent, me, me, me, me)):
                 g.chat_unread[row["event_id"]] = row["n"]
     return g.chat_unread
 
@@ -417,8 +418,10 @@ def _chat_rows(event_id, after=0):
     return get_db().execute(
         f"""SELECT * FROM (
                SELECT m.*, u.full_name, u.avatar_updated FROM event_messages m JOIN users u ON u.id = m.sender_id
-               WHERE m.event_id = ? AND m.id > ? ORDER BY m.id DESC LIMIT {MAX_SHOWN_MESSAGES}) ORDER BY id""",
-        (event_id, after)).fetchall()
+               WHERE m.event_id = ? AND m.id > ?
+                 AND m.sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
+               ORDER BY m.id DESC LIMIT {MAX_SHOWN_MESSAGES}) ORDER BY id""",
+        (event_id, after, g.user["id"])).fetchall()
 
 
 def _mark_chat_seen(event_id, rows):

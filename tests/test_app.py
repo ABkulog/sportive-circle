@@ -1331,6 +1331,20 @@ def test_event_group_chat(accounts, client, app):
     assert [m["body"] for m in msgs] == ["on my way!"]
 
 
+def test_game_chat_hides_people_you_blocked(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    client.post(f"/events/{event_id}/chat", data={"body": "you're trash lol"})
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post(f"/block/{_user_id(app, 'player@uw.edu')}")
+    assert b"trash" not in client.get(f"/events/{event_id}/chat").data
+    assert b'<span class="count-dot">' not in client.get(f"/events/{event_id}").data
+
+
 # ------------------------------------------------------------ delete
 
 def test_delete_account_needs_are_you_sure(accounts, client, app):
