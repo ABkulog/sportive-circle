@@ -9,6 +9,9 @@ from flask.cli import with_appcontext
 
 log = logging.getLogger(__name__)
 
+# A mail server that stops answering must not hang the signup page (or the reminder loop) forever.
+SMTP_TIMEOUT_SECONDS = 15
+
 
 def send_email(to, subject, body, html=None):
     """Send an email (plain text, plus the designed HTML version when given).
@@ -30,7 +33,7 @@ def send_email(to, subject, body, html=None):
     msg.set_content(body)
     if html:
         msg.add_alternative(html, subtype="html")
-    with smtplib.SMTP(cfg["MAIL_SERVER"], cfg["MAIL_PORT"]) as smtp:
+    with smtplib.SMTP(cfg["MAIL_SERVER"], cfg["MAIL_PORT"], timeout=SMTP_TIMEOUT_SECONDS) as smtp:
         smtp.starttls()
         smtp.login(cfg["MAIL_USERNAME"], cfg["MAIL_PASSWORD"])
         smtp.send_message(msg)

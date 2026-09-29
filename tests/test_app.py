@@ -2290,11 +2290,11 @@ def test_emails_escape_what_people_type(accounts, client, app):
 
 def test_real_email_has_text_and_html_parts(app, monkeypatch):
     import smtplib
-    sent = []
+    sent, timeouts = [], []
 
     class FakeSMTP:
         def __init__(self, *args, **kwargs):
-            pass
+            timeouts.append(kwargs.get("timeout"))
 
         def __enter__(self):
             return self
@@ -2319,6 +2319,7 @@ def test_real_email_has_text_and_html_parts(app, monkeypatch):
         send_designed("dubs@uw.edu", "Hi", "Hello!", ["A line."], button=("Open", "https://x.test"))
     types = [part.get_content_type() for part in sent[0].walk()]
     assert "text/plain" in types and "text/html" in types
+    assert timeouts and all(timeouts)  # a stuck mail server can't hang the page forever
 
 
 def test_every_log_out_button_asks_first(accounts, client):
