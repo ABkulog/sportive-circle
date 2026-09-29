@@ -280,6 +280,16 @@ def test_changing_the_password_logs_out_other_devices(accounts, client, app):
     assert b"Hey, Dubs" not in phone.get("/").data            # the other one is logged out
 
 
+def test_new_password_must_be_new_and_not_blank(accounts, client):
+    accounts.signup()
+    same = client.post("/profile/password", data={"current_password": "purple-and-gold", "password": "purple-and-gold",
+                                                  "password2": "purple-and-gold"}, follow_redirects=True)
+    assert b"the password you have now" in same.data
+    spaces = client.post("/profile/password", data={"current_password": "purple-and-gold", "password": " " * 10,
+                                                    "password2": " " * 10}, follow_redirects=True)
+    assert b"only spaces" in spaces.data
+
+
 def test_login_next_cannot_redirect_offsite(accounts, client):
     accounts.signup()
     accounts.logout()

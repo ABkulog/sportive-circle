@@ -464,6 +464,8 @@ def password_problem(password, password2):
         return f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
     if len(password) > MAX_PASSWORD_LENGTH:
         return f"Password can be at most {MAX_PASSWORD_LENGTH} characters."
+    if not password.strip():
+        return "Password can't be only spaces."
     if password != password2:
         return "Passwords do not match."
     return None

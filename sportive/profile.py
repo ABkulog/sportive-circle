@@ -291,6 +291,8 @@ def change_password():
         error = "Your current password isn't right."
     else:
         error = password_problem(form.get("password", ""), form.get("password2", ""))
+        if error is None and check_password_hash(g.user["password_hash"], form["password"]):
+            error = "That's the password you have now. Pick a new one."
     if error:
         flash(f"{error} Your password was not changed.", "error")
     else:
