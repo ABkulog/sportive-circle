@@ -290,6 +290,15 @@ def test_new_password_must_be_new_and_not_blank(accounts, client):
     assert b"only spaces" in spaces.data
 
 
+def test_guessing_the_current_password_locks_like_login(accounts, client):
+    accounts.signup()
+    wrong = {"current_password": "guess-guess", "password": "brand-new-pass", "password2": "brand-new-pass"}
+    for _ in range(10):
+        client.post("/profile/password", data=wrong)
+    right = dict(wrong, current_password="purple-and-gold")
+    assert b"Too many wrong passwords" in client.post("/profile/password", data=right, follow_redirects=True).data
+
+
 def test_login_next_cannot_redirect_offsite(accounts, client):
     accounts.signup()
     accounts.logout()

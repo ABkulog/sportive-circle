@@ -446,6 +446,28 @@ def hash_password(password):
     return generate_password_hash(password, current_app.config["PASSWORD_HASH_METHOD"])
 
 
+def check_current_password(user, password):
+    """For pages that ask for your password again (change password, delete account). Wrong guesses count
+    toward the same lock as the login page, so a borrowed logged-in phone can't be used to guess it.
+    Returns None if the password is right, "" if it's wrong, or a message if there were too many tries."""
+    db = get_db()
+    row = db.execute("SELECT password_hash, failed_logins, locked_until FROM users WHERE id = ?",
+                     (user["id"],)).fetchone()
+    if row["locked_until"] and now_local() < from_db(row["locked_until"]):
+        return "Too many wrong passwords. Try again in 15 minutes."
+    if check_password_hash(row["password_hash"], password):
+        if row["failed_logins"]:
+            db.execute("UPDATE users SET failed_logins = 0 WHERE id = ?", (user["id"],))
+            db.commit()
+        return None
+    failed = row["failed_logins"] + 1
+    locked = to_db(now_local() + LOCKOUT) if failed >= MAX_FAILED_LOGINS else None
+    db.execute("UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?",
+               (0 if locked else failed, locked, user["id"]))
+    db.commit()
+    return ""
+
+
 def dummy_hash():
     """A hash to check wrong logins against when the email has no account, so the answer takes as long as
     for a real account (otherwise the response time tells who has one)."""

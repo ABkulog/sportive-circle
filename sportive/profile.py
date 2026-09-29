@@ -7,7 +7,7 @@ from flask import (Blueprint, Response, abort, flash, g, redirect, render_templa
 from werkzeug.datastructures import MultiDict
 from werkzeug.security import check_password_hash
 
-from .auth import MAX_NAME_LENGTH, end_other_sessions, hash_password, login_required, password_problem, safe_next
+from .auth import MAX_NAME_LENGTH, check_current_password, end_other_sessions, hash_password, login_required, password_problem, safe_next
 from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
 from .events import INSIDE_VISIBLE, celebrate_progress, query_events, tell_players_it_was_cancelled
@@ -287,8 +287,9 @@ def edit_sports():
 @login_required
 def change_password():
     form = request.form
-    if not check_password_hash(g.user["password_hash"], form.get("current_password", "")):
-        error = "Your current password isn't right."
+    problem = check_current_password(g.user, form.get("current_password", ""))
+    if problem is not None:
+        error = problem or "Your current password isn't right."
     else:
         error = password_problem(form.get("password", ""), form.get("password2", ""))
         if error is None and check_password_hash(g.user["password_hash"], form["password"]):
@@ -347,8 +348,9 @@ def delete_account():
     if request.form.get("confirm", "").strip().upper() != CONFIRM_WORD:
         flash(f"Type {CONFIRM_WORD} in the box to confirm. Your account was not deleted.", "error")
         return redirect(url_for("profile.delete_account"))
-    if not check_password_hash(g.user["password_hash"], request.form.get("password", "")):
-        flash("That password isn't right, so your account was not deleted.", "error")
+    problem = check_current_password(g.user, request.form.get("password", ""))
+    if problem is not None:
+        flash(f"{problem or 'That password isn’t right.'} Your account was not deleted.", "error")
         return redirect(url_for("profile.delete_account"))
     # Games they host disappear with the account, so warn everyone who joined (like canceling would).
     for event in query_events(["e.host_id = :me", "e.cancelled = 0", "e.ends_at >= :now"],
