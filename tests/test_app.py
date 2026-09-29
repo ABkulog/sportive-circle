@@ -2030,6 +2030,13 @@ def test_focus_ring_is_visible_on_the_purple_header_and_hero():
     assert ".topbar :focus-visible, .husky-hero :focus-visible { outline: 3px solid var(--gold)" in css
 
 
+def test_form_fields_keep_a_focus_outline():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    assert "outline: none" not in css
+    assert "input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid" in css
+
+
 def test_leap_day_birthdays():
     from datetime import date
     from sportive.auth import is_birthday

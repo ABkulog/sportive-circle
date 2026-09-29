@@ -464,7 +464,9 @@ input, select, textarea {
   width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid var(--control-line); border-radius: 10px;
   background: var(--surface); color: var(--text); font: 16px/1.4 var(--font);   /* 16px: no zoom on iPhone */
 }
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); background: var(--bg); }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); background: var(--bg); }
+/* A border-color change alone is too faint to see (WCAG 2.4.7): keep a clear ring for keyboard users. */
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 input::placeholder, textarea::placeholder { color: var(--muted); opacity: .85; }
 .code-input { font-size: 1.6rem; letter-spacing: .4em; text-align: center; font-variant-numeric: tabular-nums; }
 .toggle { display: flex; gap: 10px; align-items: center; cursor: pointer; font-size: .95rem; }
