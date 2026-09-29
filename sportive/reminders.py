@@ -8,7 +8,6 @@ or from another scheduler:
 """
 import logging
 import random
-import secrets
 import threading
 import time
 from datetime import timedelta
@@ -20,6 +19,7 @@ from flask.cli import with_appcontext
 from .constants import SPORTS
 from .db import get_db
 from .mail import compose, send_email
+from .textutil import same_secret
 from .timeutil import fmt_clock, from_db, now_local, to_db
 
 log = logging.getLogger(__name__)
@@ -125,7 +125,7 @@ def send_reminders_task():
     the page doesn't exist."""
     token = current_app.config.get("TASK_TOKEN")
     sent = request.headers.get("X-Task-Token", "")
-    if not token or not secrets.compare_digest(sent, token):
+    if not token or not same_secret(sent, token):
         abort(404)
     return jsonify(sent=send_due_reminders())
 

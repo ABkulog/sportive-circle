@@ -15,7 +15,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from .constants import SPORTS
 from .db import get_db, set_user_sports
 from .mail import compose, failure_reason, send_email
-from .textutil import one_line
+from .textutil import one_line, same_secret, typed_code
 from .timeutil import from_db, now_local, to_db
 
 bp = Blueprint("auth", __name__)
@@ -62,7 +62,7 @@ def check_csrf():
     if request.method == "POST" and current_app.config["CSRF_ENABLED"] and request.endpoint != "tasks.send_reminders_task":
         sent = request.form.get("csrf_token", "")
         expected = session.get("csrf_token", "")
-        if not sent or not expected or not secrets.compare_digest(sent, expected):
+        if not sent or not expected or not same_secret(sent, expected):
             abort(400, "Your form expired. Go back, refresh the page and try again.")
 
 
@@ -283,7 +283,7 @@ def verify():
     if not email:
         return redirect(url_for("auth.login"))
     if request.method == "POST":
-        code = request.form.get("code", "").strip()
+        code = typed_code(request.form.get("code"))
         db = get_db()
         user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
         if user is None:
@@ -295,7 +295,7 @@ def verify():
             error = "Too many wrong tries. Send yourself a new code."
         elif not user["verify_code"] or now_local() > from_db(user["verify_expires"]):
             error = "That code expired. Send yourself a new one."
-        elif not secrets.compare_digest(code, user["verify_code"]):
+        elif not same_secret(code, user["verify_code"]):
             db.execute("UPDATE users SET verify_attempts = verify_attempts + 1 WHERE id = ?", (user["id"],))
             db.commit()
             error = "Wrong code, try again."
@@ -391,7 +391,7 @@ def reset_password():
     if not email:
         return redirect(url_for("auth.forgot_password"))
     if request.method == "POST":
-        code = request.form.get("code", "").strip()
+        code = typed_code(request.form.get("code"))
         password = request.form.get("password", "")
         db = get_db()
         user = db.execute("SELECT * FROM users WHERE email = ? AND verified = 1", (email,)).fetchone()
@@ -402,7 +402,7 @@ def reset_password():
             error = "Too many wrong tries. Ask for a new code."
         elif now_local() > from_db(user["verify_expires"]):
             error = "That code expired. Ask for a new one."
-        elif not secrets.compare_digest(code, user["verify_code"]):
+        elif not same_secret(code, user["verify_code"]):
             db.execute("UPDATE users SET verify_attempts = verify_attempts + 1 WHERE id = ?", (user["id"],))
             db.commit()
             error = "Wrong code, try again."

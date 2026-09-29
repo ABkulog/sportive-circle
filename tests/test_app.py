@@ -210,6 +210,18 @@ def test_csrf_blocks_forged_posts(tmp_path):
     assert app.test_client().post("/login", data={"email": "x@uw.edu", "password": "x"}).status_code == 400
 
 
+def test_non_ascii_csrf_token_and_codes_do_not_crash(tmp_path, accounts, client):
+    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "csrf.db"), "SECRET_KEY": "t"})
+    web = app.test_client()
+    web.get("/login")
+    assert web.post("/login", data={"csrf_token": "é🙂", "email": "x@uw.edu", "password": "x"}).status_code == 400
+
+    accounts.signup(verify=False)
+    assert b"Wrong code" in client.post("/verify", data={"code": "１２３é🙂"}).data
+    full_width = accounts.code_for("dubs@uw.edu").translate({ord(d): 0xFF10 + int(d) for d in "0123456789"})
+    assert client.post("/verify", data={"code": full_width}).status_code == 302
+
+
 def test_login_next_cannot_redirect_offsite(accounts, client):
     accounts.signup()
     accounts.logout()
