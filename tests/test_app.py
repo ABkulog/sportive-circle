@@ -1965,7 +1965,11 @@ def test_deleting_a_host_keeps_the_games_other_people_played(accounts, client, a
         assert former["email"] == "former-member@sportive.invalid" and former["verified"] == 0
     accounts.login(email="player@uw.edu")
     assert "Last week&#39;s run" in client.get("/me/events").data.decode()
-    assert client.get(f"/events/{played}").status_code == 200
+    detail = client.get(f"/events/{played}").data.decode()
+    assert "Former member" in detail
+    with app.app_context():
+        former_id = get_db().execute("SELECT host_id FROM events").fetchone()[0]
+    assert f'href="/u/{former_id}"' not in detail                 # no link to a profile that doesn't exist
     assert b"Former member" not in client.get("/friends?q=Former").data
 
 

@@ -51,6 +51,7 @@ def query_events(where, params=None, order="e.starts_at", limit=100):
     params = {"me": me, "hold_now": now_param(), **(params or {})}
     sql = f"""
         SELECT e.*, u.full_name AS host_name, u.avatar_updated AS host_avatar, cl.name AS club_name,
+               u.verified AS host_verified,
                (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id) AS going_count,
                EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me) AS i_am_going,
                {HELD} AS held_count,
