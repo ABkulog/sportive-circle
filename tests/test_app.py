@@ -2503,6 +2503,15 @@ def test_count_badges_are_readable_in_both_themes():
         assert _contrast(c["--danger"], c["--on-danger"]) >= 4.5, theme
 
 
+def test_team_pill_stays_gold_on_purple_in_dark_mode():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    rule = re.search(r"^\.team-pill \{([^}]*)\}", css, re.M).group(1)
+    assert "var(--header)" in rule and "#e8e3d3" in rule    # --purple / --gold-light flip in dark mode
+    for theme, c in _theme_colors().items():
+        assert _contrast(c["--header"], "#e8e3d3") >= 4.5, theme
+
+
 def test_relative_times_never_wrap_mid_phrase():
     import pathlib
     css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
