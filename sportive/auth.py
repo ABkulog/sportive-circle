@@ -4,7 +4,7 @@ import functools
 import logging
 import secrets
 import sqlite3
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import (Blueprint, abort, current_app, flash, g, redirect, render_template,
                    request, session, url_for)
@@ -16,7 +16,7 @@ from .constants import SPORTS
 from .db import get_db, set_user_sports
 from .mail import compose, failure_reason, send_email
 from .textutil import has_a_letter, person_name, same_secret, typed_code
-from .timeutil import from_db, now_local, to_db
+from .timeutil import SEATTLE, from_db, now_local, to_db
 
 bp = Blueprint("auth", __name__)
 log = logging.getLogger(__name__)
@@ -169,13 +169,22 @@ def send_verification_email(email, code, purpose="signup"):
     return True
 
 
+SENT_AT_FORMAT = "%Y-%m-%d %H:%M:%S"  # to the second: the cooldown is only a minute long
+
+
+def now_to_the_second():
+    return datetime.now(SEATTLE).replace(tzinfo=None, microsecond=0)
+
+
 def resend_wait(email):
     """Seconds until a new code can be sent to this address (0 = now). Stops email spam, and powers the
     "Resend code in 42s" countdown."""
     row = get_db().execute("SELECT verify_sent_at FROM users WHERE email = ?", (email,)).fetchone()
     if not row or not row["verify_sent_at"]:
         return 0
-    left = from_db(row["verify_sent_at"]) + RESEND_COOLDOWN - now_local()
+    sent = row["verify_sent_at"]
+    sent_at = datetime.strptime(sent, SENT_AT_FORMAT) if sent.count(":") == 2 else from_db(sent)
+    left = sent_at + RESEND_COOLDOWN - now_to_the_second()
     return max(0, int(left.total_seconds()) + 1) if left.total_seconds() > 0 else 0
 
 
@@ -190,7 +199,7 @@ def start_verification(email, session_key="pending_email"):
     db.execute(
         "UPDATE users SET verify_code = ?, verify_expires = ?, verify_sent_at = ?, verify_attempts = 0"
         " WHERE email = ?",
-        (code, to_db(now_local() + CODE_TTL), to_db(now_local()), email),
+        (code, to_db(now_local() + CODE_TTL), now_to_the_second().strftime(SENT_AT_FORMAT), email),
     )
     db.commit()
     session[session_key] = email

@@ -425,6 +425,21 @@ def test_old_database_gets_new_columns(tmp_path):
     assert {"verify_sent_at", "failed_logins", "locked_until"} <= columns
 
 
+def test_resend_cooldown_counts_real_seconds(accounts, app):
+    from sportive.auth import SENT_AT_FORMAT, now_to_the_second, resend_wait
+    accounts.signup(email="new@uw.edu", verify=False)
+    with app.app_context():
+        db = get_db()
+        sent = now_to_the_second() - timedelta(seconds=30)
+        db.execute("UPDATE users SET verify_sent_at = ? WHERE email = 'new@uw.edu'", (sent.strftime(SENT_AT_FORMAT),))
+        db.commit()
+        assert 28 <= resend_wait("new@uw.edu") <= 32
+        db.execute("UPDATE users SET verify_sent_at = ? WHERE email = 'new@uw.edu'",
+                   ((sent - timedelta(seconds=40)).strftime(SENT_AT_FORMAT),))
+        db.commit()
+        assert resend_wait("new@uw.edu") == 0
+
+
 def test_login_locks_after_too_many_wrong_passwords(accounts):
     accounts.signup()
     accounts.logout()
