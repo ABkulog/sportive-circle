@@ -114,6 +114,7 @@ strong { font-weight: 650; }
 em { font-style: normal; color: var(--muted); font-weight: 400; }
 small { font-size: .82rem; }
 .muted { color: var(--muted); }
+.fine-print { font-size: .82rem; line-height: 1.45; }
 .center { text-align: center; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .skip-link { position: absolute; left: -9999px; }
