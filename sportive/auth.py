@@ -360,7 +360,7 @@ def login():
         user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
         if user and user["locked_until"] and now_local() < from_db(user["locked_until"]):
             flash("Too many wrong passwords. Try again in 15 minutes.", "error")
-        elif user is None or not check_password_hash(user["password_hash"], password):
+        elif not check_password_hash(user["password_hash"] if user else dummy_hash(), password) or user is None:
             if user is not None:
                 failed = user["failed_logins"] + 1
                 locked = to_db(now_local() + LOCKOUT) if failed >= MAX_FAILED_LOGINS else None
@@ -439,6 +439,18 @@ def reset_password():
 
 def hash_password(password):
     return generate_password_hash(password, current_app.config["PASSWORD_HASH_METHOD"])
+
+
+def dummy_hash():
+    """A hash to check wrong logins against when the email has no account, so the answer takes as long as
+    for a real account (otherwise the response time tells who has one)."""
+    method = current_app.config["PASSWORD_HASH_METHOD"]
+    if _dummy_hashes.get(method) is None:
+        _dummy_hashes[method] = generate_password_hash(secrets.token_urlsafe(16), method)
+    return _dummy_hashes[method]
+
+
+_dummy_hashes = {}
 
 
 def password_problem(password, password2):

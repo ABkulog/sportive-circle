@@ -88,6 +88,15 @@ def test_wrong_password(accounts):
     assert b"Wrong email or password." in accounts.login(password="nope-nope-nope").data
 
 
+def test_unknown_email_login_still_checks_a_password_hash(accounts, monkeypatch):
+    from sportive import auth
+    checked = []
+    real = auth.check_password_hash
+    monkeypatch.setattr(auth, "check_password_hash", lambda h, p: checked.append(h) or real(h, p))
+    assert b"Wrong email or password." in accounts.login(email="nobody@uw.edu", password="whatever-123").data
+    assert checked and checked[0].startswith("pbkdf2:sha256:1000")   # same work as a real account
+
+
 def test_email_already_used(accounts):
     accounts.signup()
     accounts.logout()
