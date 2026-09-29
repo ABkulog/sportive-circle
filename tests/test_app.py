@@ -2147,6 +2147,16 @@ def test_suspending_tells_players_and_frees_their_spots(accounts, client, app):
                           (other,)).fetchone() is not None
 
 
+def test_error_page_shows_the_specific_reason(client, app):
+    from flask import abort
+
+    @app.route("/expired")
+    def expired():
+        abort(400, "Your form expired. Go back, refresh the page and try again.")
+    assert b"Your form expired" in client.get("/expired").data
+    assert b"This Dawg got lost" in client.get("/no-such-page").data
+
+
 def test_https_responses_tell_browsers_to_stay_on_https(client):
     assert "Strict-Transport-Security" not in client.get("/").headers      # local http: never
     secure = client.get("/", base_url="https://localhost")

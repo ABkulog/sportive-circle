@@ -198,5 +198,9 @@ ERRORS = {
 
 def _error_page(code, message):
     def handler(error):
+        # abort(400, "Your form expired...") explains itself; Werkzeug's stock English text doesn't.
+        custom = getattr(error, "description", None)
+        if code < 500 and custom and custom != getattr(type(error), "description", None):
+            return render_template("error.html", code=code, message=custom), code
         return render_template("error.html", code=code, message=message), code
     return handler
