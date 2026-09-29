@@ -161,6 +161,24 @@ def test_join_leave_and_capacity(accounts, client):
     assert b"You&#39;re in!" in client.post(f"/events/{event_id}/join", follow_redirects=True).data
 
 
+def test_host_cannot_shrink_game_below_who_is_in(accounts, client, app, monkeypatch):
+    from sportive import events
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form(players="4")))
+    for email in ("a@uw.edu", "b@uw.edu"):
+        accounts.logout()
+        accounts.signup(email=email)
+        client.post(f"/events/{event_id}/join")
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    assert b"already taken" in client.post(f"/events/{event_id}/edit", data=event_form(players="2")).data
+    # someone joins between the form check and the save
+    monkeypatch.setattr(events, "read_players", lambda *args, **kwargs: (2, 0, None))
+    assert b"Someone just joined" in client.post(f"/events/{event_id}/edit", data=event_form(players="2")).data
+    with app.app_context():
+        assert get_db().execute("SELECT max_players FROM events WHERE id = ?", (event_id,)).fetchone()[0] == 4
+
+
 def test_only_host_can_edit_or_cancel(accounts, client):
     accounts.signup(email="host@uw.edu")
     event_id = event_id_from(client.post("/events/new", data=event_form()))

@@ -420,10 +420,10 @@ def read_players(form, sport, team_size, event=None):
     players = int(raw) if raw.isdigit() else (DEFAULT_PLAYERS.get(sport, 10) if not raw else 0)
     if not 2 <= players <= MAX_PLAYERS:
         return None, 0, f"Pick 2 to {MAX_PLAYERS} players (you included)."
-    taken = (event["going_count"] + event["extra_players"]) if event is not None else 1 + extra
+    taken = (event["going_count"] + event["extra_players"] + event["held_count"]) if event is not None else 1 + extra
     if players < taken:
-        return None, 0, (f"{taken} people are already in, so it can't be fewer players than that." if event
-                         else "That's more people than players.")
+        return None, 0, (f"{taken} spots are already taken or held for invited friends, so it can't be fewer "
+                         "players than that." if event else "That's more people than players.")
     return players, extra, None
 
 
@@ -529,14 +529,21 @@ def edit(event_id):
             data.update(members_only=0)
         if error is None:
             db = get_db()
-            db.execute(
-                """UPDATE events SET title = :title, sport = :sport, location = :location,
+            # The size check is repeated inside the UPDATE: someone may have joined since the form was checked.
+            saved = db.execute(
+                f"""UPDATE events SET title = :title, sport = :sport, location = :location,
                        starts_at = :starts_at, ends_at = :ends_at, skill_level = :skill_level,
                        max_players = :max_players, note = :note, is_private = :is_private, password = :password,
                        open_to = :open_to, members_only = :members_only
-                   WHERE id = :id""",
-                {**data, "id": event_id},
-            )
+                   WHERE id = :id AND (:max_players IS NULL OR :max_players >= (
+                       SELECT e.extra_players + {HELD} + (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id)
+                       FROM events e WHERE e.id = :id))""",
+                {**data, "id": event_id, "hold_now": now_param()},
+            ).rowcount
+            if not saved:
+                db.rollback()
+                flash("Someone just joined, so there are more people in than that. Pick more players.", "error")
+                return render_template("events/form.html", form=form, event=get_event(event_id), min_start="")
             told = tell_players_it_changed(event, data)
             db.commit()
             flash("Saved. Everyone going got a heads-up." if told else "Saved.", "success")
