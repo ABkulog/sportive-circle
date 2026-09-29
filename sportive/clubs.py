@@ -152,11 +152,12 @@ def read_club_form(form, club_id=None):
     for key, options in CHOICES.items():
         if data[key] not in options:
             return problem(key, "Please answer every question in the form.")
-    if not data["verification_url"].startswith(VERIFICATION_PREFIXES) or " " in data["verification_url"] \
-            or len(data["verification_url"]) > 200:
-        return problem("verification_url", "Add your club's official page: its HuskyLink page "
+    # Optional (many clubs don't have one), but if it's there it has to be the real UW page.
+    if data["verification_url"] and (not data["verification_url"].startswith(VERIFICATION_PREFIXES)
+                                     or " " in data["verification_url"] or len(data["verification_url"]) > 200):
+        return problem("verification_url", "That official page should be the club's HuskyLink page "
                        "(https://huskylink.washington.edu/organization/…) or its UW Recreation page. "
-                       "This is how we check it's a real UW club.")
+                       "No page like that? Leave it empty.")
     if not 20 <= len(data["description"]) <= MAX_DESCRIPTION:
         return problem("description", f"Tell people about your club in 20 to {MAX_DESCRIPTION} characters.")
     # Everything is required: people deciding whether to join need the full picture, and a way to reach you.
@@ -183,6 +184,10 @@ def read_club_form(form, club_id=None):
             example = "a link like https://facebook.com/yourclub" if key == "facebook" else (
                 "a link like https://youtube.com/@yourclub" if key == "youtube" else "just the username, like @uwyourclub")
             return problem(key, f"That {label} doesn't look right. Use {example}.")
+    # Almost every real club has a social account (few have a website): at least one is how we check it's real.
+    if not any(data[key] for key in SOCIALS):
+        return problem("instagram", "Add at least one of your club's social media accounts, like its Instagram. "
+                       "That's how we check the club is real.")
     if data["contact_url"] and (not data["contact_url"].startswith("https://") or " " in data["contact_url"]
                                 or len(data["contact_url"]) > 200):
         return problem("contact_url", "The website / Discord / GroupMe link must be a full https:// link.")
@@ -699,7 +704,7 @@ def review_queue():
         (status,)).fetchall()
     club_counts = {row["status"]: row["n"] for row in get_db().execute(
         "SELECT status, COUNT(*) AS n FROM clubs GROUP BY status")}
-    return render_template("clubs/review.html", clubs=clubs, status=status, club_counts=club_counts,
+    return render_template("clubs/review.html", clubs=clubs, status=status, club_counts=club_counts, social_links=social_links,
                            kinds=CLUB_KINDS, focus=FOCUS, joining=JOINING, experience=EXPERIENCE, who=WHO_CAN_JOIN)
 
 

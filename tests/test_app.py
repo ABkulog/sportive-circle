@@ -1528,8 +1528,12 @@ def test_all_club_info_is_required(accounts, client):
     for field in ("meets", "location", "dues", "gear", "how_to_join", "join_question", "club_email"):
         page = client.post("/clubs/new", data={**CLUB, field: ""}).data
         assert b"Please add" in page, field
-    # Socials and website are optional: a club with only an email can register.
-    client.post("/clubs/new", data={**CLUB, "instagram": "", "contact_url": ""})
+    # At least one social account is required (most clubs have Instagram, few have a website)...
+    page = client.post("/clubs/new", data={**CLUB, "instagram": ""}).data
+    assert b"Add at least one of your club" in page and b'data-error-field="instagram"' in page
+    # ...while the website and the official UW page are optional.
+    client.post("/clubs/new", data={**CLUB, "instagram": "", "tiktok": "uwspike", "contact_url": "",
+                                    "verification_url": ""})
     with client.application.app_context():
         assert get_db().execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == 1
 
@@ -3116,3 +3120,15 @@ def test_tap_someones_photo_to_see_it_big(accounts, client, app):
     page = client.get(f"/u/{maya}").data.decode()
     assert 'data-zoom="photo-big"' in page and '<dialog id="photo-big" class="photo-lightbox"' in page
     assert f'/u/{maya}/photo?v=' in page and 'width="640"' in page
+
+
+def test_reserve_spots_on_a_full_game_says_why(accounts, client, app):
+    """Tester: "I tried reserving a spot for a full game I'm going to. It should say why I can't." """
+    _people(accounts, app, "Maya", "Me")
+    _as(accounts, "Maya")
+    full_id = event_id_from(client.post("/events/new", data=event_form(title="Packed run", players="2")))
+    _as(accounts, "Me")
+    client.post(f"/events/{full_id}/join")                          # 2 of 2: full, and I'm going
+    assert f"/events/{full_id}/party" not in client.get(f"/events/{full_id}").data.decode()  # no Reserve button
+    page = client.get(f"/events/{full_id}/party", follow_redirects=True).data.decode()
+    assert "This game is full, so there&#39;s no spot to reserve" in page

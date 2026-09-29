@@ -41,7 +41,19 @@ def party_plan(event):
     """What "Party up" means for me in this game: (team, joining_now, problem).
 
     team is None for regular games; joining_now = I'm not in yet and join together with my party.
+    A full game (or team) says so, instead of showing a page with "0 spots" and no reason.
     """
+    team, joining_now, problem = _party_plan(event)
+    if problem is None:
+        room = room_for(event, team, g.user["id"])
+        if room is not None and room - (1 if joining_now else 0) <= 0:
+            what = "Your team is" if team is not None and not joining_now else "This game is"
+            return team, joining_now, (f"{what} full, so there's no spot to reserve for a friend. "
+                                       "If someone leaves, you can reserve it then.")
+    return team, joining_now, problem
+
+
+def _party_plan(event):
     me = g.user["id"]
     if event["cancelled"] or from_db(event["ends_at"]) < now_local():
         return None, False, "This game is over."

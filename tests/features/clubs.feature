@@ -6,9 +6,9 @@ Feature: Clubs
     And "Admin" is an admin
 
   @FR-CLUB-1
-  Scenario: A club needs its official UW page
+  Scenario: A club's official page, if given, has to be its real UW page
     When "Riley" registers a club with the official page "https://example.com/my-club"
-    Then they see "This is how we check it's a real UW club"
+    Then they see "HuskyLink page"
 
   @FR-CLUB-1 @FR-CLUB-2
   Scenario: A club is hidden until an admin approves it

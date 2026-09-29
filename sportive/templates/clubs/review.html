@@ -17,8 +17,13 @@
         <strong class="club-name">{{ SPORT_EMOJI[c.sport] }} {{ c.name }}</strong>
         <span class="muted">{{ kinds.get(c.club_kind, '?') }}</span>
       </div>
-      <p><a href="{{ c.verification_url }}" target="_blank" rel="noopener nofollow"><strong>Open official page ↗</strong></a>
-        <span class="muted">({{ c.verification_url }})</span></p>
+      {# Check it's real: the club's socials (at least one is required), and its UW page if it has one. #}
+      <ul class="contact-list">
+        {% for label, emoji, url, shown in social_links(c) %}
+          <li><a href="{{ url }}" target="_blank" rel="noopener nofollow"><strong>{{ label }}</strong> {{ shown }} ↗</a></li>
+        {% endfor %}
+        {% if c.verification_url %}<li><a href="{{ c.verification_url }}" target="_blank" rel="noopener nofollow"><strong>Official UW page</strong> ↗</a></li>{% endif %}
+      </ul>
       <p><strong>Applicant:</strong> {{ c.applicant or 'deleted account' }} <span class="muted">({{ c.applicant_email }})</span>,
         {{ c.officer_role }} · says ~{{ c.member_estimate }} active members</p>
       <p class="club-about">{{ c.description }}</p>
