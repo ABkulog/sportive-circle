@@ -230,6 +230,67 @@
     });
   });
 
+  // <button data-zoom="dialog-id">: a profile photo opens big; a tap anywhere (or Esc) closes it again.
+  document.querySelectorAll("[data-zoom]").forEach((button) => {
+    const dialog = document.getElementById(button.dataset.zoom);
+    if (!dialog || typeof dialog.showModal !== "function") return;
+    button.addEventListener("click", () => dialog.showModal());
+    dialog.addEventListener("click", () => dialog.close());
+  });
+
+  // Pull down at the top of a page to refresh it (phones). Not while typing, not with unsaved changes in a
+  // form, not inside something that scrolls by itself (a chat), and not while a pop-up is open.
+  if (window.matchMedia("(pointer: coarse)").matches) {
+    const PULL = 70;  // how far to pull (px) before letting go refreshes
+    let startY = null, pulled = 0, dirty = false;
+    const hint = document.createElement("div");
+    hint.className = "pull-refresh";
+    hint.setAttribute("aria-hidden", "true");
+    hint.innerHTML = '<span class="pull-arrow">↓</span><span class="pull-text">Pull to refresh</span>';
+    document.body.append(hint);
+    document.addEventListener("input", (event) => { if (event.target.closest("form")) dirty = true; });
+    document.addEventListener("submit", () => { dirty = false; });
+    const scrollsItself = (element) => {
+      for (let el = element; el && el !== document.body; el = el.parentElement) {
+        if (el.scrollTop > 0) return true;
+        const overflow = getComputedStyle(el).overflowY;
+        if ((overflow === "auto" || overflow === "scroll") && el.scrollHeight > el.clientHeight) return true;
+      }
+      return false;
+    };
+    document.addEventListener("touchstart", (event) => {
+      const target = event.target;
+      startY = null;
+      if (window.scrollY > 0 || dirty || document.querySelector("dialog[open]") || event.touches.length > 1) return;
+      if (target.closest("input, textarea, select, [contenteditable]") || scrollsItself(target)) return;
+      startY = event.touches[0].clientY;
+      pulled = 0;
+    }, { passive: true });
+    document.addEventListener("touchmove", (event) => {
+      if (startY === null) return;
+      pulled = Math.max(0, event.touches[0].clientY - startY);
+      if (pulled > 0 && window.scrollY <= 0) {
+        const shown = Math.min(pulled * 0.5, PULL);
+        hint.style.transform = `translate(-50%, ${shown}px)`;
+        hint.classList.add("is-pulling");
+        hint.classList.toggle("is-ready", pulled > PULL * 1.4);
+        hint.querySelector(".pull-text").textContent = pulled > PULL * 1.4 ? "Release to refresh" : "Pull to refresh";
+      }
+    }, { passive: true });
+    document.addEventListener("touchend", () => {
+      if (startY === null) return;
+      startY = null;
+      if (pulled > PULL * 1.4) {
+        hint.classList.add("is-refreshing");
+        hint.querySelector(".pull-text").textContent = "Refreshing…";
+        location.reload();
+      } else {
+        hint.classList.remove("is-pulling", "is-ready");
+        hint.style.transform = "";
+      }
+    });
+  }
+
   // Every password box gets an eye button to peek at what you typed (tap again to hide it).
   const EYE = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor"' +
     ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7' +

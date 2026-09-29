@@ -897,3 +897,30 @@ button.link-button { min-height: 36px; }
 .reminder-pick { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin: 10px 0 0; font-size: .9rem; }
 .reminder-pick label { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .reminder-pick select { width: auto; padding: 8px 10px; min-height: 40px; }
+
+/* Tap a profile photo to see it big. */
+.photo-zoom { border: 0; padding: 0; background: none; cursor: zoom-in; border-radius: 50%; }
+.photo-lightbox { border: 0; padding: 0; background: transparent; max-width: none; max-height: none; overflow: visible; }
+.photo-lightbox::backdrop { background: rgb(0 0 0 / .85); }
+.photo-lightbox img { display: block; width: min(86vw, 420px); height: auto; aspect-ratio: 1; border-radius: 50%;
+                      object-fit: cover; box-shadow: 0 10px 40px rgb(0 0 0 / .5); cursor: zoom-out; }
+.photo-close { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 12px; width: 44px; height: 44px;
+               border: 0; border-radius: 50%; background: rgb(255 255 255 / .15); color: #fff; font-size: 1.6rem;
+               line-height: 1; cursor: pointer; }
+@media (prefers-reduced-motion: no-preference) {
+  .photo-lightbox[open] img { animation: photo-pop .18s ease-out; }
+  @keyframes photo-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+}
+
+/* Pull to refresh (phones). Our own, so it works the same everywhere, including the home-screen app. */
+@media (pointer: coarse) { html, body { overscroll-behavior-y: contain; } }
+.pull-refresh { position: fixed; left: 50%; top: calc(8px + env(safe-area-inset-top)); z-index: 60;
+                transform: translate(-50%, -70px); display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+                border-radius: 999px; background: var(--bg); color: var(--purple); font-weight: 700; font-size: .85rem;
+                box-shadow: 0 4px 14px rgb(0 0 0 / .18); pointer-events: none; opacity: 0; }
+.pull-refresh.is-pulling { opacity: 1; }
+.pull-refresh:not(.is-pulling) { transition: transform .2s ease, opacity .2s ease; }
+.pull-arrow { display: inline-block; transition: transform .15s ease; }
+.pull-refresh.is-ready .pull-arrow { transform: rotate(180deg); }
+.pull-refresh.is-refreshing .pull-arrow { animation: pull-spin .8s linear infinite; }
+@keyframes pull-spin { to { transform: rotate(360deg); } }
