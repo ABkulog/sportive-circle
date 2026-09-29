@@ -76,7 +76,8 @@
     textarea.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && !event.shiftKey && textarea.value.trim()) {
         event.preventDefault();
-        textarea.form.requestSubmit();
+        if (textarea.form.requestSubmit) textarea.form.requestSubmit();  // Safari 16+
+        else if (textarea.form.dispatchEvent(new Event("submit", { cancelable: true }))) textarea.form.submit();
       }
     });
     textarea.addEventListener("input", () => {

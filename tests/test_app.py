@@ -2419,6 +2419,17 @@ def test_small_segmented_control_is_compact():
     assert ".segmented.small span" in pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
 
 
+def test_scripts_do_not_depend_on_request_submit_alone():
+    # requestSubmit is Safari 16+; older iPhones need the dispatch + submit() fallback.
+    import pathlib
+    for name in ("app.js", "chat.js"):
+        js = pathlib.Path("sportive/static", name).read_text(encoding="utf-8")
+        calls = re.findall(r"(\w+(?:\.\w+)*)\.requestSubmit\(\)", js)
+        for form in calls:
+            assert f"if ({form}.requestSubmit)" in js, (name, form)
+        assert "form.submit()" in js, name
+
+
 def test_limited_badge_tag_stands_out():
     assert _css_classes_used_but_undefined(["tag-limited"]) == []
 

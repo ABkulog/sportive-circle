@@ -1,6 +1,13 @@
 // Small helpers used on many pages. Pages describe what they want with data-* attributes
 // (no inline JavaScript), so names and messages that people type can never run as code.
 (function () {
+  // form.requestSubmit() needs Safari 16+. Older iPhones get the same result by hand: run the
+  // page's submit handlers (like the confirm below), and send only if none of them said no.
+  function submitForm(form) {
+    if (form.requestSubmit) return form.requestSubmit();
+    if (form.dispatchEvent(new Event("submit", { cancelable: true }))) form.submit();
+  }
+
   // <form data-confirm="Leave the club?">: ask first. The text is plain data, so an apostrophe
   // in a name ("O'Brien") can't break it.
   document.addEventListener("submit", (event) => {
@@ -68,7 +75,7 @@
       dialog.showModal();
     }, true);
     dialog.querySelectorAll("[data-dialog-continue]").forEach((button) => {
-      button.addEventListener("click", () => { form.dataset.dialogShown = "1"; dialog.close(); form.requestSubmit(); });
+      button.addEventListener("click", () => { form.dataset.dialogShown = "1"; dialog.close(); submitForm(form); });
     });
   });
 
@@ -91,7 +98,7 @@
   // <select data-autosubmit>: filters apply as soon as you pick something.
   document.addEventListener("change", (event) => {
     const field = event.target;
-    if (field.matches && field.matches("[data-autosubmit]") && field.form) field.form.requestSubmit();
+    if (field.matches && field.matches("[data-autosubmit]") && field.form) submitForm(field.form);
   });
 
   // <p data-expand>: long text is clamped to a few lines; tap to read it all.
