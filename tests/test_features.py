@@ -658,11 +658,11 @@ def can_log_in(world, name, password):
         assert session.get("user_id") == world.person(name).id
 
 
-@then("the saved photo is a 256 by 256 JPEG without GPS data")
+@then("the saved photo is a 640 by 640 JPEG without GPS data")
 def photo_is_clean(world):
     image = world.db("SELECT image FROM avatars ORDER BY rowid DESC LIMIT 1")[0]["image"]
     with Image.open(BytesIO(image)) as photo:
-        assert photo.format == "JPEG" and photo.size == (256, 256) and not photo.getexif()
+        assert photo.format == "JPEG" and photo.size == (640, 640) and not photo.getexif()
 
 
 @then(parsers.parse('"{name}" sees "{text}" in the feed'))

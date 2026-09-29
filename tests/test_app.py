@@ -576,7 +576,7 @@ def test_photo_is_resized_and_location_data_removed(accounts, client, app):
     response = client.get(f"/u/{user_id}/photo")
     assert response.mimetype == "image/jpeg"
     served = Image.open(BytesIO(response.data))
-    assert served.size == (256, 256)
+    assert served.size == (640, 640)
     assert not served.getexif()
 
 
@@ -3116,6 +3116,41 @@ def test_players_pick_when_their_reminder_comes(accounts, client, app, monkeypat
     assert sorted(sent) == ["host@uw.edu", "player@uw.edu"]      # now within 30 min
     client.post("/events/1/reminder", data={"remind": "0"})
     assert client.post("/events/1/reminder", data={"remind": "45"}).status_code == 400   # only the listed choices
+
+
+def test_tap_someones_photo_to_see_it_big(accounts, client, app):
+    """Like Instagram: on someone else's profile their photo opens big (and closes again); yours opens the editor."""
+    accounts.signup(email="maya@uw.edu", name="Maya Chen")
+    maya = _user_id(app, "maya@uw.edu")
+    mine = client.get(f"/u/{maya}").data.decode()
+    assert 'data-zoom="photo-big"' not in mine and "/profile/photo" in mine
+    accounts.logout()
+    accounts.signup(email="me@uw.edu")
+    page = client.get(f"/u/{maya}").data.decode()
+    assert 'data-zoom="photo-big"' in page and '<dialog id="photo-big" class="photo-lightbox"' in page
+    assert f'/u/{maya}/photo?v=' in page and 'width="640"' in page
+
+
+def test_a_game_full_because_of_a_reserved_spot_is_hidden(accounts, client, app):
+    """The user: "if an event is full (even for the 30 min a spot is reserved) you can't see it"."""
+    ids = _people(accounts, app, "Maya", "Friend", "Stranger")
+    _friends(app, ids["Maya"], ids["Friend"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Held run", players="2",
+                                                                     reserve=[str(ids["Friend"])])))
+    assert "Held run" in client.get("/?scope=all").data.decode()               # the host still sees it
+    _as(accounts, "Stranger")
+    assert "Held run" not in client.get("/?scope=all").data.decode()           # Maya + 1 held spot = 2 of 2
+    assert "Held run" not in client.get(f"/u/{ids['Maya']}").data.decode()     # not on Maya's profile either
+    assert "Held run" in client.get("/?scope=full").data.decode()              # only in the Full tab
+    assert b"Sorry, this game is full." in client.post(f"/events/{game}/join", follow_redirects=True).data
+    _as(accounts, "Friend")
+    assert "Held run" in client.get("/?scope=all").data.decode()               # the friend it's held for sees it
+    with app.app_context():                                                    # 30 minutes later the hold is over:
+        get_db().execute("UPDATE invites SET expires_at = '2000-01-01 00:00'")
+        get_db().commit()
+    _as(accounts, "Stranger")
+    assert "Held run" in client.get("/?scope=all").data.decode()               # open again for everyone
 
 
 def test_reserve_spots_on_a_full_game_says_why(accounts, client, app):

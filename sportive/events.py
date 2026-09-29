@@ -71,6 +71,18 @@ def get_event(event_id, host_only=False):
     return event
 
 
+# SQL for "is this game full?": spots held for invited friends count as taken (for their 30 minutes).
+SPOTS_LEFT_SQL = (f"(e.max_players - e.extra_players - {HELD}"
+                  " - (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id))")
+IS_FULL_SQL = f"(e.max_players IS NOT NULL AND {SPOTS_LEFT_SQL} <= 0)"
+# ...and "is it mine?": I host it, I'm going, or a spot is held for me. Needs :me and :hold_now.
+IS_MINE_SQL = ("(e.host_id = :me OR EXISTS (SELECT 1 FROM rsvps m WHERE m.event_id = e.id AND m.user_id = :me)"
+               " OR EXISTS (SELECT 1 FROM invites mi WHERE mi.event_id = e.id AND mi.guest_id = :me"
+               " AND mi.status = 'pending'))")
+# Full games are hidden everywhere (nobody can join them), except your own and the Home "Full" tab.
+SHOWN_UNLESS_FULL = f"(NOT {IS_FULL_SQL} OR {IS_MINE_SQL})"
+
+
 def spots_left(event):
     """Open spots anyone can take (held spots for invited friends don't count). None = unlimited."""
     if event["max_players"] is None:
@@ -237,12 +249,8 @@ def feed():
         names = [f":s{i}" for i in range(len(my_sports))]
         where.append(f"e.sport IN ({', '.join(names)})")
         params.update({f"s{i}": sport for i, sport in enumerate(my_sports)})
-    # Full games are hidden (nobody can join them) except in the "Full" tab. Your own games always show.
-    spots_left_sql = (f"(e.max_players - e.extra_players - {HELD}"
-                      " - (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id))")
-    is_full = f"(e.max_players IS NOT NULL AND {spots_left_sql} <= 0)"
-    mine = "(e.host_id = :me OR EXISTS (SELECT 1 FROM rsvps m WHERE m.event_id = e.id AND m.user_id = :me))"
-    where.append(f"({is_full} AND NOT {mine})" if filters["scope"] == "full" else f"(NOT {is_full} OR {mine})")
+    # Full games (reserved spots count) are hidden except in the "Full" tab. Your own games always show.
+    where.append(f"({IS_FULL_SQL} AND NOT {IS_MINE_SQL})" if filters["scope"] == "full" else SHOWN_UNLESS_FULL)
     if filters["location"] in LOCATIONS:
         where.append("e.location = :location")
         params["location"] = filters["location"]
@@ -251,7 +259,7 @@ def feed():
         params["skill"] = filters["skill"]
     if filters["open"] in OPEN_SPOT_CHOICES:
         # "We're a group of 5": games with at least that many spots anyone can take right now.
-        where.append(f"(e.max_players IS NULL OR {spots_left_sql} >= :min_open)")
+        where.append(f"(e.max_players IS NULL OR {SPOTS_LEFT_SQL} >= :min_open)")
         params["min_open"] = int(filters["open"])
     else:
         filters["open"] = ""
@@ -279,7 +287,7 @@ def feed():
             {"now": to_db(now), "soon": to_db(now + QUICK_WINDOW)},
             limit=10,
         )
-        if spots_left(e) != 0 or e["i_am_going"]
+        if spots_left(e) != 0 or e["i_am_going"] or e["i_am_invited"]
     ]
     shown = {e["id"] for e in need_players}
     events = [e for e in events if e["id"] not in shown]

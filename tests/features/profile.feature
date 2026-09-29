@@ -12,7 +12,7 @@ Feature: Profiles
   Scenario: Hidden photo location data is removed
     Given "Maya" is a Husky
     When "Maya" uploads a photo that has GPS data in it
-    Then the saved photo is a 256 by 256 JPEG without GPS data
+    Then the saved photo is a 640 by 640 JPEG without GPS data
 
   @FR-PROF-3
   Scenario: Your own profile has one Edit profile button, and Add photo only without a photo
