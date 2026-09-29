@@ -760,7 +760,6 @@ form[data-wizard] .form-step { display: none; }
 .create-option:hover { text-decoration: none; border-color: var(--faint); }
 .create-option .muted { grid-column: 2; font-size: .88rem; }
 .create-option strong { font-size: 1.02rem; }
-.create-gold, .create-gold:hover { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
 .create-emoji { grid-row: span 2; font-size: 1.6rem; text-align: center; }
 
 /* ============================== Landing & How it works ============================== */
