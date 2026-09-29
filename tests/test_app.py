@@ -576,7 +576,7 @@ def test_photo_is_resized_and_location_data_removed(accounts, client, app):
     response = client.get(f"/u/{user_id}/photo")
     assert response.mimetype == "image/jpeg"
     served = Image.open(BytesIO(response.data))
-    assert served.size == (256, 256)
+    assert served.size == (640, 640)
     assert not served.getexif()
 
 
@@ -3107,6 +3107,19 @@ def test_players_pick_when_their_reminder_comes(accounts, client, app, monkeypat
     assert sorted(sent) == ["host@uw.edu", "player@uw.edu"]      # now within 30 min
     client.post("/events/1/reminder", data={"remind": "0"})
     assert client.post("/events/1/reminder", data={"remind": "45"}).status_code == 400   # only the listed choices
+
+
+def test_tap_someones_photo_to_see_it_big(accounts, client, app):
+    """Like Instagram: on someone else's profile their photo opens big (and closes again); yours opens the editor."""
+    accounts.signup(email="maya@uw.edu", name="Maya Chen")
+    maya = _user_id(app, "maya@uw.edu")
+    mine = client.get(f"/u/{maya}").data.decode()
+    assert 'data-zoom="photo-big"' not in mine and "/profile/photo" in mine
+    accounts.logout()
+    accounts.signup(email="me@uw.edu")
+    page = client.get(f"/u/{maya}").data.decode()
+    assert 'data-zoom="photo-big"' in page and '<dialog id="photo-big" class="photo-lightbox"' in page
+    assert f'/u/{maya}/photo?v=' in page and 'width="640"' in page
 
 
 def test_a_game_full_because_of_a_reserved_spot_is_hidden(accounts, client, app):

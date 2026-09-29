@@ -3,7 +3,7 @@ from io import BytesIO
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-AVATAR_SIZE = 256
+AVATAR_SIZE = 640  # big enough to look sharp when someone taps a photo to see it large
 MAX_UPLOAD_MB = 8
 ALLOWED_FORMATS = {"JPEG", "MPO", "PNG", "WEBP", "GIF"}  # MPO = the JPEG variant some phones make
 
@@ -12,7 +12,7 @@ Image.MAX_IMAGE_PIXELS = 50_000_000
 
 
 def make_avatar(data):
-    """Any photo -> a 256x256 JPEG: rotated upright, cropped to a square around the center,
+    """Any photo -> a 640x640 JPEG: rotated upright, cropped to a square around the center,
     and re-encoded from scratch, so hidden metadata (like the GPS location phones add) is gone.
 
     Raises ValueError with a friendly message if the file isn't a usable photo.
