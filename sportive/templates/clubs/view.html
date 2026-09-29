@@ -117,7 +117,7 @@
             aria-label="{{ label }}: {{ shown }}">{{ shown|truncate(45) }}</a></li>
       {% endfor %}
       {% if club.contact_url %}<li><span aria-hidden="true">🔗</span> <a href="{{ club.contact_url }}" target="_blank" rel="noopener nofollow">{{ club.contact_url|replace('https://', '')|truncate(45) }}</a></li>{% endif %}
-      <li><span aria-hidden="true">🏛️</span> <a href="{{ club.verification_url }}" target="_blank" rel="noopener nofollow">{{ kinds.get(club.club_kind, 'Official page') }}</a></li>
+      {% if club.verification_url %}<li><span aria-hidden="true">🏛️</span> <a href="{{ club.verification_url }}" target="_blank" rel="noopener nofollow">{{ kinds.get(club.club_kind, 'Official page') }}</a></li>{% endif %}
     </ul>
     {% if g.user %}
       {% set officers = members|selectattr('role', 'equalto', 'officer')|list %}

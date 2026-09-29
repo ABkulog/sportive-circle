@@ -118,8 +118,8 @@ Keep a few days of copies, and copy them somewhere off the server now and then.
 ## 6. After launch
 
 - Check **Reports** and **Club requests** (the shield and flag icons) every day or two.
-- To approve a club: open its HuskyLink or UW Recreation page, check it's active this quarter and the
-  applicant is an officer, then tap Approve.
+- To approve a club: open its social accounts (and its HuskyLink or UW Recreation page, if it gave one), check it's
+  active this quarter and the applicant is an officer, then tap Approve.
 - Run `flask --app wsgi sport-stats` after a few weeks to see how big games really are (and adjust each sport's usual size)
   (`sportive/constants.py`).
 - Watch your host's logs for errors (emails that fail are logged, not shown to users).
