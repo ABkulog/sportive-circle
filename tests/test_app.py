@@ -494,6 +494,16 @@ def test_calendar_file(accounts, client):
     assert "SUMMARY:Hoops\\, then food" in body and "TZID=America/Los_Angeles" in body
 
 
+def test_line_breaks_are_saved_as_one_character(accounts, client, app):
+    accounts.signup()
+    event_id = event_id_from(client.post("/events/new", data=event_form(note="a\r\n" * 249 + "b")))  # 499 chars typed
+    client.post("/profile/edit", data={"full_name": "Dubs Husky", "grad_year": "2028", "bio": "Hoops\r\ndaily"})
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT note FROM events WHERE id = ?", (event_id,)).fetchone()[0] == "a\n" * 249 + "b"
+        assert db.execute("SELECT bio FROM users").fetchone()[0] == "Hoops\ndaily"
+
+
 def test_calendar_file_has_no_stray_line_breaks_from_the_note(accounts, client):
     accounts.signup()
     event_id = event_id_from(client.post("/events/new", data=event_form(note="Court 3\r\nBring water\rThanks")))

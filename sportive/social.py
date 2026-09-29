@@ -14,6 +14,7 @@ from flask import (Blueprint, abort, current_app, flash, g, jsonify, redirect, r
 
 from .auth import login_required, safe_next
 from .db import get_db
+from .textutil import multi_line
 from .timeutil import fmt_clock, fmt_when, now_local, to_db
 
 bp = Blueprint("social", __name__)
@@ -120,7 +121,7 @@ def too_many_messages(me):
 
 def clean_body(text):
     """Returns (body, error)."""
-    body = (text or "").strip()
+    body = multi_line(text)
     if not body:
         return None, "Type a message first."
     if len(body) > MAX_MESSAGE_LENGTH:

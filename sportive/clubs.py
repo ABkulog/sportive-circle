@@ -21,7 +21,7 @@ from .mail import compose, send_email
 from .moderation import is_admin
 from .notifications import mark_seen
 from .photos import make_avatar
-from .textutil import one_line
+from .textutil import multi_line, one_line
 from .timeutil import now_local, to_db
 
 bp = Blueprint("clubs", __name__)
@@ -499,7 +499,7 @@ def join(club_id):
     role = my_role(club_id)
     if role in MEMBER_ROLES or role in WAITING_ROLES:
         return redirect(url_for("clubs.view", club_id=club_id))
-    message = request.form.get("message", "").strip()
+    message = multi_line(request.form.get("message"))
     if len(message) > 500:
         flash("Please keep your answer under 500 characters.", "error")
         return redirect(url_for("clubs.view", club_id=club_id) + "#join")
@@ -614,7 +614,7 @@ def updates():
     my_officer_clubs = officer_clubs(me)
     if request.method == "POST":
         club_id = request.form.get("club", type=int)
-        body = request.form.get("body", "").strip()
+        body = multi_line(request.form.get("body"))
         if club_id not in {club["id"] for club in my_officer_clubs}:
             abort(403)
         if not body or len(body) > MAX_POST:
@@ -646,7 +646,7 @@ def post(club_id):
     club = get_club(club_id)
     if my_role(club_id) != "officer" or club["status"] != "approved":
         abort(403)
-    body = request.form.get("body", "").strip()
+    body = multi_line(request.form.get("body"))
     if not body or len(body) > MAX_POST:
         flash(f"Announcements must be 1 to {MAX_POST} characters.", "error")
     else:
@@ -714,7 +714,7 @@ def review(club_id, decision):
     if not is_admin() or decision not in ("approve", "reject"):
         abort(404)
     club = get_club(club_id)
-    note = request.form.get("note", "").strip()[:500]
+    note = multi_line(request.form.get("note"))[:500]
     if decision == "reject" and not note:
         flash("Add a short note so the officers know what to fix.", "error")
         return redirect(url_for("clubs.review_queue"))

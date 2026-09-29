@@ -22,7 +22,7 @@ from .notifications import mark_seen, notify
 from .mail import compose, send_email
 from .social import friends_of, is_blocked_between
 from .spirit import greeting, top_dawgs
-from .textutil import one_line, same_secret
+from .textutil import multi_line, one_line, same_secret
 from .timeutil import fmt_clock, fmt_when, from_db, now_local, parse_form, to_db, to_form
 
 bp = Blueprint("events", __name__)
@@ -321,7 +321,7 @@ def read_event_form(form, event=None):
     sport = form.get("sport", "")
     location = form.get("location", "")
     skill_level = form.get("skill_level") or "All levels"  # not asked for private games
-    note = form.get("note", "").strip()
+    note = multi_line(form.get("note"))
     now = now_local()
 
     if len(title) > 80:
@@ -687,7 +687,7 @@ def quick():
         sport = form.get("sport", "")
         location = form.get("location", "")
         skill_level = form.get("skill_level") or "All levels"  # not asked for private games
-        note = form.get("note", "").strip()
+        note = multi_line(form.get("note"))
         starts_in = dict(QUICK_START_OPTIONS).get(_int(form.get("starts_in")))
         duration = dict(QUICK_DURATIONS).get(_int(form.get("duration")))
         is_private, password, team_size, max_players, extra, reserve = 0, "", None, 0, 0, []

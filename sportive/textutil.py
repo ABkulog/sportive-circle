@@ -12,6 +12,12 @@ def one_line(text):
     return " ".join((text or "").split())
 
 
+def multi_line(text):
+    """Trim text that may have line breaks (notes, bios, messages), with every line break as a plain \\n.
+    Browsers send \\r\\n, which would count twice toward length limits and break calendar files."""
+    return (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+
+
 def same_secret(sent, expected):
     """Constant-time comparison that works for any text. secrets.compare_digest raises TypeError on
     non-ASCII strings, so an emoji or accented letter in a form field must not reach it as str."""

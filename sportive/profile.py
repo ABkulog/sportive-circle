@@ -17,7 +17,7 @@ from .badges import (GIVEN_BADGES, ROLE_BADGES, SHOWCASE_SLOTS, TESTER, catalog,
 from .clubs import SOCIALS
 from .moderation import admin_required, is_admin
 from .notifications import mark_seen, notify
-from .textutil import one_line
+from .textutil import multi_line, one_line
 from .social import can_message, friendship_status, i_blocked, is_blocked_between
 from .timeutil import now_local, to_db
 
@@ -221,7 +221,7 @@ def edit():
         form = request.form
         full_name = one_line(form.get("full_name"))
         grad_year = form.get("grad_year", "").strip()
-        bio = form.get("bio", "").strip()
+        bio = multi_line(form.get("bio"))
         pronouns = one_line(form.get("pronouns"))
         gender = form.get("gender", "")
 

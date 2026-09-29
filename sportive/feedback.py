@@ -16,6 +16,7 @@ from .auth import login_required
 from .db import get_db
 from .moderation import admin_required, is_admin
 from .notifications import mark_seen_value, seen_value
+from .textutil import multi_line
 from .timeutil import now_local, to_db
 
 bp = Blueprint("feedback", __name__)
@@ -95,7 +96,7 @@ def suggest():
     form = request.form
     if request.method == "POST":
         kind = form.get("kind", "")
-        body = form.get("body", "").strip()
+        body = multi_line(form.get("body"))
         db = get_db()
         recent = db.execute("SELECT COUNT(*) FROM suggestions WHERE user_id = ? AND created_at >= ?",
                             (g.user["id"], to_db(now_local() - timedelta(hours=1)))).fetchone()[0]
