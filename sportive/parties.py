@@ -361,6 +361,18 @@ def accept_invite_link(user, token):
     if inviter_team is None:  # the friend left the game since sending the link
         flash("Your friend isn't in that game anymore.", "info")
         return url_for("events.detail", event_id=event_id)
+    if event["is_private"] and inviter_id != event["host_id"]:
+        # Same rule as "Invite friends" in a private game: the host says yes before a player's friend gets in.
+        db.execute("""INSERT OR REPLACE INTO invites (event_id, inviter_id, guest_id, team, status, note, created_at,
+                                                      expires_at) VALUES (?, ?, ?, ?, 'requested', '', ?, ?)""",
+                   (event_id, inviter_id, user["id"], inviter_team["team"], now_param(), now_param()))
+        inviter = db.execute("SELECT full_name FROM users WHERE id = ?", (inviter_id,)).fetchone()
+        notify(event["host_id"], "invites",
+               f"{inviter['full_name'].split()[0]} wants to bring {first} to {event_title(event)}.",
+               url_for("events.detail", event_id=event_id) + "#requests", key=f"request:{event_id}:{inviter_id}")
+        db.commit()
+        flash(f"Asked {event['host_name'].split()[0]}, the host. You'll get the invite once they say yes.", "info")
+        return url_for("events.detail", event_id=event_id)
     # The link counts as an invite (so a private game's password isn't needed), then join like anyone else.
     db.execute("""INSERT OR REPLACE INTO invites (event_id, inviter_id, guest_id, team, status, created_at, expires_at)
                   VALUES (?, ?, ?, ?, 'pending', ?, ?)""",

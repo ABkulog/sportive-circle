@@ -75,7 +75,7 @@
               <a class="btn btn-ghost" href="{{ url_for('parties.party_up', event_id=event.id) }}">{{ 'Invite friends' if event.is_private else 'Reserve spots' }}</a>
             {% endif %}
           </div>
-          <small class="muted">The link works for friends who aren't on the app: they sign up and they're in{% if event.is_private %}, no password needed{% endif %}.</small>
+          <small class="muted">The link works for friends who aren't on the app: they sign up and they're in{% if event.is_private %}{% if is_host %}, no password needed{% else %} once {{ event.host_name.split()[0] }} says yes{% endif %}{% endif %}.</small>
         </div>
         {% if my_reminder is not none and not ended %}
           {% if g.user.email_reminders %}

@@ -3150,6 +3150,23 @@ def test_invite_link_for_people_who_already_have_an_account(accounts, client, ap
     assert b"doesn&#39;t work anymore" in client.get("/join/WzEsIDJd.forged", follow_redirects=True).data
 
 
+def test_a_players_link_to_a_private_game_needs_the_hosts_ok(accounts, client, app):
+    ids = _people(accounts, app, "Hana", "Pat", "Solo")
+    _as(accounts, "Hana")
+    game = event_id_from(client.post("/events/new", data=event_form(is_private="1", password="dawgs26", title="Hoops")))
+    _as(accounts, "Pat")
+    client.post(f"/events/{game}/join", data={"password": "dawgs26"})
+    link = _invite_path(client.get(f"/events/{game}").data.decode())
+    _as(accounts, "Solo")
+    assert b"Asked Hana" in client.post(link, follow_redirects=True).data
+    with app.app_context():
+        db = get_db()
+        assert not db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (game, ids["Solo"])).fetchone()
+        assert db.execute("SELECT status FROM invites WHERE guest_id = ?", (ids["Solo"],)).fetchone()[0] == "requested"
+    _as(accounts, "Hana")
+    assert "Pat wants to bring Solo to Hoops" in client.get("/notifications").data.decode()
+
+
 def test_invite_links_expire(accounts, client, app, monkeypatch):
     from datetime import timedelta as td
     from sportive import parties
