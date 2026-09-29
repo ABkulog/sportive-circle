@@ -846,3 +846,18 @@ h1 .team-pill { font-size: .78rem; margin-left: 4px; }
 .peek:hover, .peek[aria-pressed="true"] { color: var(--purple); }
 .peek .eye-slash { display: none; }
 .peek[aria-pressed="true"] .eye-slash { display: inline; }  /* crossed out while showing: tap to hide */
+
+/* "Need help?" bubble (bottom right, above the phone tab bar). */
+.help-bubble { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 25;
+               display: flex; align-items: center; background: var(--bg); border: 1px solid var(--control-line);
+               border-radius: 999px; box-shadow: 0 4px 14px rgba(50, 0, 110, .18); }
+.help-bubble[hidden] { display: none; }
+body.has-app-nav .help-bubble { bottom: calc(72px + env(safe-area-inset-bottom)); }
+body.hide-tabs .help-bubble { display: none; }
+.help-bubble a { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 4px 0 14px;
+                 color: var(--purple); font-weight: 700; font-size: .92rem; text-decoration: none; }
+.help-bubble a svg { width: 20px; height: 20px; }
+.help-close { width: 40px; height: 44px; border: 0; background: none; color: var(--muted); font-size: 1.4rem;
+              line-height: 1; cursor: pointer; border-radius: 0 999px 999px 0; padding: 0 6px 0 0; }
+.help-close:hover { color: var(--text); }
+@media (min-width: 1000px) { body.has-app-nav .help-bubble { bottom: 24px; right: 24px; } }

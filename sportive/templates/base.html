@@ -106,6 +106,15 @@
     {% block content %}{% endblock %}
   </main>
 
+  {# "Need help?" bubble in the corner; its × hides it for good on this device (app.js). Not on sign-up/log-in
+     screens or the help pages themselves, and never over a chat's message box (hide-tabs pages). #}
+  {% if not ep.startswith('auth.') and ep not in ('faq', 'how_it_works') %}
+    <div class="help-bubble" data-help-bubble hidden>
+      <a href="{{ url_for('faq') }}">{{ icon('help') }}<span>Need help?</span></a>
+      <button type="button" class="help-close" data-help-close aria-label="Close the help button">&times;</button>
+    </div>
+  {% endif %}
+
   <footer class="site-footer">
     <p>Made by Huskies, for Huskies.</p>
     <p><a href="{{ url_for('how_it_works') }}">How it works</a> · <a href="{{ url_for('privacy') }}">Privacy</a> ·

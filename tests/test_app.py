@@ -3030,3 +3030,13 @@ def test_remember_me(accounts, client):
     client.post("/login", data={"email": "dubs@uw.edu", "password": "purple-and-gold"})  # box unticked
     cookie = client.get_cookie("session")
     assert cookie.expires is None and client.get("/settings").status_code == 200  # logged in until the browser closes
+
+
+def test_help_bubble_can_be_closed(accounts, client):
+    """A small "Need help?" bubble links to the FAQ and has an × (app.js remembers it's closed)."""
+    home = client.get("/").data.decode()
+    assert "data-help-bubble" in home and 'href="/faq"' in home and "data-help-close" in home
+    for page in ("/login", "/signup", "/faq"):  # not on sign-up screens or the help page itself
+        assert "data-help-bubble" not in client.get(page).data.decode()
+    accounts.signup()
+    assert "data-help-bubble" in client.get("/clubs").data.decode()

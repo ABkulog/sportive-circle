@@ -188,6 +188,18 @@
     });
   }
 
+  // The "Need help?" bubble: shown until someone taps its ×, then hidden on this device for good.
+  const helpBubble = document.querySelector("[data-help-bubble]");
+  if (helpBubble) {
+    let closed = false;
+    try { closed = localStorage.getItem("helpBubbleClosed") === "1"; } catch (error) { /* private mode */ }
+    helpBubble.hidden = closed;
+    helpBubble.querySelector("[data-help-close]").addEventListener("click", () => {
+      helpBubble.hidden = true;
+      try { localStorage.setItem("helpBubbleClosed", "1"); } catch (error) { /* private mode */ }
+    });
+  }
+
   // Every password box gets an eye button to peek at what you typed (tap again to hide it).
   const EYE = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor"' +
     ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7' +
