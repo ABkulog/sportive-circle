@@ -494,6 +494,14 @@ def test_calendar_file(accounts, client):
     assert "SUMMARY:Hoops\\, then food" in body and "TZID=America/Los_Angeles" in body
 
 
+def test_calendar_file_has_no_stray_line_breaks_from_the_note(accounts, client):
+    accounts.signup()
+    event_id = event_id_from(client.post("/events/new", data=event_form(note="Court 3\r\nBring water\rThanks")))
+    body = client.get(f"/events/{event_id}/calendar.ics").data.decode()
+    assert "\r" not in body.replace("\r\n", "")
+    assert "DESCRIPTION:Court 3\\nBring water\\nThanks" in body.replace("\r\n ", "")
+
+
 def test_email_only_visible_to_people_you_played_with(accounts, client, app):
     accounts.signup(email="host@uw.edu")
     event_id = event_id_from(client.post("/events/new", data=event_form()))

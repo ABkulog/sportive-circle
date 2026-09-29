@@ -912,6 +912,8 @@ def calendar_file(event_id):
         return from_db(value).strftime("%Y%m%dT%H%M%S")
 
     def ics_text(value):
+        # Notes typed in a browser end lines with \r\n; a bare \r left in would end the calendar line early.
+        value = value.replace("\r\n", "\n").replace("\r", "\n")
         return value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
     link = public_url("events.detail", event_id=event["id"])
