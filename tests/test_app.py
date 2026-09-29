@@ -4065,7 +4065,10 @@ def test_a_game_full_because_of_a_reserved_spot_is_hidden(accounts, client, app)
     assert "Held run" not in client.get("/?scope=all").data.decode()           # Maya + 1 held spot = 2 of 2
     assert "Held run" not in client.get(f"/u/{ids['Maya']}").data.decode()     # not on Maya's profile either
     assert "Held run" in client.get("/?scope=full").data.decode()              # only in the Full tab
-    assert b"Sorry, this game is full." in client.post(f"/events/{game}/join", follow_redirects=True).data
+    # ...and trying to join says why, not just "full" (tester: "it looks like it just doesn't work").
+    said = client.post(f"/events/{game}/join", follow_redirects=True).data.decode()
+    assert "Sorry, this game is full for now: 1 spot is held for friends Maya invited." in said
+    assert "a spot opens at" in said and "Full for now" in said and "data-reload-in=" in said
     _as(accounts, "Friend")
     assert "Held run" in client.get("/?scope=all").data.decode()               # the friend it's held for sees it
     with app.app_context():                                                    # 30 minutes later the hold is over:
@@ -4073,6 +4076,18 @@ def test_a_game_full_because_of_a_reserved_spot_is_hidden(accounts, client, app)
         get_db().commit()
     _as(accounts, "Stranger")
     assert "Held run" in client.get("/?scope=all").data.decode()               # open again for everyone
+
+
+def test_a_really_full_game_still_just_says_full(accounts, client, app):
+    """Only held spots get the "full for now" note: a game full of players has no time when it opens."""
+    _people(accounts, app, "Maya", "Pal", "Stranger")
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Duo", players="2")))
+    _as(accounts, "Pal")
+    client.post(f"/events/{game}/join")
+    _as(accounts, "Stranger")
+    said = client.post(f"/events/{game}/join", follow_redirects=True).data.decode()
+    assert "Sorry, this game is full." in said and "for now" not in said and "If someone leaves" in said
 
 
 def test_reserve_spots_on_a_full_game_says_why(accounts, client, app):
@@ -4413,3 +4428,73 @@ def test_admins_can_deny_spam_and_remove_verified_clubs(accounts, client, app, m
 def test_phone_groups_never_leave_a_lonely_digit():
     from sportive.phones import group_digits
     assert group_digits("07946095800") == "079-4609-5800" and group_digits("9876543210") == "987-654-3210"
+
+
+def test_send_a_public_game_to_friends_as_a_message(accounts, client, app):
+    """Tester: "there's no way of just quickly sending it to those we have on the app as a DM"."""
+    ids = _people(accounts, app, "Maya", "Me", "Pal", "Stranger")
+    _friends(app, ids["Me"], ids["Pal"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Sunset run", players="6")))
+    _as(accounts, "Me")                                               # not going, just saw it on Home
+    page = client.get(f"/events/{game}").data.decode()
+    assert f"/events/{game}/send" in page and "Send to friends" in page
+    picker = client.get(f"/events/{game}/send").data.decode()
+    assert "Pal Husky" in picker and "Stranger Husky" not in picker   # only friends
+    done = client.post(f"/events/{game}/send", data={"friend": [ids["Pal"]], "note": "you in?"},
+                       follow_redirects=True).data.decode()
+    assert "Sent to Pal." in done
+    bad = client.post(f"/events/{game}/send", data={"friend": [ids["Stranger"]]}, follow_redirects=True)
+    assert b"only send games to your friends" in bad.data              # not to strangers
+    _as(accounts, "Pal")
+    thread = client.get(f"/messages/{ids['Me']}").data.decode()
+    assert "you in?" in thread and 'class="chat-game' in thread and f'href="/events/{game}"' in thread
+    assert "Sunset run" in thread
+    polled = client.get(f"/messages/{ids['Me']}/poll?after=0").get_json()
+    shared = polled if isinstance(polled, list) else polled.get("messages", polled)
+    assert "Sunset run" in str(shared)
+
+
+def test_private_games_cant_be_sent_to_friends(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Pal")
+    _friends(app, ids["Maya"], ids["Pal"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Secret run", is_private="1",
+                                                                     password="dawgs26")))
+    assert f"/events/{game}/send" not in client.get(f"/events/{game}").data.decode()
+    assert b"Only open games" in client.post(f"/events/{game}/send", data={"friend": [ids["Pal"]]},
+                                             follow_redirects=True).data
+
+
+def test_existing_people_get_a_texts_card_on_home_until_they_answer(accounts, client, app):
+    _people(accounts, app, "Maya")
+    _as(accounts, "Maya")
+    home = client.get("/").data.decode()
+    assert "New: game updates by text" in home and 'name="consent"' in home
+    done = client.post("/settings/texts/not-now", follow_redirects=True).data.decode()
+    assert "Settings → Texts" in done and "New: game updates by text" not in client.get("/").data.decode()
+
+
+def test_adding_a_number_from_the_home_card_hides_it(accounts, client, app):
+    ids = _people(accounts, app, "Maya")
+    _as(accounts, "Maya")
+    client.post("/settings/texts", data={"action": "send", "phone_country": "US", "phone": "206-555-0142",
+                                         "consent": "1"})
+    with app.app_context():
+        code = get_db().execute("SELECT sms_code FROM users WHERE id = ?", (ids["Maya"],)).fetchone()[0]
+    assert code
+    client.post("/settings/texts", data={"action": "confirm", "code": code})
+    assert "New: game updates by text" not in client.get("/").data.decode()
+
+
+def test_texts_announcement_emails_everyone_once(accounts, client, app):
+    from sportive.announcements import announce_texts
+    _people(accounts, app, "Maya", "Jordan")
+    with app.app_context():
+        app.extensions["outbox"] = []
+        assert announce_texts(send=False) == (2, 0) and app.extensions["outbox"] == []   # dry run sends nothing
+        assert announce_texts(send=True) == (2, 0)
+        mails = [m for m in app.extensions["outbox"] if "by text" in m["subject"]]
+        assert sorted(m["to"] for m in mails) == ["jordan@uw.edu", "maya@uw.edu"]
+        assert "/settings/texts" in mails[0]["body"]
+        assert announce_texts(send=True) == (0, 0)                                          # never twice

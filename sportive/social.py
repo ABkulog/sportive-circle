@@ -14,6 +14,7 @@ from flask import (Blueprint, abort, current_app, flash, g, jsonify, redirect, r
                    session, url_for)
 
 from .auth import login_required, safe_next
+from .constants import SPORT_EMOJI
 from .db import get_db
 from .textutil import multi_line
 from .timeutil import fmt_clock, fmt_when, now_local, to_db
@@ -187,7 +188,17 @@ def message_json(row, me, kind):
         "time": fmt_clock(row["created_at"]),
         "profile": url_for("profile.view", user_id=row["sender_id"]),
         "report": None if row["sender_id"] == me else url_for("moderation.report", target_type=kind, target_id=row["id"]),
+        "game": shared_game(row),
     }
+
+
+def shared_game(row):
+    """The game card on a message sent with "Send to friends" (None for ordinary messages)."""
+    if "game_title" not in row.keys() or row["game_title"] is None:
+        return None
+    return {"title": row["game_title"], "when": fmt_when(row["game_starts"]), "where": row["game_location"],
+            "emoji": SPORT_EMOJI.get(row["game_sport"], ""), "cancelled": bool(row["game_cancelled"]),
+            "url": url_for("events.detail", event_id=row["event_id"])}
 
 
 # ---------------------------------------------------------------- friends
@@ -427,7 +438,10 @@ MAX_SHOWN_MESSAGES = 500  # a chat shows its newest 500 messages, oldest first
 def _thread_rows(me, other, after=0):
     return get_db().execute(
         f"""SELECT * FROM (
-               SELECT m.*, u.full_name, u.avatar_updated FROM direct_messages m JOIN users u ON u.id = m.sender_id
+               SELECT m.*, u.full_name, u.avatar_updated, ge.title AS game_title, ge.sport AS game_sport,
+                      ge.starts_at AS game_starts, ge.location AS game_location, ge.cancelled AS game_cancelled
+               FROM direct_messages m JOIN users u ON u.id = m.sender_id
+               LEFT JOIN events ge ON ge.id = m.event_id
                WHERE m.id > ? AND ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?))
                ORDER BY m.id DESC LIMIT {MAX_SHOWN_MESSAGES}) ORDER BY id""", (after, me, other, other, me)).fetchall()
 

@@ -121,8 +121,16 @@
       {% elif event.members_only and not event.i_am_member %}
         <button class="btn btn-large btn-block" disabled>Members only</button>
         <p class="hint">For {{ event.club_name }} members. <a href="{{ url_for('clubs.view', club_id=event.club_id) }}#join">Join the club</a></p>
+      {% elif spots_for_me == 0 and held %}
+        {# Open spots are held for friends someone invited, so say so (and when it opens) instead of a bare "Full". #}
+        <button class="btn btn-large btn-block" disabled>Full for now</button>
+        <p class="hint held-why" data-reload-in="{{ held.seconds }}">
+          {{ held.spots }} spot{{ 's are' if held.spots != 1 else ' is' }} held for friends {{ held.who }} invited.
+          If nobody takes it, a spot opens at <strong>{{ held.opens_at }}</strong> (in {{ held.minutes }} min).
+          This page updates then.</p>
       {% elif spots_for_me == 0 %}
         <button class="btn btn-large btn-block" disabled>Full</button>
+        <p class="hint">If someone leaves, a spot opens up.</p>
       {% elif event.is_private %}
         <form method="post" action="{{ url_for('events.join', event_id=event.id) }}" class="password-join" {% if join_confirm(event) %}data-confirm="{{ join_confirm(event) }}"{% endif %}>
           {{ csrf_field() }}
@@ -138,6 +146,9 @@
         {% if can_party_up(event) %}
           <a class="btn btn-ghost btn-block" href="{{ url_for('parties.party_up', event_id=event.id) }}">Join + reserve spots for friends</a>
         {% endif %}
+      {% endif %}
+      {% if can_send_to_friends(event) %}
+        <a class="btn btn-ghost btn-block send-friends" href="{{ url_for('parties.send_to_friends', event_id=event.id) }}">Send to friends</a>
       {% endif %}
     </div>
 

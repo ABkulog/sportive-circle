@@ -137,7 +137,7 @@
         {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Hosting</span>
         {% elif e.i_am_going %}<span class="badge badge-success">You're going</span>
         {% elif e.i_am_invited %}<span class="badge badge-gold">Invited</span>
-        {% elif left == 0 %}<span class="badge badge-muted">Full</span>{% endif %}
+        {% elif left == 0 %}<span class="badge badge-muted">{{ 'Full for now' if e.held_count and e.going_count + e.extra_players < e.max_players else 'Full' }}</span>{% endif %}
       </div>
     </div>
     <div class="event-side">

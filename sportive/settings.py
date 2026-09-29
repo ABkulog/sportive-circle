@@ -92,6 +92,17 @@ def texts():
     return render_template("settings/texts.html", user=user)
 
 
+@bp.route("/settings/texts/not-now", methods=("POST",))
+@login_required
+def texts_not_now():
+    """Close the "New: texts" card on Home for good (Settings -> Texts still works anytime)."""
+    db = get_db()
+    db.execute("UPDATE users SET texts_card_done = 1 WHERE id = ?", (g.user["id"],))
+    db.commit()
+    flash("OK. You can add your number anytime in Settings → Texts.", "info")
+    return redirect(url_for("events.feed"))
+
+
 @bp.route("/settings/password")
 @login_required
 def password():

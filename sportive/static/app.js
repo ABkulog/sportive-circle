@@ -22,6 +22,12 @@
       setTimeout(() => form.querySelectorAll("button").forEach((button) => { button.disabled = true; }));
     }
   });
+  // <p data-reload-in="600">: reload when a held spot frees up (a few seconds late, so it's really free),
+  // so a full-for-now game turns joinable without anyone having to keep tapping.
+  document.querySelectorAll("[data-reload-in]").forEach((element) => {
+    const seconds = Number(element.dataset.reloadIn);
+    if (seconds >= 0 && seconds < 3600) setTimeout(() => location.reload(), (seconds + 3) * 1000);
+  });
   // Coming back with the Back button shows the page from memory: unlock its forms again.
   window.addEventListener("pageshow", () => {
     document.querySelectorAll("form[data-sending]").forEach((form) => {
