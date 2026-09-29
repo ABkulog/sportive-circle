@@ -3103,3 +3103,15 @@ def test_players_pick_when_their_reminder_comes(accounts, client, app, monkeypat
     assert sorted(sent) == ["host@uw.edu", "player@uw.edu"]      # now within 30 min
     client.post("/events/1/reminder", data={"remind": "0"})
     assert client.post("/events/1/reminder", data={"remind": "45"}).status_code == 400   # only the listed choices
+
+
+def test_reserve_spots_on_a_full_game_says_why(accounts, client, app):
+    """Tester: "I tried reserving a spot for a full game I'm going to. It should say why I can't." """
+    _people(accounts, app, "Maya", "Me")
+    _as(accounts, "Maya")
+    full_id = event_id_from(client.post("/events/new", data=event_form(title="Packed run", players="2")))
+    _as(accounts, "Me")
+    client.post(f"/events/{full_id}/join")                          # 2 of 2: full, and I'm going
+    assert f"/events/{full_id}/party" not in client.get(f"/events/{full_id}").data.decode()  # no Reserve button
+    page = client.get(f"/events/{full_id}/party", follow_redirects=True).data.decode()
+    assert "This game is full, so there&#39;s no spot to reserve" in page
