@@ -3122,6 +3122,28 @@ def test_tap_someones_photo_to_see_it_big(accounts, client, app):
     assert f'/u/{maya}/photo?v=' in page and 'width="640"' in page
 
 
+def test_a_game_full_because_of_a_reserved_spot_is_hidden(accounts, client, app):
+    """The user: "if an event is full (even for the 30 min a spot is reserved) you can't see it"."""
+    ids = _people(accounts, app, "Maya", "Friend", "Stranger")
+    _friends(app, ids["Maya"], ids["Friend"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Held run", players="2",
+                                                                     reserve=[str(ids["Friend"])])))
+    assert "Held run" in client.get("/?scope=all").data.decode()               # the host still sees it
+    _as(accounts, "Stranger")
+    assert "Held run" not in client.get("/?scope=all").data.decode()           # Maya + 1 held spot = 2 of 2
+    assert "Held run" not in client.get(f"/u/{ids['Maya']}").data.decode()     # not on Maya's profile either
+    assert "Held run" in client.get("/?scope=full").data.decode()              # only in the Full tab
+    assert b"Sorry, this game is full." in client.post(f"/events/{game}/join", follow_redirects=True).data
+    _as(accounts, "Friend")
+    assert "Held run" in client.get("/?scope=all").data.decode()               # the friend it's held for sees it
+    with app.app_context():                                                    # 30 minutes later the hold is over:
+        get_db().execute("UPDATE invites SET expires_at = '2000-01-01 00:00'")
+        get_db().commit()
+    _as(accounts, "Stranger")
+    assert "Held run" in client.get("/?scope=all").data.decode()               # open again for everyone
+
+
 def test_reserve_spots_on_a_full_game_says_why(accounts, client, app):
     """Tester: "I tried reserving a spot for a full game I'm going to. It should say why I can't." """
     _people(accounts, app, "Maya", "Me")
