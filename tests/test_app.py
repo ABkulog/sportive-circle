@@ -2051,6 +2051,17 @@ def test_suspending_cancels_their_upcoming_games(accounts, client, app):
         assert get_db().execute("SELECT suspended FROM users WHERE email = 'admin@uw.edu'").fetchone()[0] == 0
 
 
+def test_suspended_login_says_where_to_appeal(accounts, client, app):
+    accounts.signup(email="bad@uw.edu")
+    accounts.logout()
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 1 WHERE email = 'bad@uw.edu'")
+        get_db().commit()
+    app.config["CONTACT_EMAIL"] = "help@sportive.test"
+    page = accounts.login(email="bad@uw.edu").data.decode()
+    assert "Email help@sportive.test from this address" in page
+
+
 def test_suspending_tells_players_and_frees_their_spots(accounts, client, app):
     accounts.signup(email="host@uw.edu")
     hosted = event_id_from(client.post("/events/new", data=event_form()))

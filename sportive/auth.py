@@ -373,8 +373,12 @@ def login():
                 db.commit()
             flash("Wrong email or password.", "error")
         elif user["suspended"]:
-            flash("This account is suspended for breaking the rules. Think it's a mistake? See the Terms page.",
-                  "error")
+            # They can't log in to message anyone, so give them an address that works from outside the app.
+            config = current_app.config
+            contact = config.get("CONTACT_EMAIL") or config.get("MAIL_FROM") or config.get("MAIL_USERNAME")
+            flash("This account is suspended for breaking the rules. Think it's a mistake? "
+                  + (f"Email {contact} from this address and we'll take another look." if contact
+                     else "Reply to any email we've sent you and we'll take another look."), "error")
         elif not user["verified"]:
             if code_recently_sent(email):
                 session["pending_email"] = email
