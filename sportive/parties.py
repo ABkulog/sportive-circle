@@ -15,7 +15,7 @@ from .db import get_db
 from .events import event_title, get_event, query_events, spots_left, try_join
 from .links import public_url
 from .invites import HOLD_TIME, MAX_PARTY, held_spots, hold_spots, my_invite, now_param, team_counts
-from .sms import drop_queued_texts
+from .sms import drop_queued_texts, queue_text
 from .notifications import notify
 from .social import is_blocked_between
 from .textutil import one_line
@@ -234,14 +234,16 @@ def answer_request(event_id, guest_id, action):
         room = room_for(event, request_row["team"], None)
         if room is not None and room < 1:
             db.rollback()
+            drop_queued_texts()
             flash("No spots left for them.", "error")
             return redirect(link + "#requests")
         db.execute("UPDATE invites SET status = 'pending', expires_at = ? WHERE id = ?",
                    (to_db(now_local() + HOLD_TIME), request_row["id"]))
         inviter = db.execute("SELECT full_name FROM users WHERE id = ?", (request_row["inviter_id"],)).fetchone()
-        notify(guest_id, "invites",
-               f"{inviter['full_name'].split()[0]} wants you in {title} ({fmt_when(event['starts_at'])}). You down?", link,
-               key=f"invite:{event_id}")
+        message = f"{inviter['full_name'].split()[0]} wants you in {title} ({fmt_when(event['starts_at'])}). You down?"
+        notify(guest_id, "invites", message, link, key=f"invite:{event_id}")
+        queue_text(guest_id, f"{message} Your spot is held for 30 min: "
+                             f"{current_app.config['PUBLIC_URL'].rstrip('/')}{link}")  # sent after the save
         notify(request_row["inviter_id"], "invites", f"{host_first} said yes to {guest_first} for {title}.", link,
                key=f"reply:{event_id}:{guest_id}")
         db.commit()

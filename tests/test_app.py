@@ -3436,3 +3436,29 @@ def test_notifications_show_when_they_happened(accounts, client, app):
     assert 'class="bell-link"' in home and '<span class="count-dot">1</span>' in home     # the number on the bell
     page = client.get("/notifications").data.decode()
     assert "5 min ago" in page and "happening now" not in page
+
+
+def test_a_reserved_spot_is_texted(accounts, client, app, monkeypatch):
+    """Whenever a spot is held for you (reserved when a game is made, with Reserve spots, or a host saying yes
+    to a friend in a private game), people who turned texts on get a text."""
+    sent = _texts(monkeypatch)
+    ids = _people(accounts, app, "Maya", "Kai", "Lee")
+    _friends(app, ids["Maya"], ids["Kai"], ids["Lee"])
+    _friends(app, ids["Kai"], ids["Lee"])
+    with app.app_context():
+        get_db().execute("UPDATE users SET phone = '+1206555' || printf('%04d', id), phone_verified = 1, sms_updates = 1")
+        get_db().commit()
+        phone = {name: get_db().execute("SELECT phone FROM users WHERE id = ?", (uid,)).fetchone()[0]
+                 for name, uid in ids.items()}
+    _as(accounts, "Maya")
+    client.post("/events/new", data=event_form(title="Made with Kai", players="6", reserve=[str(ids["Kai"])]))
+    assert any(to == phone["Kai"] and "Made with Kai" in body and "held for 30 min" in body for to, body in sent)
+    game = event_id_from(client.post("/events/new", data=event_form(title="Private run", players="6",
+                                                                     is_private="1", password="dawgs1234")))
+    _as(accounts, "Kai")
+    client.post(f"/events/{game}/join", data={"password": "dawgs1234"})
+    client.post(f"/events/{game}/party", data={"friend": str(ids["Lee"]), "note": "my roommate"})   # asks Maya
+    assert not any(to == phone["Lee"] for to, body in sent)                     # nothing held yet
+    _as(accounts, "Maya")
+    client.post(f"/events/{game}/requests/{ids['Lee']}/approve")
+    assert any(to == phone["Lee"] and "held for 30 min" in body for to, body in sent)
