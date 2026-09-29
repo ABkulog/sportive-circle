@@ -85,6 +85,14 @@ CREATE TABLE IF NOT EXISTS rsvps (
 
 CREATE INDEX IF NOT EXISTS idx_rsvps_user ON rsvps(user_id);
 
+-- People a host took off their game. They can't join it again by themselves (the host can still invite them).
+CREATE TABLE IF NOT EXISTS removed_players (
+    event_id   INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    removed_at TEXT NOT NULL,
+    PRIMARY KEY (event_id, user_id)
+);
+
 -- Invites to a game, from anyone going (a "party"). While `expires_at` hasn't passed, a pending invite
 -- holds a spot for that friend, so a group can join together without strangers taking their spots.
 -- After that the invite still works if there's room. status: pending / accepted / declined / canceled,

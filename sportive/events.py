@@ -806,6 +806,17 @@ def detail(event_id):
                            else spots_left(event) + (1 if hold_minutes_left(invite) else 0))
 
 
+KEPT_OUT = "The host took you off this game, so you can't rejoin it. There are more games on Home."
+
+
+def kept_out(event, invite):
+    """The host took me off this game. Only the host inviting me again lets me back in (not a friend's invite)."""
+    if invite is not None and invite["inviter_id"] == event["host_id"]:
+        return False
+    return get_db().execute("SELECT 1 FROM removed_players WHERE event_id = ? AND user_id = ?",
+                            (event["id"], g.user["id"])).fetchone() is not None
+
+
 def join_problem(event, password=None):
     """Why I can't join this game right now (None = I can). Checks everything except the capacity,
     which try_join checks in the same statement that adds the player."""
@@ -822,6 +833,8 @@ def join_problem(event, password=None):
         return "You can't join this game."
     if not_for_me(event):
         return not_for_me(event)
+    if kept_out(event, invite):
+        return KEPT_OUT
     if event["members_only"] and not event["i_am_member"]:
         return f"This event is for {event['club_name']} members."
     if event["team_size"] and invite is None:
@@ -1005,6 +1018,8 @@ def remove_player(event_id, user_id):
     db = get_db()
     cur = db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, user_id))
     if cur.rowcount:
+        db.execute("INSERT OR REPLACE INTO removed_players (event_id, user_id, removed_at) VALUES (?, ?, ?)",
+                   (event_id, user_id, to_db(now_local())))
         notify(user_id, "game_updates", f"{g.user['full_name'].split()[0]} took you off {event_title(event)}.",
                url_for("events.detail", event_id=event_id), key=f"change:{event_id}")
     db.commit()

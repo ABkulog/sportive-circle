@@ -3013,6 +3013,25 @@ def test_need_players_host_hears_when_someone_joins(accounts, client, app):
     assert len(texts) == 1 and texts[0].startswith("Pat joined") and "(2 going now)" in texts[0]
 
 
+def test_someone_the_host_removed_cant_just_rejoin(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    player = _user_id(app, "player@uw.edu")
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post(f"/events/{event_id}/players/{player}/remove")
+    accounts.logout()
+    accounts.login(email="player@uw.edu")
+    page = client.post(f"/events/{event_id}/join", follow_redirects=True).data.decode()
+    assert "can&#39;t rejoin it" in page
+    assert client.post(f"/events/{event_id}/party", data={}, follow_redirects=True).status_code == 200
+    with app.app_context():
+        assert get_db().execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, player)).fetchone() is None
+
+
 def test_cancel_notice_links_to_the_game(accounts, client, app):
     accounts.signup(email="host@uw.edu")
     event_id = event_id_from(client.post("/events/new", data=event_form()))
