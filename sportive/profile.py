@@ -152,11 +152,13 @@ def view(user_id):
         abort(404)
     hosting = query_events(["e.host_id = :uid", "e.cancelled = 0", "e.ends_at >= :now", INSIDE_VISIBLE],
                            {"uid": user_id, "now": to_db(now_local())}, limit=10)
-    # Emails are private: only visible to yourself and people you share an event with.
+    # Emails are private: only visible to yourself and people you actually played with (a game you were both
+    # in has ended). Joining a stranger's game just to read their email doesn't work.
     show_email = user_id == g.user["id"] or get_db().execute(
         """SELECT 1 FROM rsvps mine JOIN rsvps theirs ON mine.event_id = theirs.event_id
-           WHERE mine.user_id = ? AND theirs.user_id = ?""",
-        (g.user["id"], user_id),
+           JOIN events e ON e.id = mine.event_id
+           WHERE mine.user_id = ? AND theirs.user_id = ? AND e.cancelled = 0 AND e.ends_at < ?""",
+        (g.user["id"], user_id, to_db(now_local())),
     ).fetchone() is not None
     if user_id == g.user["id"]:
         celebrate_progress(user_id)

@@ -31,6 +31,9 @@ Feature: Profiles
     Given "Maya" hosts a basketball game tomorrow
     And "Jordan" joins Maya's game
     When "Jordan" opens Maya's profile
+    Then they don't see "maya@uw.edu"
+    Given "Maya" hosted a basketball game yesterday that "Jordan" played in
+    When "Jordan" opens Maya's profile
     Then they see "maya@uw.edu"
 
   @FR-PROF-6

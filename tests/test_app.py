@@ -521,7 +521,11 @@ def test_email_only_visible_to_people_you_played_with(accounts, client, app):
         host_id = get_db().execute("SELECT id FROM users WHERE email = 'host@uw.edu'").fetchone()[0]
     assert b"host@uw.edu" not in client.get(f"/u/{host_id}").data
     client.post(f"/events/{event_id}/join")
-    assert b"host@uw.edu" in client.get(f"/u/{host_id}").data
+    assert b"host@uw.edu" not in client.get(f"/u/{host_id}").data    # joining isn't enough...
+    with app.app_context():
+        get_db().execute("UPDATE events SET starts_at = '2026-01-10 07:00', ends_at = '2026-01-10 08:00'")
+        get_db().commit()
+    assert b"host@uw.edu" in client.get(f"/u/{host_id}").data        # ...playing together is
 
 
 def test_friendly_404(accounts, client):
