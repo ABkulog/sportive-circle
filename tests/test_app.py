@@ -2478,6 +2478,31 @@ def test_scripts_do_not_depend_on_request_submit_alone():
         assert "form.submit()" in js, name
 
 
+def _contrast(a, b):
+    def lum(hex_color):
+        rgb = [int(hex_color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        r, g, b = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    hi, lo = sorted((lum(a), lum(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _theme_colors():
+    """{"light": {...}, "dark": {...}} custom properties from style.css."""
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    blocks = {"light": re.search(r":root \{(.*?)\n\}", css, re.S).group(1),
+              "dark": re.search(r':root\[data-theme="dark"\] \{(.*?)\n\}', css, re.S).group(1)}
+    colors = {name: dict(re.findall(r"(--[\w-]+):\s*(#[0-9a-fA-F]{6})", body)) for name, body in blocks.items()}
+    colors["dark"] = {**colors["light"], **colors["dark"]}
+    return colors
+
+
+def test_count_badges_are_readable_in_both_themes():
+    for theme, c in _theme_colors().items():
+        assert _contrast(c["--danger"], c["--on-danger"]) >= 4.5, theme
+
+
 def test_relative_times_never_wrap_mid_phrase():
     import pathlib
     css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")

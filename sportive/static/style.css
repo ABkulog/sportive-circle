@@ -30,6 +30,7 @@
 
   --success: #1f7a4a;
   --danger: #c0352b;
+  --on-danger: #ffffff;        /* text on a red count badge */
   --header: #4b2e83;           /* the top bar and the landing band */
   --heading: #1e1e1e;
   --on-accent: #ffffff;        /* text on a purple button */
@@ -61,6 +62,7 @@
   --faint: #6f687c;
   --success: #6fd49c;
   --danger: #ff8a80;
+  --on-danger: #3b0b06;       /* white on the light red is ~2:1; this is ~9:1 */
   --header: #32006e;
   --heading: #f4f1f9;
   --on-accent: #1a0f33;       /* text on a (light purple) button */
@@ -87,6 +89,7 @@
     --faint: #6f687c;
     --success: #6fd49c;
     --danger: #ff8a80;
+    --on-danger: #3b0b06;
     --header: #32006e;
     --heading: #f4f1f9;
     --on-accent: #1a0f33;       /* text on a (light purple) button */
@@ -321,7 +324,7 @@ body.hide-tabs { padding-bottom: 0; }
 .link-button:disabled { color: var(--muted); cursor: default; text-decoration: none; }
 .danger-link, .link-button.danger-link { color: var(--danger); }
 .count-dot { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 5px;
-  border-radius: 999px; background: var(--danger); color: #fff; font: 700 .66rem/1 var(--font); }
+  border-radius: 999px; background: var(--danger); color: var(--on-danger); font: 700 .66rem/1 var(--font); }
 /* Pop-ups (<dialog>): a small centered card, like an iPhone alert. */
 .popup { width: min(340px, calc(100vw - 32px)); padding: 22px 20px 18px; border: 0; border-radius: 16px;
   background: var(--bg); color: var(--text); text-align: center; box-shadow: 0 12px 40px rgb(0 0 0 / .25); }
