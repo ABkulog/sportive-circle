@@ -33,6 +33,16 @@
     for (const field of steps[current].querySelectorAll("input, select, textarea")) {
       if (!field.checkValidity()) { field.reportValidity(); return false; }
     }
+    // <fieldset data-need-one="message">: at least one of its boxes has to be filled in (e.g. a social account).
+    for (const group of steps[current].querySelectorAll("[data-need-one]")) {
+      const boxes = [...group.querySelectorAll("input")];
+      if (!boxes.some((box) => box.value.trim())) {
+        boxes[0].setCustomValidity(group.dataset.needOne);
+        boxes[0].reportValidity();
+        boxes.forEach((box) => box.addEventListener("input", () => boxes[0].setCustomValidity(""), { once: true }));
+        return false;
+      }
+    }
     return true;
   }
 
