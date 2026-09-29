@@ -74,6 +74,18 @@ def load_logged_in_user():
         g.user = get_db().execute(
             "SELECT * FROM users WHERE id = ? AND verified = 1 AND suspended = 0", (user_id,)
         ).fetchone()
+        if g.user is not None and session.get("session_version", 0) != g.user["session_version"]:
+            session.clear()  # logged out everywhere since this cookie was made (e.g. the password changed)
+            g.user = None
+
+
+def end_other_sessions(user_id):
+    """Log this account out on every other device (their cookies stop working); this one stays logged in."""
+    db = get_db()
+    db.execute("UPDATE users SET session_version = session_version + 1 WHERE id = ?", (user_id,))
+    if session.get("user_id") == user_id:
+        session["session_version"] = db.execute("SELECT session_version FROM users WHERE id = ?",
+                                                (user_id,)).fetchone()[0]
 
 
 def age_on(born, today):
@@ -104,6 +116,8 @@ def log_in(user, remember=True):
     session.clear()
     session.permanent = remember  # stay logged in on your phone (see PERMANENT_SESSION_LIFETIME)
     session["user_id"] = user["id"]
+    session["session_version"] = get_db().execute("SELECT session_version FROM users WHERE id = ?",
+                                                  (user["id"],)).fetchone()[0]
     get_db().execute("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?", (user["id"],))
     get_db().commit()
     if user["birth_date"]:
@@ -414,6 +428,7 @@ def reset_password():
         if error is None:
             db.execute("UPDATE users SET password_hash = ?, verify_code = NULL, verify_expires = NULL,"
                        " verify_attempts = 0 WHERE id = ?", (hash_password(password), user["id"]))
+            end_other_sessions(user["id"])  # whoever knew the old password is logged out too
             db.commit()
             destination = log_in(user)
             flash("Password changed. You're logged in.", "success")

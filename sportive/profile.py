@@ -7,7 +7,7 @@ from flask import (Blueprint, Response, abort, flash, g, redirect, render_templa
 from werkzeug.datastructures import MultiDict
 from werkzeug.security import check_password_hash
 
-from .auth import MAX_NAME_LENGTH, hash_password, login_required, password_problem, safe_next
+from .auth import MAX_NAME_LENGTH, end_other_sessions, hash_password, login_required, password_problem, safe_next
 from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
 from .events import INSIDE_VISIBLE, celebrate_progress, query_events, tell_players_it_was_cancelled
@@ -296,8 +296,9 @@ def change_password():
     else:
         db = get_db()
         db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(form["password"]), g.user["id"]))
+        end_other_sessions(g.user["id"])
         db.commit()
-        flash("Password changed.", "success")
+        flash("Password changed. You're logged out on your other devices.", "success")
     return redirect(url_for("settings.password") if error else url_for("settings.home"))
 
 

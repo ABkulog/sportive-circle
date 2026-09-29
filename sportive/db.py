@@ -82,6 +82,7 @@ ADDED_COLUMNS = [
     ("club_posts", "event_id", "INTEGER REFERENCES events(id) ON DELETE SET NULL"),
     ("notices", "key", "TEXT"),
     ("users", "theme", "TEXT NOT NULL DEFAULT 'light'"),
+    ("users", "session_version", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

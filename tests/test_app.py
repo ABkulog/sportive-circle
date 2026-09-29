@@ -246,6 +246,19 @@ def test_non_ascii_csrf_token_and_codes_do_not_crash(tmp_path, accounts, client)
     assert client.post("/verify", data={"code": full_width}).status_code == 302
 
 
+def test_changing_the_password_logs_out_other_devices(accounts, client, app):
+    accounts.signup()
+    phone = app.test_client()
+    phone.post("/login", data={"email": "dubs@uw.edu", "password": "purple-and-gold"})
+    assert b"Hey, Dubs" in phone.get("/").data
+    done = client.post("/profile/password", data={"current_password": "purple-and-gold",
+                                                   "password": "brand-new-pass", "password2": "brand-new-pass"},
+                       follow_redirects=True)
+    assert b"Password changed" in done.data
+    assert b"Hey, Dubs" in client.get("/").data               # this device stays logged in
+    assert b"Hey, Dubs" not in phone.get("/").data            # the other one is logged out
+
+
 def test_login_next_cannot_redirect_offsite(accounts, client):
     accounts.signup()
     accounts.logout()

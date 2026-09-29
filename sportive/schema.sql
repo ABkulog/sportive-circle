@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
     photo_skipped   INTEGER NOT NULL DEFAULT 0,    -- 1 = chose "Add later" (don't ask again)
     theme           TEXT NOT NULL DEFAULT 'light', -- light / dark / system (settings.THEMES)
     suspended       INTEGER NOT NULL DEFAULT 0,    -- 1 = an admin suspended the account (can't log in)
+    session_version INTEGER NOT NULL DEFAULT 0,    -- +1 = every logged-in device is logged out (password change)
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
