@@ -2147,6 +2147,13 @@ def test_suspending_tells_players_and_frees_their_spots(accounts, client, app):
                           (other,)).fetchone() is not None
 
 
+def test_error_flashes_interrupt_screen_readers(accounts, client):
+    accounts.signup()
+    accounts.logout()
+    page = accounts.login(password="wrong-password").data.decode()
+    assert '<div class="flash flash-error" role="alert">Wrong email or password.</div>' in page
+
+
 def test_error_page_shows_the_specific_reason(client, app):
     from flask import abort
 
