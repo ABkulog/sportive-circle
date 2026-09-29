@@ -1528,8 +1528,12 @@ def test_all_club_info_is_required(accounts, client):
     for field in ("meets", "location", "dues", "gear", "how_to_join", "join_question", "club_email"):
         page = client.post("/clubs/new", data={**CLUB, field: ""}).data
         assert b"Please add" in page, field
-    # Socials and website are optional: a club with only an email can register.
-    client.post("/clubs/new", data={**CLUB, "instagram": "", "contact_url": ""})
+    # At least one social account is required (most clubs have Instagram, few have a website)...
+    page = client.post("/clubs/new", data={**CLUB, "instagram": ""}).data
+    assert b"Add at least one of your club" in page and b'data-error-field="instagram"' in page
+    # ...while the website and the official UW page are optional.
+    client.post("/clubs/new", data={**CLUB, "instagram": "", "tiktok": "uwspike", "contact_url": "",
+                                    "verification_url": ""})
     with client.application.app_context():
         assert get_db().execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == 1
 

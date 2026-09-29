@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS clubs (
     contact_url TEXT NOT NULL DEFAULT '',      -- website, Discord... (https only)
     status           TEXT NOT NULL DEFAULT 'pending',  -- 'pending' until an admin approves it, then 'approved' (or 'rejected')
     club_kind        TEXT NOT NULL DEFAULT '',  -- 'rec_club' (UW Recreation Rec Club) or 'rso' (Registered Student Organization)
-    verification_url TEXT NOT NULL DEFAULT '',  -- official HuskyLink or UW Recreation page, checked by an admin
+    verification_url TEXT NOT NULL DEFAULT '',  -- optional HuskyLink or UW Recreation page (a social account is required)
     officer_role     TEXT NOT NULL DEFAULT '',  -- the applicant's role, e.g. President
     member_estimate  INTEGER NOT NULL DEFAULT 0,  -- roughly how many active members
     focus            TEXT NOT NULL DEFAULT '',  -- competitive / recreational / instructional / mixed (UW Rec's categories)

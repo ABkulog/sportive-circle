@@ -30,9 +30,9 @@
       </select>
     </label>
     {{ choice('club_kind', kinds, "What kind of UW club is it?") }}
-    <label class="field"><span>Official club page <em>(how we verify it's real)</em></span>
+    <label class="field"><span>Official club page <em>(optional)</em></span>
       <input name="verification_url" type="url" maxlength="200" value="{{ form.get('verification_url', '') }}"
-             placeholder="https://huskylink.washington.edu/organization/…" required>
+             placeholder="https://huskylink.washington.edu/organization/…">
       <small class="muted">Your club's <a href="https://huskylink.washington.edu/organizations" target="_blank" rel="noopener">HuskyLink</a>
         page, or its <a href="https://www.washington.edu/ima/rec-clubs/club-offerings/" target="_blank" rel="noopener">UW Recreation</a> page.</small></label>
     </section>
@@ -70,8 +70,8 @@
     </section>
     <section class="wizard-step" data-step="4">
     <h2 class="form-step"><span>4</span> Social media</h2>
-    <fieldset class="field">
-      <legend>Optional: add any your club uses</legend>
+    <fieldset class="field" data-need-one="Add at least one social media account. It's how we check the club is real.">
+      <legend>Add at least one <em>(it's how we check the club is real)</em></legend>
       <div class="social-grid">
         <label class="field"><span>Instagram</span>
           <input name="instagram" maxlength="31" value="{{ form.get('instagram', '') }}" placeholder="@uwyourclub"></label>
