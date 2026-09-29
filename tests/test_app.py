@@ -1077,6 +1077,22 @@ def _finish_all_events(app):
     _joined_in_founding_year(app)
 
 
+def test_founding_dawg_deadline_uses_seattle_time_not_utc(accounts, app):
+    from sportive.badges import eligible
+    from sportive.timeutil import from_sqlite_utc
+    assert str(from_sqlite_utc("2027-01-01 05:30:00")) == "2026-12-31 21:30:00"
+    accounts.signup(email="late@uw.edu")
+    user = _user_id(app, "late@uw.edu")
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE users SET created_at = '2027-01-01 05:30:00' WHERE id = ?", (user,))  # 9:30 PM Dec 31 here
+        db.commit()
+        assert "founding_dawg" in eligible(user)
+        db.execute("UPDATE users SET created_at = '2027-01-01 09:00:00' WHERE id = ?", (user,))  # 1 AM Jan 1 here
+        db.commit()
+        assert "founding_dawg" not in eligible(user)
+
+
 def _joined_in_founding_year(app):
     """Accounts get SQLite's real clock as created_at; pin it so Founding Dawg tests still pass after 2026."""
     with app.app_context():

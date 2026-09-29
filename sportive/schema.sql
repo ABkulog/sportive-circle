@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS users (
     theme           TEXT NOT NULL DEFAULT 'light', -- light / dark / system (settings.THEMES)
     suspended       INTEGER NOT NULL DEFAULT 0,    -- 1 = an admin suspended the account (can't log in)
     session_version INTEGER NOT NULL DEFAULT 0,    -- +1 = every logged-in device is logged out (password change)
-    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))  -- UTC, unlike the rest: read with timeutil.from_sqlite_utc
 );
 
 -- One row per (user, sport) instead of one column per sport,
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS events (
     open_to       TEXT NOT NULL DEFAULT 'everyone', -- everyone / women / men / women_nb (constants.OPEN_TO)
     members_only  INTEGER NOT NULL DEFAULT 0,      -- a club event only its members can join
     cancelled     INTEGER NOT NULL DEFAULT 0,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))  -- UTC: compare with SQLite's datetime('now', ...)
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_starts_at ON events(starts_at);

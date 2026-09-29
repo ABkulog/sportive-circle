@@ -34,6 +34,13 @@ def exists_in_seattle(dt):
     return there_and_back.replace(tzinfo=None) == dt
 
 
+def from_sqlite_utc(value):
+    """A column filled in by SQLite's datetime('now') (UTC, "YYYY-MM-DD HH:MM:SS") -> Seattle local time,
+    so it can be compared with everything else in the app."""
+    utc = datetime.strptime(value[:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    return utc.astimezone(SEATTLE).replace(tzinfo=None)
+
+
 def to_form(value):
     """DB string -> value for a datetime-local input."""
     return from_db(value).strftime(FORM_FORMAT)
