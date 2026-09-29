@@ -168,3 +168,86 @@
   ends.addEventListener("change", () => { length = gap(); });
   if (starts.value) ends.min = starts.value;
 })();
+
+// "What's on there then": as the host picks a place and time, show UW Rec reservations (the place is taken)
+// and other Sportive Circle games (the place is busy, not taken: they can still post). Built with textContent.
+(function () {
+  const form = document.querySelector("form[data-sport-form]");
+  const box = form && form.querySelector("[data-whats-on]");
+  if (!box) return;
+  const location = form.querySelector('select[name="location"]');
+  const startsAt = form.querySelector('input[name="starts_at"]');
+  const endsAt = form.querySelector('input[name="ends_at"]');
+  const startsIn = form.querySelector('select[name="starts_in"]');   // Need players: "in 30 min"...
+  const duration = form.querySelector('select[name="duration"]');    // ...for "1 hour"
+  const pad = (n) => String(n).padStart(2, "0");
+  const local = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  function times() {
+    if (startsAt && endsAt) return [startsAt.value, endsAt.value];
+    if (!startsIn || !duration) return [null, null];
+    const start = new Date(Date.now() + Number(startsIn.value) * 60000);
+    return [local(start), local(new Date(start.getTime() + Number(duration.value) * 60000))];
+  }
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text) node.textContent = text;
+    return node;
+  }
+
+  function show(info) {
+    box.replaceChildren();
+    if (!info) { box.hidden = true; return; }
+    info.reserved.forEach((r) => {
+      const line = el("p", "whats-on-rec");
+      line.append(el("strong", "", "UW Rec: reserved "), `${r.when}`, ` · ${r.label}. You probably can't play there then.`);
+      box.appendChild(line);
+    });
+    if (info.uw_rec) {
+      const line = el("p", "muted");
+      if (!info.reserved.length) line.append("No UW Rec reservations we know of then. ");
+      const link = el("a", "", "Check UW Rec's schedule");
+      link.href = info.schedule; link.target = "_blank"; link.rel = "noopener";
+      line.append(link);
+      box.appendChild(line);
+    }
+    if (info.games.length) {
+      box.appendChild(el("p", "whats-on-title", "Also on Sportive Circle there then:"));
+      const list = el("ul", "whats-on-games");
+      info.games.forEach((game) => {
+        const item = el("li");
+        const name = game.url ? el("a", "", game.title) : el("span", "", game.title);
+        if (game.url) { name.href = game.url; name.target = "_blank"; }
+        item.append(name, ` · ${game.when} · ${game.going}${game.max ? "/" + game.max : ""} going`);
+        list.appendChild(item);
+      });
+      box.appendChild(list);
+      box.appendChild(el("p", "muted", "You can still post: games can share a place, and there may be room to join theirs instead."));
+    }
+    box.hidden = !box.childNodes.length;
+  }
+
+  let timer = null;
+  let asked = 0;
+  function check() {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const [starts, ends] = times();
+      if (!location.value || !starts || !ends) { show(null); return; }
+      const params = new URLSearchParams({ location: location.value, starts_at: starts, ends_at: ends });
+      if (form.dataset.eventId) params.set("event", form.dataset.eventId);
+      const ticket = ++asked;
+      try {
+        const response = await fetch(`${box.dataset.url}?${params}`, { headers: { Accept: "application/json" } });
+        if (ticket === asked && response.ok) show(await response.json());
+      } catch (error) { /* offline: no heads-up, the form still works */ }
+    }, 300);
+  }
+  [location, startsAt, endsAt, startsIn, duration].forEach((input) => {
+    if (input) { input.addEventListener("change", check); input.addEventListener("input", check); }
+  });
+  form.querySelector('select[name="sport"]')?.addEventListener("change", check);  // the place list changes with it
+  check();
+})();

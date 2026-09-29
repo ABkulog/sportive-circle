@@ -210,6 +210,7 @@
   <nav class="admin-nav" aria-label="Admin">
     <a href="{{ url_for('moderation.admin_reports') }}" {% if active == 'reports' %}aria-current="page"{% endif %}>🛡️ Reports{% set n = open_report_count() %}{% if n %} ({{ n }}){% endif %}</a>
     <a href="{{ url_for('clubs.review_queue') }}" {% if active == 'clubs' %}aria-current="page"{% endif %}>🚩 Club requests{% set n = pending_club_count() %}{% if n %} ({{ n }}){% endif %}</a>
+    <a href="{{ url_for('placecheck.admin_rec') }}" {% if active == 'uwrec' %}aria-current="page"{% endif %}>🏟️ UW Rec reservations</a>
     <a href="{{ url_for('feedback.admin_suggestions') }}" {% if active == 'suggestions' %}aria-current="page"{% endif %}>💡 Suggestions{% set n = tab_badges().admin %}{% if n %} ({{ n }} trending){% endif %}</a>
   </nav>
 {% endmacro %}
@@ -241,4 +242,6 @@
     <strong>Heads up: check the <span data-place-space>{{ SPORT_SPACE.get(sport, 'place') if sport else 'place' }}</span> is free then.</strong>
     It could be booked, full, or closed for an event. Sportive Circle doesn't reserve or check places, so that's on the host.
   </p>
+  {# Filled in as the host picks a place and time: UW Rec reservations, and other games there then. #}
+  <div class="whats-on" data-whats-on data-url="{{ url_for('placecheck.place_check') }}" aria-live="polite" hidden></div>
 {% endmacro %}
