@@ -807,6 +807,22 @@ def test_non_photos_are_rejected(accounts, client):
     assert b"isn&#39;t a photo we can use" in page
 
 
+def test_huge_pictures_are_refused_before_they_eat_the_servers_memory():
+    import pytest
+    from PIL import Image
+    from sportive.photos import MAX_FULL_DECODE_PIXELS, TOO_BIG, make_avatar
+    huge = BytesIO()
+    Image.new("L", (4100, 4000)).save(huge, "PNG")          # 16.4 MP, tiny as a file
+    assert 4100 * 4000 > MAX_FULL_DECODE_PIXELS
+    with pytest.raises(ValueError, match=TOO_BIG):
+        make_avatar(huge.getvalue())
+    # a big phone JPEG is decoded at reduced size and still comes out upright and square
+    exif = Image.Exif()
+    exif[0x0112] = 6                                        # "rotate 90°", like a phone held upright
+    avatar = Image.open(BytesIO(make_avatar(make_image(size=(6000, 4000), fmt="JPEG", exif=exif))))
+    assert avatar.size == (256, 256)
+
+
 def test_too_big_upload(app, accounts, client):
     accounts.signup(photo=False)
     app.config["MAX_CONTENT_LENGTH"] = 1000
