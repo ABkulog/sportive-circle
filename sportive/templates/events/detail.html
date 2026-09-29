@@ -51,7 +51,7 @@
     </dd></div>
   </dl>
 
-  {% if event.note %}<p class="note">{{ event.note }}</p>{% endif %}
+  {% if event.note and inside %}<p class="note">{{ event.note }}</p>{% endif %}
 
   {% if not event.cancelled and not ended %}
     {# 1. The one main action #}
@@ -154,7 +154,9 @@
       <button type="button" class="icon-action" data-share-title="{{ event_title(event) }}" data-share-url="{{ share_url }}">
         <span>{{ icon('share') }}</span><span data-share-label>Share</span></button>
       {% endif %}
-      <a class="icon-action" href="{{ url_for('events.calendar_file', event_id=event.id) }}"><span>{{ icon('calendar') }}</span>Calendar</a>
+      {% if inside %}
+        <a class="icon-action" href="{{ url_for('events.calendar_file', event_id=event.id) }}"><span>{{ icon('calendar') }}</span>Calendar</a>
+      {% endif %}
       {% if is_host %}
         <a class="icon-action" href="{{ url_for('events.edit', event_id=event.id) }}"><span>{{ icon('edit') }}</span>Edit</a>
       {% elif event.i_am_going %}
@@ -220,6 +222,11 @@
       {% endfor %}
     </div>
   </section>
+{% elif not inside %}
+<section class="band">
+  <h2>Who's going</h2>
+  <p class="muted">{{ 'Only players and club members see who’s going.' if event.members_only else 'Only players and invited friends see who’s going.' }}</p>
+</section>
 {% else %}
 <section class="band">
   <h2>Who's going</h2>

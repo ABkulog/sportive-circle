@@ -10,7 +10,7 @@ from werkzeug.security import check_password_hash
 from .auth import MAX_NAME_LENGTH, hash_password, login_required, password_problem, safe_next
 from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
-from .events import celebrate_progress, query_events, tell_players_it_was_cancelled
+from .events import INSIDE_VISIBLE, celebrate_progress, query_events, tell_players_it_was_cancelled
 from .photos import make_avatar
 from .badges import (GIVEN_BADGES, ROLE_BADGES, SHOWCASE_SLOTS, TESTER, catalog, earned_badges, is_retired,
                      give_badge, rarity, set_showcase, showcase, sync_badges)
@@ -150,7 +150,7 @@ def view(user_id):
     ).fetchone()
     if user is None or (user["suspended"] and user_id != g.user["id"] and not is_admin()):
         abort(404)
-    hosting = query_events(["e.host_id = :uid", "e.cancelled = 0", "e.ends_at >= :now"],
+    hosting = query_events(["e.host_id = :uid", "e.cancelled = 0", "e.ends_at >= :now", INSIDE_VISIBLE],
                            {"uid": user_id, "now": to_db(now_local())}, limit=10)
     # Emails are private: only visible to yourself and people you share an event with.
     show_email = user_id == g.user["id"] or get_db().execute(

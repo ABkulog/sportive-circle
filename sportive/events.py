@@ -71,6 +71,22 @@ def get_event(event_id, host_only=False):
     return event
 
 
+def can_see_inside(event):
+    """The note (often the exact spot), the player list and the calendar file of a private or members-only
+    game are for its host, players, invited friends and (members-only) club members."""
+    if event["host_id"] == g.user["id"] or event["i_am_going"] or event["i_am_invited"]:
+        return True
+    return not event["is_private"] and (not event["members_only"] or event["i_am_member"])
+
+
+# SQL twin of can_see_inside, for lists of games (e.g. what someone is hosting, on their profile).
+INSIDE_VISIBLE = """(e.host_id = :me
+    OR EXISTS (SELECT 1 FROM rsvps v WHERE v.event_id = e.id AND v.user_id = :me)
+    OR EXISTS (SELECT 1 FROM invites vi WHERE vi.event_id = e.id AND vi.guest_id = :me AND vi.status = 'pending')
+    OR (e.is_private = 0 AND (e.members_only = 0 OR EXISTS (SELECT 1 FROM club_members vm WHERE vm.club_id = e.club_id
+                                                              AND vm.user_id = :me AND vm.role IN ('member', 'officer')))))"""
+
+
 def spots_left(event):
     """Open spots anyone can take (held spots for invited friends don't count). None = unlimited."""
     if event["max_players"] is None:
@@ -728,22 +744,23 @@ def _int(value):
 def detail(event_id):
     event = get_event(event_id)
     me = g.user["id"]
+    inside = can_see_inside(event)
     attendees = get_db().execute(
         """SELECT u.id, u.full_name, u.grad_year, u.avatar_updated, r.team
            FROM rsvps r JOIN users u ON u.id = r.user_id
            WHERE r.event_id = ? ORDER BY r.created_at""",
         (event_id,),
-    ).fetchall()
+    ).fetchall() if inside else []
     invite = None if event["i_am_going"] else my_invite(event_id, me)
     my_team = next((person["team"] for person in attendees if person["id"] == me), None)
     teams = None
-    if event["team_size"]:
+    if event["team_size"] and inside:
         counts = team_counts(event_id)
         teams = {team: {"players": [p for p in attendees if p["team"] == team], "count": counts[team],
                         "held": held_spots(event_id, team=team)} for team in (1, 2)}
     my_rsvp = get_db().execute("SELECT remind_minutes FROM rsvps WHERE event_id = ? AND user_id = ?",
                                (event_id, me)).fetchone()
-    return render_template("events/detail.html", event=event, attendees=attendees,
+    return render_template("events/detail.html", event=event, attendees=attendees, inside=inside,
                            my_reminder=my_rsvp["remind_minutes"] if my_rsvp else None, remind_choices=REMIND_CHOICES,
                            ended=from_db(event["ends_at"]) < now_local(),
                            share_url=public_url("events.detail", event_id=event_id),
@@ -876,6 +893,8 @@ def ics_fold(line):
 def calendar_file(event_id):
     """'Add to calendar': a standard .ics file that Apple/Google/Outlook calendars open."""
     event = get_event(event_id)
+    if not can_see_inside(event):
+        abort(404)
 
     def ics_time(value):
         return from_db(value).strftime("%Y%m%dT%H%M%S")

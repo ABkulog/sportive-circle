@@ -2888,6 +2888,24 @@ def test_party_up_cant_get_around_who_a_game_is_for(accounts, client, app):
         assert db.execute("SELECT COUNT(*) FROM invites WHERE event_id = ?", (game,)).fetchone()[0] == 0
 
 
+def test_private_game_insides_are_only_for_players(accounts, client, app):
+    ids = _people(accounts, app, "Hana", "Stella", "Pat")
+    _as(accounts, "Hana")
+    game = event_id_from(client.post("/events/new", data=event_form(
+        is_private="1", password="dawgs26", title="Secret hoops", note="Court 3, back entrance")))
+    _as(accounts, "Pat")
+    client.post(f"/events/{game}/join", data={"password": "dawgs26"})
+    _as(accounts, "Stella")
+    page = client.get(f"/events/{game}").data.decode()
+    assert "Court 3" not in page and "Pat Husky" not in page and "Only players and invited friends" in page
+    assert client.get(f"/events/{game}/calendar.ics").status_code == 404
+    assert "Secret hoops" not in client.get(f"/u/{ids['Hana']}").data.decode()
+    _as(accounts, "Pat")
+    page = client.get(f"/events/{game}").data.decode()
+    assert "Court 3" in page and "Pat Husky" in page
+    assert client.get(f"/events/{game}/calendar.ics").status_code == 200
+
+
 def test_private_games_are_open_to_whoever_the_host_invites(accounts, client, app):
     accounts.signup()
     game = event_id_from(client.post("/events/new", data=event_form(is_private="1", password="dawgs1234",
