@@ -142,7 +142,8 @@ def notify(user_id, kind, text, url, key=None):
 
 def recent_notices(user_id):
     since = to_db(now_local() - timedelta(days=NOTICE_DAYS))
-    return get_db().execute("SELECT * FROM notices WHERE user_id = ? AND created_at >= ? ORDER BY id DESC LIMIT 50",
+    return get_db().execute("SELECT * FROM notices WHERE user_id = ? AND created_at >= ?"
+                            " ORDER BY created_at DESC, id DESC LIMIT 50",
                             (user_id, since)).fetchall()
 
 

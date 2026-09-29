@@ -15,7 +15,8 @@
     {% for n in notices %}
       <li><a class="bell-item {% if not n.read_at %}is-new{% endif %}" href="{{ n.url }}">
         <span class="bell-emoji" aria-hidden="true">{{ kinds[n.kind].emoji }}</span>
-        <span class="bell-text">{{ n.text }}<small class="muted">{{ n.created_at|relative }}</small></span>
+        <span class="bell-text">{{ n.text }}<time class="muted bell-time" datetime="{{ n.created_at }}"
+              title="{{ n.created_at|full }}">{{ n.created_at|ago }}</time></span>
         {% if not n.read_at %}<span class="bell-dot" aria-label="new"></span>{% endif %}</a></li>
     {% endfor %}
   </ul>

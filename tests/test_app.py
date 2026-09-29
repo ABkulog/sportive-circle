@@ -3414,3 +3414,25 @@ def test_password_reset_code_is_texted_to_confirmed_numbers(accounts, client, ap
         get_db().commit()
     client.post("/forgot", data={"email": "dubs@uw.edu"})
     assert sent and sent[-1][0] == "+12065550142" and "password reset code" in sent[-1][1]
+
+
+def test_notifications_show_when_they_happened(accounts, client, app):
+    """Not "happening now": each notice says how long ago it came in."""
+    from datetime import timedelta
+    from sportive.notifications import notify
+    from sportive.timeutil import fmt_ago, now_local, to_db
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    now = now_local()
+    assert fmt_ago(to_db(now)) == "Just now"
+    assert fmt_ago(to_db(now - timedelta(minutes=12))) == "12 min ago"
+    assert fmt_ago(to_db(now - timedelta(days=1))).startswith("Yesterday, ")
+    assert fmt_ago(to_db(now - timedelta(days=30))) == f"{(now - timedelta(days=30)).strftime('%b')} {(now - timedelta(days=30)).day}"
+    with app.app_context():
+        notify(me, "account", "Hello there", "/")
+        get_db().execute("UPDATE notices SET created_at = ?", (to_db(now - timedelta(minutes=5)),))
+        get_db().commit()
+    home = client.get("/").data.decode()
+    assert 'class="bell-link"' in home and '<span class="count-dot">1</span>' in home     # the number on the bell
+    page = client.get("/notifications").data.decode()
+    assert "5 min ago" in page and "happening now" not in page

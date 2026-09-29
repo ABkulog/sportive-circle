@@ -291,6 +291,24 @@
     });
   }
 
+  // The bell rings when there's something new: when you open the app, refresh, or a new notification came in
+  // since the last page (not on every page you tap through). The number pops in after the ring.
+  const bells = [...document.querySelectorAll(".bell-link")];
+  if (bells.length) {
+    const badge = bells.map((bell) => bell.querySelector(".count-dot")).find(Boolean);
+    const count = badge ? parseInt(badge.textContent, 10) || 0 : 0;
+    const nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+    let last = null;
+    try { last = sessionStorage.getItem("sc-bell"); sessionStorage.setItem("sc-bell", String(count)); } catch (e) { /* blocked */ }
+    const fresh = last === null || (nav && nav.type === "reload") || count > parseInt(last, 10);
+    if (count > 0 && fresh && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      bells.forEach((bell) => {
+        bell.classList.add("is-ringing");
+        setTimeout(() => bell.classList.remove("is-ringing"), 1500);
+      });
+    }
+  }
+
   // Every password box gets an eye button to peek at what you typed (tap again to hide it).
   const EYE = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor"' +
     ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7' +

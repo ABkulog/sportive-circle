@@ -11,7 +11,7 @@ from . import (auth, clubs, db, events, feedback, mail, moderation, notification
 from .constants import (DEFAULT_PLAYERS, LOCATIONS, OPEN_TO, OPEN_TO_BADGE, OPEN_TO_LABELS, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS,
                         MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .photos import MAX_UPLOAD_MB
-from .timeutil import fmt_clock, fmt_relative, fmt_when, now_local, same_day, to_db
+from .timeutil import fmt_ago, fmt_clock, fmt_full, fmt_relative, fmt_when, now_local, same_day, to_db
 
 DEV_SECRET_KEY = "dev-only-change-me"
 SITE_URL = "https://sportivecircle.com"  # the real address (Render also answers at *.onrender.com)
@@ -135,7 +135,7 @@ def _add_template_helpers(app):
         is_team=moderation.is_team, current_theme=settings.current_theme, sms_available=lambda: sms.sms_available(),
         pretty_phone=sms.pretty_phone, masked_phone=sms.masked_phone, SMS_CONSENT=sms.CONSENT,
     )
-    app.jinja_env.filters.update(when=fmt_when, clock=fmt_clock, relative=fmt_relative)
+    app.jinja_env.filters.update(when=fmt_when, clock=fmt_clock, relative=fmt_relative, ago=fmt_ago, full=fmt_full)
 
 
 def _version_static_files(app):

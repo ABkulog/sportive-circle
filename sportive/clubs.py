@@ -738,7 +738,7 @@ def review(club_id, decision):
                          ["Your club is verified and now visible to every Husky.",
                           "Next: post an update and add your next practice as a club event."],
                          ("Open your club", link + "?approved=1"),
-                         notice=(f"🎉 {club['name']} is verified and live!",
+                         notice=(f"{club['name']} is verified and live!",
                                  url_for("clubs.view", club_id=club_id, approved=1)))
         flash(f"Approved {club['name']}. The officers got an email and a notification.", "success")
     else:
