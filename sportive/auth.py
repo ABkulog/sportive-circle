@@ -232,6 +232,8 @@ def validate_signup(full_name, email, password, password2, grad_year, birth_date
 
 @bp.route("/signup", methods=("GET", "POST"))
 def signup():
+    if g.user is not None:  # already logged in: a second account from here would log this one out
+        return redirect(safe_next(request.args.get("next", "")))
     form = request.form
     if request.args.get("next"):
         session["after_login"] = safe_next(request.args["next"])
@@ -351,6 +353,8 @@ def resend_code():
 @bp.route("/login", methods=("GET", "POST"))
 def login():
     next_url = request.values.get("next", "")
+    if g.user is not None:
+        return redirect(safe_next(next_url))
     if next_url:
         session["after_login"] = safe_next(next_url)
     if request.method == "POST":

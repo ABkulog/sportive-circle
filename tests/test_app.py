@@ -3373,6 +3373,12 @@ def test_sign_up_is_two_short_screens(client, app):
     assert sports == {"soccer", "tennis"}
 
 
+def test_logged_in_people_skip_login_and_signup(accounts, client):
+    accounts.signup()
+    assert client.get("/login").headers["Location"] == "/"
+    assert client.get("/signup?next=/me/events").headers["Location"] == "/me/events"
+
+
 def test_remember_me(accounts, client):
     accounts.signup()
     accounts.logout()
