@@ -1206,7 +1206,7 @@ def test_clubs_are_open_to_everyone(accounts, client, app):
     directory = client.get("/clubs").data.decode()          # no account needed
     assert "UW Spikeball Club" in directory and "1 member" in directory
     page = client.get(f"/clubs/{club}").data.decode()
-    assert "Casual roundnet" in page and ">Verified<" in page and "Sign up to join" in page
+    assert "Casual roundnet" in page and "✓</span> Verified</span>" in page and "Sign up to join" in page
     assert "No experience needed" in page and "Come to any Tuesday practice!" in page and "@uwspikeball" in page
     assert "Cap Tain" not in page                             # member names need an account
 
@@ -3211,3 +3211,46 @@ def test_no_huskylink_wording_left_for_clubs(accounts, client):
     accounts.signup()
     form = client.get("/clubs/new").data.decode()
     assert "HuskyLink" not in form and "Registered Student Organization" in form
+
+
+def test_top_dawgs_has_ten_spots():
+    from sportive import spirit
+    assert spirit.TOP_DAWGS == 10 and spirit.top_dawgs.__defaults__[0] == 10
+
+
+def test_club_review_goes_to_the_bell_too(accounts, client, app, monkeypatch):
+    """Officers got the "sent back" note by email only; now it's in their notifications too, and so is
+    "approved" (which also shows confetti when they open the club)."""
+    from sportive import clubs
+    monkeypatch.setattr(clubs, "send_email", lambda *args, **kwargs: None)
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    club = _club_id(app)
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    client.post(f"/admin/clubs/{club}/reject", data={"note": "Add your club's Instagram."})
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    bell = client.get("/notifications").data.decode()
+    assert "UW Spikeball Club was sent back: “Add your club&#39;s Instagram.” Update it and resend." in bell
+    # Resending it exactly as it was isn't allowed: something has to change.
+    form = client.get(f"/clubs/{club}/edit").data.decode()
+    assert "data-must-change" in form and "Resend for review" in form
+    page = client.post(f"/clubs/{club}/edit", data=CLUB).data.decode()
+    assert 'role="status" >No changes were made.' in page                              # the caption shows
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM clubs").fetchone()[0] == "rejected"   # not resent
+    client.post(f"/clubs/{club}/edit", data={**CLUB, "instagram": "uwspikeball2"})     # a real change
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM clubs").fetchone()[0] == "pending"
+    accounts.logout()
+    accounts.login(email="admin@uw.edu")
+    client.post(f"/admin/clubs/{club}/approve")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    bell = client.get("/notifications").data.decode()
+    assert "UW Spikeball Club is verified and live!" in bell and "sent back" not in bell   # replaces the old one
+    assert f"/clubs/{club}?approved=1" in bell
+    page = client.get(f"/clubs/{club}?approved=1").data.decode()
+    assert "flash-celebrate" in page and "is verified!" in page                            # confetti

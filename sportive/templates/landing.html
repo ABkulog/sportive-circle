@@ -47,7 +47,7 @@
           {{ club_logo(c) }}
           <strong class="club-name">{{ c.name }}</strong>
           <span class="club-desc muted">{{ c.description|truncate(90) }}</span>
-          <span class="badges"><span class="badge badge-verified">Verified</span>
+          <span class="badges"><span class="badge badge-verified"><span class="check" aria-hidden="true">✓</span> Verified</span>
             {% if c.experience == 'none' %}<span class="badge">Beginners welcome</span>{% endif %}</span>
         </a>
       {% endfor %}

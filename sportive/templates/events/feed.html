@@ -92,7 +92,7 @@
         <a class="card club-card mini" href="{{ url_for('clubs.view', club_id=c.id) }}">
           {{ club_logo(c) }}
           <strong class="club-name">{{ c.name }}</strong>
-          <small class="muted">Verified · {{ c.member_count }} members</small>
+          <small class="muted"><span class="verified"><span class="check" aria-hidden="true">✓</span> Verified</span> · {{ c.member_count }} members</small>
         </a>
       {% endfor %}
     </div>
@@ -105,7 +105,7 @@
     <ol>
       {% for dawg in top_dawgs %}
         <li>
-          <span class="rank" aria-hidden="true">{{ ['🥇', '🥈', '🥉'][loop.index0] }}</span>
+          <span class="rank" aria-hidden="true">{{ ['🥇', '🥈', '🥉'][loop.index0] if loop.index <= 3 else loop.index }}</span>
           <a class="person" href="{{ url_for('profile.view', user_id=dawg.id) }}">{{ avatar(dawg.id, dawg.full_name, dawg.avatar_updated, 32) }}{{ dawg.full_name }}</a>
           <span class="muted">{{ dawg.games }} game{{ 's' if dawg.games != 1 }}</span>
         </li>

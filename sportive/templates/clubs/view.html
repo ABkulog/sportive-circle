@@ -20,7 +20,7 @@
     </div>
     <div class="club-profile-main">
       <h1>{{ club.name }}</h1>
-      <p class="club-sub">{% if club.status == 'approved' %}<span class="verified">Verified</span> · {% endif %}{{ SPORTS[club.sport] }} · {{ focus.get(club.focus, '') }}</p>
+      <p class="club-sub">{% if club.status == 'approved' %}<span class="verified"><span class="check" aria-hidden="true">✓</span> Verified</span> · {% endif %}{{ SPORTS[club.sport] }} · {{ focus.get(club.focus, '') }}</p>
     </div>
   </div>
   <ul class="stat-row" aria-label="Club stats">

@@ -9,8 +9,11 @@ def greeting(first_name):
     return f"Hey, {first_name}"
 
 
-def top_dawgs(limit=3, now=None):
-    """Who played the most games this calendar month."""
+TOP_DAWGS = 10  # spots on the Home leaderboard
+
+
+def top_dawgs(limit=TOP_DAWGS, now=None):
+    """Who played the most games this calendar month (the top 10)."""
     now = now or now_local()
     month_start = datetime.combine(now.date().replace(day=1), time())
     return get_db().execute(

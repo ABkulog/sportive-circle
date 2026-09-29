@@ -338,7 +338,8 @@ body.hide-tabs { padding-bottom: 0; }
 .badge-purple, .badge-club, .badge-level { color: var(--accent); }
 .badge-gold { color: var(--gold-ink); background: var(--gold-light); }
 .badge-muted { color: var(--muted); }
-.badge-verified { color: var(--success); }
+.badge-verified { color: var(--success); font-weight: 800; background: var(--success-soft, var(--surface)); }
+.check { font-weight: 900; }
 .going-pill, .done-pill { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--success); }
 .done-pill { font-size: .85rem; }
 
@@ -645,14 +646,16 @@ form[data-wizard] .form-step { display: none; }
 .club-logo-wrap { display: grid; justify-items: center; gap: 4px; flex: none; }
 .logo-edit { display: inline-block; padding: 8px 6px; font-size: .8rem; font-weight: 600; }
 .club-name { font-weight: 700; }
-.club-desc { font-size: .88rem; }
+.club-desc { font-size: .88rem; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2;
+             -webkit-box-orient: vertical; overflow: hidden; }  /* stays in its card, "…" after 2 lines */
+.club-card .club-name { overflow-wrap: anywhere; }
 .club-search { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
 .club-hero { border: 0; padding: 0; }
 .club-profile { display: flex; gap: 14px; align-items: center; }
 .club-profile h1 { margin: 0; font-size: 1.4rem; }
 .club-sub { margin: 2px 0 0; color: var(--muted); font-size: .88rem; }
-.verified { color: var(--success); font-weight: 600; }
-.club-about { white-space: pre-line; margin: 0; }
+.verified { color: var(--success); font-weight: 800; }  /* bold with a check mark, so it stands out */
+.club-about { white-space: pre-line; margin: 0; overflow-wrap: anywhere; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
 .clamp.is-open { display: block; }
 .club-actions { margin-top: 14px; }
@@ -932,3 +935,4 @@ button.link-button { min-height: 36px; }
 .pull-refresh.is-ready .pull-arrow { transform: rotate(180deg); }
 .pull-refresh.is-refreshing .pull-arrow { animation: pull-spin .8s linear infinite; }
 @keyframes pull-spin { to { transform: rotate(360deg); } }
+.unchanged-note { margin: 8px 0 0; text-align: center; color: var(--danger); font-weight: 600; font-size: .9rem; }

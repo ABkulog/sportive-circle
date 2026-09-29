@@ -52,6 +52,19 @@
     form.scrollIntoView({ block: "start", behavior: "smooth" });
   });
   back.addEventListener("click", () => show(current - 1));
+  // <form data-must-change>: a sent-back club can't be resent exactly as it was.
+  if (form.hasAttribute("data-must-change")) {
+    const snapshot = (f) => JSON.stringify([...new FormData(f)].filter(([key]) => key !== "csrf_token"));
+    const original = snapshot(form);
+    const note = form.querySelector("[data-unchanged-note]");
+    form.addEventListener("submit", (event) => {
+      if (snapshot(form) !== original) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (note) { note.hidden = false; note.scrollIntoView({ block: "center" }); }
+    }, true);
+    form.addEventListener("input", () => { if (note) note.hidden = true; });
+  }
   form.addEventListener("keydown", (event) => {  // Enter moves to the next step instead of submitting early
     if (event.key === "Enter" && event.target.tagName === "INPUT" && current < steps.length - 1) {
       event.preventDefault();

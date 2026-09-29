@@ -17,7 +17,8 @@
   {% if not club %}
     <p class="muted">We check each club (usually within 2 days) and email you when it's live.</p>
   {% endif %}
-  <form method="post" class="form" data-wizard data-error-field="{{ error_field or '' }}">
+  <form method="post" class="form" data-wizard data-error-field="{{ error_field or '' }}"
+        {% if club and club.status == 'rejected' %}data-must-change{% endif %}>
     {{ csrf_field() }}
     <section class="wizard-step" data-step="1">
     <h2 class="form-step"><span>1</span> Your club</h2>
@@ -106,7 +107,11 @@
       <button type="button" class="btn btn-ghost" data-wizard-back>← Back</button>
       <button type="button" class="btn" data-wizard-next>Next →</button>
     </div>
-    <button class="btn btn-block btn-large" data-wizard-submit>{{ 'Save changes' if club else 'Submit for verification' }}</button>
+    <button class="btn btn-block btn-large" data-wizard-submit>{{ 'Resend for review' if club and club.status == 'rejected'
+                                                                   else ('Save changes' if club else 'Submit for verification') }}</button>
+    {# A club that was sent back can't be resent exactly as it was: something has to change first. #}
+    <p class="unchanged-note" data-unchanged-note role="status" {% if not unchanged %}hidden{% endif %}>No changes were made.
+      Change what the note asked for, then resend.</p>
   </form>
 </div>
 <script src="{{ url_for('static', filename='wizard.js') }}" defer></script>

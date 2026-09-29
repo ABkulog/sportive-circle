@@ -256,6 +256,8 @@ def view(club_id):
            WHERE p.club_id = ? ORDER BY p.id DESC LIMIT 20""", (club_id,)).fetchall()
     members, requests = [], []
     role = my_role(club_id)
+    if request.args.get("approved") and role == "officer" and club["status"] == "approved":
+        flash(f"{club['name']} is verified! Every Husky can find it now.", "celebrate")  # confetti
     if g.get("user") is not None:
         members = roster(club_id)
     if role == "officer":
@@ -416,10 +418,10 @@ def create():
     return _club_form_page(form, None, error_field if request.method == "POST" else None)
 
 
-def _club_form_page(form, club, error_field):
+def _club_form_page(form, club, error_field, unchanged=False):
     return render_template("clubs/form.html", form=form, club=club, locations=LOCATIONS, kinds=CLUB_KINDS,
                            focus=FOCUS, joining=JOINING, experience=EXPERIENCE, who=WHO_CAN_JOIN,
-                           min_members=MIN_ACTIVE_MEMBERS, error_field=error_field)
+                           min_members=MIN_ACTIVE_MEMBERS, error_field=error_field, unchanged=unchanged)
 
 
 @bp.route("/clubs/<int:club_id>/edit", methods=("GET", "POST"))
@@ -432,6 +434,9 @@ def edit(club_id):
     if request.method == "POST":
         form = request.form
         data, error, error_field = read_club_form(form, club_id)
+        if error is None and club["status"] == "rejected" and all(data[key] == club[key] for key in FIELDS):
+            # Sent back with a note: resending it exactly as it was would just get the same answer.
+            return _club_form_page(form, club, None, unchanged=True)
         if error is None:
             # Changing who the club *is* (or fixing a rejected one) sends it back for review.
             identity_changed = any(data[key] != club[key] for key in ("name", "club_kind"))
@@ -674,12 +679,18 @@ def pending_club_count():
     return get_db().execute("SELECT COUNT(*) FROM clubs WHERE status = 'pending'").fetchone()[0]
 
 
-def _notify_officers(club, subject, heading, lines, button):
+def _notify_officers(club, subject, heading, lines, button, notice):
+    """Email every officer, and put `notice` (text, link) in their bell too: not everyone checks email."""
+    from .notifications import notify  # imported here: notifications.py is loaded after this module
     body, html = compose(subject, heading, lines, button=button,
                          reason=f"You're getting this because you're an officer of {club['name']}.")
-    for row in get_db().execute(
-            """SELECT u.email FROM club_members m JOIN users u ON u.id = m.user_id
-               WHERE m.club_id = ? AND m.role = 'officer'""", (club["id"],)):
+    officers = get_db().execute(
+        """SELECT u.id, u.email FROM club_members m JOIN users u ON u.id = m.user_id
+           WHERE m.club_id = ? AND m.role = 'officer'""", (club["id"],)).fetchall()
+    for row in officers:
+        notify(row["id"], "club_review", notice[0], notice[1], key=f"club_review:{club['id']}")
+    get_db().commit()
+    for row in officers:
         try:
             send_email(row["email"], subject, body, html=html)
         except Exception:  # email trouble shouldn't block the review
@@ -725,12 +736,16 @@ def review(club_id, decision):
         _notify_officers(club, f"✅ {club['name']} is live on Sportive Circle!", f"{club['name']} is live! 🎉",
                          ["Your club is verified and now visible to every Husky.",
                           "Next: post an update and add your next practice as a club event."],
-                         ("Open your club", link))
-        flash(f"Approved {club['name']}. The officers were emailed.", "success")
+                         ("Open your club", link + "?approved=1"),
+                         notice=(f"🎉 {club['name']} is verified and live!",
+                                 url_for("clubs.view", club_id=club_id, approved=1)))
+        flash(f"Approved {club['name']}. The officers got an email and a notification.", "success")
     else:
         _notify_officers(club, f"About your Sportive Circle club: {club['name']}", "One quick fix needed",
                          [f"We couldn't verify {club['name']} yet. Here's what to fix:", note,
                           "Update it and it'll be reviewed again."],
-                         ("Update your club", link))
+                         ("Update your club", link),
+                         notice=(f"{club['name']} was sent back: “{note}” Update it and resend.",
+                                 url_for("clubs.view", club_id=club_id)))
         flash(f"Sent {club['name']} back to the officers with your note.", "info")
     return redirect(url_for("clubs.review_queue"))
