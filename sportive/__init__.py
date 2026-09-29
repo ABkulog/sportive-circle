@@ -4,7 +4,7 @@ import os
 import secrets
 from datetime import timedelta
 
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from . import (auth, clubs, db, events, feedback, mail, moderation, notifications, pages, parties, profile,
@@ -16,6 +16,7 @@ from .timeutil import fmt_ago, fmt_clock, fmt_relative, fmt_when, now_local, sam
 
 DEV_SECRET_KEY = "dev-only-change-me"  # the old shared default: refused everywhere now
 MIN_SECRET_KEY_LENGTH = 32
+HSTS_MAX_AGE_SECONDS = 365 * 24 * 60 * 60
 SITE_URL = "https://sportivecircle.com"  # the real address (Render also answers at *.onrender.com)
 
 # Where the browser may load things from. Scripts only come from our own files and the one map
@@ -177,6 +178,9 @@ def _security_headers(response):
     headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     # Only our own pages may ask for your location ("Where am I?"); never the camera or microphone.
     headers.setdefault("Permissions-Policy", "geolocation=(self), camera=(), microphone=()")
+    if request.is_secure:
+        # Browsers only honor this over HTTPS; after that they refuse plain http:// for a year.
+        headers.setdefault("Strict-Transport-Security", f"max-age={HSTS_MAX_AGE_SECONDS}; includeSubDomains")
     if response.mimetype == "text/html":
         headers.setdefault("Cache-Control", "no-store")  # pages show private info; don't keep copies
     return response

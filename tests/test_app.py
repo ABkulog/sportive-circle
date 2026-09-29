@@ -2147,6 +2147,12 @@ def test_suspending_tells_players_and_frees_their_spots(accounts, client, app):
                           (other,)).fetchone() is not None
 
 
+def test_https_responses_tell_browsers_to_stay_on_https(client):
+    assert "Strict-Transport-Security" not in client.get("/").headers      # local http: never
+    secure = client.get("/", base_url="https://localhost")
+    assert secure.headers["Strict-Transport-Security"].startswith("max-age=31536000")
+
+
 def test_club_form_points_at_the_field_with_the_problem(accounts, client):
     accounts.signup()
     page = client.post("/clubs/new", data={**CLUB, "club_email": "not-an-email"}).data
