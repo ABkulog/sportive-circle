@@ -1473,6 +1473,21 @@ def test_visitors_get_simple_menu(client):
     assert 'class="appnav"' not in page and "/clubs" in page and "How it works" in page
 
 
+def test_joining_a_game_doesnt_unlock_direct_messages_until_it_ends(accounts, client, app):
+    from sportive.social import can_message
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="stranger@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    host, stranger = _user_id(app, "host@uw.edu"), _user_id(app, "stranger@uw.edu")
+    with app.app_context():
+        assert not can_message(stranger, host)
+        get_db().execute("UPDATE events SET starts_at = '2026-01-10 07:00', ends_at = '2026-01-10 08:00'")
+        get_db().commit()
+        assert can_message(stranger, host)
+
+
 def test_long_chats_show_the_newest_messages(accounts, client, app):
     accounts.signup()
     event_id = event_id_from(client.post("/events/new", data=event_form()))

@@ -67,9 +67,12 @@ def friends_of(user_id):
 
 
 def shared_an_event(a, b):
+    """They played a game together (it has ended). Just joining a stranger's game doesn't unlock messaging:
+    the game's group chat is there for planning it."""
     return get_db().execute(
-        """SELECT 1 FROM rsvps r1 JOIN rsvps r2 ON r1.event_id = r2.event_id
-           WHERE r1.user_id = ? AND r2.user_id = ? LIMIT 1""", (a, b)).fetchone() is not None
+        """SELECT 1 FROM rsvps r1 JOIN rsvps r2 ON r1.event_id = r2.event_id JOIN events e ON e.id = r1.event_id
+           WHERE r1.user_id = ? AND r2.user_id = ? AND e.cancelled = 0 AND e.ends_at < ? LIMIT 1""",
+        (a, b, to_db(now_local()))).fetchone() is not None
 
 
 def is_club_officer(user_id):
