@@ -30,11 +30,6 @@
       </select>
     </label>
     {{ choice('club_kind', kinds, "What kind of UW club is it?") }}
-    <label class="field"><span>Official club page <em>(optional)</em></span>
-      <input name="verification_url" type="url" maxlength="200" value="{{ form.get('verification_url', '') }}"
-             placeholder="https://huskylink.washington.edu/organization/…">
-      <small class="muted">Your club's <a href="https://huskylink.washington.edu/organizations" target="_blank" rel="noopener">HuskyLink</a>
-        page, or its <a href="https://www.washington.edu/ima/rec-clubs/club-offerings/" target="_blank" rel="noopener">UW Recreation</a> page.</small></label>
     </section>
     <section class="wizard-step" data-step="2">
     <h2 class="form-step"><span>2</span> Who it's for</h2>

@@ -496,11 +496,10 @@ def not_in_filtered_feed(world, name, text, n):
 
 # ------------------------------------------------------------------ When: clubs
 
-@when(parsers.parse('"{name}" registers a club with the official page "{url}"'))
-def register_bad_club(world, name, url):
+@when(parsers.parse('"{name}" registers a club without any social media'))
+def register_club_without_socials(world, name):
     person = world.person(name)
-    world.saw(person.client.post("/clubs/new", data={**CLUB, "name": "Some Club", "verification_url": url}),
-              person.client)
+    world.saw(person.client.post("/clubs/new", data={**CLUB, "name": "Some Club", "instagram": ""}), person.client)
 
 
 @when(parsers.parse('"{name}" registers the club "{club}"'))

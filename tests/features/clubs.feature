@@ -6,9 +6,9 @@ Feature: Clubs
     And "Admin" is an admin
 
   @FR-CLUB-1
-  Scenario: A club's official page, if given, has to be its real UW page
-    When "Riley" registers a club with the official page "https://example.com/my-club"
-    Then they see "HuskyLink page"
+  Scenario: A club without an Instagram or other social account can't register
+    When "Riley" registers a club without any social media
+    Then they see "Add at least one of your club's social media accounts"
 
   @FR-CLUB-1 @FR-CLUB-2
   Scenario: A club is hidden until an admin approves it

@@ -1189,7 +1189,8 @@ def test_clubs_are_open_to_everyone(accounts, client, app):
 def test_club_create_validation(accounts, client):
     accounts.signup()
     assert b"https://" in client.post("/clubs/new", data={**CLUB, "contact_url": "javascript:alert(1)"}).data
-    assert b"official page" in client.post("/clubs/new", data={**CLUB, "verification_url": "https://myclub.com"}).data
+    assert b"HuskyLink page" not in client.post("/clubs/new", data={**CLUB, "name": "X Club",
+                                                                    "verification_url": "https://myclub.com"}).data
     assert b"at least 5 members" in client.post("/clubs/new", data={**CLUB, "member_estimate": "2"}).data
     assert b"current officer" in client.post("/clubs/new", data={k: v for k, v in CLUB.items() if k != "attest"}).data
     client.post("/clubs/new", data=CLUB)
@@ -1391,16 +1392,16 @@ def test_admin_approves_or_sends_back(accounts, client, app, monkeypatch):
     accounts.logout()
     accounts.signup(email="admin@uw.edu")
     queue = client.get("/admin/clubs").data.decode()
-    assert "UW Spikeball Club" in queue and "huskylink.washington.edu/organization/uwspikeball" in queue
+    assert "UW Spikeball Club" in queue and "instagram.com/uwspikeball" in queue   # its socials, to check it
     assert "~30 active members" in queue
     assert b"Add a short note" in client.post(f"/admin/clubs/{club}/reject", follow_redirects=True).data
-    client.post(f"/admin/clubs/{club}/reject", data={"note": "That HuskyLink page is for a different club."})
+    client.post(f"/admin/clubs/{club}/reject", data={"note": "That Instagram is for a different club."})
     assert sent[-1][0] == "captain@uw.edu"
     accounts.logout()
     accounts.login(email="captain@uw.edu")
     page = client.get(f"/clubs/{club}").data.decode()
     assert "different club" in page and "Update and resubmit" in page
-    client.post(f"/clubs/{club}/edit", data={**CLUB, "verification_url": "https://huskylink.washington.edu/organization/spike"})
+    client.post(f"/clubs/{club}/edit", data={**CLUB, "description": "Casual roundnet on the Quad, every Tuesday!"})
     with app.app_context():
         assert get_db().execute("SELECT status FROM clubs").fetchone()[0] == "pending"   # back in the queue
     accounts.logout()
@@ -1422,8 +1423,7 @@ def test_club_quick_filters(accounts, client, app):
     accounts.signup(email="captain@uw.edu")
     client.post("/clubs/new", data=CLUB)
     client.post("/clubs/new", data={**CLUB, "name": "UW Competitive Spikeball", "joining": "tryouts",
-                                    "experience": "experienced", "dues": "$60/quarter",
-                                    "verification_url": "https://huskylink.washington.edu/organization/comp"})
+                                    "experience": "experienced", "dues": "$60/quarter"})
     with app.app_context():
         db = get_db()
         db.execute("UPDATE clubs SET status = 'approved'")
@@ -1531,7 +1531,8 @@ def test_all_club_info_is_required(accounts, client):
     # At least one social account is required (most clubs have Instagram, few have a website)...
     page = client.post("/clubs/new", data={**CLUB, "instagram": ""}).data
     assert b"Add at least one of your club" in page and b'data-error-field="instagram"' in page
-    # ...while the website and the official UW page are optional.
+    # ...while a website is optional, and the HuskyLink page isn't asked at all.
+    assert b'name="verification_url"' not in client.get("/clubs/new").data
     client.post("/clubs/new", data={**CLUB, "instagram": "", "tiktok": "uwspike", "contact_url": "",
                                     "verification_url": ""})
     with client.application.app_context():

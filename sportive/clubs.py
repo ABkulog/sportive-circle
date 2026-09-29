@@ -37,11 +37,6 @@ CLUB_KINDS = {
     "rec_club": "UW Recreation Rec Club",
     "rso": "Registered Student Organization (HuskyLink)",
 }
-VERIFICATION_PREFIXES = (
-    "https://huskylink.washington.edu/organization/",
-    "https://www.washington.edu/ima/",
-    "https://reg.recreation.uw.edu/",
-)
 FOCUS = {"competitive": "Competitive", "recreational": "Recreational", "instructional": "Instructional (learn the sport)",
          "mixed": "A mix"}
 JOINING = {"open": "Open: just show up", "tryouts": "Tryouts", "application": "Application"}
@@ -133,7 +128,7 @@ def read_club_form(form, club_id=None):
     get = lambda key: form.get(key, "").strip()
     single = lambda key: one_line(form.get(key))  # names, emails, links: no line breaks
     data = {key: single(key) for key in ("name", "sport", "meets", "location", "contact_url", "club_kind",
-                                         "verification_url", "officer_role", "focus", "joining", "experience",
+                                         "officer_role", "focus", "joining", "experience",
                                          "who_can_join", "dues", "gear", "club_email", "join_question")}
     data.update({key: get(key) for key in ("description", "how_to_join")})
     for key in SOCIALS:
@@ -152,12 +147,10 @@ def read_club_form(form, club_id=None):
     for key, options in CHOICES.items():
         if data[key] not in options:
             return problem(key, "Please answer every question in the form.")
-    # Optional (many clubs don't have one), but if it's there it has to be the real UW page.
-    if data["verification_url"] and (not data["verification_url"].startswith(VERIFICATION_PREFIXES)
-                                     or " " in data["verification_url"] or len(data["verification_url"]) > 200):
-        return problem("verification_url", "That official page should be the club's HuskyLink page "
-                       "(https://huskylink.washington.edu/organization/…) or its UW Recreation page. "
-                       "No page like that? Leave it empty.")
+    # The HuskyLink / UW Recreation page isn't asked anymore (people put their website there and got stuck):
+    # clubs are checked through their social accounts. Clubs that gave one earlier keep it.
+    old = get_db().execute("SELECT verification_url FROM clubs WHERE id = ?", (club_id or 0,)).fetchone()
+    data["verification_url"] = old["verification_url"] if old else ""
     if not 20 <= len(data["description"]) <= MAX_DESCRIPTION:
         return problem("description", f"Tell people about your club in 20 to {MAX_DESCRIPTION} characters.")
     # Everything is required: people deciding whether to join need the full picture, and a way to reach you.
@@ -440,14 +433,14 @@ def edit(club_id):
         data, error, error_field = read_club_form(form, club_id)
         if error is None:
             # Changing who the club *is* (or fixing a rejected one) sends it back for review.
-            identity_changed = any(data[key] != club[key] for key in ("name", "club_kind", "verification_url"))
+            identity_changed = any(data[key] != club[key] for key in ("name", "club_kind"))
             status = "pending" if identity_changed or club["status"] == "rejected" else club["status"]
             db = get_db()
             db.execute(f"UPDATE clubs SET {', '.join(f + ' = :' + f for f in FIELDS)}, status = :status WHERE id = :id",
                        {**data, "status": status, "id": club_id})
             db.commit()
             if status == "pending" and club["status"] != "pending":
-                flash("Saved. The name or official page changed, so we'll quickly check it again.", "info")
+                flash("Saved. The club's name or type changed, so we'll quickly check it again.", "info")
             else:
                 flash("Club updated.", "success")
             return redirect(url_for("clubs.view", club_id=club_id))
