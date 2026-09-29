@@ -317,7 +317,9 @@ body.hide-tabs { padding-bottom: 0; }
 .link-button:disabled { color: var(--muted); cursor: default; text-decoration: none; }
 .danger-link, .link-button.danger-link { color: var(--danger); }
 .count-dot { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 5px;
-  border-radius: 999px; background: var(--danger); color: #fff; font: 700 .66rem/1 var(--font); }
+  border-radius: 999px; background: #4b2e83; color: #fff; font: 700 .66rem/1 var(--font);
+  box-shadow: 0 0 0 2px var(--bg); }  /* every "new" number is Spirit Purple, ringed so it stands out */
+.top-icons .count-dot { box-shadow: 0 0 0 2px #fff; }  /* on the purple top bar */
 /* Pop-ups (<dialog>): a small centered card, like an iPhone alert. */
 .popup { width: min(340px, calc(100vw - 32px)); padding: 22px 20px 18px; border: 0; border-radius: 16px;
   background: var(--bg); color: var(--text); text-align: center; box-shadow: 0 12px 40px rgb(0 0 0 / .25); }
@@ -732,7 +734,7 @@ form[data-wizard] .form-step { display: none; }
 .convo { display: flex; gap: 12px; align-items: center; padding: 12px 0; color: var(--text);
   border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
 .convo:hover { text-decoration: none; }
-.convo.is-unread .convo-body strong::after { content: " •"; color: var(--danger); }
+.convo.is-unread .convo-body strong::after { content: " •"; color: var(--purple); }
 .convo-body { flex: 1; min-width: 0; display: grid; }
 .convo-preview { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .convo-meta { display: grid; justify-items: end; gap: 4px; }
@@ -941,7 +943,7 @@ button.link-button { min-height: 36px; }
 
 /* The bell: its number is purple (with a white ring so it shows on the purple top bar too). When there's
    something new it grows, rings side to side, and the number pops in (app.js adds .is-ringing). */
-.bell-link .count-dot { background: #4b2e83; color: #fff; box-shadow: 0 0 0 2px #fff; }
+.bell-link .count-dot { box-shadow: 0 0 0 2px #fff; }
 .bell-time { display: block; font-size: .78rem; margin-top: 2px; }
 @media (prefers-reduced-motion: no-preference) {
   .bell-link.is-ringing svg { animation: bell-ring 1.1s ease-in-out; transform-origin: 50% 8%; }
