@@ -3013,6 +3013,23 @@ def test_need_players_host_hears_when_someone_joins(accounts, client, app):
     assert len(texts) == 1 and texts[0].startswith("Pat joined") and "(2 going now)" in texts[0]
 
 
+def test_need_players_cant_be_double_posted_or_spammed(accounts, client, app):
+    accounts.signup()
+    post = lambda sport, place: client.post("/need-players", data={
+        "sport": sport, "location": place, "skill_level": "All levels",
+        "starts_in": "15", "duration": "60", "players": "4"})
+    first = event_id_from(post("soccer", "Denny Field"))
+    again = post("soccer", "Denny Field")
+    assert again.headers["Location"].endswith(f"/events/{first}")
+    for sport, place in (("basketball", "IMA (Intramural Activities Building)"), ("spikeball", "The Quad"),
+                         ("ultimate", "Denny Field")):
+        post(sport, place)
+    page = post("volleyball", "IMA (Intramural Activities Building)").data.decode()
+    assert "a lot of Need players posts" in page
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM events WHERE is_quick = 1").fetchone()[0] == 4
+
+
 def test_nonsense_filter_values_dont_count_as_filters(accounts, client):
     accounts.signup()
     page = client.get("/?scope=all&sport=zzz&location=Mars&skill=Pro&when=never&open=99").data.decode()

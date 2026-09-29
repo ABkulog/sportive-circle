@@ -32,6 +32,7 @@ MIN_PASSWORD, MAX_PASSWORD = 4, 30     # private games
 MAX_DAYS_AHEAD = 365
 OPEN_SPOT_CHOICES = ("1", "2", "3", "4", "5", "10")  # the "Open spots" filter on Home
 QUICK_WINDOW = timedelta(hours=3)      # quick posts starting this soon go to the top of the feed
+MAX_QUICK_POSTS_PER_HOUR = 4
 UP_NEXT_WINDOW = timedelta(hours=2)    # your own events starting this soon get a banner on the feed
 
 
@@ -729,6 +730,20 @@ def quick():
         needed = (max_players or 0) - 1 - extra - len(reserve)
         if error is None and needed < 1 and not team_size:
             error = "Everyone's already coming, so there's no one to find. Pick more players."
+        if error is None:
+            db, now = get_db(), to_db(now_local())
+            same = db.execute("""SELECT id FROM events WHERE host_id = ? AND is_quick = 1 AND sport = ? AND location = ?
+                                 AND is_private = ? AND team_size IS ? AND cancelled = 0 AND ends_at >= ?""",
+                              (g.user["id"], sport, location, is_private, team_size, now)).fetchone()
+            if same:
+                flash(f"You already have a Need players post for {SPORTS[sport]} at {location}. Here it is: "
+                      "edit it instead of posting again.", "info")
+                return redirect(url_for("events.detail", event_id=same["id"]))
+            # events.created_at is filled in by SQLite in UTC, so compare it with SQLite's clock too.
+            recent = db.execute("""SELECT COUNT(*) FROM events WHERE host_id = ? AND is_quick = 1
+                                   AND created_at >= datetime('now', '-1 hour')""", (g.user["id"],)).fetchone()[0]
+            if recent >= MAX_QUICK_POSTS_PER_HOUR:
+                error = "That's a lot of Need players posts in the last hour. Try again a bit later."
 
         if error is None:
             starts = round_up_5(now_local() + timedelta(minutes=_int(form.get("starts_in"))))
