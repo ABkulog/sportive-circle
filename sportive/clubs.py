@@ -41,7 +41,8 @@ FOCUS = {"competitive": "Competitive", "recreational": "Recreational", "instruct
          "mixed": "A mix"}
 JOINING = {"open": "Open: just show up", "tryouts": "Tryouts", "application": "Application"}
 EXPERIENCE = {"none": "No experience needed", "some": "Some experience helps", "experienced": "Experienced players"}
-WHO_CAN_JOIN = {"everyone": "Everyone", "women": "Women", "men": "Men", "women_nb": "Women & nonbinary"}
+WHO_CAN_JOIN = {"everyone": "Everyone", "women": "Women", "men": "Men", "nonbinary": "Nonbinary"}  # in the form
+WHO_CAN_JOIN_LABELS = {**WHO_CAN_JOIN, "women_nb": "Women & nonbinary"}  # older clubs may still say this
 # Optional social accounts: (label, emoji, rule to check it, how to turn it into a link)
 SOCIALS = {
     "instagram": ("Instagram", "📸", r"[A-Za-z0-9._]{1,30}", "https://instagram.com/{}"),
@@ -69,7 +70,7 @@ MEMBER_COUNT = ("(SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id"
                 " AND m.role IN ('member', 'officer')) AS member_count")
 
 CHOICES = {"club_kind": CLUB_KINDS, "focus": FOCUS, "joining": JOINING, "experience": EXPERIENCE,
-           "who_can_join": WHO_CAN_JOIN}
+           "who_can_join": WHO_CAN_JOIN_LABELS}
 
 
 def get_club(club_id):
@@ -275,7 +276,7 @@ def view(club_id):
                            role=role, requests=requests, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
                            socials=social_links(club),
                            joining=JOINING,
-                           experience=EXPERIENCE, who=WHO_CAN_JOIN)
+                           experience=EXPERIENCE, who=WHO_CAN_JOIN_LABELS)
 
 
 # ---------------------------------------------------- roster (officers)
@@ -701,7 +702,8 @@ def review_queue():
     club_counts = {row["status"]: row["n"] for row in get_db().execute(
         "SELECT status, COUNT(*) AS n FROM clubs GROUP BY status")}
     return render_template("clubs/review.html", clubs=clubs, status=status, club_counts=club_counts, social_links=social_links,
-                           kinds=CLUB_KINDS, focus=FOCUS, joining=JOINING, experience=EXPERIENCE, who=WHO_CAN_JOIN)
+                           kinds=CLUB_KINDS, focus=FOCUS, joining=JOINING, experience=EXPERIENCE,
+                           who=WHO_CAN_JOIN_LABELS)
 
 
 @bp.route("/admin/clubs/<int:club_id>/<decision>", methods=("POST",))

@@ -10,7 +10,7 @@ from werkzeug.datastructures import MultiDict
 from .auth import login_required, safe_next
 from .badges import sync_badges
 from .clubs import featured_clubs, suggested_clubs
-from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, OFF_CAMPUS, OPEN_TO, OPEN_TO_GENDERS,
+from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, OFF_CAMPUS, OPEN_TO_GENDERS, OPEN_TO_LABELS, OPEN_TO_PHRASE,
                         STATED_GENDERS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
                         SKILL_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .db import get_db, user_sports
@@ -377,7 +377,7 @@ def read_open_to(form, is_private):
     open_to = form.get("open_to") or "everyone"
     if is_private:
         return "everyone", None
-    if open_to not in OPEN_TO:
+    if open_to not in OPEN_TO_LABELS:  # (an older game may still say "Women & nonbinary")
         return "everyone", "Please pick who the game is open to."
     return open_to, None
 
@@ -387,7 +387,7 @@ def not_for_me(event):
     groups = OPEN_TO_GENDERS.get(event["open_to"])
     gender = g.user["gender"] if g.get("user") is not None else ""
     if groups and gender in STATED_GENDERS and gender not in groups:
-        return f"This game is for {OPEN_TO[event['open_to']].lower()}{' players' if event['open_to'] == 'women_nb' else ''}."
+        return f"This game is for {OPEN_TO_PHRASE[event['open_to']]}."
     return None
 
 
@@ -395,7 +395,7 @@ def join_confirm(event):
     """For the Join buttons: people who left gender blank are asked to confirm a game that's for a group."""
     gender = g.user["gender"] if g.get("user") is not None else ""
     if event["open_to"] in OPEN_TO_GENDERS and gender not in STATED_GENDERS:
-        return f"This game is for {OPEN_TO[event['open_to']].lower()}. Join?"
+        return f"This game is for {OPEN_TO_PHRASE[event['open_to']]}. Join?"
     return ""
 
 

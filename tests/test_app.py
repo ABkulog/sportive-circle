@@ -2755,17 +2755,31 @@ def test_games_can_be_open_to_a_group_like_uw_rec_hours(accounts, client, app):
     _as(accounts, "Maya")
     gym = dict(sport="gym", location="IMA (Intramural Activities Building)", title="Leg day buddy", players="2")
     women = event_id_from(client.post("/events/new", data=event_form(open_to="women", **gym)))
-    women_nb = event_id_from(client.post("/events/new", data=event_form(open_to="women_nb", **{**gym, "title": "Lift"})))
+    nonbinary = event_id_from(client.post("/events/new", data=event_form(open_to="nonbinary", **{**gym, "title": "Lift"})))
     assert "Women only" in client.get(f"/events/{women}").data.decode()
+    assert "Nonbinary only" in client.get(f"/events/{nonbinary}").data.decode()
+    form = client.get("/events/new").data.decode()
+    assert ">Nonbinary</option>" in form and "Women &amp; nonbinary" not in form   # the old choice isn't offered
     # Mo said "man" on his profile: these aren't in his feed, and he can't join.
     _as(accounts, "Mo")
     feed = client.get("/?scope=all").data.decode()
     assert "Leg day buddy" not in feed and "Lift" not in feed
     assert b"This game is for women." in client.post(f"/events/{women}/join", follow_redirects=True).data
-    # Kai (nonbinary): not the women-only one, yes the women & nonbinary one.
+    # Kai (nonbinary): not the women-only one, yes the nonbinary one.
     _as(accounts, "Kai")
     assert b"This game is for women." in client.post(f"/events/{women}/join", follow_redirects=True).data
-    assert b"You&#39;re in" in client.post(f"/events/{women_nb}/join", follow_redirects=True).data
+    assert b"You&#39;re in" in client.post(f"/events/{nonbinary}/join", follow_redirects=True).data
+    # ...and the nonbinary one isn't for Mo.
+    _as(accounts, "Mo")
+    assert b"This game is for nonbinary players." in client.post(f"/events/{nonbinary}/join",
+                                                                  follow_redirects=True).data
+    # A game made earlier as "Women & nonbinary" keeps working the way it was made.
+    with app.app_context():
+        get_db().execute("UPDATE events SET open_to = 'women_nb' WHERE id = ?", (nonbinary,))
+        get_db().commit()
+    assert "Women &amp; nonbinary" in client.get(f"/events/{nonbinary}").data.decode()
+    assert b"This game is for women &amp; nonbinary players." in client.post(f"/events/{nonbinary}/join",
+                                                                            follow_redirects=True).data
     # Left gender blank (it's optional): nothing is assumed; the Join button just asks to confirm.
     _as(accounts, "Blank")
     page = client.get(f"/events/{women}").data.decode()

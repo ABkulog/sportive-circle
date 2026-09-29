@@ -50,7 +50,8 @@
 {% macro open_to_field(form) %}
   <label class="field" data-show="public" {% if form.get('is_private') == '1' %}hidden{% endif %}><span>Open to</span>
     <select name="open_to">
-      {% for key, label in OPEN_TO.items() %}<option value="{{ key }}" {% if form.get('open_to', 'everyone') == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      {% set current = form.get('open_to', 'everyone') %}
+      {% for key, label in OPEN_TO_LABELS.items() if key in OPEN_TO or key == current %}<option value="{{ key }}" {% if current == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
     </select></label>
 {% endmacro %}
 
@@ -130,7 +131,7 @@
         {% if e.is_private %}<span class="badge">🔒 Private</span>{% endif %}
         {% if e.team_size %}<span class="badge">{{ e.team_size }}v{{ e.team_size }} teams</span>{% endif %}
         {% if e.members_only %}<span class="badge">Members only</span>{% endif %}
-        {% if e.open_to != 'everyone' %}<span class="badge">{{ OPEN_TO[e.open_to] }}{% if e.open_to != 'women_nb' %} only{% endif %}</span>{% endif %}
+        {% if e.open_to != 'everyone' %}<span class="badge">{{ OPEN_TO_BADGE[e.open_to] }}</span>{% endif %}
         {% if e.skill_level in ('Intermediate', 'Competitive') %}<span class="badge badge-level">{{ e.skill_level }}</span>{% endif %}
         {% if e.cancelled %}<span class="badge badge-danger">Canceled</span>
         {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Hosting</span>

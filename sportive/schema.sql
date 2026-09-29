@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS events (
     is_private    INTEGER NOT NULL DEFAULT 0,      -- 1 = joining needs the password (or an invite)
     password      TEXT NOT NULL DEFAULT '',        -- a private game's password, shown to the host and players
     team_size     INTEGER,                         -- team vs team: players per team (NULL = a regular game)
-    open_to       TEXT NOT NULL DEFAULT 'everyone', -- everyone / women / men / women_nb (constants.OPEN_TO)
+    open_to       TEXT NOT NULL DEFAULT 'everyone', -- everyone / women / men / nonbinary (constants.OPEN_TO; older games: women_nb)
     members_only  INTEGER NOT NULL DEFAULT 0,      -- a club event only its members can join
     cancelled     INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS clubs (
     focus            TEXT NOT NULL DEFAULT '',  -- competitive / recreational / instructional / mixed (UW Rec's categories)
     joining          TEXT NOT NULL DEFAULT 'open',  -- open / tryouts / application
     experience       TEXT NOT NULL DEFAULT 'none',  -- none / some / experienced
-    who_can_join     TEXT NOT NULL DEFAULT 'everyone',  -- everyone / women / men / women_nb
+    who_can_join     TEXT NOT NULL DEFAULT 'everyone',  -- everyone / women / men / nonbinary (older: women_nb)
     dues             TEXT NOT NULL DEFAULT '',  -- 'Free' or e.g. '$40/quarter'
     gear             TEXT NOT NULL DEFAULT '',  -- e.g. 'Provided' or 'Bring cleats'
     competes         INTEGER NOT NULL DEFAULT 0,  -- 1 = plays other schools
