@@ -315,6 +315,7 @@ body.hide-tabs { padding-bottom: 0; }
 .btn-large { padding: 12px 20px; font-size: 1rem; }
 .btn-block { width: 100%; }
 .btn.is-static { cursor: default; }
+.show-more { margin: 14px 0 0; }
 .link-button { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }
 .link-button:hover { text-decoration: underline; }
 .link-button:disabled { color: var(--muted); cursor: default; text-decoration: none; }

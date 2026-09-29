@@ -117,7 +117,7 @@
 {% macro event_card(e) %}
   {% set left = spots_left(e) %}
   {# The title link is stretched over the whole card (CSS), so the Join button can sit on top of it. #}
-  <div class="card event-card {% if e.cancelled %}is-cancelled{% endif %}">
+  <div class="card event-card {% if e.cancelled %}is-cancelled{% endif %}" id="game-{{ e.id }}">
     <div class="event-emoji" aria-hidden="true">{{ SPORT_EMOJI[e.sport] }}</div>
     <div class="event-body">
       <a class="event-title event-link" href="{{ url_for('events.detail', event_id=e.id) }}">{{ event_title(e) }}</a>

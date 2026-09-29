@@ -33,6 +33,8 @@ MAX_DAYS_AHEAD = 365
 OPEN_SPOT_CHOICES = ("1", "2", "3", "4", "5", "10")  # the "Open spots" filter on Home
 QUICK_WINDOW = timedelta(hours=3)      # quick posts starting this soon go to the top of the feed
 MAX_QUICK_POSTS_PER_HOUR = 4
+FEED_PAGE_SIZE = 50                    # games per "Show more games" step on the feed
+MAX_FEED_PAGES = 20
 LATE_JOIN_WINDOW = timedelta(minutes=15)  # a started "Need players" game stays up top this long
 UP_NEXT_WINDOW = timedelta(hours=2)    # your own events starting this soon get a banner on the feed
 
@@ -289,7 +291,12 @@ def feed():
         next_month = (now.replace(day=28) + timedelta(days=4)).replace(day=1)
         params["until"] = to_db(datetime.combine(next_month.date(), time()))
 
-    events = query_events(where, params)
+    # "Show more games" grows the list a page at a time (one extra row tells us if there's more).
+    page = request.args.get("page", "1")
+    page = min(int(page), MAX_FEED_PAGES) if page.isdigit() and int(page) > 0 else 1
+    events = query_events(where, params, limit=page * FEED_PAGE_SIZE + 1)
+    more_page = page + 1 if len(events) > page * FEED_PAGE_SIZE and page < MAX_FEED_PAGES else None
+    events = events[:page * FEED_PAGE_SIZE]
 
     # "Need players" posts starting soon (any sport) go in their own strip at the top. While filtering,
     # the strip is hidden and those games stay in the list, so the results match the filters exactly.
@@ -320,7 +327,7 @@ def feed():
     mark_seen("need_players")
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
-                           month_name=now.strftime("%B"),
+                           month_name=now.strftime("%B"), more_page=more_page,
                            hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now),
                            club_picks=suggested_clubs(g.user["id"], my_sports))
 

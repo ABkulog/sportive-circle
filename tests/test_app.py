@@ -2395,6 +2395,22 @@ def test_need_players_strip_drops_games_well_under_way(accounts, client, app):
     assert 'id="soon-title"' not in client.get("/?scope=all").data.decode()
 
 
+def test_feed_shows_more_games_a_page_at_a_time(accounts, client, monkeypatch):
+    from sportive import events
+    monkeypatch.setattr(events, "FEED_PAGE_SIZE", 2)
+    accounts.signup(email="host@uw.edu")
+    for i in range(3):
+        client.post("/events/new", data=event_form(title=f"Run number {i}",
+                                                   starts_at=form_time(timedelta(days=i + 1)),
+                                                   ends_at=form_time(timedelta(days=i + 1, hours=1))))
+    first = client.get("/?scope=all&sport=basketball").data.decode()
+    assert first.count("Run number") == 2 and "Show more games" in first
+    assert "page=2" in first and "sport=basketball" in first.split("Show more games")[0].rsplit("href=", 1)[1]
+    second = client.get("/?scope=all&sport=basketball&page=2").data.decode()
+    assert second.count("Run number") == 3 and "Show more games" not in second
+    assert client.get("/?scope=all&page=abc").status_code == 200
+
+
 def test_skill_filter_includes_all_levels_games(accounts, client):
     accounts.signup(email="host@uw.edu")
     client.post("/events/new", data=event_form(title="Everyone welcome run", skill_level="All levels"))
