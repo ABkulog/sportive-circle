@@ -178,10 +178,10 @@ def read_club_form(form, club_id=None):
             example = "a link like https://facebook.com/yourclub" if key == "facebook" else (
                 "a link like https://youtube.com/@yourclub" if key == "youtube" else "just the username, like @uwyourclub")
             return problem(key, f"That {label} doesn't look right. Use {example}.")
-    # Almost every real club has a social account (few have a website): at least one is how we check it's real.
-    if not any(data[key] for key in SOCIALS):
-        return problem("instagram", "Add at least one of your club's social media accounts, like its Instagram. "
-                       "That's how we check the club is real.")
+    # A social account or a website (or both): at least one is how we check the club is real.
+    if not any(data[key] for key in SOCIALS) and not data["contact_url"]:
+        return problem("instagram", "Add at least one of your club's social media accounts (like its Instagram) "
+                       "or its website. That's how we check the club is real.")
     if data["contact_url"] and (not data["contact_url"].startswith("https://") or " " in data["contact_url"]
                                 or len(data["contact_url"]) > 200):
         return problem("contact_url", "The website / Discord / GroupMe link must be a full https:// link.")

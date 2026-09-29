@@ -3,8 +3,8 @@
 {% block content %}
 {% from "_macros.html" import admin_nav %}{{ admin_nav('clubs') }}
 <h1 class="page-title">Club requests</h1>
-<p class="muted">Open the club's social accounts (and its UW page, if it gave one): is it a real UW club, active
-  this quarter, and is the applicant one of its officers?</p>
+<p class="muted">Open the club's social accounts or website: is it a real UW club, active this quarter, and is the
+  applicant one of its officers?</p>
 <nav class="home-tabs" aria-label="Status">
   {% for key, label in [('pending', 'Waiting'), ('approved', 'Approved'), ('rejected', 'Needs changes')] %}
     <a href="{{ url_for('clubs.review_queue', status=key) }}" {% if status == key %}class="is-on" aria-current="page"{% endif %}>{{ label }} ({{ club_counts.get(key, 0) }})</a>
@@ -22,6 +22,7 @@
         {% for label, emoji, url, shown in social_links(c) %}
           <li><a href="{{ url }}" target="_blank" rel="noopener nofollow"><strong>{{ label }}</strong> {{ shown }} ↗</a></li>
         {% endfor %}
+        {% if c.contact_url %}<li><a href="{{ c.contact_url }}" target="_blank" rel="noopener nofollow"><strong>Website</strong> {{ c.contact_url|replace('https://', '')|truncate(40) }} ↗</a></li>{% endif %}
         {% if c.verification_url %}<li><a href="{{ c.verification_url }}" target="_blank" rel="noopener nofollow"><strong>Official UW page</strong> ↗</a></li>{% endif %}
       </ul>
       <p><strong>Applicant:</strong> {{ c.applicant or 'deleted account' }} <span class="muted">({{ c.applicant_email }})</span>,

@@ -65,9 +65,9 @@
       <span>We compete against other schools</span></label>
     </section>
     <section class="wizard-step" data-step="4">
-    <h2 class="form-step"><span>4</span> Social media</h2>
-    <fieldset class="field" data-need-one="Add at least one social media account. It's how we check the club is real.">
-      <legend>Add at least one <em>(it's how we check the club is real)</em></legend>
+    <h2 class="form-step"><span>4</span> Socials or website</h2>
+    <fieldset class="field" data-need-one="Add a social media account or a website. It's how we check the club is real.">
+      <legend>Add at least one: a social account or a website <em>(it's how we check the club is real)</em></legend>
       <div class="social-grid">
         <label class="field"><span>Instagram</span>
           <input name="instagram" maxlength="31" value="{{ form.get('instagram', '') }}" placeholder="@uwyourclub"></label>
@@ -82,9 +82,9 @@
         <label class="field"><span>YouTube</span>
           <input name="youtube" type="url" maxlength="170" value="{{ form.get('youtube', '') }}" placeholder="https://youtube.com/@uwyourclub"></label>
       </div>
+      <label class="field"><span>Website, Discord or GroupMe</span>
+        <input name="contact_url" type="url" maxlength="200" value="{{ form.get('contact_url', '') }}" placeholder="https://…"></label>
     </fieldset>
-    <label class="field"><span>Website, Discord or GroupMe <em>(optional)</em></span>
-      <input name="contact_url" type="url" maxlength="200" value="{{ form.get('contact_url', '') }}" placeholder="https://…"></label>
     </section>
     <section class="wizard-step" data-step="5">
     <h2 class="form-step"><span>5</span> About the club and you</h2>

@@ -1553,9 +1553,15 @@ def test_all_club_info_is_required(accounts, client):
     for field in ("meets", "location", "dues", "gear", "how_to_join", "join_question", "club_email"):
         page = client.post("/clubs/new", data={**CLUB, field: ""}).data
         assert b"Please add" in page, field
-    # At least one social account is required (most clubs have Instagram, few have a website)...
-    page = client.post("/clubs/new", data={**CLUB, "instagram": ""}).data
+    # A social account or a website is required (either one, or both)...
+    page = client.post("/clubs/new", data={**CLUB, "instagram": "", "contact_url": ""}).data
     assert b"Add at least one of your club" in page and b'data-error-field="instagram"' in page
+    client.post("/clubs/new", data={**CLUB, "name": "Website Only Club", "instagram": "",
+                                    "contact_url": "https://websiteonly.example.com"})       # a website alone is fine
+    with client.application.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM clubs WHERE name = 'Website Only Club'").fetchone()[0] == 1
+        get_db().execute("DELETE FROM clubs WHERE name = 'Website Only Club'")
+        get_db().commit()
     # ...while a website is optional, and the HuskyLink page isn't asked at all.
     assert b'name="verification_url"' not in client.get("/clubs/new").data
     client.post("/clubs/new", data={**CLUB, "instagram": "", "tiktok": "uwspike", "contact_url": "",
@@ -3119,7 +3125,7 @@ def test_admin_pages_have_no_help_bubble_and_say_to_check_socials(accounts, clie
     accounts.signup()
     for page in ("/admin/clubs", "/admin/reports", "/admin/suggestions"):
         assert "data-help-bubble" not in client.get(page).data.decode(), page
-    assert "Open the club's social accounts" in client.get("/admin/clubs").data.decode()
+    assert "Open the club's social accounts or website" in client.get("/admin/clubs").data.decode()
 
 
 def test_linkedin_on_profiles(accounts, client, app):

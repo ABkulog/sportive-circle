@@ -6,8 +6,8 @@ Feature: Clubs
     And "Admin" is an admin
 
   @FR-CLUB-1
-  Scenario: A club without an Instagram or other social account can't register
-    When "Riley" registers a club without any social media
+  Scenario: A club with no social account and no website can't register
+    When "Riley" registers a club without any social media or website
     Then they see "Add at least one of your club's social media accounts"
 
   @FR-CLUB-1 @FR-CLUB-2
