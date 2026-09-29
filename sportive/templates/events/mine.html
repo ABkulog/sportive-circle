@@ -5,15 +5,6 @@
 {{ home_tabs('mine') }}
 <h1 class="page-title">My events</h1>
 
-{% if invited %}
-<section class="band">
-  <h2>Invited</h2>
-  <div class="stack">
-    {% for e in invited %}{{ event_card(e) }}{% endfor %}
-  </div>
-</section>
-{% endif %}
-
 <section class="band">
   <h2>Hosting</h2>
   <div class="stack">
