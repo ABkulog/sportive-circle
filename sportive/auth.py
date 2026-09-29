@@ -88,8 +88,11 @@ def is_birthday(born, today):
 
 
 def safe_next(target):
-    """Only allow redirects back into this site (blocks //evil.com tricks)."""
-    if target and target.startswith("/") and not target.startswith("//"):
+    """Only allow redirects back into this site. Browsers drop tabs/newlines and treat "\\" as "/", so
+    "/\\tevil.com" or "/\\evil.com" would become //evil.com; any whitespace, control character or
+    backslash is refused."""
+    if (target and target.startswith("/") and not target.startswith("//")
+            and not any(ch == "\\" or ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in target)):
         return target
     return url_for("index")
 

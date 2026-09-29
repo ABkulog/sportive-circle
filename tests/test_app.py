@@ -230,6 +230,15 @@ def test_login_next_cannot_redirect_offsite(accounts, client):
     assert response.headers["Location"] == "/"
 
 
+def test_login_next_rejects_whitespace_and_backslash_tricks(accounts, client):
+    accounts.signup()
+    for target in ("/\t/evil.example", "/\\evil.example", "/\n/evil.example", "/ /evil.example", "/\x0b/evil.example"):
+        accounts.logout()
+        response = client.post("/login", data={"email": "dubs@uw.edu", "password": "purple-and-gold",
+                                               "next": target})
+        assert response.headers["Location"] == "/", target
+
+
 def test_profile_edit(accounts, client):
     accounts.signup()
     step1 = client.post("/profile/edit", data={"full_name": "Dubs II", "grad_year": "2029", "bio": "Hoops daily"})
