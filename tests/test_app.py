@@ -3013,6 +3013,18 @@ def test_need_players_host_hears_when_someone_joins(accounts, client, app):
     assert len(texts) == 1 and texts[0].startswith("Pat joined") and "(2 going now)" in texts[0]
 
 
+def test_times_skipped_by_daylight_saving_are_refused(accounts, client, monkeypatch):
+    from datetime import datetime
+    from sportive import events
+    from sportive.timeutil import exists_in_seattle
+    assert not exists_in_seattle(datetime(2027, 3, 14, 2, 30))
+    assert exists_in_seattle(datetime(2027, 3, 14, 3, 30)) and exists_in_seattle(datetime(2027, 11, 7, 1, 30))
+    monkeypatch.setattr(events, "now_local", lambda: datetime(2027, 3, 1, 12, 0))
+    accounts.signup()
+    page = client.post("/events/new", data=event_form(starts_at="2027-03-14T02:30", ends_at="2027-03-14T04:00")).data
+    assert b"2:30 AM doesn&#39;t exist on Mar 14" in page
+
+
 def test_one_account_per_uw_inbox(accounts, client):
     accounts.signup(email="dubs@uw.edu")
     accounts.logout()

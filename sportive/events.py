@@ -23,7 +23,7 @@ from .mail import compose, send_email
 from .social import friends_of, is_blocked_between
 from .spirit import greeting, top_dawgs
 from .textutil import multi_line, one_line, same_secret
-from .timeutil import fmt_clock, fmt_when, from_db, now_local, parse_form, to_db, to_form
+from .timeutil import exists_in_seattle, fmt_clock, fmt_when, from_db, now_local, parse_form, to_db, to_form
 
 bp = Blueprint("events", __name__)
 log = logging.getLogger(__name__)
@@ -356,6 +356,10 @@ def read_event_form(form, event=None):
         return None, "Event end time cannot be empty."
     if ends <= starts:
         return None, "The event has to end after it starts."
+    for moment in (starts, ends):
+        if not exists_in_seattle(moment):
+            return None, (f"{fmt_clock(to_db(moment))} doesn't exist on {moment.strftime('%b')} {moment.day}: "
+                          "clocks jump ahead an hour for daylight saving. Pick another time.")
     max_hours = SPORT_MAX_HOURS.get(sport, DEFAULT_MAX_HOURS)
     if ends - starts > timedelta(hours=max_hours):
         longest = f"{max_hours // 24} days" if max_hours % 24 == 0 else f"{max_hours} hours"

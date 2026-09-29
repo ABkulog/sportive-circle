@@ -3,7 +3,7 @@
 All times are Seattle local time, stored in the database as "YYYY-MM-DD HH:MM"
 strings (they sort correctly as text, so SQL can compare them directly).
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 SEATTLE = ZoneInfo("America/Los_Angeles")
@@ -25,6 +25,13 @@ def from_db(value):
 
 def parse_form(value):
     return datetime.strptime(value.strip(), FORM_FORMAT)
+
+
+def exists_in_seattle(dt):
+    """False for clock times skipped when daylight saving starts (2:00-2:59 AM on the second Sunday of
+    March): no calendar app or reminder can place them."""
+    there_and_back = dt.replace(tzinfo=SEATTLE).astimezone(timezone.utc).astimezone(SEATTLE)
+    return there_and_back.replace(tzinfo=None) == dt
 
 
 def to_form(value):
