@@ -2536,6 +2536,15 @@ def test_gold_text_on_the_purple_header_is_readable():
         assert _contrast(c["--header"], c["--gold-on-header"]) >= 4.5, theme
 
 
+def test_register_your_club_line_has_room_below_the_grid(accounts, client, app):
+    import pathlib
+    _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu")
+    assert 'class="center muted register-hint"' in client.get("/clubs").data.decode()
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    assert re.search(r"^\.register-hint \{[^}]*margin: 24px", css, re.M)
+
+
 def test_relative_times_never_wrap_mid_phrase():
     import pathlib
     css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")

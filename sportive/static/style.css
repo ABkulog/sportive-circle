@@ -120,6 +120,7 @@ small { font-size: .82rem; }
 .muted { color: var(--muted); }
 .fine-print { font-size: .82rem; line-height: 1.45; }
 .center { text-align: center; }
+.register-hint { margin: 24px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .skip-link { position: absolute; left: -9999px; }
 .skip-link:focus { left: 12px; top: 12px; z-index: 100; background: var(--bg); color: var(--text); padding: 8px 12px; border-radius: 8px; }

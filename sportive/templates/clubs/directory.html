@@ -58,6 +58,6 @@
   {% endfor %}
 </div>
 {% if clubs and g.user %}
-  <p class="center muted">Run a UW club that's not here yet? <a href="{{ url_for('clubs.create') }}">Register it →</a></p>
+  <p class="center muted register-hint">Run a UW club that's not here yet? <a href="{{ url_for('clubs.create') }}">Register it →</a></p>
 {% endif %}
 {% endblock %}
