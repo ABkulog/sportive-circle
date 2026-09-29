@@ -6,18 +6,20 @@
 <div class="card form-card">
   <p class="step-label">2 of 2</p>
   <h1>Socials and sports</h1>
+  <p class="muted">Sports: pick any. Your feed shows these first.</p>
   <form method="post" class="form">
     {{ csrf_field() }}
     <fieldset class="field">
       <legend>Your socials <em>(optional, shown under your bio)</em></legend>
       <div class="row row-pair">
         {% for key, label in socials.items() %}
-          <input name="{{ key }}" maxlength="40" value="{{ form.get(key) or '' }}" placeholder="{{ label }}"
+          <input name="{{ key }}" maxlength="{{ 150 if key == 'linkedin' else 40 }}" value="{{ form.get(key) or '' }}"
+                 placeholder="{{ 'LinkedIn link' if key == 'linkedin' else label }}"
                  aria-label="{{ label }} username" autocapitalize="off" spellcheck="false">
         {% endfor %}
       </div>
     </fieldset>
-    {{ sport_checkboxes(form) }}
+    {{ sport_checkboxes(form, legend=False) }}
     <button class="btn btn-block">Save</button>
   </form>
 </div>

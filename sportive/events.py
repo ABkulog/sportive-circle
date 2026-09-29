@@ -17,6 +17,7 @@ from .db import get_db, user_sports
 from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots, my_invite,
                       now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
 from .links import public_url
+from .reminders import REMIND_CHOICES
 from .notifications import mark_seen, notify
 from .mail import compose, send_email
 from .social import friends_of, is_blocked_between
@@ -731,7 +732,10 @@ def detail(event_id):
         counts = team_counts(event_id)
         teams = {team: {"players": [p for p in attendees if p["team"] == team], "count": counts[team],
                         "held": held_spots(event_id, team=team)} for team in (1, 2)}
+    my_rsvp = get_db().execute("SELECT remind_minutes FROM rsvps WHERE event_id = ? AND user_id = ?",
+                               (event_id, me)).fetchone()
     return render_template("events/detail.html", event=event, attendees=attendees,
+                           my_reminder=my_rsvp["remind_minutes"] if my_rsvp else None, remind_choices=REMIND_CHOICES,
                            ended=from_db(event["ends_at"]) < now_local(),
                            share_url=public_url("events.detail", event_id=event_id),
                            blocked=is_blocked_between(me, event["host_id"]),
@@ -888,6 +892,19 @@ def calendar_file(event_id):
     ]
     return Response("\r\n".join(ics_fold(line) for line in lines) + "\r\n", mimetype="text/calendar",
                     headers={"Content-Disposition": f"attachment; filename=sportive-circle-{event['id']}.ics"})
+
+
+@bp.route("/events/<int:event_id>/reminder", methods=("POST",))
+@login_required
+def set_reminder(event_id):
+    """Each player picks when their reminder email comes: 1 hour or 30 min before, or none."""
+    minutes = request.form.get("remind", type=int)
+    if minutes not in REMIND_CHOICES:
+        abort(400)
+    get_db().execute("UPDATE rsvps SET remind_minutes = ? WHERE event_id = ? AND user_id = ?",
+                     (minutes, event_id, g.user["id"]))
+    get_db().commit()
+    return redirect(url_for("events.detail", event_id=event_id))
 
 
 @bp.route("/events/<int:event_id>/leave", methods=("POST",))

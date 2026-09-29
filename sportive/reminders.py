@@ -24,7 +24,8 @@ from .timeutil import fmt_clock, from_db, now_local, to_db
 
 log = logging.getLogger(__name__)
 
-REMIND_BEFORE = timedelta(minutes=60)
+REMIND_BEFORE = timedelta(minutes=60)  # the earliest a reminder goes out
+REMIND_CHOICES = {60: "1 hour before", 30: "30 min before", 0: "No reminder"}  # each player picks on the game page
 # Someone who joined 5 minutes before a game doesn't need a reminder about it.
 MIN_NOTICE = timedelta(minutes=15)
 CHECK_EVERY = timedelta(minutes=5)
@@ -50,8 +51,8 @@ def reminder_email(row, minutes):
          f"{fmt_clock(row['starts_at'])} (in {minutes} min)", row["location"], crew],
         after=[plans_changed],
         button=("See the game", link),
-        reason="You're getting this because you joined this game. "
-               "Turn these off in Settings → Email.",
+        reason="You're getting this because you joined this game. Pick 30 min or no reminder on the game page, "
+               "or turn these off in Settings → Email.",
         preheader=f"{fmt_clock(row['starts_at'])} at {row['location']}")
     return subject, body, html
 
@@ -61,19 +62,21 @@ def send_due_reminders():
     now = now_local()
     db = get_db()
     rows = db.execute(
-        """SELECT r.event_id, r.user_id, r.created_at AS joined_at, u.email, u.full_name,
+        """SELECT r.event_id, r.user_id, r.created_at AS joined_at, r.remind_minutes, u.email, u.full_name,
                   e.title, e.sport, e.location, e.starts_at, e.is_quick, e.host_id,
                   e.extra_players + (SELECT COUNT(*) FROM rsvps g WHERE g.event_id = e.id) AS going
            FROM rsvps r
            JOIN events e ON e.id = r.event_id
            JOIN users u ON u.id = r.user_id
-           WHERE r.reminder_sent = 0 AND e.cancelled = 0 AND u.verified = 1 AND u.suspended = 0 AND u.email_reminders = 1
+           WHERE r.reminder_sent = 0 AND r.remind_minutes > 0 AND e.cancelled = 0 AND u.verified = 1 AND u.suspended = 0 AND u.email_reminders = 1
              AND e.starts_at > :now AND e.starts_at <= :soon""",
         {"now": to_db(now), "soon": to_db(now + REMIND_BEFORE)},
     ).fetchall()
 
     sent = 0
     for row in rows:
+        if from_db(row["starts_at"]) - now > timedelta(minutes=row["remind_minutes"]):
+            continue  # picked "30 min before": not yet
         # Mark it before sending, and only send if this run was the one that marked it: the app runs more
         # than one copy of itself, and nobody should get the same reminder twice. (A failed send isn't retried.)
         claimed = db.execute("UPDATE rsvps SET reminder_sent = 1 WHERE event_id = ? AND user_id = ?"

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     snapchat        TEXT NOT NULL DEFAULT '',
     tiktok          TEXT NOT NULL DEFAULT '',
     x_handle        TEXT NOT NULL DEFAULT '',
+    linkedin        TEXT NOT NULL DEFAULT '',      -- the part after linkedin.com/in/
     verified        INTEGER NOT NULL DEFAULT 0,    -- 1 once the email code is confirmed
     verify_code     TEXT,                          -- 6-digit code for signing up or resetting a password
     verify_expires  TEXT,
@@ -77,6 +78,7 @@ CREATE TABLE IF NOT EXISTS rsvps (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),  -- the app always passes Seattle time
     reminder_sent INTEGER NOT NULL DEFAULT 0,
     team          INTEGER,                         -- team vs team: 1 = the host's team, 2 = the challengers
+    remind_minutes INTEGER NOT NULL DEFAULT 60,    -- reminder email this many minutes before (0 = none)
     PRIMARY KEY (event_id, user_id)
 );
 

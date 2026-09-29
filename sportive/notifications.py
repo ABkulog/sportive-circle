@@ -15,7 +15,7 @@ Two sorts of things show up:
 from collections import namedtuple
 from datetime import timedelta
 
-from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, g, redirect, render_template, request, url_for
 
 from .auth import login_required
 from .db import get_db, user_sports
@@ -30,7 +30,7 @@ Kind = namedtuple("Kind", "key emoji label place audience")
 KINDS = [
     Kind("invites", "🙌", "Invites to games", "bell", "everyone"),
     Kind("game_updates", "📅", "Changes to games you joined", "bell", "everyone"),
-    Kind("game_chat", "💬", "New messages in your games' group chats", "bell", "everyone"),
+    Kind("game_chat", "💬", "Your games' group chats", "bell", "everyone"),
     Kind("need_players", "⚡", "Need players posts for your sports", "bell", "everyone"),
     Kind("badges", "🏅", "Badges you earn", "bell", "everyone"),
     Kind("account", "👤", "Tips about your account", "bell", "everyone"),
@@ -285,8 +285,7 @@ def notification_settings():
     me = g.user["id"]
     if request.method == "POST":
         save_settings(me, request.form)
-        flash("Saved.", "success")
-        return redirect(url_for("settings.home"))
+        return redirect(url_for("notifications.notification_settings"))  # the switches show what's saved
     return render_template("settings/notifications.html", kinds=kinds_for(me), chosen=settings(me),
                            places=PLACE_NAMES)
 

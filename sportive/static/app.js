@@ -214,6 +214,22 @@
     });
   }
 
+  // <form data-autosave>: each switch saves the moment it's flipped, in the background (no reload, no jump
+  // back to the top). If that fails, the form is sent the normal way.
+  document.querySelectorAll("form[data-autosave]").forEach((form) => {
+    const status = (form.closest(".card") || form).querySelector("[data-autosave-status]");
+    form.addEventListener("change", async () => {
+      try {
+        const response = await fetch(form.action || location.href, { method: "POST", body: new FormData(form),
+                                                                      credentials: "same-origin" });
+        if (!response.ok) throw new Error(response.statusText);
+        if (status) status.textContent = "Saved";
+      } catch (error) {
+        form.submit();
+      }
+    });
+  });
+
   // Every password box gets an eye button to peek at what you typed (tap again to hide it).
   const EYE = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor"' +
     ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7' +

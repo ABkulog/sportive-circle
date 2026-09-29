@@ -714,7 +714,7 @@ def test_reminder_email_is_friendly(accounts, client, app, monkeypatch):
     subject, body = sent["player@uw.edu"]
     assert re.fullmatch(r"Evening hoops starts in \d+ min", subject)
     assert "Hey Dubs, your game is coming up" in body and "You + 1 other\n" in body and "Tap “Leave”" in body
-    assert "Settings → Email" in body
+    assert "Settings → Email" in body and "30 min" in body
     host_subject, host_body = sent["host@uw.edu"]
     assert "You're the host" in host_body
 
@@ -3067,3 +3067,39 @@ def test_help_bubble_can_be_closed(accounts, client):
         assert "data-help-bubble" not in client.get(page).data.decode()
     accounts.signup()
     assert "data-help-bubble" in client.get("/clubs").data.decode()
+
+
+def test_linkedin_on_profiles(accounts, client, app):
+    """People can add LinkedIn like the other socials; a pasted profile link works too."""
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    assert 'name="linkedin"' in client.get("/profile/edit/sports").data.decode()
+    client.post("/profile/edit/sports", data={"linkedin": "https://www.linkedin.com/in/dubs-husky/?trk=x"})
+    page = client.get(f"/u/{me}").data.decode()
+    assert 'href="https://www.linkedin.com/in/dubs-husky"' in page and "in/dubs-husky" in page
+    client.post("/profile/edit/sports", data={"linkedin": "dubs-husky-2"})       # just the name works too
+    assert 'linkedin.com/in/dubs-husky-2"' in client.get(f"/u/{me}").data.decode()
+    bad = client.post("/profile/edit/sports", data={"linkedin": "<script>"}).data
+    assert b"That LinkedIn doesn" in bad
+
+
+def test_players_pick_when_their_reminder_comes(accounts, client, app, monkeypatch):
+    """After joining: an hour before (default), 30 min before, or no reminder."""
+    from sportive import reminders
+    sent = []
+    monkeypatch.setattr(reminders, "send_email", lambda to, subject, body, **kwargs: sent.append(to))
+    _reminder_setup(accounts, client, app, joined_minutes_before=120)   # game starts in ~40 min; player logged in
+    page = client.get("/events/1").data.decode()
+    assert "Email reminder" in page and '<option value="60" selected>1 hour before</option>' in page
+    client.post("/events/1/reminder", data={"remind": "30"})
+    assert '<option value="30" selected>30 min before</option>' in client.get("/events/1").data.decode()
+    with app.app_context():
+        reminders.send_due_reminders()
+    assert sent == ["host@uw.edu"]                  # 40 min away: the host (1 hour) gets it, the player not yet
+    with app.app_context():
+        get_db().execute("UPDATE events SET starts_at = ?", (reminders.to_db(now_local() + timedelta(minutes=25)),))
+        get_db().commit()
+        reminders.send_due_reminders()
+    assert sorted(sent) == ["host@uw.edu", "player@uw.edu"]      # now within 30 min
+    client.post("/events/1/reminder", data={"remind": "0"})
+    assert client.post("/events/1/reminder", data={"remind": "45"}).status_code == 400   # only the listed choices

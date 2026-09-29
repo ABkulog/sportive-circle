@@ -26,13 +26,29 @@ bp = Blueprint("profile", __name__)
 # Optional profile details. Gender is shown only if someone picks one.
 GENDERS = {"": "Prefer not to say", "woman": "Woman", "man": "Man", "nonbinary": "Nonbinary", "other": "Another identity"}
 MAX_PRONOUNS = 20
-PERSON_SOCIALS = ("instagram", "snapchat", "tiktok", "x_handle")  # same checks as club socials (clubs.SOCIALS)
+# (label, what a valid value looks like, link, how it's shown). Same checks as club socials (clubs.SOCIALS),
+# plus LinkedIn for people.
+PERSON_SOCIAL_RULES = {
+    **{key: (SOCIALS[key][0], SOCIALS[key][2], SOCIALS[key][3], "@{}") for key in ("instagram", "snapchat", "tiktok",
+                                                                                 "x_handle")},
+    "linkedin": ("LinkedIn", r"[A-Za-z0-9\-_%]{3,100}", "https://www.linkedin.com/in/{}", "in/{}"),
+}
+PERSON_SOCIALS = tuple(PERSON_SOCIAL_RULES)
 
 
 def person_socials(user):
     """[(label, url, "@handle")] for the socials someone added, so people can DM them where they already are."""
-    return [(SOCIALS[key][0], SOCIALS[key][3].format(user[key]), f"@{user[key]}")
-            for key in PERSON_SOCIALS if user[key]]
+    return [(PERSON_SOCIAL_RULES[key][0], PERSON_SOCIAL_RULES[key][2].format(user[key]),
+             PERSON_SOCIAL_RULES[key][3].format(user[key])) for key in PERSON_SOCIALS if user[key]]
+
+
+def clean_social(key, value):
+    """What people type or paste -> just the username. LinkedIn: a pasted profile link works too."""
+    value = one_line(value).strip()
+    if key == "linkedin":
+        value = re.sub(r"^(https?://)?([a-z]{2,3}\.)?linkedin\.com/in/", "", value, flags=re.I).strip("/")
+        return value.split("?")[0].split("/")[0]
+    return value.lstrip("@")
 
 # Pages you can still open before adding a profile picture.
 ALLOWED_WITHOUT_PHOTO = {"profile.photo_upload", "profile.photo_skip", "profile.photo", "profile.delete_account",
@@ -127,7 +143,7 @@ def photo(user_id):
 @login_required
 def view(user_id):
     user = get_db().execute(
-        "SELECT id, full_name, email, grad_year, bio, pronouns, gender, instagram, snapchat, tiktok, x_handle,"
+        "SELECT id, full_name, email, grad_year, bio, pronouns, gender, instagram, snapchat, tiktok, x_handle, linkedin,"
         " avatar_updated, suspended, created_at FROM users"
         " WHERE id = ? AND verified = 1",
         (user_id,),
@@ -245,15 +261,18 @@ def edit_sports():
     me = g.user
     if request.method == "POST":
         form = request.form
-        socials = {key: one_line(form.get(key)).lstrip("@") for key in PERSON_SOCIALS}
+        socials = {key: clean_social(key, form.get(key)) for key in PERSON_SOCIALS}
         bad_social = next((key for key, value in socials.items()
-                           if value and not re.fullmatch(SOCIALS[key][2], value)), None)
-        if bad_social:
-            flash(f"That {SOCIALS[bad_social][0]} username doesn't look right. Just the username, like @dubs.", "error")
+                           if value and not re.fullmatch(PERSON_SOCIAL_RULES[key][1], value)), None)
+        if bad_social == "linkedin":
+            flash("That LinkedIn doesn't look right. Paste your profile link, like linkedin.com/in/dubs-husky.", "error")
+        elif bad_social:
+            flash(f"That {PERSON_SOCIAL_RULES[bad_social][0]} username doesn't look right. Just the username, like @dubs.",
+                  "error")
         else:
             db = get_db()
             db.execute("UPDATE users SET instagram = :instagram, snapchat = :snapchat, tiktok = :tiktok,"
-                       " x_handle = :x_handle WHERE id = :id", {**socials, "id": me["id"]})
+                       " x_handle = :x_handle, linkedin = :linkedin WHERE id = :id", {**socials, "id": me["id"]})
             set_user_sports(me["id"], [s for s in form.getlist("sports") if s in SPORTS])
             db.commit()
             flash("Profile saved.", "success")
@@ -261,7 +280,7 @@ def edit_sports():
     else:
         form = MultiDict([(key, me[key]) for key in PERSON_SOCIALS] + [("sports", s) for s in user_sports(me["id"])])
     return render_template("profile/edit_sports.html", form=form,
-                           socials={key: SOCIALS[key][0] for key in PERSON_SOCIALS})
+                           socials={key: PERSON_SOCIAL_RULES[key][0] for key in PERSON_SOCIALS})
 
 
 @bp.route("/profile/password", methods=("POST",))

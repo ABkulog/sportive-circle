@@ -77,6 +77,21 @@
           </div>
           <small class="muted">The link works for friends who aren't on the app: they sign up and they're in{% if event.is_private %}, no password needed{% endif %}.</small>
         </div>
+        {% if my_reminder is not none and not ended %}
+          {% if g.user.email_reminders %}
+            <form method="post" action="{{ url_for('events.set_reminder', event_id=event.id) }}" class="reminder-pick" data-autosave>
+              {{ csrf_field() }}
+              <label>Email reminder
+                <select name="remind">
+                  {% for minutes, label in remind_choices.items() %}<option value="{{ minutes }}" {% if my_reminder == minutes %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select></label>
+              <span class="saved-note" data-autosave-status aria-live="polite"></span>
+              <noscript><button class="btn btn-small">Save</button></noscript>
+            </form>
+          {% else %}
+            <p class="muted reminder-pick">Reminder emails are off. <a href="{{ url_for('settings.home') }}">Turn them on in Settings</a>.</p>
+          {% endif %}
+        {% endif %}
       {% endif %}
       {% if is_host or event.i_am_going %}
       {% elif blocked %}

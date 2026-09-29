@@ -156,7 +156,7 @@ SPORT_TEAM_SIZES = {
     "other": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
 }
 
-# The usual group size, picked for you in the "Players" dropdown (you can change it).
+# The usual group size, suggested in the "Players" box (the host can type any number).
 DEFAULT_PLAYERS = {
     "basketball": 10, "soccer": 14, "football": 14, "volleyball": 12, "spikeball": 4, "ultimate": 14,
     "tennis": 4, "pickleball": 4, "running": 6, "climbing": 4, "gym": 2, "rowing": 4, "snow": 4,
