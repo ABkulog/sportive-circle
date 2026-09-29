@@ -24,7 +24,7 @@ from .timeutil import now_local, to_db
 bp = Blueprint("profile", __name__)
 
 # Optional profile details. Gender is shown only if someone picks one.
-GENDERS = {"": "Prefer not to say", "woman": "Woman", "man": "Man", "nonbinary": "Nonbinary", "other": "Another identity"}
+GENDERS = {"": "Prefer not to say", "woman": "Woman", "man": "Man", "nonbinary": "Nonbinary", "other": "Other"}
 MAX_PRONOUNS = 20
 # (label, what a valid value looks like, link, how it's shown). Same checks as club socials (clubs.SOCIALS),
 # plus LinkedIn for people.

@@ -3260,3 +3260,23 @@ def test_club_review_goes_to_the_bell_too(accounts, client, app, monkeypatch):
     assert f"/clubs/{club}?approved=1" in bell
     page = client.get(f"/clubs/{club}?approved=1").data.decode()
     assert "flash-celebrate" in page and "is verified!" in page                            # confetti
+
+
+def test_open_to_anyone_or_other(accounts, client, app):
+    """Hosts pick Anyone, Women, Men, Nonbinary or Other; profiles offer Other too."""
+    ids = _people(accounts, app, "Host", "Wren", "Olly")
+    _set_gender(app, ids["Wren"], "woman")
+    _set_gender(app, ids["Olly"], "other")
+    _as(accounts, "Host")
+    form = client.get("/events/new").data.decode()
+    for label in (">Anyone</option>", ">Women</option>", ">Men</option>", ">Nonbinary</option>", ">Other</option>"):
+        assert label in form, label
+    assert ">Other</option>" in client.get("/profile/edit").data.decode()
+    game = event_id_from(client.post("/events/new", data=event_form(open_to="other", title="Other run")))
+    assert "Other only" in client.get(f"/events/{game}").data.decode()
+    _as(accounts, "Wren")
+    assert b"This game is for people who chose Other." in client.post(f"/events/{game}/join", follow_redirects=True).data
+    _as(accounts, "Olly")
+    assert b"You&#39;re in" in client.post(f"/events/{game}/join", follow_redirects=True).data
+    accounts.signup(email="officer@uw.edu")
+    assert ">Anyone</span>" in client.get("/clubs/new").data.decode()

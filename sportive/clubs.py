@@ -41,7 +41,8 @@ FOCUS = {"competitive": "Competitive", "recreational": "Recreational", "instruct
          "mixed": "A mix"}
 JOINING = {"open": "Open: just show up", "tryouts": "Tryouts", "application": "Application"}
 EXPERIENCE = {"none": "No experience needed", "some": "Some experience helps", "experienced": "Experienced players"}
-WHO_CAN_JOIN = {"everyone": "Everyone", "women": "Women", "men": "Men", "nonbinary": "Nonbinary"}  # in the form
+WHO_CAN_JOIN = {"everyone": "Anyone", "women": "Women", "men": "Men", "nonbinary": "Nonbinary",  # in the form
+                "other": "Other"}
 WHO_CAN_JOIN_LABELS = {**WHO_CAN_JOIN, "women_nb": "Women & nonbinary"}  # older clubs may still say this
 # Optional social accounts: (label, emoji, rule to check it, how to turn it into a link)
 SOCIALS = {

@@ -168,16 +168,18 @@ SKILL_LEVELS = ["All levels", "Casual", "Intermediate", "Competitive"]
 # "Open to": a game can be for everyone (the default) or, like UW Recreation's women-only hours, for a group.
 # Same choices as clubs. Someone whose profile says a gender outside the group can't join; people who left
 # gender blank (it's optional) are asked to confirm instead, so nobody is guessed about.
-OPEN_TO = {"everyone": "Everyone", "women": "Women", "men": "Men", "nonbinary": "Nonbinary"}  # what hosts can pick
+OPEN_TO = {"everyone": "Anyone", "women": "Women", "men": "Men", "nonbinary": "Nonbinary",  # what hosts can pick
+           "other": "Other"}
 # "Women & nonbinary" isn't offered anymore; games and clubs that already use it keep working.
 OPEN_TO_LABELS = {**OPEN_TO, "women_nb": "Women & nonbinary"}
-OPEN_TO_GENDERS = {"women": {"woman"}, "men": {"man"}, "nonbinary": {"nonbinary"}, "women_nb": {"woman", "nonbinary"}}
+OPEN_TO_GENDERS = {"women": {"woman"}, "men": {"man"}, "nonbinary": {"nonbinary"}, "other": {"other"},
+                   "women_nb": {"woman", "nonbinary"}}
 # How a group reads in a sentence ("This game is for ...") and on a badge.
-OPEN_TO_PHRASE = {"women": "women", "men": "men", "nonbinary": "nonbinary players",
+OPEN_TO_PHRASE = {"women": "women", "men": "men", "nonbinary": "nonbinary players", "other": "people who chose Other",
                   "women_nb": "women & nonbinary players"}
-OPEN_TO_BADGE = {"women": "Women only", "men": "Men only", "nonbinary": "Nonbinary only",
+OPEN_TO_BADGE = {"women": "Women only", "men": "Men only", "nonbinary": "Nonbinary only", "other": "Other only",
                  "women_nb": "Women & nonbinary"}
-STATED_GENDERS = {"woman", "man", "nonbinary"}  # "another identity" and blank never block anyone
+STATED_GENDERS = {"woman", "man", "nonbinary"}  # "Other" and blank never block anyone (they confirm instead)
 
 # How long one event can last, in hours. Trips (a hike, a day on the slopes, a bike ride) can take days;
 # a pickup game can't. (Testers asked why a Spikeball game could be 24 hours long.)
