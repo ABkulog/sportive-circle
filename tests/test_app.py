@@ -2982,6 +2982,19 @@ def test_games_can_be_open_to_a_group_like_uw_rec_hours(accounts, client, app):
     assert client.post(f"/events/{women}/players/{ids['Maya']}/remove").status_code == 403   # only the host
 
 
+def test_canceling_a_game_tells_invited_friends_and_closes_invites(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Doubles")))
+    client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"]]})
+    client.post(f"/events/{game}/cancel")
+    _as(accounts, "Jordan")
+    assert "Maya canceled Doubles" in client.get("/notifications").data.decode()
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM invites").fetchone()[0] == "canceled"
+
+
 def test_party_up_cant_get_around_who_a_game_is_for(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Mo", "Pal")
     _set_gender(app, ids["Maya"], "woman")

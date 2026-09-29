@@ -650,7 +650,16 @@ def tell_players_it_was_cancelled(event):
         # Links to the feed: if the host deleted their account, the game's page is gone too.
         notify(player["id"], "game_updates", f"{event['host_name'].split()[0]} canceled {title} ({when})",
                url_for("events.feed"), key=f"change:{event['id']}")
-    get_db().commit()
+    # Friends with an open invite ("You down?") hear about it too, and the invite closes.
+    db = get_db()
+    invited = db.execute("SELECT guest_id FROM invites WHERE event_id = ? AND status IN ('pending', 'requested')",
+                         (event["id"],)).fetchall()
+    db.execute("UPDATE invites SET status = 'canceled' WHERE event_id = ? AND status IN ('pending', 'requested')",
+               (event["id"],))
+    for row in invited:
+        notify(row["guest_id"], "invites", f"{event['host_name'].split()[0]} canceled {title} ({when}), "
+               "so that invite is off.", url_for("events.feed"), key=f"invite:{event['id']}")
+    db.commit()
     for player in players:
         try:
             subject = f"Canceled: {title} ({when})"
