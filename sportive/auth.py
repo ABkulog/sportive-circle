@@ -396,6 +396,7 @@ def forgot_password():
         if user and user["verified"] and not user["suspended"] and not code_recently_sent(email):
             start_verification(email, session_key="reset_email")
         session["reset_email"] = email
+        session.pop("reset_tries", None)
         flash("If that email has an account, we sent it a 6-digit code.", "info")
         return redirect(url_for("auth.reset_password"))
     return render_template("auth/forgot.html")
@@ -413,16 +414,20 @@ def reset_password():
         db = get_db()
         user = db.execute("SELECT * FROM users WHERE email = ? AND verified = 1", (email,)).fetchone()
         error = None
+        # Every answer here must look the same whether or not the email has an account (see forgot_password):
+        # no account = a code that is always wrong, with the same limit on tries.
         if user is None or not user["verify_code"]:
-            error = "That code isn't right. Ask for a new one."
+            session["reset_tries"] = session.get("reset_tries", 0) + 1
+            error = ("Too many wrong tries. Ask for a new code." if session["reset_tries"] > MAX_CODE_ATTEMPTS
+                     else "Wrong code, try again.")
         elif user["verify_attempts"] >= MAX_CODE_ATTEMPTS:
             error = "Too many wrong tries. Ask for a new code."
-        elif now_local() > from_db(user["verify_expires"]):
-            error = "That code expired. Ask for a new one."
         elif not same_secret(code, user["verify_code"]):
             db.execute("UPDATE users SET verify_attempts = verify_attempts + 1 WHERE id = ?", (user["id"],))
             db.commit()
             error = "Wrong code, try again."
+        elif now_local() > from_db(user["verify_expires"]):  # only said to someone who knows the code
+            error = "That code expired. Ask for a new one."
         else:
             error = password_problem(password, request.form.get("password2", ""))
         if error is None:

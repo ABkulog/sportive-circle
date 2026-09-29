@@ -97,6 +97,18 @@ def test_unknown_email_login_still_checks_a_password_hash(accounts, monkeypatch)
     assert checked and checked[0].startswith("pbkdf2:sha256:1000")   # same work as a real account
 
 
+def test_reset_page_answers_the_same_with_or_without_an_account(accounts, client):
+    accounts.signup()
+    accounts.logout()
+    answers = []
+    for email in ("dubs@uw.edu", "nobody@uw.edu"):
+        client.post("/forgot", data={"email": email})
+        answers.append([client.post("/reset", data={"code": "000000", "password": "new-password-1",
+                                                    "password2": "new-password-1"}).data.count(b"Wrong code")
+                        for _ in range(3)])
+    assert answers[0] == answers[1] == [1, 1, 1]
+
+
 def test_email_already_used(accounts):
     accounts.signup()
     accounts.logout()
