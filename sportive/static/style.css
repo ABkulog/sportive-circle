@@ -625,6 +625,7 @@ form[data-wizard] .form-step { display: none; }
 .stat-row li { display: grid; justify-items: center; }
 .stat-row strong { font-size: 1.15rem; font-weight: 700; line-height: 1.1; }
 .stat-row span { font-size: .78rem; color: var(--muted); }
+.stat-row .is-zero strong { color: var(--muted); font-weight: 500; }  /* a new club's zeros shouldn't be the loudest thing */
 
 /* ============================== Clubs ============================== */
 .club-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
