@@ -739,6 +739,19 @@ form[data-wizard] .form-step { display: none; }
 .chat-bubble p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .chat-name { display: block; font-size: .72rem; font-weight: 600; color: var(--muted); }
 .chat-bubble time { display: block; font-size: .66rem; opacity: .65; margin-top: 2px; text-align: right; }
+.chat-game { display: flex; align-items: center; gap: 10px; margin: 6px 0 2px; padding: 8px 10px; min-height: 44px;
+  border-radius: 12px; background: var(--bg); color: var(--text); text-decoration: none; border: 1px solid var(--line); }
+.chat-game strong { display: block; }
+.chat-game small { display: block; color: var(--muted); font-size: .78rem; }
+.chat-game-emoji { font-size: 1.4rem; line-height: 1; }
+.chat-game.is-cancelled strong { text-decoration: line-through; }
+.send-friends { margin-top: 8px; }
+.texts-card { margin: 12px 0 16px; }
+.place-check { margin: 4px 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft);
+  border-left: 3px solid var(--gold); font-size: .88rem; color: var(--muted); }
+.place-check strong { display: block; color: var(--text); margin-bottom: 2px; }
+.texts-card h2 { margin: 0 0 4px; font-size: 1.1rem; }
+.held-why strong { color: var(--text); }
 .chat-report { display: block; padding: 4px 0 2px; min-height: 24px; font-size: .75rem; color: var(--muted); }
 .chat-empty { display: grid; justify-items: center; gap: 6px; padding: 48px 14px; text-align: center; }
 .chat-empty p { margin: 0; }

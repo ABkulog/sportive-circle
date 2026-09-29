@@ -13,6 +13,13 @@
           <div class="chat-bubble">
             {% if not m.mine %}<span class="chat-name">{{ m.name }}</span>{% endif %}
             <p>{{ m.body }}</p>
+            {% if m.game %}
+              <a class="chat-game{% if m.game.cancelled %} is-cancelled{% endif %}" href="{{ m.game.url }}">
+                <span class="chat-game-emoji" aria-hidden="true">{{ m.game.emoji }}</span>
+                <span><strong>{{ m.game.title }}</strong>
+                  <small>{{ 'Canceled' if m.game.cancelled else m.game.when }} · {{ m.game.where }}</small></span>
+              </a>
+            {% endif %}
             <time>{{ m.time }}</time>
             {% if m.report %}<a class="chat-report" href="{{ m.report }}">🚩 Report</a>{% endif %}
           </div>

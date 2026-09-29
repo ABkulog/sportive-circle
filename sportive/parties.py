@@ -17,7 +17,7 @@ from .links import public_url
 from .invites import HOLD_TIME, MAX_PARTY, held_spots, hold_spots, my_invite, now_param, team_counts
 from .sms import drop_queued_texts, queue_text
 from .notifications import notify
-from .social import is_blocked_between
+from .social import can_message, friends_of, is_blocked_between, too_many_messages
 from .textutil import one_line
 from .timeutil import fmt_when, from_db, now_local, to_db
 
@@ -387,3 +387,55 @@ def accept_invite_link(user, token):
                url_for("events.detail", event_id=event_id), key=f"reply:{event_id}:{user['id']}")
         db.commit()
     return url_for("events.detail", event_id=event_id)
+
+
+# ---------------------------------------------------------------- send a game to friends
+
+MAX_SHARE_NOTE = 300
+
+
+def can_send_to_friends(event):
+    """'Send to friends' is for public games that haven't ended (private games use the invite link / password)."""
+    return (not event["is_private"] and not event["cancelled"]
+            and from_db(event["ends_at"]) >= now_local())
+
+
+def sharable_friends(event_id, me):
+    """My friends who aren't already going (blocked people aren't friends)."""
+    going = {row[0] for row in get_db().execute("SELECT user_id FROM rsvps WHERE event_id = ?", (event_id,))}
+    return [friend for friend in friends_of(me) if friend["id"] not in going]
+
+
+@bp.route("/events/<int:event_id>/send", methods=("GET", "POST"))
+@login_required
+def send_to_friends(event_id):
+    """Share a public game with friends on the app: each one gets it as a direct message with a game card."""
+    event = get_event(event_id)
+    me = g.user["id"]
+    if not can_send_to_friends(event):
+        flash("Only open games that haven't ended can be sent to friends.", "error")
+        return redirect(url_for("events.detail", event_id=event_id))
+    friends = sharable_friends(event_id, me)
+    if request.method == "POST":
+        allowed = {friend["id"] for friend in friends}
+        chosen = list(dict.fromkeys(int(value) for value in request.form.getlist("friend") if value.isdigit()))
+        note = one_line(request.form.get("note"))[:MAX_SHARE_NOTE]
+        if not chosen:
+            flash("Pick at least one friend.", "error")
+        elif any(friend_id not in allowed or not can_message(me, friend_id) for friend_id in chosen):
+            flash("You can only send games to your friends.", "error")
+        elif len(chosen) > MAX_PARTY:
+            flash(f"You can send it to up to {MAX_PARTY} friends at once.", "error")
+        elif too_many_messages(me):
+            flash("Whoa, slow down! Wait a minute before sending more messages.", "error")
+        else:
+            body = note or f"Want to play? {event_title(event)}, {fmt_when(event['starts_at'])}."
+            now = to_db(now_local())
+            db = get_db()
+            db.executemany("INSERT INTO direct_messages (sender_id, recipient_id, body, created_at, event_id)"
+                           " VALUES (?, ?, ?, ?, ?)", [(me, friend_id, body, now, event_id) for friend_id in chosen])
+            db.commit()
+            names = [friend["full_name"].split()[0] for friend in friends if friend["id"] in chosen]
+            flash(f"Sent to {names[0]}." if len(names) == 1 else f"Sent to {len(names)} friends.", "success")
+            return redirect(url_for("events.detail", event_id=event_id))
+    return render_template("events/send.html", event=event, friends=friends, max_note=MAX_SHARE_NOTE)

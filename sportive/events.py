@@ -14,8 +14,8 @@ from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, OFF
                         STATED_GENDERS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
                         SKILL_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .db import get_db, user_sports
-from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots, my_invite,
-                      now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
+from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots,
+                      holds_for_others, my_invite, now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
 from .links import public_url
 from .sms import text_user
 from .reminders import REMIND_CHOICES
@@ -336,7 +336,15 @@ def feed():
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
                            month_name=now.strftime("%B"), more_page=more_page,
                            hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now),
-                           club_picks=suggested_clubs(g.user["id"], my_sports))
+                           club_picks=suggested_clubs(g.user["id"], my_sports), texts_card=show_texts_card())
+
+
+def show_texts_card():
+    """'New: get updates by text' on Home, for people who joined before texts (or skipped them): until they
+    add a number or tap Not now."""
+    from .sms import sms_available
+    user = g.user
+    return sms_available() and not user["phone_verified"] and not user["texts_card_done"]
 
 
 # ---------------------------------------------------------- create / edit
@@ -815,7 +823,34 @@ def detail(event_id):
                            requests=requested_invites(event_id) if event["i_am_going"] else [],
                            # my own held spot is still mine to take, even if the game looks full to others
                            spots_for_me=None if spots_left(event) is None
-                           else spots_left(event) + (1 if hold_minutes_left(invite) else 0))
+                           else spots_left(event) + (1 if hold_minutes_left(invite) else 0),
+                           held=None if invite or event["i_am_going"] else full_for_now(event))
+
+
+def full_for_now(event):
+    """Why a game with open spots still says Full: friends invited by players hold them for 30 minutes.
+    Returns {"spots", "who", "opens_at" (clock), "minutes", "seconds"} or None if it's really full (or not full)."""
+    if event["max_players"] is None or event["team_size"]:
+        return None
+    me = g.user["id"]
+    db = get_db()
+    playing = db.execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (event["id"],)).fetchone()[0]
+    if playing + event["extra_players"] >= event["max_players"]:
+        return None  # full with real players: nothing opens on its own
+    holds = holds_for_others(event["id"], except_user=me)
+    if holds is None:
+        return None
+    spots, names, soonest = holds
+    seconds = max(0, int((from_db(soonest) - now_local()).total_seconds()))
+    who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+    return {"spots": spots, "who": who, "opens_at": fmt_clock(soonest), "minutes": max(1, -(-seconds // 60)),
+            "seconds": seconds}
+
+
+def full_for_now_message(held):
+    spots = f"{held['spots']} spot{'s are' if held['spots'] != 1 else ' is'}"
+    return (f"Sorry, this game is full for now: {spots} held for friends {held['who']} invited. "
+            f"If nobody takes it, a spot opens at {held['opens_at']} (in {held['minutes']} min).")
 
 
 KEPT_OUT = "The host took you off this game, so you can't rejoin it. There are more games on Home."
@@ -888,7 +923,8 @@ def try_join(event, password=None, team=None):
         db.commit()
         if db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (event["id"], me)).fetchone():
             return False, "You're already going."
-        return False, "Sorry, this game is full."
+        held = full_for_now(event)
+        return False, full_for_now_message(held) if held else "Sorry, this game is full."
     if invite:
         db.execute("UPDATE invites SET status = 'accepted' WHERE id = ?", (invite["id"],))
         notify(invite["inviter_id"], "invites", f"{g.user['full_name'].split()[0]} is in for {event_title(event)}.",

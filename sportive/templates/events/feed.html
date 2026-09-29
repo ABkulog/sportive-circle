@@ -5,6 +5,24 @@
 {{ home_tabs('feed') }}
 <h1 class="page-title">{{ hello }}</h1>
 
+{% if texts_card %}
+  {# One-time "what's new" for people who joined before texts: add a number right here. #}
+  {% from "_macros.html" import phone_field %}
+  <section class="card texts-card" aria-labelledby="texts-title">
+    <h2 id="texts-title">New: game updates by text 📱</h2>
+    <p class="muted">Get reminders, changes, cancellations and invites on your phone too. Email still gets everything.</p>
+    <form method="post" action="{{ url_for('settings.texts') }}" class="form">
+      {{ csrf_field() }}<input type="hidden" name="action" value="send">
+      {{ phone_field('phone', required=True) }}
+      <label class="toggle consent"><input type="checkbox" name="consent" value="1" required><span>{{ SMS_CONSENT }}</span></label>
+      <button class="btn btn-block">Text me a code</button>
+    </form>
+    <form method="post" action="{{ url_for('settings.texts_not_now') }}">
+      {{ csrf_field() }}<button class="link-button">Not now</button>
+    </form>
+  </section>
+{% endif %}
+
 {# "Now" row, like Instagram Stories: what's happening soon, one swipe away. #}
 {% if up_next or need_players %}
 <section class="band home-section" aria-labelledby="soon-title">

@@ -42,7 +42,25 @@
     text.textContent = message.body;
     const time = document.createElement("time");
     time.textContent = message.time;
-    bubble.append(text, time);
+    bubble.appendChild(text);
+    if (message.game) {
+      const game = document.createElement("a");
+      game.className = "chat-game" + (message.game.cancelled ? " is-cancelled" : "");
+      game.href = message.game.url;
+      const emoji = document.createElement("span");
+      emoji.className = "chat-game-emoji";
+      emoji.setAttribute("aria-hidden", "true");
+      emoji.textContent = message.game.emoji;
+      const info = document.createElement("span");
+      const title = document.createElement("strong");
+      title.textContent = message.game.title;
+      const meta = document.createElement("small");
+      meta.textContent = `${message.game.cancelled ? "Canceled" : message.game.when} · ${message.game.where}`;
+      info.append(title, " ", meta);
+      game.append(emoji, info);
+      bubble.appendChild(game);
+    }
+    bubble.appendChild(time);
     if (message.report) {
       const report = document.createElement("a");
       report.className = "chat-report";

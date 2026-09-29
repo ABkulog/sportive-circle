@@ -10,7 +10,7 @@ import logging
 import re
 import secrets
 
-from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
 
 from .auth import login_required
@@ -22,6 +22,7 @@ from .moderation import is_admin
 from .notifications import mark_seen
 from .phones import phone_from_form
 from .photos import make_avatar
+from .sms import text_user
 from .textutil import multi_line, one_line
 from .timeutil import now_local, to_db
 
@@ -532,8 +533,10 @@ def join(club_id):
     db.commit()
     # Let the officers know there's someone new.
     what = "signed up for tryouts" if new_role == "tryout" else "wants to join"
-    for officer in db.execute("""SELECT u.email FROM club_members m JOIN users u ON u.id = m.user_id
-                                 WHERE m.club_id = ? AND m.role = 'officer'""", (club_id,)):
+    for officer in db.execute("""SELECT u.id, u.email FROM club_members m JOIN users u ON u.id = m.user_id
+                                 WHERE m.club_id = ? AND m.role = 'officer'""", (club_id,)).fetchall():
+        text_user(officer["id"], f"{g.user['full_name']} {what} {club['name']}. Review: "
+                                 f"{_club_link(club_id)}#requests")  # only if they turned texts on
         try:
             subject = f"{g.user['full_name']} {what} {club['name']}"
             answer = [f"Their answer to “{club['join_question']}”:", message] if message and club["join_question"] \
@@ -700,6 +703,11 @@ def pending_club_count():
     return get_db().execute("SELECT COUNT(*) FROM clubs WHERE status = 'pending'").fetchone()[0]
 
 
+def public_url_for(path):
+    """A path from the app ("/clubs/3") as a full link for a text message."""
+    return current_app.config["PUBLIC_URL"].rstrip("/") + path if path.startswith("/") else path
+
+
 def _notify_officers(club, subject, heading, lines, button, notice):
     """Email every officer, and put `notice` (text, link) in their bell too: not everyone checks email."""
     from .notifications import notify  # imported here: notifications.py is loaded after this module
@@ -712,6 +720,7 @@ def _notify_officers(club, subject, heading, lines, button, notice):
         notify(row["id"], "club_review", notice[0], notice[1], key=f"club_review:{club['id']}")
     get_db().commit()
     for row in officers:
+        text_user(row["id"], f"{notice[0]} {public_url_for(notice[1])}")  # only if they turned texts on
         try:
             send_email(row["email"], subject, body, html=html)
         except Exception:  # email trouble shouldn't block the review

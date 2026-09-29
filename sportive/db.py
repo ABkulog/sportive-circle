@@ -92,6 +92,9 @@ ADDED_COLUMNS = [
     ("notices", "key", "TEXT"),
     ("users", "theme", "TEXT NOT NULL DEFAULT 'light'"),
     ("users", "session_version", "INTEGER NOT NULL DEFAULT 0"),
+    ("users", "texts_card_done", "INTEGER NOT NULL DEFAULT 0"),  # 1 = closed the "New: texts" card on Home
+    ("users", "texts_announced_at", "TEXT"),                     # when tools/announce_texts.py emailed them
+    ("direct_messages", "event_id", "INTEGER REFERENCES events(id) ON DELETE SET NULL"),
 ]
 
 

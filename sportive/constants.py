@@ -26,6 +26,14 @@ SPORTS = {
     "other": "Other",
 }
 
+# The place a host should check is free before posting a game ("check the courts are free").
+SPORT_SPACE = {
+    "basketball": "courts", "pickleball": "courts", "tennis": "courts", "volleyball": "courts",
+    "soccer": "field", "football": "field", "ultimate": "field", "spikeball": "spot",
+    "running": "trail", "hiking": "trail", "biking": "trail", "climbing": "wall", "gym": "gym",
+    "rowing": "boathouse", "snow": "slopes", "esports": "room", "other": "place",
+}
+
 SPORT_EMOJI = {
     "basketball": "🏀",
     "soccer": "⚽",

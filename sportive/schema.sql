@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS users (
     sms_code_expires TEXT,
     sms_code_attempts INTEGER NOT NULL DEFAULT 0,
     sms_sent_at     TEXT,
+    texts_card_done INTEGER NOT NULL DEFAULT 0,    -- 1 = closed the "New: texts" card on Home
+    texts_announced_at TEXT,                       -- when tools/announce_texts.py emailed them about texts
     verified        INTEGER NOT NULL DEFAULT 0,    -- 1 once the email code is confirmed
     verify_code     TEXT,                          -- 6-digit code for signing up or resetting a password
     verify_expires  TEXT,
@@ -166,7 +168,8 @@ CREATE TABLE IF NOT EXISTS direct_messages (
     recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     body         TEXT NOT NULL,
     created_at   TEXT NOT NULL,
-    read_at      TEXT
+    read_at      TEXT,
+    event_id     INTEGER REFERENCES events(id) ON DELETE SET NULL  -- a game shared with "Send to friends"
 );
 CREATE INDEX IF NOT EXISTS idx_dm_pair ON direct_messages(sender_id, recipient_id, id);
 CREATE INDEX IF NOT EXISTS idx_dm_unread ON direct_messages(recipient_id, read_at);

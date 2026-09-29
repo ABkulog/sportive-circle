@@ -137,7 +137,7 @@
         {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Hosting</span>
         {% elif e.i_am_going %}<span class="badge badge-success">You're going</span>
         {% elif e.i_am_invited %}<span class="badge badge-gold">Invited</span>
-        {% elif left == 0 %}<span class="badge badge-muted">Full</span>{% endif %}
+        {% elif left == 0 %}<span class="badge badge-muted">{{ 'Full for now' if e.held_count and e.going_count + e.extra_players < e.max_players else 'Full' }}</span>{% endif %}
       </div>
     </div>
     <div class="event-side">
@@ -232,4 +232,13 @@
     </div>
     {% if hint %}<small class="muted">{{ hint }}</small>{% endif %}
   </div>
+{% endmacro %}
+
+
+{% macro place_check(sport='') %}
+  {# The host checks the place is free, like anyone telling their group chat "let's play here". We don't check. #}
+  <p class="place-check" role="note">
+    <strong>Heads up: check the <span data-place-space>{{ SPORT_SPACE.get(sport, 'place') if sport else 'place' }}</span> is free then.</strong>
+    It could be booked, full, or closed for an event. Sportive Circle doesn't reserve or check places, so that's on the host.
+  </p>
 {% endmacro %}

@@ -86,6 +86,22 @@ def held_spots(event_id, team=None, except_user=None):
     return get_db().execute(sql, args).fetchone()[0]
 
 
+def holds_for_others(event_id, except_user=None):
+    """Spots held right now for other people, for explaining a game that's full only because of them.
+    Returns (how many, first names of who invited them, when the soonest one ends as a DB time) or None."""
+    sql = """SELECT u.full_name, i.expires_at FROM invites i JOIN users u ON u.id = i.inviter_id
+             WHERE i.event_id = ? AND i.status = 'pending' AND i.expires_at > ?"""
+    args = [event_id, now_param()]
+    if except_user is not None:
+        sql += " AND i.guest_id != ?"
+        args.append(except_user)
+    rows = get_db().execute(sql + " ORDER BY i.expires_at", args).fetchall()
+    if not rows:
+        return None
+    names = list(dict.fromkeys(row["full_name"].split()[0] for row in rows))  # each inviter once, in order
+    return len(rows), names, rows[0]["expires_at"]
+
+
 def team_counts(event_id):
     """{1: players on team 1, 2: ...} for a team vs team game."""
     rows = get_db().execute("SELECT team, COUNT(*) AS n FROM rsvps WHERE event_id = ? AND team IS NOT NULL"
