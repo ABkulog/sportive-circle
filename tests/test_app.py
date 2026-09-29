@@ -2024,6 +2024,12 @@ def test_hidden_pill_inputs_cant_widen_the_page():
     assert ".segmented input, .chip-check input, .choice-pill input {" in css and "width: 1px; height: 1px" in css
 
 
+def test_focus_ring_is_visible_on_the_purple_header_and_hero():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    assert ".topbar :focus-visible, .husky-hero :focus-visible { outline: 3px solid var(--gold)" in css
+
+
 def test_leap_day_birthdays():
     from datetime import date
     from sportive.auth import is_birthday
