@@ -183,22 +183,63 @@ def friends():
            JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
            WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted'
            ORDER BY u.full_name""", (me, me, me)).fetchall()
-    # People you've played with who aren't friends (or pending, or blocked) yet.
-    suggestions = db.execute(
-        """SELECT u.id, u.full_name, u.avatar_updated, COUNT(DISTINCT r2.event_id) AS games
-           FROM rsvps r1 JOIN rsvps r2 ON r1.event_id = r2.event_id AND r2.user_id != r1.user_id
-           JOIN events e ON e.id = r1.event_id AND e.cancelled = 0 AND e.ends_at < ?
-           JOIN users u ON u.id = r2.user_id AND u.verified = 1
-           WHERE r1.user_id = ?
-             AND u.id NOT IN (SELECT addressee_id FROM friendships WHERE requester_id = ?)
-             AND u.id NOT IN (SELECT requester_id FROM friendships WHERE addressee_id = ?)
-             AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
-             AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = ?)
-           GROUP BY u.id ORDER BY games DESC, u.full_name LIMIT 10""",
-        (to_db(now_local()), me, me, me, me, me)).fetchall()
     q = request.args.get("q", "").strip()[:MAX_SEARCH_LENGTH]
+    suggestions = friend_suggestions(me)
     return render_template("social/friends.html", incoming=incoming, outgoing=outgoing,
-                           friends=friend_list, suggestions=suggestions, q=q, results=search_people(me, q))
+                           friends=friend_list, suggestions=suggestions, suggestion_reason=suggestion_reason,
+                           q=q, results=search_people(me, q))
+
+
+MAX_SUGGESTIONS = 10
+
+
+def friend_suggestions(me):
+    """"Suggested for you": friends of your friends and people you've played with, most in common first.
+    Leaves out your friends, anyone with a request pending either way, blocked people and unverified or
+    suspended accounts. Each row has `mutual` (friends in common), `via` (one of them, for "Friends with Maya")
+    and `games` (finished games played together)."""
+    return get_db().execute(
+        """WITH my_friends AS (
+               SELECT CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END AS id
+               FROM friendships WHERE status = 'accepted' AND (requester_id = :me OR addressee_id = :me)),
+           friends_of_friends AS (
+               SELECT CASE WHEN f.requester_id = m.id THEN f.addressee_id ELSE f.requester_id END AS id, m.id AS via
+               FROM friendships f JOIN my_friends m ON m.id IN (f.requester_id, f.addressee_id)
+               WHERE f.status = 'accepted'),
+           played AS (
+               SELECT r2.user_id AS id, COUNT(DISTINCT r2.event_id) AS games
+               FROM rsvps r1 JOIN rsvps r2 ON r2.event_id = r1.event_id AND r2.user_id != r1.user_id
+               JOIN events e ON e.id = r1.event_id AND e.cancelled = 0 AND e.ends_at < :now
+               WHERE r1.user_id = :me GROUP BY r2.user_id),
+           candidates AS (
+               SELECT id, COUNT(DISTINCT via) AS mutual, MIN(via) AS via, 0 AS games FROM friends_of_friends GROUP BY id
+               UNION ALL
+               SELECT id, 0, NULL, games FROM played)
+           SELECT s.*, v.full_name AS via_name FROM (
+               SELECT u.id, u.full_name, u.avatar_updated, SUM(c.mutual) AS mutual, SUM(c.games) AS games,
+                      MIN(c.via) AS via_id
+               FROM candidates c JOIN users u ON u.id = c.id
+               WHERE u.id != :me AND u.verified = 1 AND u.suspended = 0
+                 AND u.id NOT IN (SELECT addressee_id FROM friendships WHERE requester_id = :me)
+                 AND u.id NOT IN (SELECT requester_id FROM friendships WHERE addressee_id = :me)
+                 AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = :me)
+                 AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = :me)
+               GROUP BY u.id) s
+           LEFT JOIN users v ON v.id = s.via_id
+           ORDER BY s.mutual + s.games DESC, s.mutual DESC, s.full_name
+           LIMIT :limit""",
+        {"me": me, "now": to_db(now_local()), "limit": MAX_SUGGESTIONS}).fetchall()
+
+
+def suggestion_reason(p):
+    """ "Friends with Maya + 2 more · 3 games together" """
+    parts = []
+    if p["mutual"]:
+        first = p["via_name"].split()[0] if p["via_name"] else "a friend"
+        parts.append(f"Friends with {first}" + (f" + {p['mutual'] - 1} more" if p["mutual"] > 1 else ""))
+    if p["games"]:
+        parts.append(f"{p['games']} game{'s' if p['games'] != 1 else ''} together")
+    return " · ".join(parts)
 
 
 MIN_SEARCH_LENGTH = 2

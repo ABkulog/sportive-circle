@@ -62,6 +62,22 @@
   </section>
 {% endif %}
 
+{% if suggestions and not q %}{# hidden while searching: the results are what matter then #}
+  <section class="band">
+    <h2>Suggested for you</h2>
+    <ul class="people">
+      {% for p in suggestions %}
+        <li class="post-game-row">{{ person_row(p, suggestion_reason(p)) }}
+          <form method="post" action="{{ url_for('social.send_request', user_id=p.id) }}">
+            {{ csrf_field() }}<input type="hidden" name="next" value="{{ url_for('social.friends') }}">
+            <button class="btn btn-small">+ Add friend</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
+
 <section class="band">
   <h2>Your pack ({{ friends|length }})</h2>
   <ul class="people">
@@ -75,21 +91,6 @@
   </ul>
 </section>
 
-{% if suggestions %}
-  <section class="band">
-    <h2>People you've played with</h2>
-    <ul class="people">
-      {% for p in suggestions %}
-        <li class="post-game-row">{{ person_row(p, p.games ~ " game" ~ ("s" if p.games != 1 else "") ~ " together") }}
-          <form method="post" action="{{ url_for('social.send_request', user_id=p.id) }}">
-            {{ csrf_field() }}<input type="hidden" name="next" value="{{ url_for('social.friends') }}">
-            <button class="btn btn-small">+ Add friend</button>
-          </form>
-        </li>
-      {% endfor %}
-    </ul>
-  </section>
-{% endif %}
 
 {% if outgoing %}
   <section class="band">

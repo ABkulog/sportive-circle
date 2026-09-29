@@ -1024,7 +1024,31 @@ def test_played_with_suggestions(accounts, client, app):
     a, b = _user_id(app, "a@uw.edu"), _user_id(app, "b@uw.edu")
     _played_games(app, "soccer", [a, b], count=2)
     page = client.get("/friends").data
-    assert "People you've played with".encode() in page and b"Alex Ace" in page and b"2 games together" in page
+    assert b"Suggested for you" in page and b"Alex Ace" in page and b"2 games together" in page
+
+
+def test_friends_of_friends_are_suggested(accounts, client, app):
+    """Mutuals: people your friends are friends with show up under "Suggested for you" with a reason."""
+    ids = _people(accounts, app, "Me", "Maya", "Sam", "Riley", "Blocked", "Pending")
+    _friends(app, ids["Me"], ids["Maya"], ids["Sam"])
+    _friends(app, ids["Maya"], ids["Riley"], ids["Blocked"], ids["Pending"])
+    _friends(app, ids["Sam"], ids["Riley"])
+    with app.app_context():
+        db = get_db()
+        db.execute("INSERT INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, '2026-09-01 10:00')",
+                   (ids["Me"], ids["Blocked"]))
+        db.execute("INSERT INTO friendships (requester_id, addressee_id, status, created_at)"
+                   " VALUES (?, ?, 'pending', '2026-09-01 10:00')", (ids["Me"], ids["Pending"]))
+        db.commit()
+    _as(accounts, "Me")
+    page = client.get("/friends").data.decode()
+    section = page[page.index("Suggested for you"):page.index("Your pack")]
+    assert "Riley Husky" in section and "Friends with Maya + 1 more" in section   # Maya and Sam both know Riley
+    assert "Blocked Husky" not in section and "Pending Husky" not in section       # blocked / already asked
+    assert "Maya Husky" not in section and "Sam Husky" not in section              # already friends
+    assert "Suggested for you" not in client.get("/friends?q=riley").data.decode()   # not while searching
+    client.post(f"/friends/request/{ids['Riley']}", data={"next": "/friends"})
+    assert "Riley Husky" not in client.get("/friends").data.decode().split("Your pack")[0].split("Suggested")[-1]
 
 
 # ---------------------------------------------------------- direct messages

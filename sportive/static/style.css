@@ -373,6 +373,11 @@ section.card h2, details.card h2 { margin-top: 0; }
 .people > li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .people > li:last-child { border-bottom: 0; }
 .post-game-row { justify-content: space-between; flex-wrap: wrap; }
+/* People lists: the name side shrinks (its hint wraps) so the button stays on the right of the same row. */
+.people .post-game-row { flex-wrap: nowrap; gap: 12px; }
+.people .post-game-row > .person { flex: 1; min-width: 0; }
+.people .post-game-row > .person > span { min-width: 0; }
+.people .post-game-row > :not(.person) { flex: none; }
 .person { display: inline-flex; align-items: center; gap: 10px; color: var(--text); font-weight: 600; }
 .person:hover { text-decoration: none; }
 .person-extra { display: block; font-weight: 400; color: var(--muted); }
