@@ -1488,7 +1488,7 @@ def test_same_sections_everywhere(accounts, client):
     for label in ("Home", "Clubs", "Create", "Profile", "Messages", "Friends", "FAQ"):
         assert f'<span class="tab-label">{label}<' in page, label
     assert '<span class="tab-label">News<' not in page                       # one thing: playing
-    assert 'class="tab  is-active" href="/" aria-current="page"' in page     # Home is highlighted
+    assert 'class="tab is-active" href="/" aria-current="page"' in page      # Home is highlighted
     assert 'aria-label="FAQ"' in page                                       # ❓ in the top bar opens the FAQ
     assert "For you" in page and "My events" in page                        # Home tabs
     menu = client.get("/create").data.decode()
@@ -2347,6 +2347,13 @@ def _css_classes_used_but_undefined(names):
 
 def test_fine_print_has_a_style():
     assert _css_classes_used_but_undefined(["fine-print"]) == []
+
+
+def test_templates_dont_use_class_names_with_no_style():
+    import pathlib
+    templates = " ".join(p.read_text(encoding="utf-8") for p in pathlib.Path("sportive/templates").rglob("*.html"))
+    for dead in ("is-hot", "tab-create", "feed-hello", "club-card mini"):
+        assert dead not in templates, dead
 
 
 def test_small_segmented_control_is_compact():

@@ -19,7 +19,7 @@
     {% endif %}
     {% for e in need_players if not up_next or e.id != up_next.id %}
       <a class="now-tile" href="{{ url_for('events.detail', event_id=e.id) }}" aria-label="{{ event_title(e) }}, {{ e.starts_at|relative }}">
-        <span class="now-ring is-hot" aria-hidden="true">{{ SPORT_EMOJI[e.sport] }}</span>
+        <span class="now-ring" aria-hidden="true">{{ SPORT_EMOJI[e.sport] }}</span>
         <strong>{% set left = spots_left(e) %}{% if e.team_size %}{{ e.team_size }}v{{ e.team_size }}{% elif left %}Need {{ left }}{% else %}{{ SPORTS[e.sport] }}{% endif %}</strong>
         <small>{{ e.starts_at|relative }}</small>
       </a>
@@ -89,7 +89,7 @@
     <h2 class="home-section-title">Clubs for you</h2>
     <div class="club-strip">
       {% for c in club_picks %}
-        <a class="card club-card mini" href="{{ url_for('clubs.view', club_id=c.id) }}">
+        <a class="card club-card" href="{{ url_for('clubs.view', club_id=c.id) }}">
           {{ club_logo(c) }}
           <strong class="club-name">{{ c.name }}</strong>
           <small class="muted">Verified · {{ c.member_count }} members</small>
