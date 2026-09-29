@@ -3,8 +3,8 @@
 {% block content %}
 {% from "_macros.html" import admin_nav %}{{ admin_nav('clubs') }}
 <h1 class="page-title">Club requests</h1>
-<p class="muted">Check each club's official page: is it a real UW club, active this quarter, and is the applicant listed
-  as an officer (or can you confirm it another way)?</p>
+<p class="muted">Open the club's social accounts (and its UW page, if it gave one): is it a real UW club, active
+  this quarter, and is the applicant one of its officers?</p>
 <nav class="home-tabs" aria-label="Status">
   {% for key, label in [('pending', 'Waiting'), ('approved', 'Approved'), ('rejected', 'Needs changes')] %}
     <a href="{{ url_for('clubs.review_queue', status=key) }}" {% if status == key %}class="is-on" aria-current="page"{% endif %}>{{ label }} ({{ club_counts.get(key, 0) }})</a>

@@ -3073,6 +3073,15 @@ def test_help_bubble_can_be_closed(accounts, client):
     assert "data-help-bubble" in client.get("/clubs").data.decode()
 
 
+def test_admin_pages_have_no_help_bubble_and_say_to_check_socials(accounts, client, app):
+    """The bubble covered the Send back button, and the page still said to check the "official page"."""
+    app.config["ADMIN_EMAILS"] = "dubs@uw.edu"
+    accounts.signup()
+    for page in ("/admin/clubs", "/admin/reports", "/admin/suggestions"):
+        assert "data-help-bubble" not in client.get(page).data.decode(), page
+    assert "Open the club's social accounts" in client.get("/admin/clubs").data.decode()
+
+
 def test_linkedin_on_profiles(accounts, client, app):
     """People can add LinkedIn like the other socials; a pasted profile link works too."""
     accounts.signup()

@@ -108,7 +108,8 @@
 
   {# "Help?" bubble in the corner; its × hides it for good on this device (app.js). Not on sign-up/log-in
      screens or the help pages themselves, and never over a chat's message box (hide-tabs pages). #}
-  {% if not ep.startswith('auth.') and ep not in ('faq', 'how_it_works') %}
+  {% if not ep.startswith('auth.') and ep not in ('faq', 'how_it_works') and '.admin' not in ep
+        and ep not in ('clubs.review_queue',) %}
     <div class="help-bubble" data-help-bubble hidden>
       <a href="{{ url_for('faq') }}">{{ icon('help') }}<span>Help?</span></a>
       <button type="button" class="help-close" data-help-close aria-label="Close the help button">&times;</button>
