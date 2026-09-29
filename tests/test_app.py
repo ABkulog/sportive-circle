@@ -3013,6 +3013,16 @@ def test_need_players_host_hears_when_someone_joins(accounts, client, app):
     assert len(texts) == 1 and texts[0].startswith("Pat joined") and "(2 going now)" in texts[0]
 
 
+def test_leaving_a_game_asks_first(accounts, client):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form(players="2")))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    page = client.get(f"/events/{event_id}").data.decode()
+    assert 'data-confirm="Leave this game? It\'s full, so someone else may take your spot."' in page
+
+
 def test_someone_the_host_removed_cant_just_rejoin(accounts, client, app):
     accounts.signup(email="host@uw.edu")
     event_id = event_id_from(client.post("/events/new", data=event_form()))
