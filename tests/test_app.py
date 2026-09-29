@@ -2545,6 +2545,14 @@ def test_small_segmented_control_is_compact():
     assert ".segmented.small span" in pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
 
 
+def test_wizard_moves_focus_into_the_new_step():
+    import pathlib
+    js = pathlib.Path("sportive/static/wizard.js").read_text(encoding="utf-8")
+    assert "function focusStep()" in js
+    assert re.search(r"show\(current \+ 1\);\s*focusStep\(\);", js)
+    assert re.search(r"show\(current - 1\); focusStep\(\);", js)
+
+
 def test_scripts_do_not_depend_on_request_submit_alone():
     # requestSubmit is Safari 16+; older iPhones need the dispatch + submit() fallback.
     import pathlib
