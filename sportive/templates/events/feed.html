@@ -77,7 +77,14 @@
     {{ event_card(e) }}
   {% else %}
     <div class="card empty">
-      <p><strong>No games yet.</strong> Start one!</p>
+      {% if active_filters %}
+        <p><strong>No games match {{ 'this filter' if active_filters == 1 else 'these filters' }}.</strong></p>
+        <p><a href="{{ url_for('events.feed', scope=filters.scope) }}">Clear filters</a> or start one yourself.</p>
+      {% elif filters.scope == 'full' %}
+        <p><strong>No full games right now.</strong></p>
+      {% else %}
+        <p><strong>No games yet.</strong> Start one!</p>
+      {% endif %}
       <a class="btn" href="{{ url_for('events.create', sport=filters.sport) }}">+ New event</a>
     </div>
   {% endfor %}

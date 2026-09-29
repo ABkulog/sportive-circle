@@ -2361,6 +2361,13 @@ def test_filtering_the_feed_keeps_need_players_posts_in_the_results(accounts, cl
     assert 'id="soon-title"' not in filtered and "No games yet" not in filtered
 
 
+def test_empty_feed_says_when_the_filters_are_the_reason(accounts, client):
+    accounts.signup()
+    page = client.get("/?scope=all&sport=soccer&when=today").data.decode()
+    assert "No games match these filters." in page and "No games yet" not in page
+    assert "No games yet" in client.get("/?scope=all").data.decode()
+
+
 def test_a_message_that_cant_be_sent_stays_in_the_box(accounts, client):
     accounts.signup()
     event_id = event_id_from(client.post("/events/new", data=event_form()))
