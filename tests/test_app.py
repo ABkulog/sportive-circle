@@ -908,6 +908,14 @@ def _finish_all_events(app):
         db = get_db()
         db.execute("UPDATE events SET starts_at = '2026-01-10 07:00', ends_at = '2026-01-10 08:00'")
         db.commit()
+    _joined_in_founding_year(app)
+
+
+def _joined_in_founding_year(app):
+    """Accounts get SQLite's real clock as created_at; pin it so Founding Dawg tests still pass after 2026."""
+    with app.app_context():
+        get_db().execute("UPDATE users SET created_at = '2026-09-01 10:00:00'")
+        get_db().commit()
 
 
 def test_greeting_is_plain(accounts, client):
@@ -1014,6 +1022,7 @@ def test_badges_are_kept_forever(accounts, client, app):
     accounts.signup(email="player@uw.edu")
     host, player = _user_id(app, "host@uw.edu"), _user_id(app, "player@uw.edu")
     _played_games(app, "soccer", [host, player])            # Sept 22, 2026 = Autumn 2026
+    _joined_in_founding_year(app)
     with app.app_context():
         new = {b.key for b in sync_badges(player)}
         assert {"first_game", "season-2026-autumn", "founding_dawg"} <= new
