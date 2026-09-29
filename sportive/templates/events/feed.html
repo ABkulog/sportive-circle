@@ -47,8 +47,8 @@
       <select name="when" aria-label="When" data-autosubmit>
         <option value="">Upcoming</option>
         <option value="today" {% if filters.when == 'today' %}selected{% endif %}>Today</option>
-        <option value="week" {% if filters.when == 'week' %}selected{% endif %}>This week</option>
-        <option value="month" {% if filters.when == 'month' %}selected{% endif %}>This month</option>
+        <option value="week" {% if filters.when == 'week' %}selected{% endif %}>Next 7 days</option>
+        <option value="month" {% if filters.when == 'month' %}selected{% endif %}>Rest of {{ month_name }}</option>
       </select>
       <select name="location" aria-label="Location" data-autosubmit>
         <option value="">Anywhere</option>

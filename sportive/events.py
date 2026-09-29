@@ -312,6 +312,7 @@ def feed():
     mark_seen("need_players")
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
+                           month_name=now.strftime("%B"),
                            hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now),
                            club_picks=suggested_clubs(g.user["id"], my_sports))
 

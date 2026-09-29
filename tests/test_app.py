@@ -1022,7 +1022,7 @@ def test_this_month_filter(accounts, client, app, monkeypatch):
     monkeypatch.setattr(events, "now_local", lambda: datetime(2026, 9, 27, 12, 0))
     page = client.get("/?when=month").data
     assert b"September game" in page and b"Next month game" not in page
-    assert b'value="month" selected' in page
+    assert b'value="month" selected>Rest of September<' in page and b">Next 7 days<" in page
     everything = client.get("/").data
     assert b"September game" in everything and b"Next month game" in everything
 
