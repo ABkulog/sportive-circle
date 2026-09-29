@@ -58,8 +58,4 @@
       <a href="{{ url_for('auth.signup', next=url_for('clubs.create')) }}">Register it</a>.</p>
   {% endif %}
 </section>
-
-<section class="sport-cloud" aria-label="Sports you can play">
-  {% for key, label in SPORTS.items() %}<span class="chip">{{ SPORT_EMOJI[key] }} {{ label }}</span>{% endfor %}
-</section>
 {% endblock %}
