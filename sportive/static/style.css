@@ -766,6 +766,8 @@ form[data-wizard] .form-step { display: none; }
 .convo-body { flex: 1; min-width: 0; display: grid; }
 .convo-preview { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .convo-meta { display: grid; justify-items: end; gap: 4px; }
+.inbox-friends { margin-top: 20px; }
+.filter-empty { margin: 12px 0; }
 
 /* ============================== Create menu ============================== */
 .create-grid { display: grid; gap: 10px; margin-bottom: 16px; }

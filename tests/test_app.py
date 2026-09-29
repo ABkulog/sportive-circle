@@ -4509,3 +4509,28 @@ def test_hosts_are_told_to_check_the_place_is_free(accounts, client, app):
     html = client.get("/events/new").data.decode()
     assert '"space"' in html and '"courts"' in html and '"trail"' in html  # the word follows the sport (forms.js)
     assert "make sure the place is free" in client.get("/terms").data.decode()
+
+
+def test_messages_lists_friends_without_chats_and_can_search(accounts, client, app):
+    """The user: "if we don't have messages with that friend, it doesn't show on the messages page"."""
+    ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Stranger")
+    _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])
+    _as(accounts, "Maya")
+    client.post(f"/messages/{ids['Jordan']}", data={"body": "yo"})
+    page = client.get("/messages").data.decode()
+    assert "Jordan Husky" in page and "Sam Husky" in page and "Start a chat" in page   # Sam: friend, no chat yet
+    assert "Stranger Husky" not in page
+    assert page.count(f'href="/messages/{ids["Jordan"]}"') == 1                         # not twice
+    assert 'data-filter-list="#inbox-people"' in page and 'data-filter-name="Sam Husky"' in page
+    found = client.get("/messages?q=sam").data.decode()
+    assert f'href="/messages/{ids["Sam"]}"' in found and "Friend" in found
+    assert "Jordan Husky" not in found
+    nobody = client.get("/messages?q=stranger").data.decode()
+    assert "Stranger Husky" not in nobody and "find them in Friends" in nobody          # strangers: add first
+    assert "at least 2 letters" in client.get("/messages?q=s").data.decode()
+
+
+def test_empty_messages_page_points_to_friends(accounts, client):
+    accounts.signup()
+    page = client.get("/messages").data.decode()
+    assert "No messages yet." in page and "Search friends and chats" in page

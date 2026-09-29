@@ -3,9 +3,40 @@
 {% block title %}Messages{% endblock %}
 {% block content %}
 <h1 class="page-title">Messages</h1>
+
+{# Typing filters the chats and friends below right away (app.js); Search also finds people you've played with. #}
+<form method="get" class="people-search" role="search" aria-label="Search messages">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search friends and chats" aria-label="Search friends and chats"
+         maxlength="60" autocomplete="off" data-filter-list="#inbox-people">
+  <button class="btn">Search</button>
+</form>
+
+{% if q %}
+  <section class="band" aria-live="polite">
+    <h2>{% if q|length < min_search %}Type at least {{ min_search }} letters{% elif results %}People for “{{ q }}”{% else %}No one to message for “{{ q }}”{% endif %}</h2>
+    <div class="stack">
+      {% for p in results or [] %}
+        <a class="card convo" href="{{ url_for('social.thread', user_id=p.id) }}">
+          {{ avatar(p.id, p.full_name, p.avatar_updated, 44) }}
+          <span class="convo-body"><strong>{{ p.full_name }}</strong>
+            <span class="muted convo-preview">{% if p.status == 'friends' %}Friend{% elif p.played %}You've played together{% else %}Can message{% endif %}{% if p.grad_year %} · Class of {{ p.grad_year }}{% endif %}</span></span>
+          <span class="convo-meta"><small class="muted">Message</small></span>
+        </a>
+      {% endfor %}
+    </div>
+    {% if q|length >= min_search and not results %}
+      <p class="muted">You can message friends and people you've played with. To reach someone new,
+        <a href="{{ url_for('social.friends', q=q) }}">find them in Friends</a> and add them first.</p>
+    {% endif %}
+    <p><a href="{{ url_for('social.inbox') }}">Clear search</a></p>
+  </section>
+{% endif %}
+
+{% if not q %}{# while searching, the results above are the list (no doubles) #}
+<div id="inbox-people">
 <div class="stack">
   {% for c in conversations %}
-    <a class="card convo {% if c.unread %}is-unread{% endif %}" href="{{ url_for('social.thread', user_id=c.id) }}">
+    <a class="card convo {% if c.unread %}is-unread{% endif %}" href="{{ url_for('social.thread', user_id=c.id) }}" data-filter-name="{{ c.full_name }}">
       {{ avatar(c.id, c.full_name, c.avatar_updated, 44) }}
       <span class="convo-body">
         <strong>{{ c.full_name }}</strong>
@@ -16,13 +47,34 @@
         {% if c.unread %}<span class="count-dot">{{ c.unread }}</span>{% endif %}
       </span>
     </a>
-  {% else %}
-    <div class="card empty">
-      <p class="empty-emoji" aria-hidden="true">✉️</p>
-      <p><strong>No messages yet.</strong></p>
-      <p class="muted">Message your <a href="{{ url_for('social.friends') }}">friends</a> or anyone you've played with
-        from their profile. For questions about a game, use its 💬 group chat.</p>
-    </div>
   {% endfor %}
 </div>
+
+{% if new_friends %}
+  <section class="inbox-friends" data-filter-group>
+    <h2 class="home-section-title">{{ 'Start a chat' if conversations else 'Message a friend' }}</h2>
+    <div class="stack">
+      {% for f in new_friends %}
+        <a class="card convo" href="{{ url_for('social.thread', user_id=f.id) }}" data-filter-name="{{ f.full_name }}">
+          {{ avatar(f.id, f.full_name, f.avatar_updated, 44) }}
+          <span class="convo-body"><strong>{{ f.full_name }}</strong>
+            <span class="muted convo-preview">Friend · no messages yet</span></span>
+          <span class="convo-meta"><small class="muted">Message</small></span>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+<p class="muted filter-empty" data-filter-empty hidden>No chats or friends match. Tap Search to look wider.</p>
+</div>
+{% endif %}
+
+{% if not q and not conversations and not new_friends %}
+  <div class="card empty">
+    <p class="empty-emoji" aria-hidden="true">✉️</p>
+    <p><strong>No messages yet.</strong></p>
+    <p class="muted">Add <a href="{{ url_for('social.friends') }}">friends</a> and they'll show up here to message.
+      For questions about a game, use its 💬 group chat.</p>
+  </div>
+{% endif %}
 {% endblock %}
