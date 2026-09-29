@@ -366,7 +366,7 @@ def delete_account():
     # Games they host disappear with the account, so warn everyone who joined (like canceling would).
     for event in query_events(["e.host_id = :me", "e.cancelled = 0", "e.ends_at >= :now"],
                               {"now": to_db(now_local())}):
-        tell_players_it_was_cancelled(event)
+        tell_players_it_was_cancelled(event, page_stays=False)
     db = get_db()
     for club in clubs_that_go_with_me(g.user["id"]):
         db.execute("DELETE FROM clubs WHERE id = ?", (club["id"],))

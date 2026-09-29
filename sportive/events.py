@@ -651,14 +651,15 @@ def tell_players_it_changed(event, data):
     return True
 
 
-def tell_players_it_was_cancelled(event):
-    """Tell everyone who joined (except the host), so nobody shows up to an empty field."""
+def tell_players_it_was_cancelled(event, page_stays=True):
+    """Tell everyone who joined (except the host), so nobody shows up to an empty field.
+    page_stays=False when the game is about to be deleted (the host's account is going), so links go to the feed."""
     players = players_except_host(event)
     title, when = event_title(event), fmt_when(event["starts_at"])
+    link = url_for("events.detail", event_id=event["id"]) if page_stays else url_for("events.feed")
     for player in players:
-        # Links to the feed: if the host deleted their account, the game's page is gone too.
         notify(player["id"], "game_updates", f"{event['host_name'].split()[0]} canceled {title} ({when})",
-               url_for("events.feed"), key=f"change:{event['id']}")
+               link, key=f"change:{event['id']}")
     # Friends with an open invite ("You down?") hear about it too, and the invite closes.
     db = get_db()
     invited = db.execute("SELECT guest_id FROM invites WHERE event_id = ? AND status IN ('pending', 'requested')",
@@ -1005,7 +1006,7 @@ def remove_player(event_id, user_id):
     cur = db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, user_id))
     if cur.rowcount:
         notify(user_id, "game_updates", f"{g.user['full_name'].split()[0]} took you off {event_title(event)}.",
-               url_for("events.feed"), key=f"change:{event_id}")
+               url_for("events.detail", event_id=event_id), key=f"change:{event_id}")
     db.commit()
     flash("Removed from the game." if cur.rowcount else "They're not in this game.", "info")
     return redirect(url_for("events.detail", event_id=event_id))

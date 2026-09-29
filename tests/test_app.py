@@ -3013,6 +3013,23 @@ def test_need_players_host_hears_when_someone_joins(accounts, client, app):
     assert len(texts) == 1 and texts[0].startswith("Pat joined") and "(2 going now)" in texts[0]
 
 
+def test_cancel_notice_links_to_the_game(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post(f"/events/{event_id}/cancel")
+    with app.app_context():
+        url = get_db().execute("SELECT url FROM notices WHERE user_id = ?", (_user_id(app, "player@uw.edu"),)).fetchone()[0]
+    assert url == f"/events/{event_id}"
+    accounts.logout()
+    accounts.login(email="player@uw.edu")
+    assert client.get(url).status_code == 200
+
+
 def test_need_players_cant_be_double_posted_or_spammed(accounts, client, app):
     accounts.signup()
     post = lambda sport, place: client.post("/need-players", data={
