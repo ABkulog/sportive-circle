@@ -197,6 +197,24 @@ def test_double_tapping_join_doesnt_crash(accounts, client, app):
         assert events.try_join(stale) == (False, "You're already going.")
 
 
+def test_saving_notification_settings_keeps_hidden_kinds_on(accounts, client, app):
+    from sportive.notifications import KINDS, settings
+    accounts.signup()
+    client.post("/settings/notifications", data={kind.key: "1" for kind in KINDS if kind.audience == "everyone"})
+    with app.app_context():
+        chosen = settings(_user_id(app, "dubs@uw.edu"))
+    assert chosen["club_requests"] and chosen["suggestion_trends"]   # not on the page, so not switched off
+
+
+def test_saving_notification_settings_keeps_hidden_kinds_on(accounts, client, app):
+    from sportive.notifications import KINDS, settings
+    accounts.signup()
+    client.post("/settings/notifications", data={kind.key: "1" for kind in KINDS if kind.audience == "everyone"})
+    with app.app_context():
+        chosen = settings(_user_id(app, "dubs@uw.edu"))
+    assert chosen["club_requests"] and chosen["suggestion_trends"]   # not on the page, so not switched off
+
+
 def test_database_uses_wal_and_waits_for_locks(app):
     with app.app_context():
         assert get_db().execute("PRAGMA journal_mode").fetchone()[0] == "wal"

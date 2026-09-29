@@ -58,11 +58,13 @@ def settings(user_id):
     return {kind.key: chosen.get(kind.key, True) for kind in KINDS}
 
 
-def save_settings(user_id, form):
+def save_settings(user_id, form, shown):
+    """Save the switches that were on the page (`shown`). Kinds that weren't shown (club requests for
+    someone who isn't an officer yet) keep their setting, instead of being saved as off."""
     db = get_db()
     db.executemany(
         "INSERT OR REPLACE INTO notification_settings (user_id, kind, badge, screen) VALUES (?, ?, ?, ?)",
-        [(user_id, kind.key, 1 if form.get(kind.key) else 0, 1 if form.get(kind.key) else 0) for kind in KINDS])
+        [(user_id, kind.key, 1 if form.get(kind.key) else 0, 1 if form.get(kind.key) else 0) for kind in shown])
     db.commit()
 
 
@@ -284,7 +286,7 @@ def kinds_for(user_id):
 def notification_settings():
     me = g.user["id"]
     if request.method == "POST":
-        save_settings(me, request.form)
+        save_settings(me, request.form, kinds_for(me))
         return redirect(url_for("notifications.notification_settings"))  # the switches show what's saved
     return render_template("settings/notifications.html", kinds=kinds_for(me), chosen=settings(me),
                            places=PLACE_NAMES)
