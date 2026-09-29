@@ -161,6 +161,12 @@ def test_join_leave_and_capacity(accounts, client):
     assert b"You&#39;re in!" in client.post(f"/events/{event_id}/join", follow_redirects=True).data
 
 
+def test_database_uses_wal_and_waits_for_locks(app):
+    with app.app_context():
+        assert get_db().execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+        assert get_db().execute("PRAGMA busy_timeout").fetchone()[0] >= 10000
+
+
 def test_host_cannot_shrink_game_below_who_is_in(accounts, client, app, monkeypatch):
     from sportive import events
     accounts.signup(email="host@uw.edu")
