@@ -20,6 +20,7 @@ from flask.cli import with_appcontext
 from .constants import SPORTS
 from .db import get_db
 from .mail import compose, send_email
+from .sms import text_user
 from .timeutil import fmt_clock, from_db, now_local, to_db
 
 log = logging.getLogger(__name__)
@@ -63,12 +64,14 @@ def send_due_reminders():
     db = get_db()
     rows = db.execute(
         """SELECT r.event_id, r.user_id, r.created_at AS joined_at, r.remind_minutes, u.email, u.full_name,
+                  u.email_reminders,
                   e.title, e.sport, e.location, e.starts_at, e.is_quick, e.host_id,
                   e.extra_players + (SELECT COUNT(*) FROM rsvps g WHERE g.event_id = e.id) AS going
            FROM rsvps r
            JOIN events e ON e.id = r.event_id
            JOIN users u ON u.id = r.user_id
-           WHERE r.reminder_sent = 0 AND r.remind_minutes > 0 AND e.cancelled = 0 AND u.verified = 1 AND u.suspended = 0 AND u.email_reminders = 1
+           WHERE r.reminder_sent = 0 AND r.remind_minutes > 0 AND e.cancelled = 0 AND u.verified = 1 AND u.suspended = 0
+             AND (u.email_reminders = 1 OR (u.sms_updates = 1 AND u.phone_verified = 1))
              AND e.starts_at > :now AND e.starts_at <= :soon""",
         {"now": to_db(now), "soon": to_db(now + REMIND_BEFORE)},
     ).fetchall()
@@ -85,12 +88,20 @@ def send_due_reminders():
         starts = from_db(row["starts_at"])
         joined = from_db(row["joined_at"][:16])
         if claimed and starts - joined >= MIN_NOTICE:
-            subject, body, html = reminder_email(row, minutes=int((starts - now).total_seconds() // 60))
-            try:
-                send_email(row["email"], subject, body, html=html)
+            minutes = int((starts - now).total_seconds() // 60)
+            if row["email_reminders"]:
+                subject, body, html = reminder_email(row, minutes=minutes)
+                try:
+                    send_email(row["email"], subject, body, html=html)
+                    sent += 1
+                except Exception:  # one bad address or email hiccup must not stop everyone else's reminders
+                    log.exception("Couldn't send a reminder to %s", row["email"])
+            # A text too, for people who asked for texts (sms.text_user checks that, and never raises).
+            title = f"{SPORTS[row['sport']]} pickup game" if row["is_quick"] else row["title"]
+            link = f"{current_app.config['PUBLIC_URL'].rstrip('/')}/events/{row['event_id']}"
+            if text_user(row["user_id"], f"{title} starts at {fmt_clock(row['starts_at'])} (in {minutes} min) at "
+                                         f"{row['location']}. {link}", kind="reminder") and not row["email_reminders"]:
                 sent += 1
-            except Exception:  # one bad address or email hiccup must not stop everyone else's reminders
-                log.exception("Couldn't send a reminder to %s", row["email"])
     return sent
 
 

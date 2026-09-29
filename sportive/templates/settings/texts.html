@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Texts{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('settings.home') }}">← Settings</a>
+<div class="card form-card">
+  <h1>Texts</h1>
+  {% if user.phone and user.phone_verified %}
+    <p class="muted">We text <strong>{{ pretty_phone(user.phone) }}</strong>: game reminders, changes, cancellations
+      and invites. Email still gets everything.</p>
+    <form method="post" data-autosave>
+      {{ csrf_field() }}<input type="hidden" name="action" value="toggle">
+      <label class="switch-row"><span class="switch-text">Text me updates</span>
+        <input type="checkbox" class="switch" name="sms_updates" value="1" {% if user.sms_updates %}checked{% endif %}></label>
+      <span class="saved-note" data-autosave-status aria-live="polite"></span>
+      <noscript><button class="btn btn-small">Save</button></noscript>
+    </form>
+    <form method="post" data-confirm="Remove your number? We'll stop texting you.">
+      {{ csrf_field() }}<input type="hidden" name="action" value="remove">
+      <button class="link-button danger-link">Remove my number</button>
+    </form>
+  {% else %}
+    <p class="muted">Optional. Get codes and game updates by text too. Your UW email still gets everything.</p>
+    <form method="post" class="form">
+      {{ csrf_field() }}<input type="hidden" name="action" value="send">
+      <label class="field"><span>Phone number</span>
+        <input name="phone" type="tel" inputmode="tel" autocomplete="tel" value="{{ pretty_phone(user.phone) }}"
+               placeholder="(206) 555-0142" required></label>
+      <label class="toggle consent"><input type="checkbox" name="consent" value="1" required><span>{{ SMS_CONSENT }}</span></label>
+      <button class="btn btn-block">{{ 'Text me a new code' if user.sms_code else 'Text me a code' }}</button>
+    </form>
+    {% if user.phone and user.sms_code %}
+      <form method="post" class="form confirm-code">
+        {{ csrf_field() }}<input type="hidden" name="action" value="confirm">
+        <label class="field"><span>Code we texted to {{ masked_phone(user.phone) }}</span>
+          <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
+                 class="code-input" required autofocus></label>
+        <button class="btn btn-block">Confirm my number</button>
+      </form>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -127,6 +127,8 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-NOTIF-1 | Everything new shows in exactly one place, never twice: messages on ✉️, friend requests on 👥, club news on the Clubs tab, and everything else (invites, game changes, game chats, Need players, badges) in the 🔔 bell, in plain sentences. A number clears when you open that place. | Must | ✅ |
 | FR-NOTIF-2 | Settings → Notifications: one on/off switch per kind, saying where it shows up. No pop-ups. | Must | ✅ |
 | FR-NOTIF-3 | No repeats: a newer notice about the same thing replaces the older one (a host editing a game three times = one notice). New accounts start with nothing to catch up on. | Should | ✅ |
+| FR-SMS-1 | Texts are optional: people can add a phone number (at sign-up step 3 or in Settings → Texts), must tick a permission box, and confirm it with a texted code. Email stays required (the UW email is the proof of being a UW student). | Should | ✅ |
+| FR-SMS-2 | Confirmed, opted-in numbers get texts for game reminders (at the time each player picked), changed times/places, cancellations, invites and password-reset codes. Texts can be turned off or the number removed anytime; replying STOP is respected; texts are limited per day. | Should | ✅ |
 | FR-SET-1 | A Settings page, separate from Edit profile: notifications, look (light / dark / match my phone, also chosen at sign-up), reminder emails, password, log out, delete account. Edit profile is only about you (photo, bio, socials, sports). | Must | ✅ |
 
 ### Safety and admin (SAFE)

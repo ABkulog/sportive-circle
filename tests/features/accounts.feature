@@ -43,7 +43,7 @@ Feature: Accounts
   @FR-AUTH-5
   Scenario: The reset page doesn't reveal who has an account
     When someone asks to reset the password for "nobody@uw.edu"
-    Then they see "If that email has an account, we sent it a 6-digit code."
+    Then they see "If that email has an account, we sent it a 6-digit code"
 
   @FR-AUTH-6
   Scenario: Change password from settings

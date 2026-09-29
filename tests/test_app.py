@@ -3077,10 +3077,10 @@ def test_invite_friends_to_the_app_makes_you_friends(accounts, client, app):
         assert get_db().execute("SELECT status FROM friendships").fetchone()[0] == "accepted"
 
 
-def test_sign_up_is_two_short_screens(client, app):
-    """Screen 1 checks the details (and emails the code); screen 2 is sports; then the code page."""
+def test_sign_up_is_short_screens(client, app):
+    """Screen 1 checks the details (and emails the code); screen 2 is sports; screen 3 (optional) is texts."""
     page = client.get("/signup").data.decode()
-    assert "Step 1 of 2" in page and 'name="sports"' not in page and ">Next</button>" in page
+    assert "Step 1 of 3" in page and 'name="sports"' not in page and ">Next</button>" in page
     bad = client.post("/signup", data={"full_name": "Dubs Husky", "email": "dubs@gmail.com", "password": "purple-and-gold",
                                        "password2": "purple-and-gold", "birth_date": "2005-01-15"})
     assert bad.status_code == 200 and b"Please use your UW email" in bad.data  # Next still checks everything
@@ -3089,8 +3089,9 @@ def test_sign_up_is_two_short_screens(client, app):
                                          "password2": "purple-and-gold", "birth_date": "2005-01-15"})
     assert step1.headers["Location"] == "/signup/sports"
     page = client.get("/signup/sports").data.decode()
-    assert "Step 2 of 2" in page and 'value="soccer"' in page
-    assert client.post("/signup/sports", data={"sports": ["soccer", "tennis", "made-up"]}).headers["Location"] == "/verify"
+    assert "Step 2 of 3" in page and 'value="soccer"' in page
+    assert client.post("/signup/sports", data={"sports": ["soccer", "tennis", "made-up"]}).headers["Location"] == "/signup/texts"
+    assert client.post("/signup/texts", data={"phone": ""}).headers["Location"] == "/verify"   # skipping is fine
     with app.app_context():
         sports = {r[0] for r in get_db().execute("SELECT sport FROM user_sports")}
     assert sports == {"soccer", "tennis"}
@@ -3280,3 +3281,136 @@ def test_open_to_anyone_or_other(accounts, client, app):
     assert b"You&#39;re in" in client.post(f"/events/{game}/join", follow_redirects=True).data
     accounts.signup(email="officer@uw.edu")
     assert ">Anyone</span>" in client.get("/clubs/new").data.decode()
+
+
+# ---------------------------------------------------------------- texts (SMS)
+
+def _texts(monkeypatch):
+    """Capture texts instead of sending them."""
+    from sportive import sms
+    sent = []
+    monkeypatch.setattr(sms, "send_sms", lambda to, body: sent.append((to, body)) or True)
+    return sent
+
+
+def test_phone_numbers_are_cleaned_up():
+    from sportive.sms import normalize_phone, pretty_phone
+    assert normalize_phone("(206) 555-0142") == normalize_phone("206.555.0142") == "+12065550142"
+    assert normalize_phone("+1 206 555 0142") == normalize_phone("1-206-555-0142") == "+12065550142"
+    assert normalize_phone("+44 20 7946 0958") == "+442079460958"
+    assert normalize_phone("555-0142") is None and normalize_phone("hello") is None and normalize_phone("") is None
+    assert pretty_phone("+12065550142") == "(206) 555-0142"
+
+
+def test_sign_up_with_texts(client, app, monkeypatch):
+    """Optional step 3: a phone number with permission, confirmed with a texted code on the same code page."""
+    sent = _texts(monkeypatch)
+    client.post("/signup", data={"full_name": "Dubs Husky", "email": "dubs@uw.edu", "password": "purple-and-gold",
+                                 "password2": "purple-and-gold", "birth_date": "2005-01-15"})
+    client.post("/signup/sports", data={"sports": ["soccer"]})
+    page = client.get("/signup/texts").data.decode()
+    assert "Step 3 of 3" in page and "Reply STOP" in page and 'name="consent"' in page
+    assert b"Tick the box" in client.post("/signup/texts", data={"phone": "206-555-0142"}).data   # permission first
+    assert b"doesn&#39;t look like a phone number" in client.post("/signup/texts",
+                                                                  data={"phone": "12", "consent": "1"}).data
+    assert client.post("/signup/texts", data={"phone": "206-555-0142", "consent": "1"}).headers["Location"] == "/verify"
+    assert sent[-1][0] == "+12065550142" and "Sportive Circle code:" in sent[-1][1]
+    page = client.get("/verify").data.decode()
+    assert "Code we texted to (•••) •••-0142" in page and "Code from your email" in page
+    with app.app_context():
+        row = get_db().execute("SELECT verify_code, sms_code FROM users").fetchone()
+    client.post("/verify", data={"code": row["verify_code"], "phone_code": row["sms_code"]})
+    with app.app_context():
+        user = get_db().execute("SELECT verified, phone_verified, sms_updates, sms_consent_at FROM users").fetchone()
+    assert user["verified"] == 1 and user["phone_verified"] == 1 and user["sms_updates"] == 1 and user["sms_consent_at"]
+
+
+def test_texts_only_go_to_confirmed_opted_in_numbers(accounts, client, app, monkeypatch):
+    from sportive import sms
+    sent = _texts(monkeypatch)
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    with app.app_context():
+        assert sms.text_user(me, "hi") is False                                   # no number
+    client.post("/settings/texts", data={"action": "send", "phone": "(206) 555-0142", "consent": "1"})
+    with app.app_context():
+        assert sms.text_user(me, "hi") is False                                   # not confirmed yet
+        code = get_db().execute("SELECT sms_code FROM users WHERE id = ?", (me,)).fetchone()[0]
+    assert b"isn&#39;t right" in client.post("/settings/texts", data={"action": "confirm", "code": "000000"},
+                                             follow_redirects=True).data
+    client.post("/settings/texts", data={"action": "confirm", "code": code})
+    assert "(206) 555-0142" in client.get("/settings/texts").data.decode()
+    with app.app_context():
+        assert sms.text_user(me, "Game at 5") is True and sent[-1] == ("+12065550142", "Sportive Circle: Game at 5")
+    client.post("/settings/texts", data={"action": "toggle"})                     # switched off
+    with app.app_context():
+        assert sms.text_user(me, "hi") is False
+    client.post("/settings/texts", data={"action": "toggle", "sms_updates": "1"})
+    client.post("/settings/texts", data={"action": "remove"})
+    with app.app_context():
+        assert sms.text_user(me, "hi") is False
+        assert get_db().execute("SELECT phone FROM users WHERE id = ?", (me,)).fetchone()[0] == ""
+
+
+def test_replying_stop_turns_texts_off(accounts, client, app, monkeypatch):
+    from sportive import sms
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    with app.app_context():
+        get_db().execute("UPDATE users SET phone = '+12065550142', phone_verified = 1, sms_updates = 1")
+        get_db().commit()
+
+        def opted_out(to, body):
+            raise sms.SmsError(sms.OPTED_OUT, "unsubscribed")
+        monkeypatch.setattr(sms, "send_sms", opted_out)
+        assert sms.text_user(me, "hi") is False
+        assert get_db().execute("SELECT sms_updates FROM users").fetchone()[0] == 0
+
+
+def test_code_texts_are_limited(accounts, client, app, monkeypatch):
+    from sportive import sms
+    _texts(monkeypatch)
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    with app.app_context():
+        for n in range(sms.MAX_CODES_PER_DAY):
+            get_db().execute("UPDATE users SET sms_sent_at = NULL")
+            assert sms.start_phone_check(me, f"+1206555010{n}") is None
+        get_db().execute("UPDATE users SET sms_sent_at = NULL")
+        assert "a lot of codes" in sms.start_phone_check(me, "+12065550199")
+
+
+def test_reminders_and_invites_are_texted_too(accounts, client, app, monkeypatch):
+    from sportive import reminders
+    sent = _texts(monkeypatch)
+    monkeypatch.setattr(reminders, "send_email", lambda *args, **kwargs: None)
+    _reminder_setup(accounts, client, app, joined_minutes_before=120)   # player is logged in
+    with app.app_context():
+        get_db().execute("UPDATE users SET phone = '+12065550142', phone_verified = 1, sms_updates = 1,"
+                         " email_reminders = 0 WHERE email = 'player@uw.edu'")
+        get_db().commit()
+        reminders.send_due_reminders()
+    assert any(to == "+12065550142" and "Evening hoops starts at" in body for to, body in sent)
+    # an invite (spot held) is texted after it's saved
+    ids = {"player": _user_id(app, "player@uw.edu"), "host": _user_id(app, "host@uw.edu")}
+    _friends(app, ids["player"], ids["host"])
+    game = event_id_from(client.post("/events/new", data=event_form(title="Texted run", players="6")))
+    client.post(f"/events/{game}/party", data={"friend": str(ids["host"])})
+    with app.app_context():
+        get_db().execute("UPDATE users SET phone = '+12065550199', phone_verified = 1, sms_updates = 1"
+                         " WHERE email = 'host@uw.edu'")
+        get_db().commit()
+    game2 = event_id_from(client.post("/events/new", data=event_form(title="Second run", players="6")))
+    client.post(f"/events/{game2}/party", data={"friend": str(ids["host"])})
+    assert any(to == "+12065550199" and "Second run" in body and "held for 30 min" in body for to, body in sent)
+
+
+def test_password_reset_code_is_texted_to_confirmed_numbers(accounts, client, app, monkeypatch):
+    sent = _texts(monkeypatch)
+    accounts.signup()
+    accounts.logout()
+    with app.app_context():
+        get_db().execute("UPDATE users SET phone = '+12065550142', phone_verified = 1, verify_sent_at = NULL")
+        get_db().commit()
+    client.post("/forgot", data={"email": "dubs@uw.edu"})
+    assert sent and sent[-1][0] == "+12065550142" and "password reset code" in sent[-1][1]

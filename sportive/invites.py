@@ -6,7 +6,10 @@ spot is free for anyone again, but the invite still works if there's room.
 """
 from datetime import timedelta
 
+from flask import current_app
+
 from .db import get_db
+from .sms import queue_text
 from .timeutil import from_db, now_local, to_db
 
 HOLD_TIME = timedelta(minutes=30)
@@ -50,6 +53,8 @@ def hold_spots(event_id, inviter, friend_ids, team, message, link):
                             VALUES (?, ?, ?, ?, 'pending', ?, ?)""",
                          (event_id, inviter, friend_id, team, now_param(), expires))
         notify(friend_id, "invites", message, link, key=f"invite:{event_id}")
+        queue_text(friend_id, f"{message} Your spot is held for 30 min: "
+                              f"{current_app.config['PUBLIC_URL'].rstrip('/')}{link}")  # sent after the save
 
 
 def pending_invites(event_id):

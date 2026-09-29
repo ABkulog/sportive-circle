@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Get texts{% endblock %}
+{% block content %}
+<div class="card form-card">
+  <p class="step-label">Step 3 of 3</p>
+  <h1>Get texts too?</h1>
+  <p class="muted">Optional. Your UW email still gets everything. Many people check texts faster.</p>
+  <form method="post" class="form">
+    {{ csrf_field() }}
+    <label class="field"><span>Phone number</span>
+      <input name="phone" type="tel" inputmode="tel" autocomplete="tel" value="{{ phone }}" placeholder="(206) 555-0142"></label>
+    <label class="toggle consent"><input type="checkbox" name="consent" value="1">
+      <span>{{ SMS_CONSENT }}</span></label>
+    <p class="muted fine-print">We text a code to confirm the number. It's never shown to anyone, and you can turn texts
+      off anytime in Settings.</p>
+    <button class="btn btn-block">Text me a code</button>
+  </form>
+  <form method="post" class="center">
+    {{ csrf_field() }}<input type="hidden" name="phone" value="">
+    <button class="link-button">Skip, email only</button>
+  </form>
+</div>
+{% endblock %}

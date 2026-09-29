@@ -7,7 +7,7 @@ from flask import Flask, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from . import (auth, clubs, db, events, feedback, mail, moderation, notifications, pages, parties, profile,
-               reminders, settings, social, stats)
+               reminders, settings, sms, social, stats)
 from .constants import (DEFAULT_PLAYERS, LOCATIONS, OPEN_TO, OPEN_TO_BADGE, OPEN_TO_LABELS, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS,
                         MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .photos import MAX_UPLOAD_MB
@@ -70,6 +70,10 @@ def create_app(test_config=None):
         CONTACT_EMAIL=os.environ.get("CONTACT_EMAIL", ""),
         # Secret the scheduler sends to /tasks/send-reminders (unset = that page doesn't exist).
         TASK_TOKEN=os.environ.get("TASK_TOKEN"),
+        # Texts (optional, see sms.py). Without these, the text option is hidden on the live site.
+        TWILIO_ACCOUNT_SID=_setting("TWILIO_ACCOUNT_SID"),
+        TWILIO_AUTH_TOKEN=_setting("TWILIO_AUTH_TOKEN"),
+        TWILIO_FROM=_setting("TWILIO_FROM"),
         # Send game reminders from inside the app (on by default on Render; REMINDER_LOOP=0 turns it off).
         REMINDER_LOOP=(_setting("REMINDER_LOOP") or ("1" if os.environ.get("RENDER_EXTERNAL_URL") else "0")) == "1",
     )
@@ -85,6 +89,7 @@ def create_app(test_config=None):
     logging.basicConfig(level=logging.INFO)
 
     db.init_app(app)
+    sms.init_app(app)
     for blueprint in (auth.bp, events.bp, parties.bp, profile.bp, settings.bp, social.bp, clubs.bp, moderation.bp,
                       notifications.bp, reminders.bp, feedback.bp):
         app.register_blueprint(blueprint)
@@ -127,7 +132,8 @@ def _add_template_helpers(app):
         tab_badges=notifications.tab_badges, badge_text=notifications.badge_text, bell_count=notifications.bell_count,
         chat_unread=social.event_chat_unread, is_admin=moderation.is_admin,
         open_report_count=moderation.open_report_count, pending_club_count=clubs.pending_club_count,
-        is_team=moderation.is_team, current_theme=settings.current_theme,
+        is_team=moderation.is_team, current_theme=settings.current_theme, sms_available=lambda: sms.sms_available(),
+        pretty_phone=sms.pretty_phone, masked_phone=sms.masked_phone, SMS_CONSENT=sms.CONSENT,
     )
     app.jinja_env.filters.update(when=fmt_when, clock=fmt_clock, relative=fmt_relative)
 

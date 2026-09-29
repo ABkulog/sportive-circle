@@ -17,6 +17,7 @@ from .db import get_db, user_sports
 from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots, my_invite,
                       now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
 from .links import public_url
+from .sms import text_user
 from .reminders import REMIND_CHOICES
 from .notifications import mark_seen, notify
 from .mail import compose, send_email
@@ -610,6 +611,9 @@ def tell_players_it_changed(event, data):
                key=f"change:{event['id']}")
     if any(change.startswith(("new time", "new place")) for change in changes):
         for player in players:
+            text_user(player["id"], f"{host} changed {title}: now {fmt_when(data['starts_at'])} at {data['location']}. "
+                                    f"{public_url('events.detail', event_id=event['id'])}")
+        for player in players:
             try:
                 subject = f"Changed: {title}"
                 body, html = compose(
@@ -634,6 +638,8 @@ def tell_players_it_was_cancelled(event):
         notify(player["id"], "game_updates", f"{event['host_name'].split()[0]} canceled {title} ({when})",
                url_for("events.feed"), key=f"change:{event['id']}")
     get_db().commit()
+    for player in players:
+        text_user(player["id"], f"{event['host_name'].split()[0]} canceled {title} ({when}).")
     for player in players:
         try:
             subject = f"Canceled: {title} ({when})"

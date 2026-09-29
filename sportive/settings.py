@@ -6,6 +6,7 @@ from flask import Blueprint, flash, g, redirect, render_template, request, url_f
 
 from .auth import login_required
 from .db import get_db
+from .timeutil import now_local, to_db
 
 bp = Blueprint("settings", __name__)
 
@@ -48,6 +49,46 @@ def reminders():
     db.commit()
     flash("Game reminder emails are on." if on else "Game reminder emails are off.", "success")
     return redirect(url_for("settings.home"))
+
+
+@bp.route("/settings/texts", methods=("GET", "POST"))
+@login_required
+def texts():
+    """Texts (optional): add a number (with permission), confirm it with a texted code, turn texts on or off,
+    or remove the number."""
+    from .sms import check_phone_code, normalize_phone, remove_phone, sms_available, start_phone_check
+    if not sms_available():
+        flash("Texts aren't available yet. Everything comes by email for now.", "info")
+        return redirect(url_for("settings.home"))
+    me = g.user["id"]
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "send":
+            phone = normalize_phone(request.form.get("phone"))
+            if phone is None:
+                flash("That doesn't look like a phone number. Try (206) 555-0142.", "error")
+            elif not request.form.get("consent"):
+                flash("Tick the box to say it's OK to text you.", "error")
+            else:
+                problem = start_phone_check(me, phone)
+                flash(problem or "We texted you a code. Type it below.", "error" if problem else "success")
+        elif action == "confirm":
+            problem = check_phone_code(me, request.form.get("code", "").strip())
+            flash(problem or "Your number is confirmed. We'll text you reminders and updates.",
+                  "error" if problem else "success")
+        elif action == "toggle":
+            on = 1 if request.form.get("sms_updates") else 0
+            db = get_db()
+            db.execute("UPDATE users SET sms_updates = ?, sms_consent_at = CASE WHEN ? THEN ? ELSE sms_consent_at END"
+                       " WHERE id = ? AND phone_verified = 1", (on, on, to_db(now_local()), me))
+            db.commit()
+        elif action == "remove":
+            remove_phone(me)
+            flash("Your number is removed. No more texts.", "success")
+        return redirect(url_for("settings.texts"))
+    user = get_db().execute("SELECT phone, phone_verified, sms_updates, sms_code FROM users WHERE id = ?",
+                            (me,)).fetchone()
+    return render_template("settings/texts.html", user=user)
 
 
 @bp.route("/settings/password")

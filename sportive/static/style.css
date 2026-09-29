@@ -936,3 +936,5 @@ button.link-button { min-height: 36px; }
 .pull-refresh.is-refreshing .pull-arrow { animation: pull-spin .8s linear infinite; }
 @keyframes pull-spin { to { transform: rotate(360deg); } }
 .unchanged-note { margin: 8px 0 0; text-align: center; color: var(--danger); font-weight: 600; font-size: .9rem; }
+.consent span { font-size: .88rem; color: var(--muted); }
+.confirm-code { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }

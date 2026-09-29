@@ -3,7 +3,7 @@
 {% block title %}Your sports{% endblock %}
 {% block content %}
 <div class="card form-card">
-  <p class="step-label">Step 2 of 2</p>
+  <p class="step-label">Step 2 of {{ 3 if sms_available() else 2 }}</p>
   <h1>What do you play?</h1>
   <p class="muted">Pick any while your code arrives. You can change them later.</p>
   <form method="post" class="form">

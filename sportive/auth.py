@@ -271,10 +271,39 @@ def signup_sports():
         get_db().execute("UPDATE users SET theme = ? WHERE id = ?", (theme, user["id"]))
         get_db().commit()
         session["theme"] = theme  # the code page already looks the way they picked
-        return redirect(url_for("auth.verify"))
+        from .sms import sms_available  # imported here: sms.py is small, but keep auth.py's imports light
+        return redirect(url_for("auth.signup_texts" if sms_available() else "auth.verify"))
     chosen = [row[0] for row in get_db().execute("SELECT sport FROM user_sports WHERE user_id = ?", (user["id"],))]
     return render_template("auth/signup_sports.html", form=MultiDict([("sports", s) for s in chosen]),
                            theme=session.get("theme", "light"))
+
+
+@bp.route("/signup/texts", methods=("GET", "POST"))
+def signup_texts():
+    """Sign-up step 3 (optional): get codes and game updates by text too. Asks for permission first."""
+    from .sms import normalize_phone, sms_available, start_phone_check
+    email = session.get("pending_email")
+    user = email and get_db().execute("SELECT id, phone FROM users WHERE email = ? AND verified = 0",
+                                      (email,)).fetchone()
+    if not user:
+        return redirect(url_for("auth.signup"))
+    if not sms_available():
+        return redirect(url_for("auth.verify"))
+    if request.method == "POST":
+        raw = request.form.get("phone", "")
+        if not raw.strip():
+            return redirect(url_for("auth.verify"))  # skipped: texts stay off
+        phone = normalize_phone(raw)
+        if phone is None:
+            flash("That doesn't look like a phone number. Try (206) 555-0142.", "error")
+        elif not request.form.get("consent"):
+            flash("Tick the box to say it's OK to text you (or skip this step).", "error")
+        else:
+            problem = start_phone_check(user["id"], phone)
+            if problem is None:
+                return redirect(url_for("auth.verify"))
+            flash(problem, "error")
+    return render_template("auth/signup_texts.html", phone=request.form.get("phone", ""))
 
 
 @bp.route("/verify", methods=("GET", "POST"))
@@ -309,11 +338,23 @@ def verify():
             from .notifications import start_markers  # imported here: notifications.py imports this module
             start_markers(user["id"])
             db.commit()
+            phone_code = request.form.get("phone_code", "").strip()
+            phone_problem = None
+            if phone_code and user["phone"] and not user["phone_verified"]:
+                from .sms import check_phone_code
+                phone_problem = check_phone_code(user["id"], phone_code)
             destination = log_in(user)
             flash(f"Welcome, {user['full_name'].split()[0]}!", "celebrate")
+            if phone_problem:
+                flash(f"{phone_problem} You can confirm your number in Settings → Texts.", "info")
+            elif phone_code:
+                flash("Your number is confirmed. We'll text you reminders and updates.", "success")
             return redirect(destination)
         flash(error, "error")
-    return render_template("auth/verify.html", email=email, wait=resend_wait(email))
+    pending_phone = get_db().execute("SELECT phone FROM users WHERE email = ? AND phone != '' AND phone_verified = 0"
+                                     " AND sms_code IS NOT NULL", (email,)).fetchone()
+    return render_template("auth/verify.html", email=email, wait=resend_wait(email),
+                           pending_phone=pending_phone["phone"] if pending_phone else None)
 
 
 @bp.route("/verify/resend", methods=("POST",))
@@ -378,8 +419,12 @@ def forgot_password():
         user = get_db().execute("SELECT verified, suspended FROM users WHERE email = ?", (email,)).fetchone()
         if user and user["verified"] and not user["suspended"] and not code_recently_sent(email):
             start_verification(email, session_key="reset_email")
+            from .sms import text_code
+            row = get_db().execute("SELECT id, verify_code FROM users WHERE email = ?", (email,)).fetchone()
+            text_code(row["id"], row["verify_code"], "password reset")
         session["reset_email"] = email
-        flash("If that email has an account, we sent it a 6-digit code.", "info")
+        flash("If that email has an account, we sent it a 6-digit code (and texted it, if you added a phone).",
+              "info")
         return redirect(url_for("auth.reset_password"))
     return render_template("auth/forgot.html")
 

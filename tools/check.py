@@ -61,7 +61,7 @@ def logged_in(app, password, email=None):
 # ------------------------------------------------------------------ 3. link crawl
 
 START = ["/", "/how-it-works", "/faq", "/privacy", "/terms", "/clubs", "/create", "/me/events", "/friends",
-         "/friends?q=ma", "/messages", "/profile/edit", "/profile/badges", "/profile/notifications", "/settings/notifications", "/settings", "/settings/password", "/notifications",
+         "/friends?q=ma", "/messages", "/profile/edit", "/profile/badges", "/profile/notifications", "/settings/notifications", "/settings", "/settings/password", "/settings/texts", "/notifications",
          "/profile/photo",
          "/clubs/updates", "/admin/reports", "/admin/clubs", "/u/1", "/u/2", "/events/new", "/need-players", "/events/1/party", "/events/2/party", "/clubs/1/share", "/clubs/1/qr.svg",
          "/clubs/new", "/signup", "/login", "/forgot", "/suggestions", "/admin/suggestions",
@@ -145,6 +145,8 @@ FIELDS = {
     "/profile/edit": ["full_name", "grad_year", "bio", "pronouns", "gender"],
     "/profile/edit/sports": ["sports", "instagram", "snapchat", "tiktok", "x_handle", "linkedin"],
     "/signup/sports": ["sports", "theme"],
+    "/signup/texts": ["phone", "consent"],
+    "/settings/texts": ["action", "phone", "consent", "code", "sms_updates"],
     "/admin/users/3/tester/give": [],
     "/profile/password": ["current_password", "password", "password2"],
     "/profile/badges": ["show"],

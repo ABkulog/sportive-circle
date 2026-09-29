@@ -16,6 +16,14 @@ CREATE TABLE IF NOT EXISTS users (
     tiktok          TEXT NOT NULL DEFAULT '',
     x_handle        TEXT NOT NULL DEFAULT '',
     linkedin        TEXT NOT NULL DEFAULT '',      -- the part after linkedin.com/in/
+    phone           TEXT NOT NULL DEFAULT '',      -- optional, for texts: +12065550142 (sms.py)
+    phone_verified  INTEGER NOT NULL DEFAULT 0,    -- 1 once they typed the code we texted
+    sms_updates     INTEGER NOT NULL DEFAULT 0,    -- 1 = they said yes to texts (and can turn it off)
+    sms_consent_at  TEXT,                          -- when they said yes
+    sms_code        TEXT,
+    sms_code_expires TEXT,
+    sms_code_attempts INTEGER NOT NULL DEFAULT 0,
+    sms_sent_at     TEXT,
     verified        INTEGER NOT NULL DEFAULT 0,    -- 1 once the email code is confirmed
     verify_code     TEXT,                          -- 6-digit code for signing up or resetting a password
     verify_expires  TEXT,
@@ -308,3 +316,14 @@ CREATE TABLE IF NOT EXISTS reports (
     reviewed_at      TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, id);
+
+-- Every text we send (or try to), for the per-day limits and troubleshooting.
+CREATE TABLE IF NOT EXISTS sms_log (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    phone      TEXT NOT NULL,
+    kind       TEXT NOT NULL,        -- 'code' or 'update'
+    ok         INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sms_log_user ON sms_log(user_id, created_at);

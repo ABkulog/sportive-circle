@@ -6,8 +6,12 @@
   <p class="muted">We sent a 6-digit code to <strong>{{ email }}</strong>. Give it a minute, and check Junk too.</p>
   <form method="post" class="form">
     {{ csrf_field() }}
-    <label class="field"><span>Code</span>
+    <label class="field"><span>Code from your email</span>
       <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" class="code-input" required autofocus></label>
+    {% if pending_phone %}
+      <label class="field"><span>Code we texted to {{ masked_phone(pending_phone) }} <em>(confirms your number)</em></span>
+        <input name="phone_code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" class="code-input"></label>
+    {% endif %}
     <button class="btn btn-block">Verify</button>
   </form>
   <form method="post" action="{{ url_for('auth.resend_code') }}" class="center">

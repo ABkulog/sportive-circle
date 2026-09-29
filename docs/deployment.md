@@ -97,6 +97,21 @@ Codes and reminders are much less likely to land in Junk when they come from you
    `CONTACT_EMAIL` = `hello@sportivecircle.com` → Save. Test it: sign up with a new account, or run
    `flask --app wsgi check-email you@uw.edu` in the Render Shell.
 
+### Texts (SMS), optional
+
+People can choose to get codes and game updates by text too (email stays required). Texts stay hidden
+until a texting service is set up:
+
+1. Sign up at [Twilio](https://www.twilio.com) and add a payment method (texts cost about a cent each in the
+   US; a number is about $1-2 a month).
+2. Get a number that can text: a **toll-free number** is the quickest (Twilio -> Phone Numbers -> Buy a number
+   -> Toll-free), then fill in **toll-free verification** (US carriers require it; it takes a few days). Describe
+   it as: "Game reminders and updates for UW students who opt in at sign-up or in Settings; they reply STOP to
+   stop." A local 10-digit number works too but needs **A2P 10DLC** registration instead.
+3. Render -> Environment: `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` (Twilio console home page) and
+   `TWILIO_FROM` (your number, like `+18885550142`) -> Save. The "Get texts too?" step and Settings -> Texts
+   appear on their own. Twilio handles STOP/HELP replies automatically.
+
 ### If a secret leaks (SECRET_KEY, TASK_TOKEN)
 
 Render → sportive-circle → **Environment** → **Edit** → give `SECRET_KEY` and `TASK_TOKEN` new random values

@@ -15,6 +15,7 @@ from .db import get_db
 from .events import event_title, get_event, query_events, spots_left, try_join
 from .links import public_url
 from .invites import HOLD_TIME, MAX_PARTY, held_spots, hold_spots, my_invite, now_param, team_counts
+from .sms import drop_queued_texts
 from .notifications import notify
 from .social import is_blocked_between
 from .textutil import one_line
@@ -146,6 +147,7 @@ def send_party(event, chosen, team, joining_now, note=""):
         needed = (0 if ask_host else len(chosen)) + (1 if joining_now else 0)
         if room is not None and needed > room:
             db.rollback()
+            drop_queued_texts()
             for_friends = room - (1 if joining_now else 0)
             if for_friends <= 0:
                 return "Sorry, there's no room for a party in this game."
@@ -177,6 +179,7 @@ def send_party(event, chosen, team, joining_now, note=""):
         db.commit()
     except Exception:
         db.rollback()
+        drop_queued_texts()
         raise
     return None
 
