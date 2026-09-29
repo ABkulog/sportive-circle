@@ -13,6 +13,7 @@
   --gold-light: #e8e3d3;       /* Husky Gold (web): soft highlights */
   --gold-text: #85754d;        /* Heritage Gold: gold text that's readable on white */
   --gold-ink: #5c4f2e;         /* darker gold for small text on a gold-tinted chip */
+  --gold-on-header: #cdbd92;   /* gold *text* on the purple header: Husky Gold itself is only ~4.3:1 there */
   --spirit-gold: #ffc700;      /* Spirit Gold: tiny accents only */
   --accent: var(--purple);
   --accent-soft: #f1edf8;      /* a whisper of purple for boxes that need attention */
@@ -233,7 +234,7 @@ section.band > .section-title:first-child { margin-top: 0; }
 .brand { font-family: var(--display); font-weight: 800; font-size: 1.3rem; letter-spacing: .01em;
   color: var(--text); text-decoration: none; }
 .topbar .brand { color: #fff; }
-.topbar .brand-accent { color: var(--gold); }
+.topbar .brand-accent { color: var(--gold-on-header); }
 .brand { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .topbar .brand { flex: none; }   /* the logo never gets squeezed under the links */
 .topbar .nav, .topbar .top-icons { min-width: 0; }
@@ -755,7 +756,7 @@ form[data-wizard] .form-step { display: none; }
   background: var(--header); border-bottom: 6px solid var(--gold); }
 .husky-hero .eyebrow { color: #e8e3d3; }  /* the hero is purple in light and dark mode: fixed colors */
 .husky-hero h1 { color: #fff; text-transform: uppercase; letter-spacing: .01em; }
-.husky-hero .gold { color: var(--gold); }
+.husky-hero .gold { color: var(--gold-on-header); }
 .husky-hero .lead { color: rgba(255, 255, 255, .85); }
 .btn-on-purple { background: #b7a57a; color: #32006e; }
 .btn-on-purple:hover { background: #e8e3d3; }

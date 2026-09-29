@@ -2512,6 +2512,15 @@ def test_team_pill_stays_gold_on_purple_in_dark_mode():
         assert _contrast(c["--header"], "#e8e3d3") >= 4.5, theme
 
 
+def test_gold_text_on_the_purple_header_is_readable():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    assert ".topbar .brand-accent { color: var(--gold-on-header); }" in css
+    assert ".husky-hero .gold { color: var(--gold-on-header); }" in css
+    for theme, c in _theme_colors().items():
+        assert _contrast(c["--header"], c["--gold-on-header"]) >= 4.5, theme
+
+
 def test_relative_times_never_wrap_mid_phrase():
     import pathlib
     css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
