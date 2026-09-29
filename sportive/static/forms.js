@@ -1,4 +1,4 @@
-// Keeps the "Location" list and the "Players" number in sync with the chosen sport.
+// Keeps the "Location" list and the "Participants" number in sync with the chosen sport.
 // The server checks the same rules (constants.py), so this is only for convenience.
 (function () {
   const rulesElement = document.getElementById("sport-rules");
@@ -23,7 +23,7 @@
     else if (!allowed.includes(current)) location.value = "";
   }
 
-  // "Players": any number the host needs. Picking another sport suggests its usual size (5v5 basketball = 10),
+  // "Participants": any number the host needs. Picking another sport suggests its usual size (5v5 basketball = 10),
   // unless the host already typed their own number.
   let typedPlayers = false;
   if (players) players.addEventListener("input", () => { typedPlayers = true; });

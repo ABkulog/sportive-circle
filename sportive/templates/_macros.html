@@ -66,14 +66,14 @@
 {% endmacro %}
 
 {% macro players_block(form, friends=None, event=None) %}
-  {# Players = everyone who can play, you included. "Who's coming?" = the friends already in: picked from the
+  {# Participants = everyone who can take part, you included (not every sport has "players"). "Who's coming?" = the friends already in: picked from the
      app (their spots are held, or they're invited if it's private) or just counted if they aren't on the app.
      The host picks any number (every game is different); a new sport starts at its usual size.
      forms.js writes "You + 2 friends = 3 of 10 · need 7 more". #}
   {% set sport = form.get('sport', '') %}
   {% set chosen = (form.get('players') or DEFAULT_PLAYERS.get(sport, 10))|string %}
   {% set team_game = event.team_size if event else form.get('team_size') %}
-  <label class="field" data-show="regular" {% if team_game %}hidden{% endif %}><span>Players <em>(including you)</em></span>
+  <label class="field" data-show="regular" {% if team_game %}hidden{% endif %}><span>Participants <em>(including you)</em></span>
     <input name="players" type="number" inputmode="numeric" min="2" max="{{ MAX_PLAYERS }}" value="{{ chosen }}"
            required data-players></label>
   {% if not event %}

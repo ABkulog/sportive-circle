@@ -34,7 +34,7 @@ Feature: Games
   @FR-EVT-3
   Scenario: A game can't have more than 100 players (hosts pick any number below that)
     When "Maya" tries to host basketball for 300 players
-    Then they see "Pick 2 to 100 players"
+    Then they see "Pick 2 to 100 participants"
 
   @FR-EVT-4
   Scenario: Need players goes to the top of the feed

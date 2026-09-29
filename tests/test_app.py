@@ -114,7 +114,7 @@ def test_event_validation(accounts, client):
         b"can&#39;t be before now": event_form(starts_at=form_time(timedelta(hours=-2)),
                                                ends_at=form_time(timedelta(hours=1))),
         b"Please choose a location.": event_form(location="Moon"),
-        b"Pick 2 to 100 players": event_form(players="1"),
+        b"Pick 2 to 100 participants": event_form(players="1"),
     }
     for message, data in cases.items():
         assert message in client.post("/events/new", data=data).data, message
@@ -501,9 +501,10 @@ def test_host_picks_any_number_of_players(accounts, client, app):
     with app.app_context():
         sizes = dict(get_db().execute("SELECT id, max_players FROM events").fetchall())
     assert sizes[big] == 30 and sizes[event_id] == 10                                    # 5v5 by default
-    assert b"Pick 2 to 100 players" in client.post("/events/new", data=event_form(players="101")).data
+    assert b"Pick 2 to 100 participants" in client.post("/events/new", data=event_form(players="101")).data
     page = client.get("/events/new").data.decode()
     assert 'name="players" type="number"' in page and 'max="100"' in page
+    assert "Participants <em>(including you)</em>" in page and "<span>3</span> Participants</h2>" in page
 
 
 def test_quick_post_player_cap(accounts, client):
@@ -512,7 +513,7 @@ def test_quick_post_player_cap(accounts, client):
         "sport": "tennis", "location": "IMA North Tennis Courts", "skill_level": "All levels",
         "starts_in": "15", "duration": "60", "players": "5",
     }).data
-    assert b"Pick 2 to 100 players" not in page and b"can have 2 to" not in page   # 5 for tennis is the host's call
+    assert b"Pick 2 to 100 participants" not in page and b"can have 2 to" not in page   # 5 for tennis is the host's call
 
 
 def test_forms_include_sport_rules(accounts, client):

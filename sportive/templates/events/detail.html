@@ -44,7 +44,7 @@
     <div><dt>Where</dt><dd>{{ event.location }}
       {% set tip = place_tip(event.sport, event.location) %}{% if tip %}<small class="muted place-tip">{{ tip }}</small>{% endif %}</dd></div>
     <div><dt>Host</dt><dd><a class="person" href="{{ url_for('profile.view', user_id=event.host_id) }}">{{ avatar(event.host_id, event.host_name, event.host_avatar, 28) }}{{ event.host_name }}</a></dd></div>
-    <div><dt>Players</dt><dd>
+    <div><dt>Participants</dt><dd>
       {{ event.going_count + event.extra_players }} going{% if event.max_players %} of {{ event.max_players }}
         · {% if left == 0 %}<strong>full</strong>{% else %}<strong>{{ left }} spot{{ 's' if left != 1 }} left</strong>{% endif %}{% endif %}
       {% if event.held_count %}<small class="muted fact-note">{{ event.held_count }} held for invited friends</small>{% endif %}

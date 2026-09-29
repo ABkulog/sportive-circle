@@ -427,11 +427,11 @@ def read_players(form, sport, team_size, event=None):
     raw = form.get("players", "").strip()
     players = int(raw) if raw.isdigit() else (DEFAULT_PLAYERS.get(sport, 10) if not raw else 0)
     if not 2 <= players <= MAX_PLAYERS:
-        return None, 0, f"Pick 2 to {MAX_PLAYERS} players (you included)."
+        return None, 0, f"Pick 2 to {MAX_PLAYERS} participants (you included)."
     taken = (event["going_count"] + event["extra_players"]) if event is not None else 1 + extra
     if players < taken:
         return None, 0, (f"{taken} people are already in, so it can't be fewer players than that." if event
-                         else "That's more people than players.")
+                         else "That's more people than participants.")
     return players, extra, None
 
 
@@ -694,7 +694,7 @@ def quick():
                 error = error.replace("reserve", "invite")
         needed = (max_players or 0) - 1 - extra - len(reserve)
         if error is None and needed < 1 and not team_size:
-            error = "Everyone's already coming, so there's no one to find. Pick more players."
+            error = "Everyone's already coming, so there's no one to find. Pick more participants."
 
         if error is None:
             starts = round_up_5(now_local() + timedelta(minutes=_int(form.get("starts_in"))))
