@@ -20,6 +20,7 @@ from .links import public_url
 from .mail import compose, send_email
 from .moderation import is_admin
 from .notifications import mark_seen
+from .phones import phone_from_form
 from .photos import make_avatar
 from .textutil import multi_line, one_line
 from .timeutil import now_local, to_db
@@ -137,6 +138,7 @@ def read_club_form(form, club_id=None):
         value = get(key)
         data[key] = value if value.startswith("https://") else value.lstrip("@")
     data["competes"] = 1 if form.get("competes") else 0
+    data["contact_phone"] = phone_from_form(form.get("contact_phone_country"), form.get("contact_phone")) or ""
     members = get("member_estimate")
 
     def problem(field, message):
@@ -186,6 +188,9 @@ def read_club_form(form, club_id=None):
     if data["contact_url"] and (not data["contact_url"].startswith("https://") or " " in data["contact_url"]
                                 or len(data["contact_url"]) > 200):
         return problem("contact_url", "The website / Discord / GroupMe link must be a full https:// link.")
+    if not data["contact_phone"]:
+        return problem("contact_phone", "Add a phone number we can reach you at about this club (only our team "
+                       "sees it). Pick the country, then the number.")
     if not 2 <= len(data["officer_role"]) <= 40:
         return problem("officer_role", "What's your role in the club? (e.g. President, Captain, Treasurer)")
     if not members.isdigit() or int(members) < MIN_ACTIVE_MEMBERS:
@@ -203,7 +208,7 @@ def read_club_form(form, club_id=None):
 FIELDS = ("name", "sport", "description", "meets", "location", "contact_url", "club_kind", "verification_url",
           "officer_role", "member_estimate", "focus", "joining", "experience", "who_can_join", "dues", "gear",
           "competes", "how_to_join", "club_email", "instagram", "join_question", "tiktok", "snapchat", "x_handle",
-          "facebook", "youtube")
+          "facebook", "youtube", "contact_phone")
 
 
 # ---------------------------------------------------------------- browse
@@ -437,6 +442,9 @@ def edit(club_id):
     club = get_club(club_id)
     if my_role(club_id) != "officer":
         abort(403)
+    if club["status"] == "denied":
+        flash("This club request was denied, so it can't be changed or resent.", "error")
+        return redirect(url_for("clubs.view", club_id=club_id))
     error_field = None
     if request.method == "POST":
         form = request.form
@@ -716,7 +724,7 @@ def review_queue():
     if not is_admin():
         abort(404)
     status = request.args.get("status", "pending")
-    if status not in ("pending", "approved", "rejected"):
+    if status not in ("pending", "approved", "rejected", "denied"):
         status = "pending"
     clubs = get_db().execute(
         f"""SELECT c.*, u.full_name AS applicant, u.email AS applicant_email,
@@ -730,17 +738,50 @@ def review_queue():
                            who=WHO_CAN_JOIN_LABELS)
 
 
+REVIEW_DECISIONS = {
+    # decision: (the statuses it's allowed from, the new status)
+    "approve": (("pending", "rejected"), "approved"),
+    "reject": (("pending", "rejected"), "rejected"),           # "Send back": the officers fix it and resend
+    "deny": (("pending", "rejected"), "denied"),              # spam: hidden, can't be resent, nobody is told
+    "remove": (("approved",), "pending"),                    # a verified club goes back to the waiting list
+    "restore": (("denied",), "pending"),                     # a denial was a mistake
+}
+
+
 @bp.route("/admin/clubs/<int:club_id>/<decision>", methods=("POST",))
 @login_required
 def review(club_id, decision):
-    if not is_admin() or decision not in ("approve", "reject"):
+    if not is_admin() or decision not in REVIEW_DECISIONS:
         abort(404)
     club = get_club(club_id)
+    allowed_from, new_status = REVIEW_DECISIONS[decision]
+    back = redirect(url_for("clubs.review_queue", status=club["status"]))
+    if club["status"] not in allowed_from:
+        flash("That club already moved on. Here's where it is now.", "info")
+        return back
     note = multi_line(request.form.get("note"))[:500]
     if decision == "reject" and not note:
         flash("Add a short note so the officers know what to fix.", "error")
-        return redirect(url_for("clubs.review_queue"))
+        return back
     db = get_db()
+    if decision in ("deny", "remove", "restore"):
+        db.execute("UPDATE clubs SET status = ?, review_note = ?, reviewed_at = ? WHERE id = ?",
+                   (new_status, note if decision == "remove" else club["review_note"], to_db(now_local()), club_id))
+        db.commit()
+        if decision == "deny":
+            flash(f"Denied {club['name']}. It's hidden and can't be resent.", "info")
+        elif decision == "restore":
+            flash(f"{club['name']} is back on the waiting list.", "success")
+        else:
+            _notify_officers(club, f"About your Sportive Circle club: {club['name']}", "Your club is back in review",
+                             [f"{club['name']} was moved back to our waiting list, so it's hidden for now."]
+                             + ([f"Why: {note}"] if note else [])
+                             + ["We'll check it again soon and let you know."],
+                             ("See your club", _club_link(club_id)),
+                             notice=(f"{club['name']} is back in review" + (f": “{note}”" if note else ".")
+                                     + " It's hidden until it's approved again.", url_for("clubs.view", club_id=club_id)))
+            flash(f"Removed {club['name']} from the club list. It's on the waiting list now.", "info")
+        return redirect(url_for("clubs.review_queue", status=new_status))
     db.execute("UPDATE clubs SET status = ?, review_note = ?, reviewed_at = ? WHERE id = ?",
                ("approved" if decision == "approve" else "rejected", note, to_db(now_local()), club_id))
     db.commit()

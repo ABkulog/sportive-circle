@@ -56,7 +56,8 @@ def reminders():
 def texts():
     """Texts (optional): add a number (with permission), confirm it with a texted code, turn texts on or off,
     or remove the number."""
-    from .sms import check_phone_code, normalize_phone, remove_phone, sms_available, start_phone_check
+    from .phones import phone_from_form
+    from .sms import check_phone_code, remove_phone, sms_available, start_phone_check
     if not sms_available():
         flash("Texts aren't available yet. Everything comes by email for now.", "info")
         return redirect(url_for("settings.home"))
@@ -64,7 +65,7 @@ def texts():
     if request.method == "POST":
         action = request.form.get("action")
         if action == "send":
-            phone = normalize_phone(request.form.get("phone"))
+            phone = phone_from_form(request.form.get("phone_country"), request.form.get("phone"))
             if phone is None:
                 flash("That doesn't look like a phone number. Try (206) 555-0142.", "error")
             elif not request.form.get("consent"):

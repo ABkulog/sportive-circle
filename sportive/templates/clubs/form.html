@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Edit club' if club else 'Register your club' }}{% endblock %}
+{% from "_macros.html" import phone_field %}
 {% macro choice(name, options, label) %}
   <fieldset class="field">
     <legend>{{ label }}</legend>
@@ -65,7 +66,7 @@
       <span>We compete against other schools</span></label>
     </section>
     <section class="wizard-step" data-step="4">
-    <h2 class="form-step"><span>4</span> Socials or website</h2>
+    <h2 class="form-step"><span>4</span> Contact</h2>
     <fieldset class="field" data-need-one="Add a social media account or a website. It's how we check the club is real.">
       <legend>Add at least one: a social account or a website <em>(it's how we check the club is real)</em></legend>
       <div class="social-grid">
@@ -85,21 +86,24 @@
       <label class="field"><span>Website, Discord or GroupMe</span>
         <input name="contact_url" type="url" maxlength="200" value="{{ form.get('contact_url', '') }}" placeholder="https://…"></label>
     </fieldset>
+    <label class="field"><span>Club email</span>
+      <input name="club_email" type="email" maxlength="120" value="{{ form.get('club_email', '') }}" placeholder="yourclub@uw.edu" required></label>
     </section>
     <section class="wizard-step" data-step="5">
     <h2 class="form-step"><span>5</span> About the club and you</h2>
     <label class="field"><span>About the club</span>
       <textarea name="description" rows="3" maxlength="1000" required
                 placeholder="What you do, what a practice looks like, and who should join.">{{ form.get('description', '') }}</textarea></label>
-    <label class="field"><span>Club email</span>
-      <input name="club_email" type="email" maxlength="120" value="{{ form.get('club_email', '') }}" placeholder="yourclub@uw.edu" required></label>
-    <div class="row">
+    <div class="row row-pair">
       <label class="field"><span>Your role in the club</span>
         <input name="officer_role" maxlength="40" value="{{ form.get('officer_role', '') }}" placeholder="President" required></label>
       <label class="field"><span>Active members (about)</span>
         <input name="member_estimate" type="number" min="{{ min_members }}" max="5000" value="{{ form.get('member_estimate', '') }}"
                placeholder="25" required></label>
     </div>
+    {{ phone_field('contact_phone', form.get('contact_phone', ''), 'Your phone number', required=True,
+                   hint='Only our team sees it, to reach you about this club.',
+                   country=form.get('contact_phone_country')) }}
     <label class="toggle attest"><input type="checkbox" name="attest" value="1" required {% if club %}checked{% endif %}>
       <span>I'm a current officer of this club, and it's active this quarter.</span></label>
     </section>

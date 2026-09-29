@@ -5,6 +5,8 @@
 <a class="back-link" href="{{ url_for('clubs.directory') }}">← Clubs</a>
 {% if club.status == 'pending' %}
   <div class="flash flash-info club-status">⏳ <strong>Waiting for verification</strong> (usually within 2 days). Only officers can see this page.</div>
+{% elif club.status == 'denied' %}
+  <div class="flash flash-error club-status">This club request was denied. It isn't listed and can't be resent.</div>
 {% elif club.status == 'rejected' %}
   <div class="flash flash-error club-status">We couldn't verify this club yet.
     {% if club.review_note %}<br><strong>What to fix:</strong> {{ club.review_note }}{% endif %}
@@ -38,7 +40,7 @@
     {% if not g.user %}
       <a class="btn btn-block" href="{{ url_for('auth.signup', next=request.path) }}">Sign up to join</a>
     {% elif club.status != 'approved' %}
-      {% if role == 'officer' %}<a class="btn btn-ghost btn-block" href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit application</a>{% endif %}
+      {% if role == 'officer' and club.status != 'denied' %}<a class="btn btn-ghost btn-block" href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit application</a>{% endif %}
     {% elif role in ('member', 'officer') %}
       <div class="action-pair">
         <span class="btn btn-ghost is-static">{{ 'Officer' if role == 'officer' else 'Member' }}</span>

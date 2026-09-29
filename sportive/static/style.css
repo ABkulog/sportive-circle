@@ -916,7 +916,7 @@ body.has-help main.page { padding-bottom: 76px; }  /* the last card can scroll a
 .btn-small { min-height: 36px; }
 button.link-button { min-height: 36px; }
 .more-menu > summary { min-height: 40px; display: inline-flex; align-items: center; }
-.home-tabs a { min-width: 44px; text-align: center; }
+.home-tabs a { min-width: 44px; text-align: center; flex: none; }  /* never squeezed: the row scrolls instead */
 .past-list a { display: inline-block; padding: 8px 0; }
 .switch-heading { font-size: .8rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
                   color: var(--muted); margin: 10px 0 0; }
@@ -974,3 +974,5 @@ button.link-button { min-height: 36px; }
   100% { transform: scale(1) rotate(0); }
 }
 @keyframes bell-count-pop { from { transform: scale(0); } to { transform: scale(1); } }
+.phone-row { display: grid; grid-template-columns: minmax(96px, auto) minmax(0, 1fr); gap: 8px; }
+.phone-row select { width: auto; }

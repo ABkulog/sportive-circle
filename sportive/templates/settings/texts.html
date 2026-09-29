@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Texts{% endblock %}
+{% from "_macros.html" import phone_field %}
 {% block content %}
 <a class="back-link" href="{{ url_for('settings.home') }}">← Settings</a>
 <div class="card form-card">
@@ -22,9 +23,7 @@
     <p class="muted">Optional. Get codes and game updates by text too. Your UW email still gets everything.</p>
     <form method="post" class="form">
       {{ csrf_field() }}<input type="hidden" name="action" value="send">
-      <label class="field"><span>Phone number</span>
-        <input name="phone" type="tel" inputmode="tel" autocomplete="tel" value="{{ pretty_phone(user.phone) }}"
-               placeholder="(206) 555-0142" required></label>
+      {{ phone_field('phone', user.phone, required=True) }}
       <label class="toggle consent"><input type="checkbox" name="consent" value="1" required><span>{{ SMS_CONSENT }}</span></label>
       <button class="btn btn-block">{{ 'Text me a new code' if user.sms_code else 'Text me a code' }}</button>
     </form>

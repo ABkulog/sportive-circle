@@ -6,7 +6,7 @@
 <p class="muted">Open the club's social accounts or website: is it a real UW club, active this quarter, and is the
   applicant one of its officers?</p>
 <nav class="home-tabs" aria-label="Status">
-  {% for key, label in [('pending', 'Waiting'), ('approved', 'Approved'), ('rejected', 'Needs changes')] %}
+  {% for key, label in [('pending', 'Waiting'), ('approved', 'Approved'), ('rejected', 'Sent back'), ('denied', 'Denied')] %}
     <a href="{{ url_for('clubs.review_queue', status=key) }}" {% if status == key %}class="is-on" aria-current="page"{% endif %}>{{ label }} ({{ club_counts.get(key, 0) }})</a>
   {% endfor %}
 </nav>
@@ -27,11 +27,13 @@
       </ul>
       <p><strong>Applicant:</strong> {{ c.applicant or 'deleted account' }} <span class="muted">({{ c.applicant_email }})</span>,
         {{ c.officer_role }} · says ~{{ c.member_estimate }} active members</p>
+      {% if c.contact_phone %}<p><strong>Phone:</strong> <a href="tel:{{ c.contact_phone }}">{{ phone_for_admins(c.contact_phone) }}</a>
+        <span class="muted">(only admins see this)</span></p>{% endif %}
       <p class="club-about">{{ c.description }}</p>
       <p class="muted">{{ focus.get(c.focus, '') }} · {{ joining.get(c.joining, '') }} · {{ experience.get(c.experience, '') }}
         · {{ who.get(c.who_can_join, '') }} · Dues: {{ c.dues or 'Free' }}</p>
       {% if c.review_note %}<p class="report-details">Note: “{{ c.review_note }}”</p>{% endif %}
-      {% if status != 'approved' %}
+      {% if status in ('pending', 'rejected') %}
         <div class="review-actions">
           <form method="post" action="{{ url_for('clubs.review', club_id=c.id, decision='approve') }}">
             {{ csrf_field() }}<button class="btn">Approve</button></form>
@@ -40,9 +42,25 @@
             <input name="note" maxlength="500" placeholder="What should they fix? (required)" aria-label="Reason">
             <button class="btn btn-danger-ghost">Send back</button>
           </form>
+          <form method="post" action="{{ url_for('clubs.review', club_id=c.id, decision='deny') }}"
+                data-confirm="Deny {{ c.name }} as spam? It's hidden and can't be resent. Nobody is told.">
+            {{ csrf_field() }}<button class="link-button danger-link">Deny (spam)</button></form>
+        </div>
+      {% elif status == 'approved' %}
+        <div class="review-actions">
+          <a class="btn btn-small btn-ghost" href="{{ url_for('clubs.view', club_id=c.id) }}">View club</a>
+          <form method="post" action="{{ url_for('clubs.review', club_id=c.id, decision='remove') }}" class="reject-form"
+                data-confirm="Remove {{ c.name }} from the club list? It goes back to the waiting list and its officers are told.">
+            {{ csrf_field() }}
+            <input name="note" maxlength="500" placeholder="Why? (optional, the officers see it)" aria-label="Why it's removed">
+            <button class="btn btn-danger-ghost">Remove</button>
+          </form>
         </div>
       {% else %}
-        <a class="btn btn-small btn-ghost" href="{{ url_for('clubs.view', club_id=c.id) }}">View club</a>
+        <div class="review-actions">
+          <form method="post" action="{{ url_for('clubs.review', club_id=c.id, decision='restore') }}">
+            {{ csrf_field() }}<button class="btn btn-ghost">Restore to waiting list</button></form>
+        </div>
       {% endif %}
     </article>
   {% else %}

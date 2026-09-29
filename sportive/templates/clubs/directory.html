@@ -40,6 +40,7 @@
         {% if c.upcoming %}<span class="badge">{{ c.upcoming }} upcoming</span>{% endif %}
         {% if c.status == 'approved' %}<span class="badge badge-verified"><span class="check" aria-hidden="true">✓</span> Verified</span>
         {% elif c.status == 'pending' %}<span class="badge badge-gold">⏳ In review</span>
+        {% elif c.status == 'denied' %}<span class="badge badge-danger">Denied</span>
         {% else %}<span class="badge badge-danger">Needs changes</span>{% endif %}
         {% if c.my_status == 'officer' and c.waiting %}<span class="badge badge-gold">🙋 {{ c.waiting }} waiting to join</span>{% endif %}
         {% if c.my_status in ('member', 'officer') %}<span class="badge badge-success">{{ 'Officer' if c.my_status == 'officer' else 'Member' }}</span>

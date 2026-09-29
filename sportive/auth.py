@@ -319,7 +319,8 @@ def signup_sports():
 @bp.route("/signup/texts", methods=("GET", "POST"))
 def signup_texts():
     """Sign-up step 3 (optional): get codes and game updates by text too. Asks for permission first."""
-    from .sms import normalize_phone, sms_available, start_phone_check
+    from .phones import phone_from_form
+    from .sms import sms_available, start_phone_check
     email = session.get("pending_email")
     user = email and get_db().execute("SELECT id, phone FROM users WHERE email = ? AND verified = 0",
                                       (email,)).fetchone()
@@ -331,7 +332,7 @@ def signup_texts():
         raw = request.form.get("phone", "")
         if not raw.strip():
             return redirect(url_for("auth.verify"))  # skipped: texts stay off
-        phone = normalize_phone(raw)
+        phone = phone_from_form(request.form.get("phone_country"), raw)
         if phone is None:
             flash("That doesn't look like a phone number. Try (206) 555-0142.", "error")
         elif not request.form.get("consent"):
@@ -341,7 +342,8 @@ def signup_texts():
             if problem is None:
                 return redirect(url_for("auth.verify"))
             flash(problem, "error")
-    return render_template("auth/signup_texts.html", phone=request.form.get("phone", ""))
+    return render_template("auth/signup_texts.html", phone=request.form.get("phone", ""),
+                           country=request.form.get("phone_country"))
 
 
 @bp.route("/verify", methods=("GET", "POST"))

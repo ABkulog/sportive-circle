@@ -213,3 +213,23 @@
     <a href="{{ url_for('feedback.admin_suggestions') }}" {% if active == 'suggestions' %}aria-current="page"{% endif %}>💡 Suggestions{% set n = tab_badges().admin %}{% if n %} ({{ n }} trending){% endif %}</a>
   </nav>
 {% endmacro %}
+
+{% macro phone_field(name, value='', label='Phone number', required=False, hint='', country=None) %}
+  {# A country picker ("US +1") and a number box that adds dashes as you type (app.js). Sends name_country + name.
+     `value` is a saved number (+12065550142) or, after a form error, what was typed (with `country`). #}
+  {% if value and value.startswith('+') and not country %}{% set country, national = split_phone(value) %}
+  {% else %}{% set national = value or '' %}{% set country = country or 'US' %}{% endif %}
+  <div class="field phone-field">
+    <label for="{{ name }}-number"><span>{{ label }}</span></label>
+    <div class="phone-row">
+      <select name="{{ name }}_country" aria-label="Country code" data-phone-country>
+        {% for code, country_name, dial in PHONE_COUNTRIES %}
+          <option value="{{ code }}" data-dial="{{ dial }}" title="{{ country_name }}" {% if code == country %}selected{% endif %}>{{ code }} +{{ dial }}</option>
+        {% endfor %}
+      </select>
+      <input id="{{ name }}-number" name="{{ name }}" type="tel" inputmode="tel" autocomplete="tel-national"
+             value="{{ national }}" placeholder="206-555-0142" maxlength="20" data-phone {% if required %}required{% endif %}>
+    </div>
+    {% if hint %}<small class="muted">{{ hint }}</small>{% endif %}
+  </div>
+{% endmacro %}

@@ -139,7 +139,8 @@ CLUB = {"sport": "spikeball", "description": "Casual roundnet on the Quad. Every
         "verification_url": "https://huskylink.washington.edu/organization/uwspikeball", "officer_role": "President",
         "member_estimate": "30", "focus": "recreational", "joining": "open", "experience": "none",
         "who_can_join": "everyone", "dues": "Free", "gear": "Nets provided", "how_to_join": "Come to any practice!",
-        "club_email": "spike@uw.edu", "join_question": "Played before?", "attest": "1", "instagram": "uwspikeball"}
+        "club_email": "spike@uw.edu", "join_question": "Played before?", "attest": "1", "instagram": "uwspikeball",
+        "contact_phone_country": "US", "contact_phone": "206-555-0142"}
 
 
 def club_id(world, club):

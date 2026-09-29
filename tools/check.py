@@ -151,7 +151,7 @@ FIELDS = {
     "/profile/password": ["current_password", "password", "password2"],
     "/profile/badges": ["show"],
     "/profile/delete": ["confirm", "password"],
-    "/clubs/new": ["name", "sport", "description", "verification_url", "member_estimate", "club_email", "instagram",
+    "/clubs/new": ["name", "sport", "description", "verification_url", "contact_phone", "contact_phone_country", "member_estimate", "club_email", "instagram",
                    "facebook", "contact_url", "joining", "focus"],
     "/clubs/1/join": ["message"],
     "/clubs/updates": ["club", "body"],

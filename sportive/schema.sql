@@ -199,9 +199,10 @@ CREATE TABLE IF NOT EXISTS clubs (
     meets       TEXT NOT NULL DEFAULT '',      -- e.g. "Tuesdays & Thursdays, 7-9 PM"
     location    TEXT NOT NULL DEFAULT '',
     contact_url TEXT NOT NULL DEFAULT '',      -- website, Discord... (https only)
-    status           TEXT NOT NULL DEFAULT 'pending',  -- 'pending' until an admin approves it, then 'approved' (or 'rejected')
+    status           TEXT NOT NULL DEFAULT 'pending',  -- 'pending' until an admin approves it, then 'approved' ('rejected' = sent back, 'denied' = spam)
     club_kind        TEXT NOT NULL DEFAULT '',  -- 'rec_club' (UW Recreation Rec Club) or 'rso' (Registered Student Organization)
     verification_url TEXT NOT NULL DEFAULT '',  -- no longer asked (clubs are checked through their socials); kept for old clubs
+    contact_phone    TEXT NOT NULL DEFAULT '',  -- the applicant's phone, +12065550142: only admins see it
     officer_role     TEXT NOT NULL DEFAULT '',  -- the applicant's role, e.g. President
     member_estimate  INTEGER NOT NULL DEFAULT 0,  -- roughly how many active members
     focus            TEXT NOT NULL DEFAULT '',  -- competitive / recreational / instructional / mixed (UW Rec's categories)

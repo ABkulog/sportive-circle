@@ -316,6 +316,26 @@
     }
   }
 
+  // Phone boxes: dashes appear as you type (206-555-0142 for +1 numbers; other countries in groups).
+  document.querySelectorAll("input[data-phone]").forEach((input) => {
+    const picker = input.closest(".phone-row") && input.closest(".phone-row").querySelector("[data-phone-country]");
+    const format = () => {
+      if (input.value.trim().startsWith("+")) return;  // a full international number: leave it as typed
+      const us = !picker || picker.selectedOptions[0].dataset.dial === "1";
+      let digits = input.value.replace(/\D/g, "");
+      if (us && digits.length === 11 && digits.startsWith("1")) digits = digits.slice(1);
+      if (us) digits = digits.slice(0, 10);
+      const parts = us ? [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6)]
+        : (() => { const head = digits.slice(0, -4), groups = [];
+                   for (let i = 0; i < head.length; i += 3) groups.push(head.slice(i, i + 3));
+                   if (groups.length > 1 && groups[groups.length - 1].length === 1) groups.splice(-2, 2, groups.slice(-2).join(""));
+                   return digits.length > 4 ? [...groups, digits.slice(-4)] : [digits]; })();
+      input.value = parts.filter(Boolean).join("-");
+    };
+    input.addEventListener("input", format);
+    if (picker) picker.addEventListener("change", format);
+  });
+
   // Every password box gets an eye button to peek at what you typed (tap again to hide it).
   const EYE = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor"' +
     ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7' +

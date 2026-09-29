@@ -8,7 +8,7 @@ from flask import Flask, render_template, request
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from . import (auth, clubs, db, events, feedback, mail, moderation, notifications, pages, parties, profile,
-               reminders, settings, sms, social, stats)
+               phones, reminders, settings, sms, social, stats)
 from .constants import (DEFAULT_PLAYERS, LOCATIONS, OPEN_TO, OPEN_TO_BADGE, OPEN_TO_LABELS, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS,
                         MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .photos import MAX_UPLOAD_MB
@@ -157,6 +157,7 @@ def _add_template_helpers(app):
         open_report_count=moderation.open_report_count, pending_club_count=clubs.pending_club_count,
         is_team=moderation.is_team, current_theme=settings.current_theme, sms_available=lambda: sms.sms_available(),
         pretty_phone=sms.pretty_phone, masked_phone=sms.masked_phone, SMS_CONSENT=sms.CONSENT,
+        PHONE_COUNTRIES=phones.COUNTRIES, split_phone=phones.split_phone, phone_for_admins=phones.pretty_phone,
     )
     app.jinja_env.filters.update(when=fmt_when, clock=fmt_clock, relative=fmt_relative, ago=fmt_ago, full=fmt_full)
 

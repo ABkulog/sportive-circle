@@ -1463,7 +1463,8 @@ CLUB = {"name": "UW Spikeball Club", "sport": "spikeball",
         "officer_role": "President", "member_estimate": "30", "focus": "recreational", "joining": "open",
         "experience": "none", "who_can_join": "everyone", "dues": "Free", "gear": "Nets provided",
         "how_to_join": "Come to any Tuesday practice!", "club_email": "spike@uw.edu", "instagram": "@uwspikeball",
-        "join_question": "Have you played spikeball before?", "attest": "1"}
+        "join_question": "Have you played spikeball before?", "attest": "1",
+        "contact_phone_country": "US", "contact_phone": "206-555-0142"}
 
 
 def _club_id(app, name="UW Spikeball Club"):
@@ -4337,3 +4338,78 @@ def test_a_reserved_spot_is_texted(accounts, client, app, monkeypatch):
     _as(accounts, "Maya")
     client.post(f"/events/{game}/requests/{ids['Lee']}/approve")
     assert any(to == phone["Lee"] and "held for 30 min" in body for to, body in sent)
+
+
+def test_phone_numbers_with_a_country_picker():
+    """Pick the country (+1, +44...), type the number any way: it's saved with its country code."""
+    from sportive.phones import group_digits, phone_from_form, pretty_phone, split_phone
+    assert phone_from_form("US", "206-555-0142") == phone_from_form("US", "(206) 555 0142") == "+12065550142"
+    assert phone_from_form("CA", "1 604 555 0142") == "+16045550142"
+    assert phone_from_form("GB", "07946 095 800") == "+447946095800"          # the leading 0 is dropped
+    assert phone_from_form("IN", "98765 43210") == "+919876543210"
+    assert phone_from_form("US", "+44 7946 095800") == "+447946095800"       # a typed + code wins
+    assert phone_from_form("US", "555-0142") is None and phone_from_form("ZZ", "2065550142") is None
+    assert split_phone("+12065550142") == ("US", "206-555-0142")
+    assert pretty_phone("+447946095800") == "+44 794-609-5800"
+    assert group_digits("2065550142", us=True) == "206-555-0142"
+
+
+def test_club_registration_asks_for_a_phone_only_admins_see(accounts, client, app):
+    accounts.signup(email="captain@uw.edu")
+    form = client.get("/clubs/new").data.decode()
+    assert 'name="contact_phone_country"' in form and '<option value="GB" data-dial="44"' in form
+    page = client.post("/clubs/new", data={**CLUB, "contact_phone": ""}).data.decode()
+    assert "Add a phone number we can reach you at" in page and 'data-error-field="contact_phone"' in page
+    client.post("/clubs/new", data={**CLUB, "contact_phone_country": "GB", "contact_phone": "07946 095800"})
+    with app.app_context():
+        assert get_db().execute("SELECT contact_phone FROM clubs").fetchone()[0] == "+447946095800"
+    club = _club_id(app)
+    assert "+44 794-609-5800" not in client.get(f"/clubs/{club}").data.decode()      # not on the club page
+    accounts.logout()
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="admin@uw.edu")
+    assert 'href="tel:+447946095800">+44 794-609-5800</a>' in client.get("/admin/clubs").data.decode()
+
+
+def test_admins_can_deny_spam_and_remove_verified_clubs(accounts, client, app, monkeypatch):
+    from sportive import clubs
+    monkeypatch.setattr(clubs, "send_email", lambda *args, **kwargs: None)
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="spammer@uw.edu")
+    client.post("/clubs/new", data={**CLUB, "name": "Buy Cheap Stuff"})
+    spam = _club_id(app, "Buy Cheap Stuff")
+    accounts.logout()
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    with app.app_context():
+        real = get_db().execute("SELECT id FROM clubs WHERE name = ?", (CLUB["name"],)).fetchone()[0]
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    queue = client.get("/admin/clubs").data.decode()
+    assert "Deny (spam)" in queue and ">Denied (0)</a>" in queue
+    client.post(f"/admin/clubs/{spam}/deny")
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM clubs WHERE id = ?", (spam,)).fetchone()[0] == "denied"
+    assert "Buy Cheap Stuff" in client.get("/admin/clubs?status=denied").data.decode()
+    client.post(f"/admin/clubs/{real}/approve")
+    assert "UW Spikeball Club" in client.get("/clubs").data.decode()
+    # Remove: back to the waiting list, off the public list, and the officers hear why
+    client.post(f"/admin/clubs/{real}/remove", data={"note": "Your Instagram is private."})
+    assert f'href="/clubs/{real}"' not in client.get("/clubs").data.decode()          # off the public list
+    assert "UW Spikeball Club" in client.get("/admin/clubs?status=pending").data.decode()
+    assert client.post(f"/admin/clubs/{real}/restore").status_code == 302            # only denied ones restore
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM clubs WHERE id = ?", (real,)).fetchone()[0] == "pending"
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    assert "back in review: “Your Instagram is private.”" in client.get("/notifications").data.decode()
+    # the spammer can't edit or resend a denied request
+    accounts.logout()
+    accounts.login(email="spammer@uw.edu")
+    assert "was denied" in client.get(f"/clubs/{spam}").data.decode()
+    assert client.get(f"/clubs/{spam}/edit").headers["Location"].endswith(f"/clubs/{spam}")
+
+
+def test_phone_groups_never_leave_a_lonely_digit():
+    from sportive.phones import group_digits
+    assert group_digits("07946095800") == "079-4609-5800" and group_digits("9876543210") == "987-654-3210"
