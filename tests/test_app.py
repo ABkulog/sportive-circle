@@ -2349,6 +2349,18 @@ def test_fine_print_has_a_style():
     assert _css_classes_used_but_undefined(["fine-print"]) == []
 
 
+def test_filtering_the_feed_keeps_need_players_posts_in_the_results(accounts, client):
+    accounts.signup(email="host@uw.edu")
+    client.post("/need-players", data={"sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
+                                       "starts_in": "15", "duration": "60", "players": "4"})
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    unfiltered = client.get("/?scope=all").data.decode()
+    assert 'id="soon-title"' in unfiltered
+    filtered = client.get("/?scope=all&sport=soccer").data.decode()
+    assert 'id="soon-title"' not in filtered and "No games yet" not in filtered
+
+
 def test_a_message_that_cant_be_sent_stays_in_the_box(accounts, client):
     accounts.signup()
     event_id = event_id_from(client.post("/events/new", data=event_form()))

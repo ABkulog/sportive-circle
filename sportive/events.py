@@ -284,8 +284,10 @@ def feed():
 
     events = query_events(where, params)
 
-    # "Need players" posts starting soon (any sport) go in their own strip at the top.
-    need_players = [
+    # "Need players" posts starting soon (any sport) go in their own strip at the top. While filtering,
+    # the strip is hidden and those games stay in the list, so the results match the filters exactly.
+    filtering = filters["scope"] == "full" or any(filters[key] for key in ("sport", "location", "skill", "when", "open"))
+    need_players = [] if filtering else [
         e for e in query_events(
             ["e.cancelled = 0", "e.is_quick = 1", "e.ends_at >= :now", "e.starts_at <= :soon", NOT_BLOCKED,
              games_open_to_me(),
