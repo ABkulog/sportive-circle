@@ -482,6 +482,20 @@ def test_reminders_are_sent_once(accounts, client, app, monkeypatch):
     assert "Evening hoops" in sent[0][1] and "/events/1" in sent[0][2]
 
 
+def test_moving_a_game_rearms_its_reminders(accounts, client, app, monkeypatch):
+    from sportive import reminders
+    monkeypatch.setattr(reminders, "send_email", lambda *args, **kwargs: None)
+    _reminder_setup(accounts, client, app, joined_minutes_before=120)
+    with app.app_context():
+        assert reminders.send_due_reminders() == 2
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post("/events/1/edit", data=event_form(title="Evening hoops", starts_at=form_time(timedelta(days=1)),
+                                                  ends_at=form_time(timedelta(days=1, hours=2))))
+    with app.app_context():
+        assert get_db().execute("SELECT SUM(reminder_sent) FROM rsvps").fetchone()[0] == 0
+
+
 def test_no_reminder_for_last_minute_joins_or_opt_outs(accounts, client, app, monkeypatch):
     from sportive import reminders
     sent = []

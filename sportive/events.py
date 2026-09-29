@@ -544,6 +544,8 @@ def edit(event_id):
                 db.rollback()
                 flash("Someone just joined, so there are more people in than that. Pick more players.", "error")
                 return render_template("events/form.html", form=form, event=get_event(event_id), min_start="")
+            if data["starts_at"] != event["starts_at"]:  # a reminder for the old time doesn't cover the new one
+                db.execute("UPDATE rsvps SET reminder_sent = 0 WHERE event_id = ?", (event_id,))
             told = tell_players_it_changed(event, data)
             db.commit()
             flash("Saved. Everyone going got a heads-up." if told else "Saved.", "success")
