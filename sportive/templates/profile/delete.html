@@ -12,6 +12,9 @@
     {% if lose.hosting %}
       <li><strong>{{ lose.hosting }}</strong> upcoming game{{ 's' if lose.hosting != 1 }} you host (canceled for everyone)</li>
     {% endif %}
+    {% for c in lone_clubs %}
+      <li>Your club <strong>{{ c.name }}</strong> (nobody else is in it yet, so it's deleted too)</li>
+    {% endfor %}
   </ul>
 
   {% if sole_officer %}

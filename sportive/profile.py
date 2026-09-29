@@ -326,13 +326,22 @@ def what_you_would_lose(user_id):
     }
 
 
-def clubs_only_i_lead(user_id):
-    """Clubs where this person is the only officer (they'd be left without a leader)."""
-    return get_db().execute(
-        """SELECT c.id, c.name FROM clubs c JOIN club_members m ON m.club_id = c.id
+SOLE_OFFICER = """SELECT c.id, c.name FROM clubs c JOIN club_members m ON m.club_id = c.id
            WHERE m.user_id = ? AND m.role = 'officer'
-             AND (SELECT COUNT(*) FROM club_members o WHERE o.club_id = c.id AND o.role = 'officer') = 1""",
-        (user_id,)).fetchall()
+             AND (SELECT COUNT(*) FROM club_members o WHERE o.club_id = c.id AND o.role = 'officer') = 1
+             AND {} (c.status = 'approved' AND EXISTS (SELECT 1 FROM club_members o WHERE o.club_id = c.id
+                                                        AND o.role = 'member'))"""
+
+
+def clubs_only_i_lead(user_id):
+    """Live clubs with members where this person is the only officer (they'd be left without a leader)."""
+    return get_db().execute(SOLE_OFFICER.format(""), (user_id,)).fetchall()
+
+
+def clubs_that_go_with_me(user_id):
+    """Clubs only this person runs that nobody else is in yet (still pending, rejected, or no members).
+    There's no one to hand them to, so they're deleted with the account instead of blocking it."""
+    return get_db().execute(SOLE_OFFICER.format("NOT"), (user_id,)).fetchall()
 
 
 @bp.route("/profile/delete", methods=("GET", "POST"))
@@ -343,7 +352,7 @@ def delete_account():
     sole_officer = clubs_only_i_lead(g.user["id"])
     if request.method == "GET":
         return render_template("profile/delete.html", lose=what_you_would_lose(g.user["id"]), word=CONFIRM_WORD,
-                               sole_officer=sole_officer)
+                               sole_officer=sole_officer, lone_clubs=clubs_that_go_with_me(g.user["id"]))
     if sole_officer:
         flash(f"You're the only officer of {sole_officer[0]['name']}. Make someone else an officer first.", "error")
         return redirect(url_for("profile.delete_account"))
@@ -359,6 +368,8 @@ def delete_account():
                               {"now": to_db(now_local())}):
         tell_players_it_was_cancelled(event)
     db = get_db()
+    for club in clubs_that_go_with_me(g.user["id"]):
+        db.execute("DELETE FROM clubs WHERE id = ?", (club["id"],))
     # ON DELETE CASCADE (schema.sql) also removes your sports, RSVPs and hosted events.
     db.execute("DELETE FROM users WHERE id = ?", (g.user["id"],))
     db.commit()

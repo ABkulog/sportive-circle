@@ -1875,12 +1875,30 @@ def test_need_players_chat_opens(accounts, client):
 
 
 def test_only_officer_cant_delete_account(accounts, client, app):
-    _approved_club(accounts, client, app)
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu")
+    accounts.logout()
+    with app.app_context():
+        get_db().execute("INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, 'member', '2026-01-01 10:00')",
+                         (club, _user_id(app, "fan@uw.edu")))
+        get_db().commit()
     accounts.login(email="captain@uw.edu")
     assert "the only officer" in client.get("/profile/delete").data.decode()
     client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
     with app.app_context():
         assert get_db().execute("SELECT COUNT(*) FROM users WHERE email = 'captain@uw.edu'").fetchone()[0] == 1
+
+
+def test_pending_club_doesnt_block_deleting_the_account(accounts, client, app):
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    page = client.get("/profile/delete").data.decode()
+    assert "the only officer" not in page and "deleted too" in page
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT COUNT(*) FROM users WHERE email = 'captain@uw.edu'").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == 0
 
 
 def test_signup_cant_flood_an_inbox(accounts, client):
