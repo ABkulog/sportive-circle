@@ -3013,6 +3013,20 @@ def test_need_players_host_hears_when_someone_joins(accounts, client, app):
     assert len(texts) == 1 and texts[0].startswith("Pat joined") and "(2 going now)" in texts[0]
 
 
+def test_blocked_people_are_listed_in_settings_and_can_be_unblocked(accounts, client, app):
+    accounts.signup(email="pest@uw.edu", name="Pesky Pete")
+    pest = _user_id(app, "pest@uw.edu")
+    accounts.logout()
+    accounts.signup()
+    assert "You haven't blocked anyone." in client.get("/settings/blocked").data.decode()
+    assert "/settings/blocked" in client.get("/settings").data.decode()
+    client.post(f"/block/{pest}")
+    assert "Pesky Pete" in client.get("/settings/blocked").data.decode()
+    response = client.post(f"/unblock/{pest}", data={"from": "blocked"})
+    assert response.headers["Location"].endswith("/settings/blocked")
+    assert "You haven't blocked anyone." in client.get("/settings/blocked").data.decode()
+
+
 def test_leaving_a_game_asks_first(accounts, client):
     accounts.signup(email="host@uw.edu")
     event_id = event_id_from(client.post("/events/new", data=event_form(players="2")))

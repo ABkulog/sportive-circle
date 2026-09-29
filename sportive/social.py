@@ -345,7 +345,19 @@ def unblock(user_id):
     db.execute("DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?", (g.user["id"], user_id))
     db.commit()
     flash("Unblocked.", "info")
+    if request.form.get("from") == "blocked":
+        return redirect(url_for("social.blocked_people"))
     return redirect(url_for("profile.view", user_id=user_id))
+
+
+@bp.route("/settings/blocked")
+@login_required
+def blocked_people():
+    """Everyone I've blocked, so I can find and unblock them without remembering who they were."""
+    people = get_db().execute(
+        """SELECT u.id, u.full_name, u.avatar_updated, b.created_at FROM blocks b JOIN users u ON u.id = b.blocked_id
+           WHERE b.blocker_id = ? ORDER BY b.created_at DESC""", (g.user["id"],)).fetchall()
+    return render_template("settings/blocked.html", people=people)
 
 
 # ---------------------------------------------------------- direct messages
