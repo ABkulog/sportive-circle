@@ -400,7 +400,9 @@ def test_relative_time_counts_hours_across_midnight(monkeypatch):
     from sportive import timeutil
     monkeypatch.setattr(timeutil, "now_local", lambda: datetime(2026, 9, 26, 23, 4))
     assert timeutil.fmt_relative("2026-09-26 23:15") == "in 11 min"
-    assert timeutil.fmt_relative("2026-09-27 00:43") == "in 1 hr"
+    assert timeutil.fmt_relative("2026-09-27 00:43") == "in 1 hr 40 min"
+    assert timeutil.fmt_relative("2026-09-27 01:03") == "in 2 hr"        # 1:59 away, not "in 1 hr"
+    assert timeutil.fmt_relative("2026-09-27 04:50") == "in 6 hr"        # 5:46 away rounds to the nearest hour
     assert timeutil.fmt_relative("2026-09-27 19:00") == "tomorrow"
     assert timeutil.fmt_relative("2026-09-30 19:00") == "in 4 days"
 

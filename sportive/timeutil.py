@@ -64,8 +64,11 @@ def fmt_relative(value):
         return "happening now"
     if minutes < 60:
         return f"in {minutes} min"
+    if minutes < 3 * 60:  # "in 1 hr" for 1:55 away sends people out an hour late; show the minutes too
+        hours, mins = divmod(round(minutes / 5) * 5, 60)
+        return f"in {hours} hr" + (f" {mins} min" if mins else "")
     if minutes < 12 * 60:
-        return f"in {minutes // 60} hr"
+        return f"in {round(minutes / 60)} hr"
     days = (dt.date() - now.date()).days
     if days == 0:
         return "later today"
