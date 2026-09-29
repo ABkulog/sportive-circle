@@ -728,7 +728,10 @@ form[data-wizard] .form-step { display: none; }
 .chat-name { display: block; font-size: .72rem; font-weight: 600; color: var(--muted); }
 .chat-bubble time { display: block; font-size: .66rem; opacity: .65; margin-top: 2px; text-align: right; }
 .chat-report { display: block; padding: 4px 0 2px; min-height: 24px; font-size: .75rem; color: var(--muted); }
-.chat-empty { text-align: center; padding: 0 14px 14px; margin: 0; }
+.chat-empty { display: grid; justify-items: center; gap: 6px; padding: 48px 14px; text-align: center; }
+.chat-empty p { margin: 0; }
+.chat-empty-icon { font-size: 2rem; }
+.chat.is-empty .chat-messages { height: auto; padding: 0; }  /* no tall blank box above "Say hi!" */
 .chat-composer { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
 .chat-composer textarea { resize: none; min-height: 42px; max-height: 140px; border-radius: 20px; }
 .convo { display: flex; gap: 12px; align-items: center; padding: 12px 0; color: var(--text);

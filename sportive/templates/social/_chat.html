@@ -1,6 +1,6 @@
 {# Shared chat box: messages + composer. Needs: messages, poll_url, action (form URL), can_send, placeholder #}
 {% macro chat_box(messages, poll_url, action, can_send, placeholder, empty_text, draft='') %}
-  <div class="chat card" data-poll-url="{{ poll_url }}"
+  <div class="chat card{% if not messages %} is-empty{% endif %}" data-poll-url="{{ poll_url }}"
        data-last-id="{{ messages[-1].id if messages else 0 }}">
     <ol class="chat-messages" id="chat-messages" aria-live="polite">
       {% for m in messages %}
@@ -19,7 +19,10 @@
         </li>
       {% endfor %}
     </ol>
-    <p class="chat-empty muted" id="chat-empty" {% if messages %}hidden{% endif %}>{{ empty_text }}</p>
+    <div class="chat-empty" id="chat-empty" {% if messages %}hidden{% endif %}>
+      <span class="chat-empty-icon" aria-hidden="true">👋</span>
+      <p class="muted">{{ empty_text if can_send else "No messages." }}</p>
+    </div>
     {% if can_send %}
       <form method="post" action="{{ action }}" class="chat-composer" id="composer">
         {{ csrf_field() }}

@@ -1893,6 +1893,19 @@ def test_need_players_chat_opens(accounts, client):
     assert page.status_code == 200 and b"Need 2 more for Soccer" in page.data
 
 
+def test_empty_chat_shows_a_real_empty_state(accounts, client):
+    accounts.signup()
+    game = event_id_from(client.post("/events/new", data=event_form()))
+    page = client.get(f"/events/{game}/chat").data.decode()
+    assert 'class="chat card is-empty"' in page and "No messages yet. Say hi!" in page
+    client.post(f"/events/{game}/chat", data={"body": "Who's bringing a ball?"})
+    assert "is-empty" not in client.get(f"/events/{game}/chat").data.decode()
+    other = event_id_from(client.post("/events/new", data=event_form(title="Called off")))
+    client.post(f"/events/{other}/cancel")
+    closed = client.get(f"/events/{other}/chat").data.decode()
+    assert "Say hi!" not in closed and "No messages." in closed      # a closed chat doesn't invite a message
+
+
 def test_only_officer_cant_delete_account(accounts, client, app):
     club = _approved_club(accounts, client, app)
     accounts.signup(email="fan@uw.edu")

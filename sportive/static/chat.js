@@ -65,6 +65,7 @@
       messages.forEach(render);
       lastId = messages[messages.length - 1].id;
       if (empty) empty.hidden = true;
+      box.classList.remove("is-empty");
       if (nearBottom) scrollDown();
     } catch (error) { /* offline for a moment; try again next time */ }
   }
