@@ -2363,6 +2363,23 @@ def test_filtering_the_feed_keeps_need_players_posts_in_the_results(accounts, cl
     assert 'id="soon-title"' not in filtered and "No games yet" not in filtered
 
 
+def test_need_players_strip_drops_games_well_under_way(accounts, client, app):
+    from sportive.timeutil import to_db
+    accounts.signup(email="host@uw.edu")
+    client.post("/need-players", data={"sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
+                                       "starts_in": "15", "duration": "120", "players": "4"})
+    with app.app_context():
+        db = get_db()
+        now = now_local()
+        db.execute("UPDATE events SET starts_at = ?, ends_at = ?",
+                   (to_db(now - timedelta(hours=1)), to_db(now + timedelta(minutes=10))))
+        db.commit()
+    assert 'id="soon-title"' in client.get("/?scope=all").data.decode()  # the host can still find it
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    assert 'id="soon-title"' not in client.get("/?scope=all").data.decode()
+
+
 def test_skill_filter_includes_all_levels_games(accounts, client):
     accounts.signup(email="host@uw.edu")
     client.post("/events/new", data=event_form(title="Everyone welcome run", skill_level="All levels"))

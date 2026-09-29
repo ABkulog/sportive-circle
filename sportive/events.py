@@ -33,6 +33,7 @@ MAX_DAYS_AHEAD = 365
 OPEN_SPOT_CHOICES = ("1", "2", "3", "4", "5", "10")  # the "Open spots" filter on Home
 QUICK_WINDOW = timedelta(hours=3)      # quick posts starting this soon go to the top of the feed
 MAX_QUICK_POSTS_PER_HOUR = 4
+LATE_JOIN_WINDOW = timedelta(minutes=15)  # a started "Need players" game stays up top this long
 UP_NEXT_WINDOW = timedelta(hours=2)    # your own events starting this soon get a banner on the feed
 
 
@@ -297,10 +298,12 @@ def feed():
         e for e in query_events(
             ["e.cancelled = 0", "e.is_quick = 1", "e.ends_at >= :now", "e.starts_at <= :soon", NOT_BLOCKED,
              games_open_to_me(),
+             # a game well under way isn't a call for players any more (unless it's yours to find)
+             "(e.starts_at >= :late OR EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me))",
              # a private post isn't a call to everyone: only its players and invited friends see it up top
              "(e.is_private = 0 OR EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"
              " OR EXISTS (SELECT 1 FROM invites i WHERE i.event_id = e.id AND i.guest_id = :me AND i.status = 'pending'))"],
-            {"now": to_db(now), "soon": to_db(now + QUICK_WINDOW)},
+            {"now": to_db(now), "soon": to_db(now + QUICK_WINDOW), "late": to_db(now - LATE_JOIN_WINDOW)},
             limit=10,
         )
         if spots_left(e) != 0 or e["i_am_going"]
