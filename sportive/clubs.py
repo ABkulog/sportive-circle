@@ -277,6 +277,7 @@ def view(club_id):
         (club_id, to_db(now_local()))).fetchall()
     return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
                            role=role, requests=requests, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
+                           officer_count=sum(1 for m in members if m["role"] == "officer"),
                            socials=social_links(club),
                            joining=JOINING,
                            experience=EXPERIENCE, who=WHO_CAN_JOIN)
@@ -611,6 +612,30 @@ def make_officer(club_id, user_id):
         flash("They're an officer now.", "success")
     else:
         flash("Only confirmed members can be made officers. They may have left the club.", "error")
+    db.commit()
+    return redirect(url_for("clubs.view", club_id=club_id) + "#members")
+
+
+@bp.route("/clubs/<int:club_id>/officers/<int:user_id>/step-down", methods=("POST",))
+@login_required
+def step_down(club_id, user_id):
+    """An officer steps down, or makes another officer a regular member. The club always keeps one officer."""
+    if my_role(club_id) != "officer":
+        abort(403)
+    db = get_db()
+    changed = db.execute(
+        """UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ? AND role = 'officer'
+             AND (SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'officer') > 1""",
+        (club_id, user_id, club_id)).rowcount
+    if not changed:
+        flash("A club needs at least one officer. Make someone else an officer first.", "error")
+    elif user_id == g.user["id"]:
+        flash("You stepped down. You're still a member.", "info")
+    else:
+        club = get_club(club_id)
+        _dm(g.user["id"], user_id, f"You're now a regular member of {club['name']} (no longer an officer). "
+                                   f"{_club_link(club_id)}")
+        flash("They're a regular member now.", "info")
     db.commit()
     return redirect(url_for("clubs.view", club_id=club_id) + "#members")
 

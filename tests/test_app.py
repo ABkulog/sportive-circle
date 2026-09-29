@@ -1900,6 +1900,25 @@ def test_make_officer_only_reports_success_when_it_worked(accounts, client, app)
     assert "Only confirmed members can be made officers" in page and "officer now" not in page
 
 
+def test_officers_can_step_down_but_one_always_stays(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu")
+    client.post(f"/clubs/{club}/join", data={"message": "hi"})
+    fan = _user_id(app, "fan@uw.edu")
+    captain = _user_id(app, "captain@uw.edu")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    page = client.post(f"/clubs/{club}/officers/{captain}/step-down", follow_redirects=True).data.decode()
+    assert "at least one officer" in page
+    client.post(f"/clubs/{club}/members/{fan}/approve")
+    client.post(f"/clubs/{club}/officers/{fan}")
+    assert "Make regular member" in client.get(f"/clubs/{club}").data.decode()
+    client.post(f"/clubs/{club}/officers/{fan}/step-down")
+    with app.app_context():
+        role = get_db().execute("SELECT role FROM club_members WHERE club_id = ? AND user_id = ?", (club, fan)).fetchone()[0]
+    assert role == "member"
+
+
 def test_pending_club_doesnt_block_deleting_the_account(accounts, client, app):
     accounts.signup(email="captain@uw.edu")
     client.post("/clubs/new", data=CLUB)

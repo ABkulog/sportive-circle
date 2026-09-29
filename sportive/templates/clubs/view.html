@@ -226,6 +226,16 @@
           <li class="post-game-row">
             <a class="person" href="{{ url_for('profile.view', user_id=m.id) }}">{{ avatar(m.id, m.full_name, m.avatar_updated, 32) }}<span>{{ m.full_name }}{% if role == 'officer' %}<small class="muted person-extra">{{ m.email }}</small>{% endif %}</span></a>
             {% if m.role == 'officer' %}<span class="badge badge-purple">Officer</span>
+              {% if role == 'officer' and officer_count > 1 %}
+                <details class="more-menu">
+                  <summary aria-label="Options for {{ m.full_name }}">⋯</summary>
+                  <div class="more-menu-panel right">
+                    <form method="post" action="{{ url_for('clubs.step_down', club_id=club.id, user_id=m.id) }}"
+                          data-confirm="{{ 'Step down as officer? You stay a member.' if m.id == g.user.id else 'Make ' ~ m.full_name ~ ' a regular member?' }}">
+                      {{ csrf_field() }}<button class="link-button">{{ 'Step down as officer' if m.id == g.user.id else 'Make regular member' }}</button></form>
+                  </div>
+                </details>
+              {% endif %}
             {% elif role == 'officer' %}
               <details class="more-menu">
                 <summary aria-label="Options for {{ m.full_name }}">⋯</summary>
