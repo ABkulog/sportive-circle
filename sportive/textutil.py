@@ -12,6 +12,17 @@ def one_line(text):
     return " ".join((text or "").split())
 
 
+def person_name(text):
+    """A name as it should be shown: one line, without invisible characters (zero-width spaces, and
+    right-to-left overrides that can make "Maya" display as someone else's name)."""
+    visible = "".join(ch for ch in (text or "") if unicodedata.category(ch) not in ("Cf", "Cc"))
+    return one_line(visible)
+
+
+def has_a_letter(text):
+    return any(unicodedata.category(ch).startswith("L") for ch in text)
+
+
 def multi_line(text):
     """Trim text that may have line breaks (notes, bios, messages), with every line break as a plain \\n.
     Browsers send \\r\\n, which would count twice toward length limits and break calendar files."""

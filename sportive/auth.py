@@ -15,7 +15,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from .constants import SPORTS
 from .db import get_db, set_user_sports
 from .mail import compose, failure_reason, send_email
-from .textutil import one_line, same_secret, typed_code
+from .textutil import has_a_letter, person_name, same_secret, typed_code
 from .timeutil import from_db, now_local, to_db
 
 bp = Blueprint("auth", __name__)
@@ -203,6 +203,8 @@ def validate_signup(full_name, email, password, password2, grad_year, birth_date
     domains = current_app.config["ALLOWED_EMAIL_DOMAINS"]
     if not full_name:
         return "Full name cannot be empty."
+    if not has_a_letter(full_name):
+        return "Please use your real name, so teammates know who you are."
     if len(full_name) > MAX_NAME_LENGTH:
         return f"Please keep your name under {MAX_NAME_LENGTH} characters."
     if not email:
@@ -238,7 +240,7 @@ def signup():
     if request.args.get("next"):
         session["after_login"] = safe_next(request.args["next"])
     if request.method == "POST":
-        full_name = one_line(form.get("full_name"))
+        full_name = person_name(form.get("full_name"))
         email = form.get("email", "").strip().lower()
         password = form.get("password", "")
         password2 = form.get("password2", "")

@@ -17,7 +17,7 @@ from .badges import (GIVEN_BADGES, ROLE_BADGES, SHOWCASE_SLOTS, TESTER, catalog,
 from .clubs import SOCIALS
 from .moderation import admin_required, is_admin
 from .notifications import mark_seen, notify
-from .textutil import multi_line, one_line
+from .textutil import has_a_letter, multi_line, one_line, person_name
 from .social import can_message, friendship_status, i_blocked, is_blocked_between
 from .timeutil import now_local, to_db
 
@@ -221,7 +221,7 @@ def edit():
     me = g.user
     if request.method == "POST":
         form = request.form
-        full_name = one_line(form.get("full_name"))
+        full_name = person_name(form.get("full_name"))
         grad_year = form.get("grad_year", "").strip()
         bio = multi_line(form.get("bio"))
         pronouns = one_line(form.get("pronouns"))
@@ -230,6 +230,8 @@ def edit():
         error = None
         if not full_name:
             error = "Full name cannot be empty."
+        elif not has_a_letter(full_name):
+            error = "Please use your real name, so teammates know who you are."
         elif len(full_name) > MAX_NAME_LENGTH:
             error = f"Please keep your name under {MAX_NAME_LENGTH} characters."
         elif grad_year and (not grad_year.isdigit() or not 1950 <= int(grad_year) <= now_local().year + 8):

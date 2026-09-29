@@ -3013,6 +3013,16 @@ def test_need_players_host_hears_when_someone_joins(accounts, client, app):
     assert len(texts) == 1 and texts[0].startswith("Pat joined") and "(2 going now)" in texts[0]
 
 
+def test_names_cant_be_invisible_or_flipped(accounts, client, app):
+    blank = accounts.signup(email="ghost@uw.edu", name="\u200b\u200b", verify=False).data.decode()
+    assert "Full name cannot be empty." in blank
+    dots = accounts.signup(email="dots@uw.edu", name="...", verify=False).data.decode()
+    assert "Please use your real name" in dots
+    accounts.signup(email="maya@uw.edu", name="Ma\u202eya Chen")
+    with app.app_context():
+        assert get_db().execute("SELECT full_name FROM users WHERE email = 'maya@uw.edu'").fetchone()[0] == "Maya Chen"
+
+
 def test_blocked_people_are_listed_in_settings_and_can_be_unblocked(accounts, client, app):
     accounts.signup(email="pest@uw.edu", name="Pesky Pete")
     pest = _user_id(app, "pest@uw.edu")
