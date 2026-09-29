@@ -2430,6 +2430,13 @@ def test_scripts_do_not_depend_on_request_submit_alone():
         assert "form.submit()" in js, name
 
 
+def test_relative_times_never_wrap_mid_phrase():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    assert re.search(r"^\.rel \{[^}]*white-space: nowrap", css, re.M)
+    assert re.search(r"^\.now-tile small \{[^}]*white-space: nowrap", css, re.M)
+
+
 def test_limited_badge_tag_stands_out():
     assert _css_classes_used_but_undefined(["tag-limited"]) == []
 

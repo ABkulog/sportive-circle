@@ -401,7 +401,7 @@ section.card h2, details.card h2 { margin-top: 0; }
 .event-link:hover { text-decoration: none; }
 .event-card:hover .event-title { text-decoration: underline; }
 .event-meta { color: var(--muted); font-size: .88rem; overflow-wrap: anywhere; }
-.rel { color: var(--muted); }
+.rel { color: var(--muted); white-space: nowrap; }  /* keep "(in 14 min)" on one line wherever it appears */
 .dot { opacity: .6; }
 .event-side { flex: none; display: grid; justify-items: end; gap: 6px; text-align: right; }
 .event-count { font-size: .85rem; color: var(--muted); }
@@ -429,7 +429,7 @@ section.card h2, details.card h2 { margin-top: 0; }
   background: var(--surface); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--gold); }
 .now-tile.is-mine .now-ring { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--purple); }
 .now-tile strong { font-size: .75rem; font-weight: 600; margin-top: 6px; line-height: 1.1; }
-.now-tile small { font-size: .7rem; color: var(--muted); }
+.now-tile small { font-size: .7rem; color: var(--muted); white-space: nowrap; }
 .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 4px; }
 .filter-more { display: contents; }
 .filter-more > summary { list-style: none; cursor: pointer; font-weight: 600; }
@@ -838,7 +838,6 @@ details.card.fold { border: 0; border-top: 1px solid var(--line); border-bottom:
 .quiet-leave .link-button { padding: 10px 0; }
 .photo-extra { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .photo-extra form { margin: 0; }
-.event-meta .rel { white-space: nowrap; }  /* keep "in 2 days" together when the date line wraps */
 /* The people who run Sportive Circle (admins): a small gold-on-purple label next to their name. */
 .team-pill { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 999px;
   background: var(--purple); color: var(--gold-light); font: 700 .72rem/1.4 var(--font); letter-spacing: .02em;
