@@ -144,9 +144,10 @@ def admin_required(view):
 @admin_required
 def admin_reports():
     status = request.args.get("status", "open")
-    if status not in ("open", "reviewed", "dismissed"):
+    if status not in ("open", "reviewed", "dismissed", "suspended"):
         status = "open"
     db = get_db()
+    suspended = db.execute("SELECT id, full_name, email FROM users WHERE suspended = 1 ORDER BY full_name").fetchall()
     reports = db.execute(
         """SELECT r.*, reporter.full_name AS reporter_name, reported.full_name AS reported_name,
                   reported.email AS reported_email, reported.suspended AS reported_suspended
@@ -162,7 +163,7 @@ def admin_reports():
     report_counts = {row["status"]: row["n"] for row in db.execute(
         "SELECT status, COUNT(*) AS n FROM reports GROUP BY status")}
     return render_template("moderation/admin.html", reports=reports, flagged=flagged, status=status,
-                           report_counts=report_counts, reasons=REASONS)
+                           report_counts=report_counts, reasons=REASONS, suspended=suspended)
 
 
 @bp.route("/admin/reports/<int:report_id>/<action>", methods=("POST",))

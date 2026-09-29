@@ -2051,6 +2051,20 @@ def test_suspending_cancels_their_upcoming_games(accounts, client, app):
         assert get_db().execute("SELECT suspended FROM users WHERE email = 'admin@uw.edu'").fetchone()[0] == 0
 
 
+def test_admins_can_find_and_restore_suspended_accounts(accounts, client, app):
+    accounts.signup(email="bad@uw.edu", name="Rowan Ruleb")
+    bad = _user_id(app, "bad@uw.edu")
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    client.post(f"/admin/users/{bad}/suspend")
+    page = client.get("/admin/reports?status=suspended").data.decode()
+    assert "Suspended accounts (1)" in page and "Rowan Ruleb" in page and "Restore account" in page
+    response = client.post(f"/admin/users/{bad}/restore?from=suspended")
+    assert "status=suspended" in response.headers["Location"]
+    assert "No suspended accounts." in client.get("/admin/reports?status=suspended").data.decode()
+
+
 def test_suspended_login_says_where_to_appeal(accounts, client, app):
     accounts.signup(email="bad@uw.edu")
     accounts.logout()
