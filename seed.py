@@ -16,6 +16,7 @@ from sportive.photos import make_avatar
 from sportive.timeutil import now_local, to_db
 
 DEMO_PASSWORD = "huskies-demo-2026"
+PRIVATE_GAME_PASSWORD = "demo"  # printed at the end, never put in the game's title
 
 USERS = [
     ("demo.maya@uw.edu", "Maya Chen", 2027, ["basketball", "running", "hiking"], "Pickup hoops most evenings."),
@@ -132,8 +133,8 @@ def add_friends_and_games(db, ids, now):
                    (ids[a], ids[b], to_db(now)))
     starts = (now + timedelta(days=3)).replace(hour=18, minute=0)
     for host, title, sport, place, extra in (
-            (2, "Friends-only pickup (password: demo)", "basketball", "IMA (Intramural Activities Building)",
-             {"is_private": 1, "password": "demo", "max_players": 10}),
+            (2, "Friends-only pickup", "basketball", "IMA (Intramural Activities Building)",
+             {"is_private": 1, "password": PRIVATE_GAME_PASSWORD, "max_players": 10}),
             (0, "3v3 hoops, bring a team", "basketball", "IMA (Intramural Activities Building)",
              {"team_size": 3, "max_players": 6})):
         cur = db.execute(
@@ -189,6 +190,7 @@ def main():
         db.commit()
         print(f"Added {len(USERS)} demo users and {len(EVENTS)} events, with past games.")
         print(f"Log in as {USERS[0][0]} with password {DEMO_PASSWORD}")
+        print(f"The demo private game's password is {PRIVATE_GAME_PASSWORD}")
 
 
 if __name__ == "__main__":

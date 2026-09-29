@@ -21,7 +21,7 @@ from .mail import compose, send_email
 from .moderation import is_admin
 from .notifications import mark_seen
 from .photos import make_avatar
-from .textutil import one_line
+from .textutil import multi_line, one_line
 from .timeutil import now_local, to_db
 
 bp = Blueprint("clubs", __name__)
@@ -277,6 +277,7 @@ def view(club_id):
          "hold_now": to_db(now_local())}).fetchall()
     return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
                            role=role, requests=requests, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
+                           officer_count=sum(1 for m in members if m["role"] == "officer"),
                            socials=social_links(club),
                            joining=JOINING,
                            experience=EXPERIENCE, who=WHO_CAN_JOIN_LABELS)
@@ -293,6 +294,12 @@ def roster(club_id):
            ORDER BY m.role = 'officer' DESC, u.full_name""", (club_id,)).fetchall()
 
 
+def spreadsheet_safe(text):
+    """Excel and Google Sheets run a cell starting with = + - @ (or a tab/CR) as a formula, so a member named
+    '=HYPERLINK(...)' could run one on the officer's computer. A leading ' makes it plain text."""
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
+
 @bp.route("/clubs/<int:club_id>/roster.csv")
 @login_required
 def roster_csv(club_id):
@@ -303,8 +310,8 @@ def roster_csv(club_id):
     writer = csv.writer(output)
     writer.writerow(["Name", "UW email", "Class of", "Role", "Joined"])
     for person in roster(club_id):
-        writer.writerow([person["full_name"], person["email"], person["grad_year"] or "", person["role"].title(),
-                         person["joined_at"][:10]])
+        writer.writerow([spreadsheet_safe(person["full_name"]), person["email"], person["grad_year"] or "",
+                         person["role"].title(), person["joined_at"][:10]])
     filename = re.sub(r"[^A-Za-z0-9]+", "-", club["name"]).strip("-").lower() or "club"
     return Response(output.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename={filename}-roster.csv"})
@@ -502,7 +509,7 @@ def join(club_id):
     role = my_role(club_id)
     if role in MEMBER_ROLES or role in WAITING_ROLES:
         return redirect(url_for("clubs.view", club_id=club_id))
-    message = request.form.get("message", "").strip()
+    message = multi_line(request.form.get("message"))
     if len(message) > 500:
         flash("Please keep your answer under 500 characters.", "error")
         return redirect(url_for("clubs.view", club_id=club_id) + "#join")
@@ -599,10 +606,40 @@ def make_officer(club_id, user_id):
     if my_role(club_id) != "officer":
         abort(403)
     db = get_db()
-    db.execute("UPDATE club_members SET role = 'officer' WHERE club_id = ? AND user_id = ? AND role = 'member'",
-               (club_id, user_id))
+    changed = db.execute("UPDATE club_members SET role = 'officer' WHERE club_id = ? AND user_id = ? AND role = 'member'",
+                         (club_id, user_id)).rowcount
+    if changed:
+        club = get_club(club_id)
+        _dm(g.user["id"], user_id, f"⭐ You're now an officer of {club['name']}. You can edit the club, post updates "
+                                   f"and confirm new members. {_club_link(club_id)}")
+        flash("They're an officer now.", "success")
+    else:
+        flash("Only confirmed members can be made officers. They may have left the club.", "error")
     db.commit()
-    flash("They're an officer now.", "success")
+    return redirect(url_for("clubs.view", club_id=club_id) + "#members")
+
+
+@bp.route("/clubs/<int:club_id>/officers/<int:user_id>/step-down", methods=("POST",))
+@login_required
+def step_down(club_id, user_id):
+    """An officer steps down, or makes another officer a regular member. The club always keeps one officer."""
+    if my_role(club_id) != "officer":
+        abort(403)
+    db = get_db()
+    changed = db.execute(
+        """UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ? AND role = 'officer'
+             AND (SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'officer') > 1""",
+        (club_id, user_id, club_id)).rowcount
+    if not changed:
+        flash("A club needs at least one officer. Make someone else an officer first.", "error")
+    elif user_id == g.user["id"]:
+        flash("You stepped down. You're still a member.", "info")
+    else:
+        club = get_club(club_id)
+        _dm(g.user["id"], user_id, f"You're now a regular member of {club['name']} (no longer an officer). "
+                                   f"{_club_link(club_id)}")
+        flash("They're a regular member now.", "info")
+    db.commit()
     return redirect(url_for("clubs.view", club_id=club_id) + "#members")
 
 
@@ -617,7 +654,7 @@ def updates():
     my_officer_clubs = officer_clubs(me)
     if request.method == "POST":
         club_id = request.form.get("club", type=int)
-        body = request.form.get("body", "").strip()
+        body = multi_line(request.form.get("body"))
         if club_id not in {club["id"] for club in my_officer_clubs}:
             abort(403)
         if not body or len(body) > MAX_POST:
@@ -649,7 +686,7 @@ def post(club_id):
     club = get_club(club_id)
     if my_role(club_id) != "officer" or club["status"] != "approved":
         abort(403)
-    body = request.form.get("body", "").strip()
+    body = multi_line(request.form.get("body"))
     if not body or len(body) > MAX_POST:
         flash(f"Announcements must be 1 to {MAX_POST} characters.", "error")
     else:
@@ -724,7 +761,7 @@ def review(club_id, decision):
     if not is_admin() or decision not in ("approve", "reject"):
         abort(404)
     club = get_club(club_id)
-    note = request.form.get("note", "").strip()[:500]
+    note = multi_line(request.form.get("note"))[:500]
     if decision == "reject" and not note:
         flash("Add a short note so the officers know what to fix.", "error")
         return redirect(url_for("clubs.review_queue"))

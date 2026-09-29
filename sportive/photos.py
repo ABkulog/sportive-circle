@@ -9,6 +9,11 @@ ALLOWED_FORMATS = {"JPEG", "MPO", "PNG", "WEBP", "GIF"}  # MPO = the JPEG varian
 
 # Refuse absurdly large images (a tiny file can claim to be gigapixels and eat all the memory).
 Image.MAX_IMAGE_PIXELS = 50_000_000
+# JPEGs are decoded at a reduced size (draft mode), so big phone photos are cheap. Other formats are
+# decoded in full: 16 MP is ~64 MB as RGBA, which a small server can afford; 50 MP (~200 MB) it can't.
+MAX_FULL_DECODE_PIXELS = 16_000_000
+TOO_BIG = "That picture is too big. Try a smaller one, or a screenshot of it."
+NOT_A_PHOTO = "That file isn't a photo we can use. Try a JPG or PNG picture."
 
 
 def make_avatar(data):
@@ -21,6 +26,10 @@ def make_avatar(data):
         with Image.open(BytesIO(data)) as image:
             if image.format not in ALLOWED_FORMATS:
                 raise ValueError
+            if image.format in ("JPEG", "MPO"):
+                image.draft("RGB", (AVATAR_SIZE * 2, AVATAR_SIZE * 2))
+            elif image.width * image.height > MAX_FULL_DECODE_PIXELS:
+                raise ValueError(TOO_BIG)
             image = ImageOps.exif_transpose(image)  # phones store "rotate me" in metadata
             if image.mode in ("RGBA", "LA", "P"):
                 image = image.convert("RGBA")
@@ -33,5 +42,9 @@ def make_avatar(data):
             output = BytesIO()
             image.save(output, "JPEG", quality=85, optimize=True)
             return output.getvalue()
-    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, ValueError):
-        raise ValueError("That file isn't a photo we can use. Try a JPG or PNG picture.") from None
+    except ValueError as error:
+        raise ValueError(TOO_BIG if str(error) == TOO_BIG else NOT_A_PHOTO) from None
+    except Image.DecompressionBombError:
+        raise ValueError(TOO_BIG) from None
+    except (UnidentifiedImageError, OSError):
+        raise ValueError(NOT_A_PHOTO) from None

@@ -43,7 +43,8 @@
     </dd></div>
     <div><dt>Where</dt><dd>{{ event.location }}
       {% set tip = place_tip(event.sport, event.location) %}{% if tip %}<small class="muted place-tip">{{ tip }}</small>{% endif %}</dd></div>
-    <div><dt>Host</dt><dd><a class="person" href="{{ url_for('profile.view', user_id=event.host_id) }}">{{ avatar(event.host_id, event.host_name, event.host_avatar, 28) }}{{ event.host_name }}</a></dd></div>
+    <div><dt>Host</dt><dd>{% if event.host_verified %}<a class="person" href="{{ url_for('profile.view', user_id=event.host_id) }}">{{ avatar(event.host_id, event.host_name, event.host_avatar, 28) }}{{ event.host_name }}</a>
+      {%- else %}<span class="person muted">{{ event.host_name }}</span>{% endif %}</dd></div>
     <div><dt>Participants</dt><dd>
       {{ event.going_count + event.extra_players }} going{% if event.max_players %} of {{ event.max_players }}
         · {% if left == 0 %}<strong>full</strong>{% else %}<strong>{{ left }} spot{{ 's' if left != 1 }} left</strong>{% endif %}{% endif %}
@@ -51,7 +52,7 @@
     </dd></div>
   </dl>
 
-  {% if event.note %}<p class="note">{{ event.note }}</p>{% endif %}
+  {% if event.note and inside %}<p class="note">{{ event.note }}</p>{% endif %}
 
   {% if not event.cancelled and not ended %}
     {# 1. The one main action #}
@@ -75,7 +76,7 @@
               <a class="btn btn-ghost" href="{{ url_for('parties.party_up', event_id=event.id) }}">{{ 'Invite friends' if event.is_private else 'Reserve spots' }}</a>
             {% endif %}
           </div>
-          <small class="muted">The link works for friends who aren't on the app: they sign up and they're in{% if event.is_private %}, no password needed{% endif %}.</small>
+          <small class="muted">The link works for friends who aren't on the app: they sign up and they're in{% if event.is_private %}{% if is_host %}, no password needed{% else %} once {{ event.host_name.split()[0] }} says yes{% endif %}{% endif %}.</small>
         </div>
         {% if my_reminder is not none and not ended %}
           {% if g.user.email_reminders %}
@@ -154,11 +155,14 @@
       <button type="button" class="icon-action" data-share-title="{{ event_title(event) }}" data-share-url="{{ share_url }}">
         <span>{{ icon('share') }}</span><span data-share-label>Share</span></button>
       {% endif %}
-      <a class="icon-action" href="{{ url_for('events.calendar_file', event_id=event.id) }}"><span>{{ icon('calendar') }}</span>Calendar</a>
+      {% if inside %}
+        <a class="icon-action" href="{{ url_for('events.calendar_file', event_id=event.id) }}"><span>{{ icon('calendar') }}</span>Calendar</a>
+      {% endif %}
       {% if is_host %}
         <a class="icon-action" href="{{ url_for('events.edit', event_id=event.id) }}"><span>{{ icon('edit') }}</span>Edit</a>
       {% elif event.i_am_going %}
-        <form method="post" action="{{ url_for('events.leave', event_id=event.id) }}" class="icon-action-form">
+        <form method="post" action="{{ url_for('events.leave', event_id=event.id) }}" class="icon-action-form"
+              data-confirm="Leave this game?{% if spots_left(event) == 0 %} It's full, so someone else may take your spot.{% endif %}">
           {{ csrf_field() }}<button class="icon-action"><span>{{ icon('logout') }}</span>Leave</button>
         </form>
       {% endif %}
@@ -220,6 +224,11 @@
       {% endfor %}
     </div>
   </section>
+{% elif not inside %}
+<section class="band">
+  <h2>Who's going</h2>
+  <p class="muted">{{ 'Only players and club members see who’s going.' if event.members_only else 'Only players and invited friends see who’s going.' }}</p>
+</section>
 {% else %}
 <section class="band">
   <h2>Who's going</h2>

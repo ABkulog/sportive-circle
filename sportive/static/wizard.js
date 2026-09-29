@@ -46,12 +46,24 @@
     return true;
   }
 
+  // After changing steps, move focus into the new step. Otherwise focus stays on a button that may have
+  // just been hidden (Next on the last step), and keyboard / screen reader users are dropped at the top
+  // of the page. (The step titles are hidden in wizard mode; the progress line announces the step name.)
+  function focusStep() {
+    const field = [...steps[current].querySelectorAll("input, select, textarea")]
+      .find((el) => el.type !== "hidden" && !el.disabled && el.getClientRects().length);
+    const target = field || progress.querySelector(".wizard-count");
+    if (!field) target.tabIndex = -1;
+    target.focus({ preventScroll: true });
+  }
+
   next.addEventListener("click", () => {
     if (!stepIsValid()) return;
     show(current + 1);
+    focusStep();
     form.scrollIntoView({ block: "start", behavior: "smooth" });
   });
-  back.addEventListener("click", () => show(current - 1));
+  back.addEventListener("click", () => { show(current - 1); focusStep(); });
   // <form data-must-change>: a sent-back club can't be resent exactly as it was.
   if (form.hasAttribute("data-must-change")) {
     const snapshot = (f) => JSON.stringify([...new FormData(f)].filter(([key]) => key !== "csrf_token"));

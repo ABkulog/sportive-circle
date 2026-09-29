@@ -23,8 +23,8 @@ from .notifications import mark_seen, notify
 from .mail import compose, send_email
 from .social import friends_of, is_blocked_between
 from .spirit import greeting, top_dawgs
-from .textutil import one_line
-from .timeutil import fmt_clock, fmt_when, from_db, now_local, parse_form, to_db, to_form
+from .textutil import multi_line, one_line, same_secret
+from .timeutil import exists_in_seattle, fmt_clock, fmt_when, from_db, now_local, parse_form, to_db, to_form
 
 bp = Blueprint("events", __name__)
 log = logging.getLogger(__name__)
@@ -33,6 +33,10 @@ MIN_PASSWORD, MAX_PASSWORD = 4, 30     # private games
 MAX_DAYS_AHEAD = 365
 OPEN_SPOT_CHOICES = ("1", "2", "3", "4", "5", "10")  # the "Open spots" filter on Home
 QUICK_WINDOW = timedelta(hours=3)      # quick posts starting this soon go to the top of the feed
+MAX_QUICK_POSTS_PER_HOUR = 4
+FEED_PAGE_SIZE = 50                    # games per "Show more games" step on the feed
+MAX_FEED_PAGES = 20
+LATE_JOIN_WINDOW = timedelta(minutes=15)  # a started "Need players" game stays up top this long
 UP_NEXT_WINDOW = timedelta(hours=2)    # your own events starting this soon get a banner on the feed
 
 
@@ -48,6 +52,7 @@ def query_events(where, params=None, order="e.starts_at", limit=100):
     params = {"me": me, "hold_now": now_param(), **(params or {})}
     sql = f"""
         SELECT e.*, u.full_name AS host_name, u.avatar_updated AS host_avatar, cl.name AS club_name,
+               u.verified AS host_verified,
                (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id) AS going_count,
                EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me) AS i_am_going,
                {HELD} AS held_count,
@@ -82,6 +87,20 @@ IS_MINE_SQL = ("(e.host_id = :me OR EXISTS (SELECT 1 FROM rsvps m WHERE m.event_
                " AND mi.status = 'pending'))")
 # Full games are hidden everywhere (nobody can join them), except your own and the Home "Full" tab.
 SHOWN_UNLESS_FULL = f"(NOT {IS_FULL_SQL} OR {IS_MINE_SQL})"
+def can_see_inside(event):
+    """The note (often the exact spot), the player list and the calendar file of a private or members-only
+    game are for its host, players, invited friends and (members-only) club members."""
+    if event["host_id"] == g.user["id"] or event["i_am_going"] or event["i_am_invited"]:
+        return True
+    return not event["is_private"] and (not event["members_only"] or event["i_am_member"])
+
+
+# SQL twin of can_see_inside, for lists of games (e.g. what someone is hosting, on their profile).
+INSIDE_VISIBLE = """(e.host_id = :me
+    OR EXISTS (SELECT 1 FROM rsvps v WHERE v.event_id = e.id AND v.user_id = :me)
+    OR EXISTS (SELECT 1 FROM invites vi WHERE vi.event_id = e.id AND vi.guest_id = :me AND vi.status = 'pending')
+    OR (e.is_private = 0 AND (e.members_only = 0 OR EXISTS (SELECT 1 FROM club_members vm WHERE vm.club_id = e.club_id
+                                                              AND vm.user_id = :me AND vm.role IN ('member', 'officer')))))"""
 
 
 def spots_left(event):
@@ -238,6 +257,11 @@ def feed():
     filters = {key: request.args.get(key, "") for key in ("scope", "sport", "location", "skill", "when", "open")}
     if filters["scope"] not in ("interests", "all", "full"):
         filters["scope"] = "interests" if my_sports else "all"
+    # Values from an old or hand-edited link that aren't real choices are ignored, not counted as filters.
+    for key, choices in (("sport", SPORTS), ("location", LOCATIONS), ("skill", SKILL_LEVELS),
+                         ("when", ("today", "week", "month")), ("open", OPEN_SPOT_CHOICES)):
+        if filters[key] not in choices:
+            filters[key] = ""
 
     now = now_local()
     where = ["e.cancelled = 0", "e.ends_at >= :now", NOT_BLOCKED, games_open_to_me(), MEMBERS_ONLY_FOR_MEMBERS]
@@ -256,14 +280,14 @@ def feed():
         where.append("e.location = :location")
         params["location"] = filters["location"]
     if filters["skill"] in SKILL_LEVELS:
-        where.append("e.skill_level = :skill")
+        # "All levels" games welcome every level, so they match any level someone picks.
+        where.append("e.skill_level IN (:skill, 'All levels')")
         params["skill"] = filters["skill"]
     if filters["open"] in OPEN_SPOT_CHOICES:
-        # "We're a group of 5": games with at least that many spots anyone can take right now.
-        where.append(f"(e.max_players IS NULL OR {SPOTS_LEFT_SQL} >= :min_open)")
+        # "We're a group of 5": games with at least that many spots anyone can take right now
+        # (not private games, which need a password, or team games, which are joined as a team).
+        where.append(f"e.is_private = 0 AND e.team_size IS NULL AND (e.max_players IS NULL OR {SPOTS_LEFT_SQL} >= :min_open)")
         params["min_open"] = int(filters["open"])
-    else:
-        filters["open"] = ""
     if filters["when"] == "today":
         where.append("e.starts_at < :until")
         params["until"] = to_db(datetime.combine(now.date() + timedelta(days=1), time()))
@@ -275,17 +299,26 @@ def feed():
         next_month = (now.replace(day=28) + timedelta(days=4)).replace(day=1)
         params["until"] = to_db(datetime.combine(next_month.date(), time()))
 
-    events = query_events(where, params)
+    # "Show more games" grows the list a page at a time (one extra row tells us if there's more).
+    page = request.args.get("page", "1")
+    page = min(int(page), MAX_FEED_PAGES) if page.isdigit() and int(page) > 0 else 1
+    events = query_events(where, params, limit=page * FEED_PAGE_SIZE + 1)
+    more_page = page + 1 if len(events) > page * FEED_PAGE_SIZE and page < MAX_FEED_PAGES else None
+    events = events[:page * FEED_PAGE_SIZE]
 
-    # "Need players" posts starting soon (any sport) go in their own strip at the top.
-    need_players = [
+    # "Need players" posts starting soon (any sport) go in their own strip at the top. While filtering,
+    # the strip is hidden and those games stay in the list, so the results match the filters exactly.
+    filtering = filters["scope"] == "full" or any(filters[key] for key in ("sport", "location", "skill", "when", "open"))
+    need_players = [] if filtering else [
         e for e in query_events(
             ["e.cancelled = 0", "e.is_quick = 1", "e.ends_at >= :now", "e.starts_at <= :soon", NOT_BLOCKED,
              games_open_to_me(),
+             # a game well under way isn't a call for players any more (unless it's yours to find)
+             "(e.starts_at >= :late OR EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me))",
              # a private post isn't a call to everyone: only its players and invited friends see it up top
              "(e.is_private = 0 OR EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"
              " OR EXISTS (SELECT 1 FROM invites i WHERE i.event_id = e.id AND i.guest_id = :me AND i.status = 'pending'))"],
-            {"now": to_db(now), "soon": to_db(now + QUICK_WINDOW)},
+            {"now": to_db(now), "soon": to_db(now + QUICK_WINDOW), "late": to_db(now - LATE_JOIN_WINDOW)},
             limit=10,
         )
         if spots_left(e) != 0 or e["i_am_going"] or e["i_am_invited"]
@@ -302,6 +335,7 @@ def feed():
     mark_seen("need_players")
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
+                           month_name=now.strftime("%B"), more_page=more_page,
                            hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now),
                            club_picks=suggested_clubs(g.user["id"], my_sports))
 
@@ -314,7 +348,7 @@ def read_event_form(form, event=None):
     sport = form.get("sport", "")
     location = form.get("location", "")
     skill_level = form.get("skill_level") or "All levels"  # not asked for private games
-    note = form.get("note", "").strip()
+    note = multi_line(form.get("note"))
     now = now_local()
 
     if len(title) > 80:
@@ -340,6 +374,10 @@ def read_event_form(form, event=None):
         return None, "Event end time cannot be empty."
     if ends <= starts:
         return None, "The event has to end after it starts."
+    for moment in (starts, ends):
+        if not exists_in_seattle(moment):
+            return None, (f"{fmt_clock(to_db(moment))} doesn't exist on {moment.strftime('%b')} {moment.day}: "
+                          "clocks jump ahead an hour for daylight saving. Pick another time.")
     max_hours = SPORT_MAX_HOURS.get(sport, DEFAULT_MAX_HOURS)
     if ends - starts > timedelta(hours=max_hours):
         longest = f"{max_hours // 24} days" if max_hours % 24 == 0 else f"{max_hours} hours"
@@ -429,10 +467,10 @@ def read_players(form, sport, team_size, event=None):
     players = int(raw) if raw.isdigit() else (DEFAULT_PLAYERS.get(sport, 10) if not raw else 0)
     if not 2 <= players <= MAX_PLAYERS:
         return None, 0, f"Pick 2 to {MAX_PLAYERS} participants (you included)."
-    taken = (event["going_count"] + event["extra_players"]) if event is not None else 1 + extra
+    taken = (event["going_count"] + event["extra_players"] + event["held_count"]) if event is not None else 1 + extra
     if players < taken:
-        return None, 0, (f"{taken} people are already in, so it can't be fewer players than that." if event
-                         else "That's more people than participants.")
+        return None, 0, (f"{taken} spots are already taken or held for invited friends, so it can't be fewer "
+                         "participants than that." if event else "That's more people than participants.")
     return players, extra, None
 
 
@@ -538,14 +576,23 @@ def edit(event_id):
             data.update(members_only=0)
         if error is None:
             db = get_db()
-            db.execute(
-                """UPDATE events SET title = :title, sport = :sport, location = :location,
+            # The size check is repeated inside the UPDATE: someone may have joined since the form was checked.
+            saved = db.execute(
+                f"""UPDATE events SET title = :title, sport = :sport, location = :location,
                        starts_at = :starts_at, ends_at = :ends_at, skill_level = :skill_level,
                        max_players = :max_players, note = :note, is_private = :is_private, password = :password,
                        open_to = :open_to, members_only = :members_only
-                   WHERE id = :id""",
-                {**data, "id": event_id},
-            )
+                   WHERE id = :id AND (:max_players IS NULL OR :max_players >= (
+                       SELECT e.extra_players + {HELD} + (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id)
+                       FROM events e WHERE e.id = :id))""",
+                {**data, "id": event_id, "hold_now": now_param()},
+            ).rowcount
+            if not saved:
+                db.rollback()
+                flash("Someone just joined, so there are more people in than that. Pick more players.", "error")
+                return render_template("events/form.html", form=form, event=get_event(event_id), min_start="")
+            if data["starts_at"] != event["starts_at"]:  # a reminder for the old time doesn't cover the new one
+                db.execute("UPDATE rsvps SET reminder_sent = 0 WHERE event_id = ?", (event_id,))
             told = tell_players_it_changed(event, data)
             db.commit()
             flash("Saved. Everyone going got a heads-up." if told else "Saved.", "success")
@@ -629,15 +676,25 @@ def tell_players_it_changed(event, data):
     return True
 
 
-def tell_players_it_was_cancelled(event):
-    """Tell everyone who joined (except the host), so nobody shows up to an empty field."""
+def tell_players_it_was_cancelled(event, page_stays=True):
+    """Tell everyone who joined (except the host), so nobody shows up to an empty field.
+    page_stays=False when the game is about to be deleted (the host's account is going), so links go to the feed."""
     players = players_except_host(event)
     title, when = event_title(event), fmt_when(event["starts_at"])
+    link = url_for("events.detail", event_id=event["id"]) if page_stays else url_for("events.feed")
     for player in players:
-        # Links to the feed: if the host deleted their account, the game's page is gone too.
         notify(player["id"], "game_updates", f"{event['host_name'].split()[0]} canceled {title} ({when})",
-               url_for("events.feed"), key=f"change:{event['id']}")
-    get_db().commit()
+               link, key=f"change:{event['id']}")
+    # Friends with an open invite ("You down?") hear about it too, and the invite closes.
+    db = get_db()
+    invited = db.execute("SELECT guest_id FROM invites WHERE event_id = ? AND status IN ('pending', 'requested')",
+                         (event["id"],)).fetchall()
+    db.execute("UPDATE invites SET status = 'canceled' WHERE event_id = ? AND status IN ('pending', 'requested')",
+               (event["id"],))
+    for row in invited:
+        notify(row["guest_id"], "invites", f"{event['host_name'].split()[0]} canceled {title} ({when}), "
+               "so that invite is off.", url_for("events.feed"), key=f"invite:{event['id']}")
+    db.commit()
     for player in players:
         text_user(player["id"], f"{event['host_name'].split()[0]} canceled {title} ({when}).")
     for player in players:
@@ -667,7 +724,7 @@ def quick():
         sport = form.get("sport", "")
         location = form.get("location", "")
         skill_level = form.get("skill_level") or "All levels"  # not asked for private games
-        note = form.get("note", "").strip()
+        note = multi_line(form.get("note"))
         starts_in = dict(QUICK_START_OPTIONS).get(_int(form.get("starts_in")))
         duration = dict(QUICK_DURATIONS).get(_int(form.get("duration")))
         is_private, password, team_size, max_players, extra, reserve = 0, "", None, 0, 0, []
@@ -701,6 +758,20 @@ def quick():
         needed = (max_players or 0) - 1 - extra - len(reserve)
         if error is None and needed < 1 and not team_size:
             error = "Everyone's already coming, so there's no one to find. Pick more participants."
+        if error is None:
+            db, now = get_db(), to_db(now_local())
+            same = db.execute("""SELECT id FROM events WHERE host_id = ? AND is_quick = 1 AND sport = ? AND location = ?
+                                 AND is_private = ? AND team_size IS ? AND cancelled = 0 AND ends_at >= ?""",
+                              (g.user["id"], sport, location, is_private, team_size, now)).fetchone()
+            if same:
+                flash(f"You already have a Need players post for {SPORTS[sport]} at {location}. Here it is: "
+                      "edit it instead of posting again.", "info")
+                return redirect(url_for("events.detail", event_id=same["id"]))
+            # events.created_at is filled in by SQLite in UTC, so compare it with SQLite's clock too.
+            recent = db.execute("""SELECT COUNT(*) FROM events WHERE host_id = ? AND is_quick = 1
+                                   AND created_at >= datetime('now', '-1 hour')""", (g.user["id"],)).fetchone()[0]
+            if recent >= MAX_QUICK_POSTS_PER_HOUR:
+                error = "That's a lot of Need players posts in the last hour. Try again a bit later."
 
         if error is None:
             starts = round_up_5(now_local() + timedelta(minutes=_int(form.get("starts_in"))))
@@ -733,22 +804,23 @@ def _int(value):
 def detail(event_id):
     event = get_event(event_id)
     me = g.user["id"]
+    inside = can_see_inside(event)
     attendees = get_db().execute(
         """SELECT u.id, u.full_name, u.grad_year, u.avatar_updated, r.team
            FROM rsvps r JOIN users u ON u.id = r.user_id
            WHERE r.event_id = ? ORDER BY r.created_at""",
         (event_id,),
-    ).fetchall()
+    ).fetchall() if inside else []
     invite = None if event["i_am_going"] else my_invite(event_id, me)
     my_team = next((person["team"] for person in attendees if person["id"] == me), None)
     teams = None
-    if event["team_size"]:
+    if event["team_size"] and inside:
         counts = team_counts(event_id)
         teams = {team: {"players": [p for p in attendees if p["team"] == team], "count": counts[team],
                         "held": held_spots(event_id, team=team)} for team in (1, 2)}
     my_rsvp = get_db().execute("SELECT remind_minutes FROM rsvps WHERE event_id = ? AND user_id = ?",
                                (event_id, me)).fetchone()
-    return render_template("events/detail.html", event=event, attendees=attendees,
+    return render_template("events/detail.html", event=event, attendees=attendees, inside=inside,
                            my_reminder=my_rsvp["remind_minutes"] if my_rsvp else None, remind_choices=REMIND_CHOICES,
                            ended=from_db(event["ends_at"]) < now_local(),
                            share_url=public_url("events.detail", event_id=event_id),
@@ -759,6 +831,17 @@ def detail(event_id):
                            # my own held spot is still mine to take, even if the game looks full to others
                            spots_for_me=None if spots_left(event) is None
                            else spots_left(event) + (1 if hold_minutes_left(invite) else 0))
+
+
+KEPT_OUT = "The host took you off this game, so you can't rejoin it. There are more games on Home."
+
+
+def kept_out(event, invite):
+    """The host took me off this game. Only the host inviting me again lets me back in (not a friend's invite)."""
+    if invite is not None and invite["inviter_id"] == event["host_id"]:
+        return False
+    return get_db().execute("SELECT 1 FROM removed_players WHERE event_id = ? AND user_id = ?",
+                            (event["id"], g.user["id"])).fetchone() is not None
 
 
 def join_problem(event, password=None):
@@ -777,6 +860,8 @@ def join_problem(event, password=None):
         return "You can't join this game."
     if not_for_me(event):
         return not_for_me(event)
+    if kept_out(event, invite):
+        return KEPT_OUT
     if event["members_only"] and not event["i_am_member"]:
         return f"This event is for {event['club_name']} members."
     if event["team_size"] and invite is None:
@@ -784,7 +869,7 @@ def join_problem(event, password=None):
     if event["is_private"] and invite is None:
         if too_many_password_tries(event["id"], me):
             return "Too many wrong passwords. Try again in an hour, or ask to be invited."
-        if not password or not secrets.compare_digest(password.strip(), event["password"]):
+        if not password or not same_secret(password.strip(), event["password"]):
             count_wrong_password(event["id"], me)
             return "That's not the password." if password else "This game is private. Enter the password."
     return None
@@ -801,8 +886,9 @@ def try_join(event, password=None, team=None):
     db = get_db()
     # The capacity check and the insert happen in one statement, so two people tapping "Join" at the
     # same moment can't both take the last spot. Spots held for other invited friends don't count as open.
+    # OR IGNORE: a double tap (or two tabs) must not crash on the one-RSVP-per-person rule.
     cur = db.execute(
-        f"""INSERT INTO rsvps (event_id, user_id, created_at, team)
+        f"""INSERT OR IGNORE INTO rsvps (event_id, user_id, created_at, team)
             SELECT e.id, :me, :now, :team FROM events e
             WHERE e.id = :id AND (e.max_players IS NULL OR
                   e.extra_players + (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id)
@@ -815,11 +901,19 @@ def try_join(event, password=None, team=None):
         {"me": me, "id": event["id"], "now": to_db(now_local()), "hold_now": now_param(), "team": team})
     if not cur.rowcount:
         db.commit()
+        if db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (event["id"], me)).fetchone():
+            return False, "You're already going."
         return False, "Sorry, this game is full."
     if invite:
         db.execute("UPDATE invites SET status = 'accepted' WHERE id = ?", (invite["id"],))
         notify(invite["inviter_id"], "invites", f"{g.user['full_name'].split()[0]} is in for {event_title(event)}.",
                url_for("events.detail", event_id=event["id"]), key=f"reply:{event['id']}:{me}")
+    elif event["is_quick"] and event["host_id"] != me:
+        # A "Need players" host is waiting on exactly this; one notice per game, updated as people join.
+        going = db.execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (event["id"],)).fetchone()[0]
+        notify(event["host_id"], "game_updates",
+               f"{g.user['full_name'].split()[0]} joined {event_title(event)} ({going} going now).",
+               url_for("events.detail", event_id=event["id"]), key=f"joined:{event['id']}")
     db.commit()
     return True, "You're in! See you there."
 
@@ -881,11 +975,15 @@ def ics_fold(line):
 def calendar_file(event_id):
     """'Add to calendar': a standard .ics file that Apple/Google/Outlook calendars open."""
     event = get_event(event_id)
+    if not can_see_inside(event):
+        abort(404)
 
     def ics_time(value):
         return from_db(value).strftime("%Y%m%dT%H%M%S")
 
     def ics_text(value):
+        # Notes typed in a browser end lines with \r\n; a bare \r left in would end the calendar line early.
+        value = value.replace("\r\n", "\n").replace("\r", "\n")
         return value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
     link = public_url("events.detail", event_id=event["id"])
@@ -947,8 +1045,10 @@ def remove_player(event_id, user_id):
     db = get_db()
     cur = db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, user_id))
     if cur.rowcount:
+        db.execute("INSERT OR REPLACE INTO removed_players (event_id, user_id, removed_at) VALUES (?, ?, ?)",
+                   (event_id, user_id, to_db(now_local())))
         notify(user_id, "game_updates", f"{g.user['full_name'].split()[0]} took you off {event_title(event)}.",
-               url_for("events.feed"), key=f"change:{event_id}")
+               url_for("events.detail", event_id=event_id), key=f"change:{event_id}")
     db.commit()
     flash("Removed from the game." if cur.rowcount else "They're not in this game.", "info")
     return redirect(url_for("events.detail", event_id=event_id))
@@ -964,8 +1064,12 @@ def my_events():
     going = query_events(
         ["e.host_id != :me", "e.ends_at >= :now",
          "EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"], now)
+    invited = query_events(
+        ["e.cancelled = 0", "e.ends_at >= :now", NOT_BLOCKED,
+         "NOT EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)",
+         "EXISTS (SELECT 1 FROM invites i WHERE i.event_id = e.id AND i.guest_id = :me AND i.status = 'pending')"], now)
     past = query_events(
         ["e.ends_at < :now", "e.cancelled = 0",
          "EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"],
         now, order="e.starts_at DESC", limit=10)
-    return render_template("events/mine.html", hosting=hosting, going=going, past=past)
+    return render_template("events/mine.html", hosting=hosting, going=going, invited=invited, past=past)

@@ -10,6 +10,7 @@
     <a class="settings-row" href="{{ url_for('settings.texts') }}"><span>Texts <small class="muted">{{ 'on · ' ~ pretty_phone(g.user.phone) if g.user.phone_verified and g.user.sms_updates else ('off' if g.user.phone_verified else 'get updates by text') }}</small></span><span aria-hidden="true">›</span></a>
   {% endif %}
   <a class="settings-row" href="{{ url_for('settings.password') }}"><span>Change password</span><span aria-hidden="true">›</span></a>
+  <a class="settings-row" href="{{ url_for('social.blocked_people') }}"><span>Blocked people</span><span aria-hidden="true">›</span></a>
 </nav>
 
 <section class="settings-group">

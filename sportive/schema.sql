@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS users (
     photo_skipped   INTEGER NOT NULL DEFAULT 0,    -- 1 = chose "Add later" (don't ask again)
     theme           TEXT NOT NULL DEFAULT 'light', -- light / dark / system (settings.THEMES)
     suspended       INTEGER NOT NULL DEFAULT 0,    -- 1 = an admin suspended the account (can't log in)
-    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    session_version INTEGER NOT NULL DEFAULT 0,    -- +1 = every logged-in device is logged out (password change)
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))  -- UTC, unlike the rest: read with timeutil.from_sqlite_utc
 );
 
 -- One row per (user, sport) instead of one column per sport,
@@ -75,7 +76,7 @@ CREATE TABLE IF NOT EXISTS events (
     open_to       TEXT NOT NULL DEFAULT 'everyone', -- everyone / women / men / nonbinary (constants.OPEN_TO; older games: women_nb)
     members_only  INTEGER NOT NULL DEFAULT 0,      -- a club event only its members can join
     cancelled     INTEGER NOT NULL DEFAULT 0,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))  -- UTC: compare with SQLite's datetime('now', ...)
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_starts_at ON events(starts_at);
@@ -91,6 +92,14 @@ CREATE TABLE IF NOT EXISTS rsvps (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rsvps_user ON rsvps(user_id);
+
+-- People a host took off their game. They can't join it again by themselves (the host can still invite them).
+CREATE TABLE IF NOT EXISTS removed_players (
+    event_id   INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    removed_at TEXT NOT NULL,
+    PRIMARY KEY (event_id, user_id)
+);
 
 -- Invites to a game, from anyone going (a "party"). While `expires_at` hasn't passed, a pending invite
 -- holds a spot for that friend, so a group can join together without strangers taking their spots.

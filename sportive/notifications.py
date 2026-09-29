@@ -59,11 +59,13 @@ def settings(user_id):
     return {kind.key: chosen.get(kind.key, True) for kind in KINDS}
 
 
-def save_settings(user_id, form):
+def save_settings(user_id, form, shown):
+    """Save the switches that were on the page (`shown`). Kinds that weren't shown (club requests for
+    someone who isn't an officer yet) keep their setting, instead of being saved as off."""
     db = get_db()
     db.executemany(
         "INSERT OR REPLACE INTO notification_settings (user_id, kind, badge, screen) VALUES (?, ?, ?, ?)",
-        [(user_id, kind.key, 1 if form.get(kind.key) else 0, 1 if form.get(kind.key) else 0) for kind in KINDS])
+        [(user_id, kind.key, 1 if form.get(kind.key) else 0, 1 if form.get(kind.key) else 0) for kind in shown])
     db.commit()
 
 
@@ -264,7 +266,11 @@ def bell():
     items = bell_items()
     notices = [notice for notice in recent_notices(me) if chosen[notice["kind"]]]
     db = get_db()
-    db.execute("UPDATE notices SET read_at = ? WHERE user_id = ? AND read_at IS NULL", (to_db(now_local()), me))
+    # Only what was shown counts as read: a kind switched off now still shows up if it's switched back on.
+    shown_kinds = [kind for kind in NOTICE_KINDS if chosen[kind]]
+    if shown_kinds:
+        db.execute(f"UPDATE notices SET read_at = ? WHERE user_id = ? AND read_at IS NULL"
+                   f" AND kind IN ({', '.join('?' for _ in shown_kinds)})", (to_db(now_local()), me, *shown_kinds))
     db.commit()
     g.pop("notification_counts", None)  # the bell in the top bar shows 0 on this page
     return render_template("notifications/bell.html", items=items, notices=notices, kinds=KIND_BY_KEY)
@@ -286,7 +292,7 @@ def kinds_for(user_id):
 def notification_settings():
     me = g.user["id"]
     if request.method == "POST":
-        save_settings(me, request.form)
+        save_settings(me, request.form, kinds_for(me))
         return redirect(url_for("notifications.notification_settings"))  # the switches show what's saved
     return render_template("settings/notifications.html", kinds=kinds_for(me), chosen=settings(me),
                            places=PLACE_NAMES)

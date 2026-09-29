@@ -8,7 +8,7 @@
   <title>{% block title %}Home{% endblock %} · Sportive Circle</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Encode+Sans+Condensed:wght@700;800&family=Open+Sans:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Encode+Sans+Condensed:wght@700;800&family=Open+Sans:wght@400..700&display=swap">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml">
   <meta name="theme-color" content="#4b2e83">
@@ -33,7 +33,7 @@
 {% set nav_badges = tab_badges() if app_nav else {} %}
 {% macro icon(name) %}<svg class="icon" aria-hidden="true"><use href="#i-{{ name }}"/></svg>{% endmacro %}
 {% macro tab(url, icon_name, label, active, badge=0, extra_class='') %}
-  <a class="tab {{ extra_class }} {% if active %}is-active{% endif %}" href="{{ url }}" {% if active %}aria-current="page"{% endif %}>
+  <a class="tab{% if extra_class %} {{ extra_class }}{% endif %}{% if active %} is-active{% endif %}" href="{{ url }}" {% if active %}aria-current="page"{% endif %}>
     <span class="tab-icon">{{ icon(icon_name) }}{% if badge %}<span class="count-dot">{{ badge_text(badge) }}</span>{% endif %}</span>
     <span class="tab-label">{{ label }}{% if badge %}<span class="visually-hidden"> ({{ badge }} new)</span>{% endif %}</span>
   </a>
@@ -79,7 +79,7 @@
       <a class="brand side-only" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='icon.svg') }}" alt="" width="28" height="28"><span>Sportive<span class="brand-accent">Circle</span></span></a>
       {{ tab(url_for('events.feed'), 'home', 'Home', ep in ('events.feed', 'index', 'events.my_events', 'events.detail'), nav_badges.home) }}
       {{ tab(url_for('clubs.directory'), 'clubs', 'Clubs', ep.startswith('clubs.') and ep not in ('clubs.create', 'clubs.review_queue'), nav_badges.clubs) }}
-      {{ tab(url_for('create_menu'), 'plus', 'Create', ep in ('create_menu', 'events.create', 'events.quick', 'clubs.create'), extra_class='tab-create') }}
+      {{ tab(url_for('create_menu'), 'plus', 'Create', ep in ('create_menu', 'events.create', 'events.quick', 'clubs.create')) }}
       {{ tab(url_for('profile.view', user_id=g.user.id), 'user', 'Profile', (ep.startswith('profile.') or ep.startswith('settings.') or ep == 'notifications.notification_settings') and (ep != 'profile.view' or request.view_args.get('user_id') == g.user.id), nav_badges.profile) }}
       <div class="side-only side-extra">
         {{ tab(url_for('notifications.bell'), 'bell', 'Notifications', ep == 'notifications.bell', bell_count(), extra_class='bell-link') }}
@@ -101,7 +101,7 @@
 
   <main class="page" id="main">
     {% for category, message in get_flashed_messages(with_categories=true) %}
-      <div class="flash flash-{{ category }}" role="status">{{ message }}</div>
+      <div class="flash flash-{{ category }}" role="{{ 'alert' if category == 'error' else 'status' }}">{{ message }}</div>
     {% endfor %}
     {% block content %}{% endblock %}
   </main>

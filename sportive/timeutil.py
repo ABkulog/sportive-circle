@@ -3,7 +3,7 @@
 All times are Seattle local time, stored in the database as "YYYY-MM-DD HH:MM"
 strings (they sort correctly as text, so SQL can compare them directly).
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 SEATTLE = ZoneInfo("America/Los_Angeles")
@@ -25,6 +25,20 @@ def from_db(value):
 
 def parse_form(value):
     return datetime.strptime(value.strip(), FORM_FORMAT)
+
+
+def exists_in_seattle(dt):
+    """False for clock times skipped when daylight saving starts (2:00-2:59 AM on the second Sunday of
+    March): no calendar app or reminder can place them."""
+    there_and_back = dt.replace(tzinfo=SEATTLE).astimezone(timezone.utc).astimezone(SEATTLE)
+    return there_and_back.replace(tzinfo=None) == dt
+
+
+def from_sqlite_utc(value):
+    """A column filled in by SQLite's datetime('now') (UTC, "YYYY-MM-DD HH:MM:SS") -> Seattle local time,
+    so it can be compared with everything else in the app."""
+    utc = datetime.strptime(value[:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    return utc.astimezone(SEATTLE).replace(tzinfo=None)
 
 
 def to_form(value):
@@ -57,8 +71,11 @@ def fmt_relative(value):
         return "happening now"
     if minutes < 60:
         return f"in {minutes} min"
+    if minutes < 3 * 60:  # "in 1 hr" for 1:55 away sends people out an hour late; show the minutes too
+        hours, mins = divmod(round(minutes / 5) * 5, 60)
+        return f"in {hours} hr" + (f" {mins} min" if mins else "")
     if minutes < 12 * 60:
-        return f"in {minutes // 60} hr"
+        return f"in {round(minutes / 60)} hr"
     days = (dt.date() - now.date()).days
     if days == 0:
         return "later today"
@@ -69,8 +86,8 @@ def fmt_relative(value):
 
 def fmt_ago(value):
     """When something happened: 'Just now', '12 min ago', '3 hr ago', 'Yesterday, 4:12 PM', 'Mon, 4:12 PM',
-    'Sep 21'. (fmt_relative is for things still to come.)"""
-    dt = from_db(value)
+    'Sep 21' (with the year if it's not this year). (fmt_relative is for things still to come.)"""
+    dt = from_db(value[:16])  # some rows (made by SQLite) also have seconds
     now = now_local()
     minutes = int((now - dt).total_seconds() // 60)
     if minutes < 1:
@@ -87,12 +104,12 @@ def fmt_ago(value):
         return f"Yesterday, {clock}"
     if days < 7:
         return f"{dt.strftime('%a')}, {clock}"
-    return f"{dt.strftime('%b')} {dt.day}"
+    return f"{dt.strftime('%b')} {dt.day}" + (f", {dt.year}" if dt.year != now.year else "")
 
 
 def fmt_full(value):
     """'Monday, Sep 21, 4:12 PM' (for a hover / long-press title)."""
-    dt = from_db(value)
+    dt = from_db(value[:16])
     return f"{dt.strftime('%A, %b')} {dt.day}, {dt.strftime('%I:%M %p').lstrip('0')}"
 
 

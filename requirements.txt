@@ -1,9 +1,14 @@
-Flask>=3.0
-Pillow          # profile pictures
-segno           # QR codes for clubs (and tools/make_qr.py)
-tzdata          # timezone data on Windows
-gunicorn        # production web server (see wsgi.py)
-pytest          # tests
-pytest-bdd      # Gherkin scenarios (tests/features)
-pyflakes        # code check in tools/check.py
-pyyaml          # tests check render.yaml
+# Version ranges the tests pass with. Each allows bug-fix and minor releases of the tested versions but not the
+# next major release, so a new release can't break a fresh deploy. They work on Python 3.9 (local laptops) and
+# 3.12 (Render). To upgrade: raise a range here, run tools/check.py, commit.
+Flask>=3.1.3,<3.2
+Werkzeug>=3.1.8,<3.2   # Flask's request/response layer; its minor releases have broken apps before
+Jinja2>=3.1.6,<3.2     # templates
+Pillow>=11.3,<13       # profile pictures (12.x needs Python 3.10+, so 3.9 gets 11.3)
+segno>=1.6.6,<1.7      # QR codes for clubs (and tools/make_qr.py)
+tzdata>=2026.4         # timezone data on Windows (newer is always better: DST rule changes)
+gunicorn>=23,<27       # production web server (see wsgi.py)
+pytest>=8.4,<10        # tests
+pytest-bdd>=8.1,<9     # Gherkin scenarios (tests/features)
+pyflakes>=3.4,<5       # code check in tools/check.py
+PyYAML>=6.0.3,<7       # tests check render.yaml

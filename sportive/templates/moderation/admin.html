@@ -16,7 +16,23 @@
     <a href="{{ url_for('moderation.admin_reports', status=key) }}" {% if status == key %}class="is-on" aria-current="page"{% endif %}>
       {{ label }} ({{ report_counts.get(key, 0) }})</a>
   {% endfor %}
+  <a href="{{ url_for('moderation.admin_reports', status='suspended') }}" {% if status == 'suspended' %}class="is-on" aria-current="page"{% endif %}>
+    Suspended accounts ({{ suspended|length }})</a>
 </nav>
+
+{% if status == 'suspended' %}
+  {% if suspended %}
+    <ul class="people card">
+      {% for u in suspended %}
+        <li class="post-game-row"><a href="{{ url_for('profile.view', user_id=u.id) }}"><strong>{{ u.full_name }}</strong></a>
+          <span class="muted">{{ u.email }}</span>
+          {{ suspend_button(u.id, u.full_name, True) }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="card empty"><p class="empty-emoji" aria-hidden="true">🛡️</p><p><strong>No suspended accounts.</strong></p></div>
+  {% endif %}
+{% else %}
 
 {% if flagged and status == 'open' %}
   <section class="card flagged">
@@ -61,4 +77,5 @@
     <div class="card empty"><p class="empty-emoji" aria-hidden="true">🛡️</p><p><strong>No {{ status }} reports.</strong></p></div>
   {% endfor %}
 </div>
+{% endif %}
 {% endblock %}

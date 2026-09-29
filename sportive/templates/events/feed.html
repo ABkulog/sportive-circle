@@ -19,7 +19,7 @@
     {% endif %}
     {% for e in need_players if not up_next or e.id != up_next.id %}
       <a class="now-tile" href="{{ url_for('events.detail', event_id=e.id) }}" aria-label="{{ event_title(e) }}, {{ e.starts_at|relative }}">
-        <span class="now-ring is-hot" aria-hidden="true">{{ SPORT_EMOJI[e.sport] }}</span>
+        <span class="now-ring" aria-hidden="true">{{ SPORT_EMOJI[e.sport] }}</span>
         <strong>{% set left = spots_left(e) %}{% if e.team_size %}{{ e.team_size }}v{{ e.team_size }}{% elif left %}Need {{ left }}{% else %}{{ SPORTS[e.sport] }}{% endif %}</strong>
         <small>{{ e.starts_at|relative }}</small>
       </a>
@@ -47,8 +47,8 @@
       <select name="when" aria-label="When" data-autosubmit>
         <option value="">Upcoming</option>
         <option value="today" {% if filters.when == 'today' %}selected{% endif %}>Today</option>
-        <option value="week" {% if filters.when == 'week' %}selected{% endif %}>This week</option>
-        <option value="month" {% if filters.when == 'month' %}selected{% endif %}>This month</option>
+        <option value="week" {% if filters.when == 'week' %}selected{% endif %}>Next 7 days</option>
+        <option value="month" {% if filters.when == 'month' %}selected{% endif %}>Rest of {{ month_name }}</option>
       </select>
       <select name="location" aria-label="Location" data-autosubmit>
         <option value="">Anywhere</option>
@@ -77,11 +77,21 @@
     {{ event_card(e) }}
   {% else %}
     <div class="card empty">
-      <p><strong>No games yet.</strong> Start one!</p>
+      {% if active_filters %}
+        <p><strong>No games match {{ 'this filter' if active_filters == 1 else 'these filters' }}.</strong></p>
+        <p><a href="{{ url_for('events.feed', scope=filters.scope) }}">Clear filters</a> or start one yourself.</p>
+      {% elif filters.scope == 'full' %}
+        <p><strong>No full games right now.</strong></p>
+      {% else %}
+        <p><strong>No games yet.</strong> Start one!</p>
+      {% endif %}
       <a class="btn" href="{{ url_for('events.create', sport=filters.sport) }}">+ New event</a>
     </div>
   {% endfor %}
 </div>
+{% if more_page %}
+  <p class="show-more"><a class="btn btn-ghost btn-block" href="{{ url_for('events.feed', page=more_page, **filters) }}#game-{{ events[-1].id }}">Show more games</a></p>
+{% endif %}
 </section>
 
 {% if club_picks %}
@@ -89,7 +99,7 @@
     <h2 class="home-section-title">Clubs for you</h2>
     <div class="club-strip">
       {% for c in club_picks %}
-        <a class="card club-card mini" href="{{ url_for('clubs.view', club_id=c.id) }}">
+        <a class="card club-card" href="{{ url_for('clubs.view', club_id=c.id) }}">
           {{ club_logo(c) }}
           <strong class="club-name">{{ c.name }}</strong>
           <small class="muted"><span class="verified"><span class="check" aria-hidden="true">✓</span> Verified</span> · {{ c.member_count }} members</small>

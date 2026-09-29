@@ -24,9 +24,9 @@
     </div>
   </div>
   <ul class="stat-row" aria-label="Club stats">
-    <li><strong>{{ club.member_count }}</strong><span>member{{ 's' if club.member_count != 1 }}</span></li>
-    <li><strong>{{ followers }}</strong><span>follower{{ 's' if followers != 1 }}</span></li>
-    <li><strong>{{ events|length }}</strong><span>event{{ 's' if events|length != 1 }}</span></li>
+    {% for count, noun in [(club.member_count, 'member'), (followers, 'follower'), (events|length, 'event')] %}
+      <li {% if not count %}class="is-zero"{% endif %}><strong>{{ count }}</strong><span>{{ noun }}{{ 's' if count != 1 }}</span></li>
+    {% endfor %}
   </ul>
   <p class="club-about clamp" id="club-about" title="Tap to read more" data-expand>{{ club.description }}</p>
   {% if club.status == 'approved' %}
@@ -226,6 +226,16 @@
           <li class="post-game-row">
             <a class="person" href="{{ url_for('profile.view', user_id=m.id) }}">{{ avatar(m.id, m.full_name, m.avatar_updated, 32) }}<span>{{ m.full_name }}{% if role == 'officer' %}<small class="muted person-extra">{{ m.email }}</small>{% endif %}</span></a>
             {% if m.role == 'officer' %}<span class="badge badge-purple">Officer</span>
+              {% if role == 'officer' and officer_count > 1 %}
+                <details class="more-menu">
+                  <summary aria-label="Options for {{ m.full_name }}">⋯</summary>
+                  <div class="more-menu-panel right">
+                    <form method="post" action="{{ url_for('clubs.step_down', club_id=club.id, user_id=m.id) }}"
+                          data-confirm="{{ 'Step down as officer? You stay a member.' if m.id == g.user.id else 'Make ' ~ m.full_name ~ ' a regular member?' }}">
+                      {{ csrf_field() }}<button class="link-button">{{ 'Step down as officer' if m.id == g.user.id else 'Make regular member' }}</button></form>
+                  </div>
+                </details>
+              {% endif %}
             {% elif role == 'officer' %}
               <details class="more-menu">
                 <summary aria-label="Options for {{ m.full_name }}">⋯</summary>

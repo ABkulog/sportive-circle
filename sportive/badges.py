@@ -8,7 +8,7 @@ from datetime import date
 
 from .db import get_db
 from .moderation import admin_emails
-from .timeutil import from_db, now_local, to_db
+from .timeutil import from_db, from_sqlite_utc, now_local, to_db
 
 Badge = namedtuple("Badge", "key emoji name how until")  # until = last day it can be earned (None = forever)
 
@@ -104,8 +104,7 @@ def eligible(user_id):
         "night_dawg": any(s.hour >= 21 or s.hour < 5 for s in starts),
         "all_rounder": len({game["sport"] for game in games}) >= 3,
         "explorer": len({game["location"] for game in games}) >= 5,
-        # created_at is stored by SQLite in UTC; the date is close enough for a deadline.
-        "founding_dawg": user is not None and date.fromisoformat(user["created_at"][:10]) <= FOUNDING_DEADLINE,
+        "founding_dawg": user is not None and from_sqlite_utc(user["created_at"]).date() <= FOUNDING_DEADLINE,
     }
     keys.update(key for key, earned in checks.items() if earned)
     if user_email(user_id) in admin_emails():

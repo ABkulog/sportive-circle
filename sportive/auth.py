@@ -4,7 +4,7 @@ import functools
 import logging
 import secrets
 import sqlite3
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import (Blueprint, abort, current_app, flash, g, redirect, render_template,
                    request, session, url_for)
@@ -15,8 +15,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from .constants import SPORTS
 from .db import get_db, set_user_sports
 from .mail import compose, failure_reason, send_email
-from .textutil import one_line
-from .timeutil import from_db, now_local, to_db
+from .textutil import has_a_letter, person_name, same_secret, typed_code
+from .timeutil import SEATTLE, from_db, now_local, to_db
 
 bp = Blueprint("auth", __name__)
 log = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ def check_csrf():
     if request.method == "POST" and current_app.config["CSRF_ENABLED"] and request.endpoint != "tasks.send_reminders_task":
         sent = request.form.get("csrf_token", "")
         expected = session.get("csrf_token", "")
-        if not sent or not expected or not secrets.compare_digest(sent, expected):
+        if not sent or not expected or not same_secret(sent, expected):
             abort(400, "Your form expired. Go back, refresh the page and try again.")
 
 
@@ -74,6 +74,18 @@ def load_logged_in_user():
         g.user = get_db().execute(
             "SELECT * FROM users WHERE id = ? AND verified = 1 AND suspended = 0", (user_id,)
         ).fetchone()
+        if g.user is not None and session.get("session_version", 0) != g.user["session_version"]:
+            session.clear()  # logged out everywhere since this cookie was made (e.g. the password changed)
+            g.user = None
+
+
+def end_other_sessions(user_id):
+    """Log this account out on every other device (their cookies stop working); this one stays logged in."""
+    db = get_db()
+    db.execute("UPDATE users SET session_version = session_version + 1 WHERE id = ?", (user_id,))
+    if session.get("user_id") == user_id:
+        session["session_version"] = db.execute("SELECT session_version FROM users WHERE id = ?",
+                                                (user_id,)).fetchone()[0]
 
 
 def age_on(born, today):
@@ -88,8 +100,11 @@ def is_birthday(born, today):
 
 
 def safe_next(target):
-    """Only allow redirects back into this site (blocks //evil.com tricks)."""
-    if target and target.startswith("/") and not target.startswith("//"):
+    """Only allow redirects back into this site. Browsers drop tabs/newlines and treat "\\" as "/", so
+    "/\\tevil.com" or "/\\evil.com" would become //evil.com; any whitespace, control character or
+    backslash is refused."""
+    if (target and target.startswith("/") and not target.startswith("//")
+            and not any(ch == "\\" or ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in target)):
         return target
     return url_for("index")
 
@@ -101,6 +116,8 @@ def log_in(user, remember=True):
     session.clear()
     session.permanent = remember  # stay logged in on your phone (see PERMANENT_SESSION_LIFETIME)
     session["user_id"] = user["id"]
+    session["session_version"] = get_db().execute("SELECT session_version FROM users WHERE id = ?",
+                                                  (user["id"],)).fetchone()[0]
     get_db().execute("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?", (user["id"],))
     get_db().commit()
     if user["birth_date"]:
@@ -152,13 +169,22 @@ def send_verification_email(email, code, purpose="signup"):
     return True
 
 
+SENT_AT_FORMAT = "%Y-%m-%d %H:%M:%S"  # to the second: the cooldown is only a minute long
+
+
+def now_to_the_second():
+    return datetime.now(SEATTLE).replace(tzinfo=None, microsecond=0)
+
+
 def resend_wait(email):
     """Seconds until a new code can be sent to this address (0 = now). Stops email spam, and powers the
     "Resend code in 42s" countdown."""
     row = get_db().execute("SELECT verify_sent_at FROM users WHERE email = ?", (email,)).fetchone()
     if not row or not row["verify_sent_at"]:
         return 0
-    left = from_db(row["verify_sent_at"]) + RESEND_COOLDOWN - now_local()
+    sent = row["verify_sent_at"]
+    sent_at = datetime.strptime(sent, SENT_AT_FORMAT) if sent.count(":") == 2 else from_db(sent)
+    left = sent_at + RESEND_COOLDOWN - now_to_the_second()
     return max(0, int(left.total_seconds()) + 1) if left.total_seconds() > 0 else 0
 
 
@@ -173,7 +199,7 @@ def start_verification(email, session_key="pending_email"):
     db.execute(
         "UPDATE users SET verify_code = ?, verify_expires = ?, verify_sent_at = ?, verify_attempts = 0"
         " WHERE email = ?",
-        (code, to_db(now_local() + CODE_TTL), to_db(now_local()), email),
+        (code, to_db(now_local() + CODE_TTL), now_to_the_second().strftime(SENT_AT_FORMAT), email),
     )
     db.commit()
     session[session_key] = email
@@ -186,6 +212,8 @@ def validate_signup(full_name, email, password, password2, grad_year, birth_date
     domains = current_app.config["ALLOWED_EMAIL_DOMAINS"]
     if not full_name:
         return "Full name cannot be empty."
+    if not has_a_letter(full_name):
+        return "Please use your real name, so teammates know who you are."
     if len(full_name) > MAX_NAME_LENGTH:
         return f"Please keep your name under {MAX_NAME_LENGTH} characters."
     if not email:
@@ -194,6 +222,9 @@ def validate_signup(full_name, email, password, password2, grad_year, birth_date
         return "Please use your UW email address (ending in @uw.edu)."
     if email.count("@") != 1 or email.startswith("@") or email.split("@")[1] not in domains:
         return "Please use your UW email address (ending in @uw.edu)."
+    local = email.split("@")[0]
+    if "+" in local:  # netid+2@uw.edu reaches the same inbox, so it would allow a second account
+        return "Please use your plain UW email (netid@uw.edu), without a +tag."
     problem = password_problem(password, password2)
     if problem:
         return problem
@@ -207,19 +238,26 @@ def validate_signup(full_name, email, password, password2, grad_year, birth_date
         return "Please enter a valid date of birth."
     if not MIN_AGE <= age_on(born, now_local().date()) <= MAX_AGE:
         return "You are not within the age range required to use this app."
-    existing = get_db().execute("SELECT verified FROM users WHERE email = ?", (email,)).fetchone()
-    if existing and existing["verified"]:
-        return "This email is already in use."
+    # netid@uw.edu and netid@u.washington.edu are the same UW mailbox: one account per person.
+    same_inbox = [f"{local}@{domain}" for domain in domains]
+    existing = get_db().execute(
+        f"SELECT email FROM users WHERE verified = 1 AND email IN ({', '.join('?' for _ in same_inbox)})",
+        same_inbox).fetchone()
+    if existing:
+        return ("This email is already in use." if existing["email"] == email
+                else f"You already have an account as {existing['email']}. Log in with that email.")
     return None
 
 
 @bp.route("/signup", methods=("GET", "POST"))
 def signup():
+    if g.user is not None:  # already logged in: a second account from here would log this one out
+        return redirect(safe_next(request.args.get("next", "")))
     form = request.form
     if request.args.get("next"):
         session["after_login"] = safe_next(request.args["next"])
     if request.method == "POST":
-        full_name = one_line(form.get("full_name"))
+        full_name = person_name(form.get("full_name"))
         email = form.get("email", "").strip().lower()
         password = form.get("password", "")
         password2 = form.get("password2", "")
@@ -312,7 +350,7 @@ def verify():
     if not email:
         return redirect(url_for("auth.login"))
     if request.method == "POST":
-        code = request.form.get("code", "").strip()
+        code = typed_code(request.form.get("code"))
         db = get_db()
         user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
         if user is None:
@@ -324,7 +362,7 @@ def verify():
             error = "Too many wrong tries. Send yourself a new code."
         elif not user["verify_code"] or now_local() > from_db(user["verify_expires"]):
             error = "That code expired. Send yourself a new one."
-        elif not secrets.compare_digest(code, user["verify_code"]):
+        elif not same_secret(code, user["verify_code"]):
             db.execute("UPDATE users SET verify_attempts = verify_attempts + 1 WHERE id = ?", (user["id"],))
             db.commit()
             error = "Wrong code, try again."
@@ -375,6 +413,8 @@ def resend_code():
 @bp.route("/login", methods=("GET", "POST"))
 def login():
     next_url = request.values.get("next", "")
+    if g.user is not None:
+        return redirect(safe_next(next_url))
     if next_url:
         session["after_login"] = safe_next(next_url)
     if request.method == "POST":
@@ -384,7 +424,7 @@ def login():
         user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
         if user and user["locked_until"] and now_local() < from_db(user["locked_until"]):
             flash("Too many wrong passwords. Try again in 15 minutes.", "error")
-        elif user is None or not check_password_hash(user["password_hash"], password):
+        elif not check_password_hash(user["password_hash"] if user else dummy_hash(), password) or user is None:
             if user is not None:
                 failed = user["failed_logins"] + 1
                 locked = to_db(now_local() + LOCKOUT) if failed >= MAX_FAILED_LOGINS else None
@@ -393,8 +433,12 @@ def login():
                 db.commit()
             flash("Wrong email or password.", "error")
         elif user["suspended"]:
-            flash("This account is suspended for breaking the rules. Think it's a mistake? See the Terms page.",
-                  "error")
+            # They can't log in to message anyone, so give them an address that works from outside the app.
+            config = current_app.config
+            contact = config.get("CONTACT_EMAIL") or config.get("MAIL_FROM") or config.get("MAIL_USERNAME")
+            flash("This account is suspended for breaking the rules. Think it's a mistake? "
+                  + (f"Email {contact} from this address and we'll take another look." if contact
+                     else "Reply to any email we've sent you and we'll take another look."), "error")
         elif not user["verified"]:
             if code_recently_sent(email):
                 session["pending_email"] = email
@@ -405,7 +449,8 @@ def login():
             return redirect(url_for("auth.verify"))
         else:
             return redirect(log_in(user, remember=request.form.get("remember") == "1"))
-    return render_template("auth/login.html", next_url=next_url)
+    return render_template("auth/login.html", next_url=next_url,
+                           email=request.form.get("email", "").strip()[:254])
 
 
 # --------------------------------------------------------- forgot password
@@ -423,6 +468,7 @@ def forgot_password():
             row = get_db().execute("SELECT id, verify_code FROM users WHERE email = ?", (email,)).fetchone()
             text_code(row["id"], row["verify_code"], "password reset")
         session["reset_email"] = email
+        session.pop("reset_tries", None)
         flash("If that email has an account, we sent it a 6-digit code (and texted it, if you added a phone).",
               "info")
         return redirect(url_for("auth.reset_password"))
@@ -436,26 +482,31 @@ def reset_password():
     if not email:
         return redirect(url_for("auth.forgot_password"))
     if request.method == "POST":
-        code = request.form.get("code", "").strip()
+        code = typed_code(request.form.get("code"))
         password = request.form.get("password", "")
         db = get_db()
         user = db.execute("SELECT * FROM users WHERE email = ? AND verified = 1", (email,)).fetchone()
         error = None
+        # Every answer here must look the same whether or not the email has an account (see forgot_password):
+        # no account = a code that is always wrong, with the same limit on tries.
         if user is None or not user["verify_code"]:
-            error = "That code isn't right. Ask for a new one."
+            session["reset_tries"] = session.get("reset_tries", 0) + 1
+            error = ("Too many wrong tries. Ask for a new code." if session["reset_tries"] > MAX_CODE_ATTEMPTS
+                     else "Wrong code, try again.")
         elif user["verify_attempts"] >= MAX_CODE_ATTEMPTS:
             error = "Too many wrong tries. Ask for a new code."
-        elif now_local() > from_db(user["verify_expires"]):
-            error = "That code expired. Ask for a new one."
-        elif not secrets.compare_digest(code, user["verify_code"]):
+        elif not same_secret(code, user["verify_code"]):
             db.execute("UPDATE users SET verify_attempts = verify_attempts + 1 WHERE id = ?", (user["id"],))
             db.commit()
             error = "Wrong code, try again."
+        elif now_local() > from_db(user["verify_expires"]):  # only said to someone who knows the code
+            error = "That code expired. Ask for a new one."
         else:
             error = password_problem(password, request.form.get("password2", ""))
         if error is None:
             db.execute("UPDATE users SET password_hash = ?, verify_code = NULL, verify_expires = NULL,"
                        " verify_attempts = 0 WHERE id = ?", (hash_password(password), user["id"]))
+            end_other_sessions(user["id"])  # whoever knew the old password is logged out too
             db.commit()
             destination = log_in(user)
             flash("Password changed. You're logged in.", "success")
@@ -468,12 +519,48 @@ def hash_password(password):
     return generate_password_hash(password, current_app.config["PASSWORD_HASH_METHOD"])
 
 
+def check_current_password(user, password):
+    """For pages that ask for your password again (change password, delete account). Wrong guesses count
+    toward the same lock as the login page, so a borrowed logged-in phone can't be used to guess it.
+    Returns None if the password is right, "" if it's wrong, or a message if there were too many tries."""
+    db = get_db()
+    row = db.execute("SELECT password_hash, failed_logins, locked_until FROM users WHERE id = ?",
+                     (user["id"],)).fetchone()
+    if row["locked_until"] and now_local() < from_db(row["locked_until"]):
+        return "Too many wrong passwords. Try again in 15 minutes."
+    if check_password_hash(row["password_hash"], password):
+        if row["failed_logins"]:
+            db.execute("UPDATE users SET failed_logins = 0 WHERE id = ?", (user["id"],))
+            db.commit()
+        return None
+    failed = row["failed_logins"] + 1
+    locked = to_db(now_local() + LOCKOUT) if failed >= MAX_FAILED_LOGINS else None
+    db.execute("UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?",
+               (0 if locked else failed, locked, user["id"]))
+    db.commit()
+    return ""
+
+
+def dummy_hash():
+    """A hash to check wrong logins against when the email has no account, so the answer takes as long as
+    for a real account (otherwise the response time tells who has one)."""
+    method = current_app.config["PASSWORD_HASH_METHOD"]
+    if _dummy_hashes.get(method) is None:
+        _dummy_hashes[method] = generate_password_hash(secrets.token_urlsafe(16), method)
+    return _dummy_hashes[method]
+
+
+_dummy_hashes = {}
+
+
 def password_problem(password, password2):
     """The error message for a new password, or None if it's fine."""
     if len(password) < MIN_PASSWORD_LENGTH:
         return f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
     if len(password) > MAX_PASSWORD_LENGTH:
         return f"Password can be at most {MAX_PASSWORD_LENGTH} characters."
+    if not password.strip():
+        return "Password can't be only spaces."
     if password != password2:
         return "Passwords do not match."
     return None

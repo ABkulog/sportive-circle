@@ -7,17 +7,17 @@ from flask import (Blueprint, Response, abort, flash, g, redirect, render_templa
 from werkzeug.datastructures import MultiDict
 from werkzeug.security import check_password_hash
 
-from .auth import MAX_NAME_LENGTH, hash_password, login_required, password_problem, safe_next
+from .auth import MAX_NAME_LENGTH, check_current_password, end_other_sessions, hash_password, login_required, password_problem, safe_next
 from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
-from .events import SHOWN_UNLESS_FULL, celebrate_progress, query_events, tell_players_it_was_cancelled
+from .events import INSIDE_VISIBLE, SHOWN_UNLESS_FULL, celebrate_progress, query_events, tell_players_it_was_cancelled
 from .photos import make_avatar
 from .badges import (GIVEN_BADGES, ROLE_BADGES, SHOWCASE_SLOTS, TESTER, catalog, earned_badges, is_retired,
                      give_badge, rarity, set_showcase, showcase, sync_badges)
 from .clubs import SOCIALS
 from .moderation import admin_required, is_admin
 from .notifications import mark_seen, notify
-from .textutil import one_line
+from .textutil import has_a_letter, multi_line, one_line, person_name
 from .social import can_message, friendship_status, i_blocked, is_blocked_between
 from .timeutil import now_local, to_db
 
@@ -150,13 +150,15 @@ def view(user_id):
     ).fetchone()
     if user is None or (user["suspended"] and user_id != g.user["id"] and not is_admin()):
         abort(404)
-    hosting = query_events(["e.host_id = :uid", "e.cancelled = 0", "e.ends_at >= :now", SHOWN_UNLESS_FULL],
+    hosting = query_events(["e.host_id = :uid", "e.cancelled = 0", "e.ends_at >= :now", INSIDE_VISIBLE, SHOWN_UNLESS_FULL],
                            {"uid": user_id, "now": to_db(now_local())}, limit=10)
-    # Emails are private: only visible to yourself and people you share an event with.
+    # Emails are private: only visible to yourself and people you actually played with (a game you were both
+    # in has ended). Joining a stranger's game just to read their email doesn't work.
     show_email = user_id == g.user["id"] or get_db().execute(
         """SELECT 1 FROM rsvps mine JOIN rsvps theirs ON mine.event_id = theirs.event_id
-           WHERE mine.user_id = ? AND theirs.user_id = ?""",
-        (g.user["id"], user_id),
+           JOIN events e ON e.id = mine.event_id
+           WHERE mine.user_id = ? AND theirs.user_id = ? AND e.cancelled = 0 AND e.ends_at < ?""",
+        (g.user["id"], user_id, to_db(now_local())),
     ).fetchone() is not None
     if user_id == g.user["id"]:
         celebrate_progress(user_id)
@@ -219,15 +221,17 @@ def edit():
     me = g.user
     if request.method == "POST":
         form = request.form
-        full_name = one_line(form.get("full_name"))
+        full_name = person_name(form.get("full_name"))
         grad_year = form.get("grad_year", "").strip()
-        bio = form.get("bio", "").strip()
+        bio = multi_line(form.get("bio"))
         pronouns = one_line(form.get("pronouns"))
         gender = form.get("gender", "")
 
         error = None
         if not full_name:
             error = "Full name cannot be empty."
+        elif not has_a_letter(full_name):
+            error = "Please use your real name, so teammates know who you are."
         elif len(full_name) > MAX_NAME_LENGTH:
             error = f"Please keep your name under {MAX_NAME_LENGTH} characters."
         elif grad_year and (not grad_year.isdigit() or not 1950 <= int(grad_year) <= now_local().year + 8):
@@ -287,21 +291,26 @@ def edit_sports():
 @login_required
 def change_password():
     form = request.form
-    if not check_password_hash(g.user["password_hash"], form.get("current_password", "")):
-        error = "Your current password isn't right."
+    problem = check_current_password(g.user, form.get("current_password", ""))
+    if problem is not None:
+        error = problem or "Your current password isn't right."
     else:
         error = password_problem(form.get("password", ""), form.get("password2", ""))
+        if error is None and check_password_hash(g.user["password_hash"], form["password"]):
+            error = "That's the password you have now. Pick a new one."
     if error:
         flash(f"{error} Your password was not changed.", "error")
     else:
         db = get_db()
         db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(form["password"]), g.user["id"]))
+        end_other_sessions(g.user["id"])
         db.commit()
-        flash("Password changed.", "success")
+        flash("Password changed. You're logged out on your other devices.", "success")
     return redirect(url_for("settings.password") if error else url_for("settings.home"))
 
 
 CONFIRM_WORD = "DELETE"
+FORMER_MEMBER_EMAIL = "former-member@sportive.invalid"  # not @uw.edu, so nobody can sign up as it
 
 
 def what_you_would_lose(user_id):
@@ -320,13 +329,39 @@ def what_you_would_lose(user_id):
     }
 
 
-def clubs_only_i_lead(user_id):
-    """Clubs where this person is the only officer (they'd be left without a leader)."""
-    return get_db().execute(
-        """SELECT c.id, c.name FROM clubs c JOIN club_members m ON m.club_id = c.id
+SOLE_OFFICER = """SELECT c.id, c.name FROM clubs c JOIN club_members m ON m.club_id = c.id
            WHERE m.user_id = ? AND m.role = 'officer'
-             AND (SELECT COUNT(*) FROM club_members o WHERE o.club_id = c.id AND o.role = 'officer') = 1""",
-        (user_id,)).fetchall()
+             AND (SELECT COUNT(*) FROM club_members o WHERE o.club_id = c.id AND o.role = 'officer') = 1
+             AND {} (c.status = 'approved' AND EXISTS (SELECT 1 FROM club_members o WHERE o.club_id = c.id
+                                                        AND o.role = 'member'))"""
+
+
+def clubs_only_i_lead(user_id):
+    """Live clubs with members where this person is the only officer (they'd be left without a leader)."""
+    return get_db().execute(SOLE_OFFICER.format(""), (user_id,)).fetchall()
+
+
+def clubs_that_go_with_me(user_id):
+    """Clubs only this person runs that nobody else is in yet (still pending, rejected, or no members).
+    There's no one to hand them to, so they're deleted with the account instead of blocking it."""
+    return get_db().execute(SOLE_OFFICER.format("NOT"), (user_id,)).fetchall()
+
+
+def keep_games_other_people_played(user_id):
+    """Finished games this person hosted are part of everyone else's history (Past games, badges,
+    Top Dawgs), so they're handed to a hidden "Former member" account instead of being deleted.
+    That account is unverified with no usable password, so it can't log in or show up anywhere."""
+    db = get_db()
+    played = """host_id = :me AND cancelled = 0 AND ends_at < :now
+                AND EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = events.id AND r.user_id != :me)"""
+    params = {"me": user_id, "now": to_db(now_local())}
+    if not db.execute(f"SELECT 1 FROM events WHERE {played}", params).fetchone():
+        return
+    row = db.execute("SELECT id FROM users WHERE email = ?", (FORMER_MEMBER_EMAIL,)).fetchone()
+    params["former"] = row["id"] if row else db.execute(
+        "INSERT INTO users (email, password_hash, full_name, verified) VALUES (?, '!', 'Former member', 0)",
+        (FORMER_MEMBER_EMAIL,)).lastrowid
+    db.execute(f"UPDATE events SET host_id = :former WHERE {played}", params)
 
 
 @bp.route("/profile/delete", methods=("GET", "POST"))
@@ -337,22 +372,26 @@ def delete_account():
     sole_officer = clubs_only_i_lead(g.user["id"])
     if request.method == "GET":
         return render_template("profile/delete.html", lose=what_you_would_lose(g.user["id"]), word=CONFIRM_WORD,
-                               sole_officer=sole_officer)
+                               sole_officer=sole_officer, lone_clubs=clubs_that_go_with_me(g.user["id"]))
     if sole_officer:
         flash(f"You're the only officer of {sole_officer[0]['name']}. Make someone else an officer first.", "error")
         return redirect(url_for("profile.delete_account"))
     if request.form.get("confirm", "").strip().upper() != CONFIRM_WORD:
         flash(f"Type {CONFIRM_WORD} in the box to confirm. Your account was not deleted.", "error")
         return redirect(url_for("profile.delete_account"))
-    if not check_password_hash(g.user["password_hash"], request.form.get("password", "")):
-        flash("That password isn't right, so your account was not deleted.", "error")
+    problem = check_current_password(g.user, request.form.get("password", ""))
+    if problem is not None:
+        flash(f"{problem or 'That password isn’t right.'} Your account was not deleted.", "error")
         return redirect(url_for("profile.delete_account"))
     # Games they host disappear with the account, so warn everyone who joined (like canceling would).
     for event in query_events(["e.host_id = :me", "e.cancelled = 0", "e.ends_at >= :now"],
                               {"now": to_db(now_local())}):
-        tell_players_it_was_cancelled(event)
+        tell_players_it_was_cancelled(event, page_stays=False)
     db = get_db()
-    # ON DELETE CASCADE (schema.sql) also removes your sports, RSVPs and hosted events.
+    for club in clubs_that_go_with_me(g.user["id"]):
+        db.execute("DELETE FROM clubs WHERE id = ?", (club["id"],))
+    keep_games_other_people_played(g.user["id"])
+    # ON DELETE CASCADE (schema.sql) also removes your sports, RSVPs and the rest of your hosted events.
     db.execute("DELETE FROM users WHERE id = ?", (g.user["id"],))
     db.commit()
     session.clear()

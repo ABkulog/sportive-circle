@@ -88,6 +88,27 @@ def test_wrong_password(accounts):
     assert b"Wrong email or password." in accounts.login(password="nope-nope-nope").data
 
 
+def test_unknown_email_login_still_checks_a_password_hash(accounts, monkeypatch):
+    from sportive import auth
+    checked = []
+    real = auth.check_password_hash
+    monkeypatch.setattr(auth, "check_password_hash", lambda h, p: checked.append(h) or real(h, p))
+    assert b"Wrong email or password." in accounts.login(email="nobody@uw.edu", password="whatever-123").data
+    assert checked and checked[0].startswith("pbkdf2:sha256:1000")   # same work as a real account
+
+
+def test_reset_page_answers_the_same_with_or_without_an_account(accounts, client):
+    accounts.signup()
+    accounts.logout()
+    answers = []
+    for email in ("dubs@uw.edu", "nobody@uw.edu"):
+        client.post("/forgot", data={"email": email})
+        answers.append([client.post("/reset", data={"code": "000000", "password": "new-password-1",
+                                                    "password2": "new-password-1"}).data.count(b"Wrong code")
+                        for _ in range(3)])
+    assert answers[0] == answers[1] == [1, 1, 1]
+
+
 def test_email_already_used(accounts):
     accounts.signup()
     accounts.logout()
@@ -161,6 +182,67 @@ def test_join_leave_and_capacity(accounts, client):
     assert b"You&#39;re in!" in client.post(f"/events/{event_id}/join", follow_redirects=True).data
 
 
+def test_double_tapping_join_doesnt_crash(accounts, client, app):
+    from flask import g
+    from sportive import events
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    player = _user_id(app, "player@uw.edu")
+    with app.test_request_context():
+        g.user = get_db().execute("SELECT * FROM users WHERE id = ?", (player,)).fetchone()
+        stale = events.get_event(event_id)           # the page as it was before the first tap landed
+        assert events.try_join(stale)[0] is True
+        assert events.try_join(stale) == (False, "You're already going.")
+
+
+def test_saving_notification_settings_keeps_hidden_kinds_on(accounts, client, app):
+    from sportive.notifications import KINDS, settings
+    accounts.signup()
+    client.post("/settings/notifications", data={kind.key: "1" for kind in KINDS if kind.audience == "everyone"})
+    with app.app_context():
+        chosen = settings(_user_id(app, "dubs@uw.edu"))
+    assert chosen["club_requests"] and chosen["suggestion_trends"]   # not on the page, so not switched off
+
+
+def test_opening_the_bell_leaves_switched_off_notices_unread(accounts, client, app):
+    from sportive.notifications import KINDS, notify
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    client.post("/settings/notifications", data={k.key: "1" for k in KINDS if k.key != "invites"})
+    with app.test_request_context():
+        notify(me, "invites", "Maya wants you in Hoops", "/events/1")
+        get_db().commit()
+    client.get("/notifications")
+    with app.app_context():
+        assert get_db().execute("SELECT read_at FROM notices").fetchone()[0] is None
+
+
+def test_database_uses_wal_and_waits_for_locks(app):
+    with app.app_context():
+        assert get_db().execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+        assert get_db().execute("PRAGMA busy_timeout").fetchone()[0] >= 10000
+
+
+def test_host_cannot_shrink_game_below_who_is_in(accounts, client, app, monkeypatch):
+    from sportive import events
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form(players="4")))
+    for email in ("a@uw.edu", "b@uw.edu"):
+        accounts.logout()
+        accounts.signup(email=email)
+        client.post(f"/events/{event_id}/join")
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    assert b"already taken" in client.post(f"/events/{event_id}/edit", data=event_form(players="2")).data
+    # someone joins between the form check and the save
+    monkeypatch.setattr(events, "read_players", lambda *args, **kwargs: (2, 0, None))
+    assert b"Someone just joined" in client.post(f"/events/{event_id}/edit", data=event_form(players="2")).data
+    with app.app_context():
+        assert get_db().execute("SELECT max_players FROM events WHERE id = ?", (event_id,)).fetchone()[0] == 4
+
+
 def test_only_host_can_edit_or_cancel(accounts, client):
     accounts.signup(email="host@uw.edu")
     event_id = event_id_from(client.post("/events/new", data=event_form()))
@@ -210,12 +292,65 @@ def test_csrf_blocks_forged_posts(tmp_path):
     assert app.test_client().post("/login", data={"email": "x@uw.edu", "password": "x"}).status_code == 400
 
 
+def test_non_ascii_csrf_token_and_codes_do_not_crash(tmp_path, accounts, client):
+    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "csrf.db"), "SECRET_KEY": "t"})
+    web = app.test_client()
+    web.get("/login")
+    assert web.post("/login", data={"csrf_token": "é🙂", "email": "x@uw.edu", "password": "x"}).status_code == 400
+
+    accounts.signup(verify=False)
+    assert b"Wrong code" in client.post("/verify", data={"code": "１２３é🙂"}).data
+    full_width = accounts.code_for("dubs@uw.edu").translate({ord(d): 0xFF10 + int(d) for d in "0123456789"})
+    assert client.post("/verify", data={"code": full_width}).status_code == 302
+
+
+def test_changing_the_password_logs_out_other_devices(accounts, client, app):
+    accounts.signup()
+    phone = app.test_client()
+    phone.post("/login", data={"email": "dubs@uw.edu", "password": "purple-and-gold"})
+    assert b"Hey, Dubs" in phone.get("/").data
+    done = client.post("/profile/password", data={"current_password": "purple-and-gold",
+                                                   "password": "brand-new-pass", "password2": "brand-new-pass"},
+                       follow_redirects=True)
+    assert b"Password changed" in done.data
+    assert b"Hey, Dubs" in client.get("/").data               # this device stays logged in
+    assert b"Hey, Dubs" not in phone.get("/").data            # the other one is logged out
+
+
+def test_new_password_must_be_new_and_not_blank(accounts, client):
+    accounts.signup()
+    same = client.post("/profile/password", data={"current_password": "purple-and-gold", "password": "purple-and-gold",
+                                                  "password2": "purple-and-gold"}, follow_redirects=True)
+    assert b"the password you have now" in same.data
+    spaces = client.post("/profile/password", data={"current_password": "purple-and-gold", "password": " " * 10,
+                                                    "password2": " " * 10}, follow_redirects=True)
+    assert b"only spaces" in spaces.data
+
+
+def test_guessing_the_current_password_locks_like_login(accounts, client):
+    accounts.signup()
+    wrong = {"current_password": "guess-guess", "password": "brand-new-pass", "password2": "brand-new-pass"}
+    for _ in range(10):
+        client.post("/profile/password", data=wrong)
+    right = dict(wrong, current_password="purple-and-gold")
+    assert b"Too many wrong passwords" in client.post("/profile/password", data=right, follow_redirects=True).data
+
+
 def test_login_next_cannot_redirect_offsite(accounts, client):
     accounts.signup()
     accounts.logout()
     response = client.post("/login", data={"email": "dubs@uw.edu", "password": "purple-and-gold",
                                            "next": "//evil.example"})
     assert response.headers["Location"] == "/"
+
+
+def test_login_next_rejects_whitespace_and_backslash_tricks(accounts, client):
+    accounts.signup()
+    for target in ("/\t/evil.example", "/\\evil.example", "/\n/evil.example", "/ /evil.example", "/\x0b/evil.example"):
+        accounts.logout()
+        response = client.post("/login", data={"email": "dubs@uw.edu", "password": "purple-and-gold",
+                                               "next": target})
+        assert response.headers["Location"] == "/", target
 
 
 def test_profile_edit(accounts, client):
@@ -256,7 +391,9 @@ def test_relative_time_counts_hours_across_midnight(monkeypatch):
     from sportive import timeutil
     monkeypatch.setattr(timeutil, "now_local", lambda: datetime(2026, 9, 26, 23, 4))
     assert timeutil.fmt_relative("2026-09-26 23:15") == "in 11 min"
-    assert timeutil.fmt_relative("2026-09-27 00:43") == "in 1 hr"
+    assert timeutil.fmt_relative("2026-09-27 00:43") == "in 1 hr 40 min"
+    assert timeutil.fmt_relative("2026-09-27 01:03") == "in 2 hr"        # 1:59 away, not "in 1 hr"
+    assert timeutil.fmt_relative("2026-09-27 04:50") == "in 6 hr"        # 5:46 away rounds to the nearest hour
     assert timeutil.fmt_relative("2026-09-27 19:00") == "tomorrow"
     assert timeutil.fmt_relative("2026-09-30 19:00") == "in 4 days"
 
@@ -277,6 +414,21 @@ def test_old_database_gets_new_columns(tmp_path):
     create_app({"TESTING": True, "DATABASE": str(path), "SECRET_KEY": "t"})
     columns = {row[1] for row in sqlite3.connect(path).execute("PRAGMA table_info(users)")}
     assert {"verify_sent_at", "failed_logins", "locked_until"} <= columns
+
+
+def test_resend_cooldown_counts_real_seconds(accounts, app):
+    from sportive.auth import SENT_AT_FORMAT, now_to_the_second, resend_wait
+    accounts.signup(email="new@uw.edu", verify=False)
+    with app.app_context():
+        db = get_db()
+        sent = now_to_the_second() - timedelta(seconds=30)
+        db.execute("UPDATE users SET verify_sent_at = ? WHERE email = 'new@uw.edu'", (sent.strftime(SENT_AT_FORMAT),))
+        db.commit()
+        assert 28 <= resend_wait("new@uw.edu") <= 32
+        db.execute("UPDATE users SET verify_sent_at = ? WHERE email = 'new@uw.edu'",
+                   ((sent - timedelta(seconds=40)).strftime(SENT_AT_FORMAT),))
+        db.commit()
+        assert resend_wait("new@uw.edu") == 0
 
 
 def test_login_locks_after_too_many_wrong_passwords(accounts):
@@ -350,6 +502,24 @@ def test_calendar_file(accounts, client):
     assert "SUMMARY:Hoops\\, then food" in body and "TZID=America/Los_Angeles" in body
 
 
+def test_line_breaks_are_saved_as_one_character(accounts, client, app):
+    accounts.signup()
+    event_id = event_id_from(client.post("/events/new", data=event_form(note="a\r\n" * 249 + "b")))  # 499 chars typed
+    client.post("/profile/edit", data={"full_name": "Dubs Husky", "grad_year": "2028", "bio": "Hoops\r\ndaily"})
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT note FROM events WHERE id = ?", (event_id,)).fetchone()[0] == "a\n" * 249 + "b"
+        assert db.execute("SELECT bio FROM users").fetchone()[0] == "Hoops\ndaily"
+
+
+def test_calendar_file_has_no_stray_line_breaks_from_the_note(accounts, client):
+    accounts.signup()
+    event_id = event_id_from(client.post("/events/new", data=event_form(note="Court 3\r\nBring water\rThanks")))
+    body = client.get(f"/events/{event_id}/calendar.ics").data.decode()
+    assert "\r" not in body.replace("\r\n", "")
+    assert "DESCRIPTION:Court 3\\nBring water\\nThanks" in body.replace("\r\n ", "")
+
+
 def test_email_only_visible_to_people_you_played_with(accounts, client, app):
     accounts.signup(email="host@uw.edu")
     event_id = event_id_from(client.post("/events/new", data=event_form()))
@@ -359,7 +529,11 @@ def test_email_only_visible_to_people_you_played_with(accounts, client, app):
         host_id = get_db().execute("SELECT id FROM users WHERE email = 'host@uw.edu'").fetchone()[0]
     assert b"host@uw.edu" not in client.get(f"/u/{host_id}").data
     client.post(f"/events/{event_id}/join")
-    assert b"host@uw.edu" in client.get(f"/u/{host_id}").data
+    assert b"host@uw.edu" not in client.get(f"/u/{host_id}").data    # joining isn't enough...
+    with app.app_context():
+        get_db().execute("UPDATE events SET starts_at = '2026-01-10 07:00', ends_at = '2026-01-10 08:00'")
+        get_db().commit()
+    assert b"host@uw.edu" in client.get(f"/u/{host_id}").data        # ...playing together is
 
 
 def test_friendly_404(accounts, client):
@@ -372,6 +546,31 @@ def test_refuses_to_run_publicly_without_secret_key(tmp_path):
     import pytest
     with pytest.raises(RuntimeError):
         create_app({"DATABASE": str(tmp_path / "x.db")})
+    for weak in ("dev-only-change-me", "short-key", ""):
+        with pytest.raises(RuntimeError):
+            create_app({"DATABASE": str(tmp_path / "x.db"), "SECRET_KEY": weak})
+    assert create_app({"DATABASE": str(tmp_path / "x.db"), "SECRET_KEY": "k" * 40}).secret_key == "k" * 40
+
+
+def test_dev_mode_gets_its_own_persistent_secret_key(tmp_path):
+    first = create_app({"DATABASE": str(tmp_path / "x.db"), "DEBUG": True})
+    second = create_app({"DATABASE": str(tmp_path / "x.db"), "DEBUG": True})
+    assert first.secret_key == second.secret_key != "dev-only-change-me"
+    assert len(first.secret_key) >= 32
+
+
+def test_bell_times_say_how_long_ago(monkeypatch):
+    from datetime import datetime
+    from sportive import timeutil
+    monkeypatch.setattr(timeutil, "now_local", lambda: datetime(2026, 9, 29, 15, 0))
+    assert timeutil.fmt_ago("2026-09-29 15:00:40") == "Just now"       # rows made by SQLite have seconds too
+    assert timeutil.fmt_ago("2026-09-29 14:35") == "25 min ago"
+    assert timeutil.fmt_ago("2026-09-29 09:00") == "6 hr ago"
+    assert timeutil.fmt_ago("2026-09-29 01:30") == "Today, 1:30 AM"
+    assert timeutil.fmt_ago("2026-09-28 22:00") == "Yesterday, 10:00 PM"
+    assert timeutil.fmt_ago("2026-09-25 10:00") == "Fri, 10:00 AM"
+    assert timeutil.fmt_ago("2026-08-01 10:00") == "Aug 1"
+    assert timeutil.fmt_ago("2025-08-01 10:00") == "Aug 1, 2025"
 
 
 def test_dates_show_year_when_not_this_year(monkeypatch):
@@ -430,6 +629,20 @@ def test_reminders_are_sent_once(accounts, client, app, monkeypatch):
         assert reminders.send_due_reminders() == 0  # never twice
     assert {to for to, _, _ in sent} == {"host@uw.edu", "player@uw.edu"}
     assert "Evening hoops" in sent[0][1] and "/events/1" in sent[0][2]
+
+
+def test_moving_a_game_rearms_its_reminders(accounts, client, app, monkeypatch):
+    from sportive import reminders
+    monkeypatch.setattr(reminders, "send_email", lambda *args, **kwargs: None)
+    _reminder_setup(accounts, client, app, joined_minutes_before=120)
+    with app.app_context():
+        assert reminders.send_due_reminders() == 2
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post("/events/1/edit", data=event_form(title="Evening hoops", starts_at=form_time(timedelta(days=1)),
+                                                  ends_at=form_time(timedelta(days=1, hours=2))))
+    with app.app_context():
+        assert get_db().execute("SELECT SUM(reminder_sent) FROM rsvps").fetchone()[0] == 0
 
 
 def test_no_reminder_for_last_minute_joins_or_opt_outs(accounts, client, app, monkeypatch):
@@ -588,6 +801,22 @@ def test_non_photos_are_rejected(accounts, client):
     assert b"isn&#39;t a photo we can use" in page
 
 
+def test_huge_pictures_are_refused_before_they_eat_the_servers_memory():
+    import pytest
+    from PIL import Image
+    from sportive.photos import MAX_FULL_DECODE_PIXELS, TOO_BIG, make_avatar
+    huge = BytesIO()
+    Image.new("L", (4100, 4000)).save(huge, "PNG")          # 16.4 MP, tiny as a file
+    assert 4100 * 4000 > MAX_FULL_DECODE_PIXELS
+    with pytest.raises(ValueError, match=TOO_BIG):
+        make_avatar(huge.getvalue())
+    # a big phone JPEG is decoded at reduced size and still comes out upright and square
+    exif = Image.Exif()
+    exif[0x0112] = 6                                        # "rotate 90°", like a phone held upright
+    avatar = Image.open(BytesIO(make_avatar(make_image(size=(6000, 4000), fmt="JPEG", exif=exif))))
+    assert avatar.size == (640, 640)
+
+
 def test_too_big_upload(app, accounts, client):
     accounts.signup(photo=False)
     app.config["MAX_CONTENT_LENGTH"] = 1000
@@ -693,7 +922,7 @@ def test_add_later_is_remembered(accounts, client, app):
     assert ">Add photo</a>" not in profile and ">Edit profile</a>" in profile   # one button; the photo is in there
     assert "Add photo" in client.get("/profile/edit").data.decode()
     photo_page = client.get("/profile/photo").data.decode()
-    assert "Add later" not in photo_page and "Last step" not in photo_page
+    assert "Add later" not in photo_page and "Step 3 of 3" not in photo_page
 
 
 def test_add_later_keeps_shared_link(accounts, client):
@@ -753,7 +982,7 @@ def test_reminder_loop_only_runs_on_the_server(tmp_path, monkeypatch):
     monkeypatch.setattr(reminders, "start_reminder_loop", lambda app: started.append(app))
     monkeypatch.delenv("REMINDER_LOOP", raising=False)
     monkeypatch.delenv("RENDER_EXTERNAL_URL", raising=False)
-    monkeypatch.setenv("SECRET_KEY", "t")
+    monkeypatch.setenv("SECRET_KEY", "t" * 40)
     create_app({"DATABASE": str(tmp_path / "a.db")})
     assert started == []  # a laptop doesn't email anyone
     monkeypatch.setenv("RENDER_EXTERNAL_URL", "https://sportive-circle.onrender.com")
@@ -820,7 +1049,7 @@ def test_this_month_filter(accounts, client, app, monkeypatch):
     monkeypatch.setattr(events, "now_local", lambda: datetime(2026, 9, 27, 12, 0))
     page = client.get("/?when=month").data
     assert b"September game" in page and b"Next month game" not in page
-    assert b'value="month" selected' in page
+    assert b'value="month" selected>Rest of September<' in page and b">Next 7 days<" in page
     everything = client.get("/").data
     assert b"September game" in everything and b"Next month game" in everything
 
@@ -839,6 +1068,30 @@ def _finish_all_events(app):
         db = get_db()
         db.execute("UPDATE events SET starts_at = '2026-01-10 07:00', ends_at = '2026-01-10 08:00'")
         db.commit()
+    _joined_in_founding_year(app)
+
+
+def test_founding_dawg_deadline_uses_seattle_time_not_utc(accounts, app):
+    from sportive.badges import eligible
+    from sportive.timeutil import from_sqlite_utc
+    assert str(from_sqlite_utc("2027-01-01 05:30:00")) == "2026-12-31 21:30:00"
+    accounts.signup(email="late@uw.edu")
+    user = _user_id(app, "late@uw.edu")
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE users SET created_at = '2027-01-01 05:30:00' WHERE id = ?", (user,))  # 9:30 PM Dec 31 here
+        db.commit()
+        assert "founding_dawg" in eligible(user)
+        db.execute("UPDATE users SET created_at = '2027-01-01 09:00:00' WHERE id = ?", (user,))  # 1 AM Jan 1 here
+        db.commit()
+        assert "founding_dawg" not in eligible(user)
+
+
+def _joined_in_founding_year(app):
+    """Accounts get SQLite's real clock as created_at; pin it so Founding Dawg tests still pass after 2026."""
+    with app.app_context():
+        get_db().execute("UPDATE users SET created_at = '2026-09-01 10:00:00'")
+        get_db().commit()
 
 
 def test_greeting_is_plain(accounts, client):
@@ -945,6 +1198,7 @@ def test_badges_are_kept_forever(accounts, client, app):
     accounts.signup(email="player@uw.edu")
     host, player = _user_id(app, "host@uw.edu"), _user_id(app, "player@uw.edu")
     _played_games(app, "soccer", [host, player])            # Sept 22, 2026 = Autumn 2026
+    _joined_in_founding_year(app)
     with app.app_context():
         new = {b.key for b in sync_badges(player)}
         assert {"first_game", "season-2026-autumn", "founding_dawg"} <= new
@@ -1144,6 +1398,33 @@ def test_event_group_chat(accounts, client, app):
     assert [m["body"] for m in msgs] == ["on my way!"]
 
 
+def test_blocking_takes_them_off_your_upcoming_games(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post(f"/block/{_user_id(app, 'player@uw.edu')}")
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (event_id,)).fetchone()[0] == 1
+
+
+def test_game_chat_hides_people_you_blocked(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    client.post(f"/events/{event_id}/chat", data={"body": "you're trash lol"})
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post(f"/block/{_user_id(app, 'player@uw.edu')}")
+    assert b"trash" not in client.get(f"/events/{event_id}/chat").data
+    assert b'<span class="count-dot">' not in client.get(f"/events/{event_id}").data
+
+
 # ------------------------------------------------------------ delete
 
 def test_delete_account_needs_are_you_sure(accounts, client, app):
@@ -1275,7 +1556,7 @@ def test_same_sections_everywhere(accounts, client):
     for label in ("Home", "Clubs", "Create", "Profile", "Messages", "Friends", "FAQ"):
         assert f'<span class="tab-label">{label}<' in page, label
     assert '<span class="tab-label">News<' not in page                       # one thing: playing
-    assert 'class="tab  is-active" href="/" aria-current="page"' in page     # Home is highlighted
+    assert 'class="tab is-active" href="/" aria-current="page"' in page      # Home is highlighted
     assert 'aria-label="FAQ"' in page                                       # ❓ in the top bar opens the FAQ
     assert "For you" in page and "My events" in page                        # Home tabs
     menu = client.get("/create").data.decode()
@@ -1285,6 +1566,34 @@ def test_same_sections_everywhere(accounts, client):
 def test_visitors_get_simple_menu(client):
     page = client.get("/").data.decode()
     assert 'class="appnav"' not in page and "/clubs" in page and "How it works" in page
+
+
+def test_joining_a_game_doesnt_unlock_direct_messages_until_it_ends(accounts, client, app):
+    from sportive.social import can_message
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="stranger@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    host, stranger = _user_id(app, "host@uw.edu"), _user_id(app, "stranger@uw.edu")
+    with app.app_context():
+        assert not can_message(stranger, host)
+        get_db().execute("UPDATE events SET starts_at = '2026-01-10 07:00', ends_at = '2026-01-10 08:00'")
+        get_db().commit()
+        assert can_message(stranger, host)
+
+
+def test_long_chats_show_the_newest_messages(accounts, client, app):
+    accounts.signup()
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    me = _user_id(app, "dubs@uw.edu")
+    with app.app_context():
+        get_db().executemany("INSERT INTO event_messages (event_id, sender_id, body, created_at) VALUES (?, ?, ?, ?)",
+                             [(event_id, me, f"msg-{i:04d}", "2026-09-01 10:00") for i in range(520)])
+        get_db().commit()
+    page = client.get(f"/events/{event_id}/chat").data.decode()
+    assert "msg-0519" in page and "msg-0000" not in page
+    assert page.index("msg-0100") < page.index("msg-0519")        # still oldest first
 
 
 def test_chats_hide_the_tab_bar_on_phones(accounts, client):
@@ -1503,6 +1812,8 @@ def test_follow_is_not_membership(accounts, client, app):
     page = client.get(f"/clubs/{club}").data.decode()
     stats = re.findall(r"<strong>(\d+)</strong><span>(\w+)</span>", page)
     assert ">Unfollow<" in page and ("1", "member") in stats and ("1", "follower") in stats   # captain only
+    assert '<li class="is-zero"><strong>0</strong><span>events</span>' in page
+    assert '<li class="is-zero"><strong>1</strong>' not in page
 
 
 def test_tryouts_flow_with_messages(accounts, client, app):
@@ -1639,13 +1950,109 @@ def test_need_players_chat_opens(accounts, client):
     assert page.status_code == 200 and b"Need 2 more for Soccer" in page.data
 
 
+def test_empty_chat_shows_a_real_empty_state(accounts, client):
+    accounts.signup()
+    game = event_id_from(client.post("/events/new", data=event_form()))
+    page = client.get(f"/events/{game}/chat").data.decode()
+    assert 'class="chat card is-empty"' in page and "No messages yet. Say hi!" in page
+    client.post(f"/events/{game}/chat", data={"body": "Who's bringing a ball?"})
+    assert "is-empty" not in client.get(f"/events/{game}/chat").data.decode()
+    other = event_id_from(client.post("/events/new", data=event_form(title="Called off")))
+    client.post(f"/events/{other}/cancel")
+    closed = client.get(f"/events/{other}/chat").data.decode()
+    assert "Say hi!" not in closed and "No messages." in closed      # a closed chat doesn't invite a message
+
+
+def test_deleting_a_host_keeps_the_games_other_people_played(accounts, client, app):
+    from sportive.timeutil import to_db
+    accounts.signup(email="host@uw.edu")
+    played = event_id_from(client.post("/events/new", data=event_form(title="Last week's run")))
+    alone = event_id_from(client.post("/events/new", data=event_form(title="Nobody came")))
+    upcoming = event_id_from(client.post("/events/new", data=event_form(title="Next week's run")))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    client.post(f"/events/{played}/join")
+    client.post(f"/events/{upcoming}/join")
+    with app.app_context():
+        db = get_db()
+        past = now_local() - timedelta(days=7)
+        db.execute("UPDATE events SET starts_at = ?, ends_at = ? WHERE id IN (?, ?)",
+                   (to_db(past), to_db(past + timedelta(hours=1)), played, alone))
+        db.commit()
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
+    with app.app_context():
+        db = get_db()
+        left = {row[0] for row in db.execute("SELECT id FROM events")}
+        assert left == {played}                           # history kept; the rest goes with the account
+        former = db.execute("SELECT u.email, u.verified FROM events e JOIN users u ON u.id = e.host_id").fetchone()
+        assert former["email"] == "former-member@sportive.invalid" and former["verified"] == 0
+    accounts.login(email="player@uw.edu")
+    assert "Last week&#39;s run" in client.get("/me/events").data.decode()
+    detail = client.get(f"/events/{played}").data.decode()
+    assert "Former member" in detail
+    with app.app_context():
+        former_id = get_db().execute("SELECT host_id FROM events").fetchone()[0]
+    assert f'href="/u/{former_id}"' not in detail                 # no link to a profile that doesn't exist
+    assert b"Former member" not in client.get("/friends?q=Former").data
+
+
 def test_only_officer_cant_delete_account(accounts, client, app):
-    _approved_club(accounts, client, app)
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu")
+    accounts.logout()
+    with app.app_context():
+        get_db().execute("INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, 'member', '2026-01-01 10:00')",
+                         (club, _user_id(app, "fan@uw.edu")))
+        get_db().commit()
     accounts.login(email="captain@uw.edu")
     assert "the only officer" in client.get("/profile/delete").data.decode()
     client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
     with app.app_context():
         assert get_db().execute("SELECT COUNT(*) FROM users WHERE email = 'captain@uw.edu'").fetchone()[0] == 1
+
+
+def test_make_officer_only_reports_success_when_it_worked(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu")
+    client.post(f"/clubs/{club}/follow")               # a follower, not a member
+    fan = _user_id(app, "fan@uw.edu")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    page = client.post(f"/clubs/{club}/officers/{fan}", follow_redirects=True).data.decode()
+    assert "Only confirmed members can be made officers" in page and "officer now" not in page
+
+
+def test_officers_can_step_down_but_one_always_stays(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu")
+    client.post(f"/clubs/{club}/join", data={"message": "hi"})
+    fan = _user_id(app, "fan@uw.edu")
+    captain = _user_id(app, "captain@uw.edu")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    page = client.post(f"/clubs/{club}/officers/{captain}/step-down", follow_redirects=True).data.decode()
+    assert "at least one officer" in page
+    client.post(f"/clubs/{club}/members/{fan}/approve")
+    client.post(f"/clubs/{club}/officers/{fan}")
+    assert "Make regular member" in client.get(f"/clubs/{club}").data.decode()
+    client.post(f"/clubs/{club}/officers/{fan}/step-down")
+    with app.app_context():
+        role = get_db().execute("SELECT role FROM club_members WHERE club_id = ? AND user_id = ?", (club, fan)).fetchone()[0]
+    assert role == "member"
+
+
+def test_pending_club_doesnt_block_deleting_the_account(accounts, client, app):
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    page = client.get("/profile/delete").data.decode()
+    assert "the only officer" not in page and "deleted too" in page
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT COUNT(*) FROM users WHERE email = 'captain@uw.edu'").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == 0
 
 
 def test_signup_cant_flood_an_inbox(accounts, client):
@@ -1786,7 +2193,7 @@ def test_security_headers_everywhere(client):
 def test_no_inline_scripts_in_any_template():
     import pathlib
     for template in pathlib.Path("sportive/templates").rglob("*.html"):
-        text = template.read_text()
+        text = template.read_text(encoding="utf-8")
         assert not re.search(r"\son(submit|click|change|input|load)=", text), template
         assert not re.search(r"<script>", text), template
 
@@ -1814,6 +2221,85 @@ def test_suspending_cancels_their_upcoming_games(accounts, client, app):
     client.post(f"/admin/users/{_user_id(app, 'admin@uw.edu')}/suspend")   # admins can't be suspended here
     with app.app_context():
         assert get_db().execute("SELECT suspended FROM users WHERE email = 'admin@uw.edu'").fetchone()[0] == 0
+
+
+def test_admins_can_find_and_restore_suspended_accounts(accounts, client, app):
+    accounts.signup(email="bad@uw.edu", name="Rowan Ruleb")
+    bad = _user_id(app, "bad@uw.edu")
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    client.post(f"/admin/users/{bad}/suspend")
+    page = client.get("/admin/reports?status=suspended").data.decode()
+    assert "Suspended accounts (1)" in page and "Rowan Ruleb" in page and "Restore account" in page
+    response = client.post(f"/admin/users/{bad}/restore?from=suspended")
+    assert "status=suspended" in response.headers["Location"]
+    assert "No suspended accounts." in client.get("/admin/reports?status=suspended").data.decode()
+
+
+def test_suspended_login_says_where_to_appeal(accounts, client, app):
+    accounts.signup(email="bad@uw.edu")
+    accounts.logout()
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 1 WHERE email = 'bad@uw.edu'")
+        get_db().commit()
+    app.config["CONTACT_EMAIL"] = "help@sportive.test"
+    page = accounts.login(email="bad@uw.edu").data.decode()
+    assert "Email help@sportive.test from this address" in page
+
+
+def test_suspending_tells_players_and_frees_their_spots(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    hosted = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="other@uw.edu")
+    others_game = event_id_from(client.post("/events/new", data=event_form()))
+    client.post(f"/events/{hosted}/join")
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post(f"/events/{others_game}/join")
+    host = _user_id(app, "host@uw.edu")
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    client.post(f"/admin/users/{host}/suspend")
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (others_game, host)).fetchone() is None
+        other = _user_id(app, "other@uw.edu")
+        assert db.execute("SELECT 1 FROM notices WHERE user_id = ? AND text LIKE '%canceled%'",
+                          (other,)).fetchone() is not None
+
+
+def test_error_flashes_interrupt_screen_readers(accounts, client):
+    accounts.signup()
+    accounts.logout()
+    page = accounts.login(password="wrong-password").data.decode()
+    assert '<div class="flash flash-error" role="alert">Wrong email or password.</div>' in page
+
+
+def test_wrong_password_keeps_the_email_and_focuses_the_password(accounts, client):
+    accounts.signup()
+    accounts.logout()
+    page = accounts.login(password="wrong-password").data.decode()
+    assert 'value="dubs@uw.edu"' in page
+    assert re.search(r'name="password"[^>]*autofocus', page)
+
+
+def test_error_page_shows_the_specific_reason(client, app):
+    from flask import abort
+
+    @app.route("/expired")
+    def expired():
+        abort(400, "Your form expired. Go back, refresh the page and try again.")
+    assert b"Your form expired" in client.get("/expired").data
+    assert b"This Dawg got lost" in client.get("/no-such-page").data
+
+
+def test_https_responses_tell_browsers_to_stay_on_https(client):
+    assert "Strict-Transport-Security" not in client.get("/").headers      # local http: never
+    secure = client.get("/", base_url="https://localhost")
+    assert secure.headers["Strict-Transport-Security"].startswith("max-age=31536000")
 
 
 def test_club_form_points_at_the_field_with_the_problem(accounts, client):
@@ -1862,7 +2348,7 @@ def test_dropdowns_are_alphabetical():
 def test_no_gold_dot_under_the_active_tab_and_css_updates_reach_phones(accounts, client):
     """Testers: the yellow dot under the selected tab covered the tab's text on iPhones."""
     import pathlib
-    css = pathlib.Path("sportive/static/style.css").read_text()
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
     assert ".tab-icon::after" not in css and ".tab.is-active .tab-icon::after" not in css
     accounts.signup()
     page = client.get("/").data.decode()
@@ -1874,7 +2360,7 @@ def test_hidden_always_hides():
     """Fields hidden by JavaScript (like tryout spots on Casual games) must really disappear,
     even when their class sets display: grid or flex."""
     import pathlib
-    assert "[hidden] { display: none !important; }" in pathlib.Path("sportive/static/style.css").read_text()
+    assert "[hidden] { display: none !important; }" in pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
 
 
 # ------------------------------------------------------------ bug hunt (Sept 27, 2026)
@@ -1973,8 +2459,226 @@ def test_chat_title_uses_the_live_need_players_title(accounts, client):
 
 def test_hidden_pill_inputs_cant_widen_the_page():
     import pathlib
-    css = pathlib.Path("sportive/static/style.css").read_text()
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
     assert ".segmented input, .chip-check input, .choice-pill input {" in css and "width: 1px; height: 1px" in css
+
+
+def _css_classes_used_but_undefined(names):
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    return [name for name in names if not re.search(r"\." + re.escape(name) + r"\b", css)]
+
+
+def test_fine_print_has_a_style():
+    assert _css_classes_used_but_undefined(["fine-print"]) == []
+
+
+def test_filtering_the_feed_keeps_need_players_posts_in_the_results(accounts, client):
+    accounts.signup(email="host@uw.edu")
+    client.post("/need-players", data={"sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
+                                       "starts_in": "15", "duration": "60", "players": "4"})
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    unfiltered = client.get("/?scope=all").data.decode()
+    assert 'id="soon-title"' in unfiltered
+    filtered = client.get("/?scope=all&sport=soccer").data.decode()
+    assert 'id="soon-title"' not in filtered and "No games yet" not in filtered
+
+
+def test_need_players_strip_drops_games_well_under_way(accounts, client, app):
+    from sportive.timeutil import to_db
+    accounts.signup(email="host@uw.edu")
+    client.post("/need-players", data={"sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
+                                       "starts_in": "15", "duration": "120", "players": "4"})
+    with app.app_context():
+        db = get_db()
+        now = now_local()
+        db.execute("UPDATE events SET starts_at = ?, ends_at = ?",
+                   (to_db(now - timedelta(hours=1)), to_db(now + timedelta(minutes=10))))
+        db.commit()
+    assert 'id="soon-title"' in client.get("/?scope=all").data.decode()  # the host can still find it
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    assert 'id="soon-title"' not in client.get("/?scope=all").data.decode()
+
+
+def test_feed_shows_more_games_a_page_at_a_time(accounts, client, monkeypatch):
+    from sportive import events
+    monkeypatch.setattr(events, "FEED_PAGE_SIZE", 2)
+    accounts.signup(email="host@uw.edu")
+    for i in range(3):
+        client.post("/events/new", data=event_form(title=f"Run number {i}",
+                                                   starts_at=form_time(timedelta(days=i + 1)),
+                                                   ends_at=form_time(timedelta(days=i + 1, hours=1))))
+    first = client.get("/?scope=all&sport=basketball").data.decode()
+    assert first.count("Run number") == 2 and "Show more games" in first
+    assert "page=2" in first and "sport=basketball" in first.split("Show more games")[0].rsplit("href=", 1)[1]
+    second = client.get("/?scope=all&sport=basketball&page=2").data.decode()
+    assert second.count("Run number") == 3 and "Show more games" not in second
+    assert client.get("/?scope=all&page=abc").status_code == 200
+
+
+def test_skill_filter_includes_all_levels_games(accounts, client):
+    accounts.signup(email="host@uw.edu")
+    client.post("/events/new", data=event_form(title="Everyone welcome run", skill_level="All levels"))
+    client.post("/events/new", data=event_form(title="Sweaty comp run", skill_level="Competitive"))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    page = client.get("/?scope=all&skill=Casual").data.decode()
+    assert "Everyone welcome run" in page and "Sweaty comp run" not in page
+
+
+def test_empty_feed_says_when_the_filters_are_the_reason(accounts, client):
+    accounts.signup()
+    page = client.get("/?scope=all&sport=soccer&when=today").data.decode()
+    assert "No games match these filters." in page and "No games yet" not in page
+    assert "No games yet" in client.get("/?scope=all").data.decode()
+
+
+def test_a_message_that_cant_be_sent_stays_in_the_box(accounts, client):
+    accounts.signup()
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    too_long = "x" * 990 + " 🐾" * 10
+    page = client.post(f"/events/{event_id}/chat", data={"body": too_long}, follow_redirects=True).data.decode()
+    assert "Messages can be up to 1000 characters." in page
+    assert f"autofocus>{too_long[:1000]}</textarea>" in page
+    assert too_long[:50] not in client.get(f"/events/{event_id}/chat").data.decode()   # only brought back once
+
+
+def test_every_body_font_weight_in_the_css_is_loaded():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    base = pathlib.Path("sportive/templates/base.html").read_text(encoding="utf-8")
+    low, high = map(int, re.search(r"Open\+Sans:wght@(\d+)\.\.(\d+)", base).groups())
+    body_weights = {int(w) for w in re.findall(r"font-weight:\s*(\d+)", css)} - {800}   # 800 = display font
+    assert all(low <= weight <= high for weight in body_weights), body_weights
+
+
+def test_long_unbroken_titles_wrap_instead_of_widening_the_page():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    assert "h1, h2, h3 { line-height: 1.2; margin: 0 0 .5rem; overflow-wrap: break-word; }" in css
+    for rule in (".event-title {", ".club-name {"):
+        assert "overflow-wrap: anywhere" in css.split(rule, 1)[1].split("}", 1)[0], rule
+
+
+def test_templates_dont_use_class_names_with_no_style():
+    import pathlib
+    templates = " ".join(p.read_text(encoding="utf-8") for p in pathlib.Path("sportive/templates").rglob("*.html"))
+    for dead in ("is-hot", "tab-create", "feed-hello", "club-card mini"):
+        assert dead not in templates, dead
+
+
+def test_small_segmented_control_is_compact():
+    import pathlib
+    assert ".segmented.small span" in pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+
+
+def test_wizard_moves_focus_into_the_new_step():
+    import pathlib
+    js = pathlib.Path("sportive/static/wizard.js").read_text(encoding="utf-8")
+    assert "function focusStep()" in js
+    assert re.search(r"show\(current \+ 1\);\s*focusStep\(\);", js)
+    assert re.search(r"show\(current - 1\); focusStep\(\);", js)
+
+
+def test_scripts_do_not_depend_on_request_submit_alone():
+    # requestSubmit is Safari 16+; older iPhones need the dispatch + submit() fallback.
+    import pathlib
+    for name in ("app.js", "chat.js"):
+        js = pathlib.Path("sportive/static", name).read_text(encoding="utf-8")
+        calls = re.findall(r"(\w+(?:\.\w+)*)\.requestSubmit\(\)", js)
+        for form in calls:
+            assert f"if ({form}.requestSubmit)" in js, (name, form)
+        assert "form.submit()" in js, name
+
+
+def _contrast(a, b):
+    def lum(hex_color):
+        rgb = [int(hex_color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        r, g, b = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    hi, lo = sorted((lum(a), lum(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _theme_colors():
+    """{"light": {...}, "dark": {...}} custom properties from style.css."""
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    blocks = {"light": re.search(r":root \{(.*?)\n\}", css, re.S).group(1),
+              "dark": re.search(r':root\[data-theme="dark"\] \{(.*?)\n\}', css, re.S).group(1)}
+    colors = {name: dict(re.findall(r"(--[\w-]+):\s*(#[0-9a-fA-F]{6})", body)) for name, body in blocks.items()}
+    colors["dark"] = {**colors["light"], **colors["dark"]}
+    return colors
+
+
+def test_count_badges_are_readable_in_both_themes():
+    for theme, c in _theme_colors().items():
+        assert _contrast(c["--danger"], c["--on-danger"]) >= 4.5, theme
+
+
+def test_team_pill_stays_gold_on_purple_in_dark_mode():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    rule = re.search(r"^\.team-pill \{([^}]*)\}", css, re.M).group(1)
+    assert "var(--header)" in rule and "#e8e3d3" in rule    # --purple / --gold-light flip in dark mode
+    for theme, c in _theme_colors().items():
+        assert _contrast(c["--header"], "#e8e3d3") >= 4.5, theme
+
+
+def test_gold_text_on_the_purple_header_is_readable():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    assert ".topbar .brand-accent { color: var(--gold-on-header); }" in css
+    assert ".husky-hero .gold { color: var(--gold-on-header); }" in css
+    for theme, c in _theme_colors().items():
+        assert _contrast(c["--header"], c["--gold-on-header"]) >= 4.5, theme
+
+
+def test_register_your_club_line_has_room_below_the_grid(accounts, client, app):
+    import pathlib
+    _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu")
+    assert 'class="center muted register-hint"' in client.get("/clubs").data.decode()
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    assert re.search(r"^\.register-hint \{[^}]*margin: 24px", css, re.M)
+
+
+def test_every_dependency_has_a_version_pin():
+    import pathlib
+    for line in pathlib.Path("requirements.txt").read_text(encoding="utf-8").splitlines():
+        package = line.split("#")[0].strip()
+        if package:
+            assert re.search(r"(~=|==|>=)\d", package), f"unpinned: {package}"
+
+
+def test_relative_times_never_wrap_mid_phrase():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    assert re.search(r"^\.rel \{[^}]*white-space: nowrap", css, re.M)
+    assert re.search(r"^\.now-tile small \{[^}]*white-space: nowrap", css, re.M)
+
+
+def test_limited_badge_tag_stands_out():
+    assert _css_classes_used_but_undefined(["tag-limited"]) == []
+
+
+def test_need_players_create_option_is_highlighted():
+    assert _css_classes_used_but_undefined(["create-gold"]) == []
+
+
+def test_focus_ring_is_visible_on_the_purple_header_and_hero():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    assert ".topbar :focus-visible, .husky-hero :focus-visible { outline: 3px solid var(--gold)" in css
+
+
+def test_form_fields_keep_a_focus_outline():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    assert "input:focus, select:focus, textarea:focus { outline: none" not in css
+    assert "input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid" in css
 
 
 def test_leap_day_birthdays():
@@ -2258,11 +2962,11 @@ def test_emails_escape_what_people_type(accounts, client, app):
 
 def test_real_email_has_text_and_html_parts(app, monkeypatch):
     import smtplib
-    sent = []
+    sent, timeouts = [], []
 
     class FakeSMTP:
         def __init__(self, *args, **kwargs):
-            pass
+            timeouts.append(kwargs.get("timeout"))
 
         def __enter__(self):
             return self
@@ -2287,6 +2991,7 @@ def test_real_email_has_text_and_html_parts(app, monkeypatch):
         send_designed("dubs@uw.edu", "Hi", "Hello!", ["A line."], button=("Open", "https://x.test"))
     types = [part.get_content_type() for part in sent[0].walk()]
     assert "text/plain" in types and "text/html" in types
+    assert timeouts and all(timeouts)  # a stuck mail server can't hang the page forever
 
 
 def test_every_log_out_button_asks_first(accounts, client):
@@ -2439,6 +3144,20 @@ def test_only_friends_can_be_invited(accounts, client, app):
         assert get_db().execute("SELECT status FROM invites").fetchone()[0] == "canceled"
 
 
+def test_pending_invites_show_on_my_events(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Saturday doubles")))
+    client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"]]})
+    _as(accounts, "Jordan")
+    page = client.get("/me/events").data.decode()
+    assert "<h2>Invited</h2>" in page and "Saturday doubles" in page
+    client.post(f"/events/{game}/invite/answer", data={"answer": "yes"})
+    page = client.get("/me/events").data.decode()
+    assert "<h2>Invited</h2>" not in page and "Saturday doubles" in page     # now under Going
+
+
 def test_private_game_needs_the_password_unless_invited(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Jordan", "Sam")
     _friends(app, ids["Maya"], ids["Jordan"])
@@ -2535,6 +3254,154 @@ def test_open_spots_filter(accounts, client, app):
     assert "Small run" in client.get("/?scope=all&open=2").data.decode()
     assert "Small run" in client.get("/?scope=all&open=junk").data.decode()   # nonsense = no filter
     assert "Small run" in client.get("/?scope=all&open=1").data.decode()      # "need just one more" works
+
+
+def test_need_players_host_hears_when_someone_joins(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/need-players", data={
+        "sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
+        "starts_in": "15", "duration": "60", "players": "4"}))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu", name="Pat Player")
+    client.post(f"/events/{event_id}/join")
+    with app.app_context():
+        texts = [r[0] for r in get_db().execute("SELECT text FROM notices WHERE user_id = ?",
+                                                 (_user_id(app, "host@uw.edu"),))]
+    assert len(texts) == 1 and texts[0].startswith("Pat joined") and "(2 going now)" in texts[0]
+
+
+def test_signup_step_counter_counts_the_photo_step(accounts, client):
+    accounts.signup(photo=False)
+    assert "Step 4 of 4" in client.get("/profile/photo").data.decode()   # "Step 3 of 3" when texts are off
+    client.post("/profile/photo/skip")
+    assert "Step 1 of 2" in client.get("/profile/edit").data.decode()
+
+
+def test_times_skipped_by_daylight_saving_are_refused(accounts, client, monkeypatch):
+    from datetime import datetime
+    from sportive import events
+    from sportive.timeutil import exists_in_seattle
+    assert not exists_in_seattle(datetime(2027, 3, 14, 2, 30))
+    assert exists_in_seattle(datetime(2027, 3, 14, 3, 30)) and exists_in_seattle(datetime(2027, 11, 7, 1, 30))
+    monkeypatch.setattr(events, "now_local", lambda: datetime(2027, 3, 1, 12, 0))
+    accounts.signup()
+    page = client.post("/events/new", data=event_form(starts_at="2027-03-14T02:30", ends_at="2027-03-14T04:00")).data
+    assert b"2:30 AM doesn&#39;t exist on Mar 14" in page
+
+
+def test_one_account_per_uw_inbox(accounts, client):
+    accounts.signup(email="dubs@uw.edu")
+    accounts.logout()
+    plus = accounts.signup(email="dubs+2@uw.edu", verify=False).data.decode()
+    assert "without a +tag" in plus
+    alias = accounts.signup(email="dubs@u.washington.edu", verify=False).data.decode()
+    assert "You already have an account as dubs@uw.edu" in alias
+
+
+def test_names_cant_be_invisible_or_flipped(accounts, client, app):
+    blank = accounts.signup(email="ghost@uw.edu", name="\u200b\u200b", verify=False).data.decode()
+    assert "Full name cannot be empty." in blank
+    dots = accounts.signup(email="dots@uw.edu", name="...", verify=False).data.decode()
+    assert "Please use your real name" in dots
+    accounts.signup(email="maya@uw.edu", name="Ma\u202eya Chen")
+    with app.app_context():
+        assert get_db().execute("SELECT full_name FROM users WHERE email = 'maya@uw.edu'").fetchone()[0] == "Maya Chen"
+
+
+def test_blocked_people_are_listed_in_settings_and_can_be_unblocked(accounts, client, app):
+    accounts.signup(email="pest@uw.edu", name="Pesky Pete")
+    pest = _user_id(app, "pest@uw.edu")
+    accounts.logout()
+    accounts.signup()
+    assert "You haven't blocked anyone." in client.get("/settings/blocked").data.decode()
+    assert "/settings/blocked" in client.get("/settings").data.decode()
+    client.post(f"/block/{pest}")
+    assert "Pesky Pete" in client.get("/settings/blocked").data.decode()
+    response = client.post(f"/unblock/{pest}", data={"from": "blocked"})
+    assert response.headers["Location"].endswith("/settings/blocked")
+    assert "You haven't blocked anyone." in client.get("/settings/blocked").data.decode()
+
+
+def test_leaving_a_game_asks_first(accounts, client):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form(players="2")))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    page = client.get(f"/events/{event_id}").data.decode()
+    assert 'data-confirm="Leave this game? It\'s full, so someone else may take your spot."' in page
+
+
+def test_someone_the_host_removed_cant_just_rejoin(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    player = _user_id(app, "player@uw.edu")
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post(f"/events/{event_id}/players/{player}/remove")
+    accounts.logout()
+    accounts.login(email="player@uw.edu")
+    page = client.post(f"/events/{event_id}/join", follow_redirects=True).data.decode()
+    assert "can&#39;t rejoin it" in page
+    assert client.post(f"/events/{event_id}/party", data={}, follow_redirects=True).status_code == 200
+    with app.app_context():
+        assert get_db().execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, player)).fetchone() is None
+
+
+def test_cancel_notice_links_to_the_game(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post(f"/events/{event_id}/cancel")
+    with app.app_context():
+        url = get_db().execute("SELECT url FROM notices WHERE user_id = ?", (_user_id(app, "player@uw.edu"),)).fetchone()[0]
+    assert url == f"/events/{event_id}"
+    accounts.logout()
+    accounts.login(email="player@uw.edu")
+    assert client.get(url).status_code == 200
+
+
+def test_need_players_cant_be_double_posted_or_spammed(accounts, client, app):
+    accounts.signup()
+    post = lambda sport, place: client.post("/need-players", data={
+        "sport": sport, "location": place, "skill_level": "All levels",
+        "starts_in": "15", "duration": "60", "players": "4"})
+    first = event_id_from(post("soccer", "Denny Field"))
+    again = post("soccer", "Denny Field")
+    assert again.headers["Location"].endswith(f"/events/{first}")
+    for sport, place in (("basketball", "IMA (Intramural Activities Building)"), ("spikeball", "The Quad"),
+                         ("ultimate", "Denny Field")):
+        post(sport, place)
+    page = post("volleyball", "IMA (Intramural Activities Building)").data.decode()
+    assert "a lot of Need players posts" in page
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM events WHERE is_quick = 1").fetchone()[0] == 4
+
+
+def test_nonsense_filter_values_dont_count_as_filters(accounts, client):
+    accounts.signup()
+    page = client.get("/?scope=all&sport=zzz&location=Mars&skill=Pro&when=never&open=99").data.decode()
+    assert "Filters ·" not in page and "Clear filters" not in page and "No games yet" in page
+
+
+def test_open_spots_filter_skips_games_a_group_cant_just_join(accounts, client, app):
+    _people(accounts, app, "Maya", "Me")
+    _as(accounts, "Maya")
+    client.post("/events/new", data=event_form(title="Secret run", players="12", is_private="1", password="hoops"))
+    client.post("/events/new", data=event_form(title="Team clash", players="10", team_size="5"))
+    client.post("/events/new", data=event_form(title="Open run", players="12"))
+    _as(accounts, "Me")
+    five = client.get("/?scope=all&open=5").data.decode()
+    assert "Open run" in five and "Secret run" not in five and "Team clash" not in five
+    everything = client.get("/?scope=all").data.decode()
+    assert "Secret run" in everything and "Team clash" in everything
 
 
 def test_full_games_have_their_own_tab(accounts, client, app):
@@ -2824,6 +3691,54 @@ def test_games_can_be_open_to_a_group_like_uw_rec_hours(accounts, client, app):
     assert client.post(f"/events/{women}/players/{ids['Maya']}/remove").status_code == 403   # only the host
 
 
+def test_canceling_a_game_tells_invited_friends_and_closes_invites(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Doubles")))
+    client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"]]})
+    client.post(f"/events/{game}/cancel")
+    _as(accounts, "Jordan")
+    assert "Maya canceled Doubles" in client.get("/notifications").data.decode()
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM invites").fetchone()[0] == "canceled"
+
+
+def test_party_up_cant_get_around_who_a_game_is_for(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Mo", "Pal")
+    _set_gender(app, ids["Maya"], "woman")
+    _set_gender(app, ids["Mo"], "man")
+    _friends(app, ids["Mo"], ids["Pal"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(
+        open_to="women", sport="gym", location="IMA (Intramural Activities Building)", players="4")))
+    _as(accounts, "Mo")
+    assert b"This game is for women." in client.get(f"/events/{game}/party", follow_redirects=True).data
+    client.post(f"/events/{game}/party", data={"friend": [ids["Pal"]]})
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (game, ids["Mo"])).fetchone() is None
+        assert db.execute("SELECT COUNT(*) FROM invites WHERE event_id = ?", (game,)).fetchone()[0] == 0
+
+
+def test_private_game_insides_are_only_for_players(accounts, client, app):
+    ids = _people(accounts, app, "Hana", "Stella", "Pat")
+    _as(accounts, "Hana")
+    game = event_id_from(client.post("/events/new", data=event_form(
+        is_private="1", password="dawgs26", title="Secret hoops", note="Court 3, back entrance")))
+    _as(accounts, "Pat")
+    client.post(f"/events/{game}/join", data={"password": "dawgs26"})
+    _as(accounts, "Stella")
+    page = client.get(f"/events/{game}").data.decode()
+    assert "Court 3" not in page and "Pat Husky" not in page and "Only players and invited friends" in page
+    assert client.get(f"/events/{game}/calendar.ics").status_code == 404
+    assert "Secret hoops" not in client.get(f"/u/{ids['Hana']}").data.decode()
+    _as(accounts, "Pat")
+    page = client.get(f"/events/{game}").data.decode()
+    assert "Court 3" in page and "Pat Husky" in page
+    assert client.get(f"/events/{game}/calendar.ics").status_code == 200
+
+
 def test_private_games_are_open_to_whoever_the_host_invites(accounts, client, app):
     accounts.signup()
     game = event_id_from(client.post("/events/new", data=event_form(is_private="1", password="dawgs1234",
@@ -2935,6 +3850,13 @@ def test_officers_get_a_roster_members_dont(accounts, client, app):
     page = client.get(f"/clubs/{club}").data.decode()
     assert "captain@uw.edu" not in page and "Copy all emails" not in page
     assert client.get(f"/clubs/{club}/roster.csv").status_code == 403
+
+
+def test_roster_names_cant_become_spreadsheet_formulas():
+    from sportive.clubs import spreadsheet_safe
+    assert spreadsheet_safe('=HYPERLINK("http://evil","x")').startswith("'=")
+    assert spreadsheet_safe("+1 234") == "'+1 234" and spreadsheet_safe("@me") == "'@me"
+    assert spreadsheet_safe("Mem Ber") == "Mem Ber"
 
 
 def test_search_engines_and_link_previews(client, app):
@@ -3050,9 +3972,13 @@ def test_invite_link_for_people_who_already_have_an_account(accounts, client, ap
     game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
     link = _invite_path(client.get(f"/events/{game}").data.decode())
     accounts.logout()
-    accounts.signup(email="old@uw.edu", name="Old Timer")        # logged in: the link just puts them in
-    assert client.get(link).headers["Location"] == f"/events/{game}"
+    accounts.signup(email="old@uw.edu", name="Old Timer")        # logged in: opening the link asks first
     old = _user_id(app, "old@uw.edu")
+    assert b"Join the game" in client.get(link).data
+    with app.app_context():
+        assert not get_db().execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (game, old)).fetchone()
+        assert not get_db().execute("SELECT 1 FROM friendships").fetchone()
+    assert client.post(link).headers["Location"] == f"/events/{game}"
     with app.app_context():
         assert get_db().execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (game, old)).fetchone()
     accounts.logout()
@@ -3062,6 +3988,35 @@ def test_invite_link_for_people_who_already_have_an_account(accounts, client, ap
     assert accounts.login(email="later@uw.edu").headers["Location"] == f"/events/{game}"
     # A made-up or edited link does nothing.
     assert b"doesn&#39;t work anymore" in client.get("/join/WzEsIDJd.forged", follow_redirects=True).data
+
+
+def test_a_players_link_to_a_private_game_needs_the_hosts_ok(accounts, client, app):
+    ids = _people(accounts, app, "Hana", "Pat", "Solo")
+    _as(accounts, "Hana")
+    game = event_id_from(client.post("/events/new", data=event_form(is_private="1", password="dawgs26", title="Hoops")))
+    _as(accounts, "Pat")
+    client.post(f"/events/{game}/join", data={"password": "dawgs26"})
+    link = _invite_path(client.get(f"/events/{game}").data.decode())
+    _as(accounts, "Solo")
+    assert b"Asked Hana" in client.post(link, follow_redirects=True).data
+    with app.app_context():
+        db = get_db()
+        assert not db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (game, ids["Solo"])).fetchone()
+        assert db.execute("SELECT status FROM invites WHERE guest_id = ?", (ids["Solo"],)).fetchone()[0] == "requested"
+    _as(accounts, "Hana")
+    assert "Pat wants to bring Solo to Hoops" in client.get("/notifications").data.decode()
+
+
+def test_invite_links_expire(accounts, client, app, monkeypatch):
+    from datetime import timedelta as td
+    from sportive import parties
+    accounts.signup(email="maya@uw.edu", name="Maya Chen")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    link = _invite_path(client.get(f"/events/{game}").data.decode())
+    accounts.logout()
+    assert b"Maya wants you in their game" in client.get(link).data
+    monkeypatch.setattr(parties, "LINK_MAX_AGE", td(seconds=-1))
+    assert b"doesn&#39;t work anymore" in client.get(link, follow_redirects=True).data
 
 
 def test_invite_friends_to_the_app_makes_you_friends(accounts, client, app):
@@ -3080,7 +4035,7 @@ def test_invite_friends_to_the_app_makes_you_friends(accounts, client, app):
 def test_sign_up_is_short_screens(client, app):
     """Screen 1 checks the details (and emails the code); screen 2 is sports; screen 3 (optional) is texts."""
     page = client.get("/signup").data.decode()
-    assert "Step 1 of 3" in page and 'name="sports"' not in page and ">Next</button>" in page
+    assert "Step 1 of 4" in page and 'name="sports"' not in page and ">Next</button>" in page   # (3 without texts)
     bad = client.post("/signup", data={"full_name": "Dubs Husky", "email": "dubs@gmail.com", "password": "purple-and-gold",
                                        "password2": "purple-and-gold", "birth_date": "2005-01-15"})
     assert bad.status_code == 200 and b"Please use your UW email" in bad.data  # Next still checks everything
@@ -3089,12 +4044,18 @@ def test_sign_up_is_short_screens(client, app):
                                          "password2": "purple-and-gold", "birth_date": "2005-01-15"})
     assert step1.headers["Location"] == "/signup/sports"
     page = client.get("/signup/sports").data.decode()
-    assert "Step 2 of 3" in page and 'value="soccer"' in page
+    assert "Step 2 of 4" in page and 'value="soccer"' in page
     assert client.post("/signup/sports", data={"sports": ["soccer", "tennis", "made-up"]}).headers["Location"] == "/signup/texts"
     assert client.post("/signup/texts", data={"phone": ""}).headers["Location"] == "/verify"   # skipping is fine
     with app.app_context():
         sports = {r[0] for r in get_db().execute("SELECT sport FROM user_sports")}
     assert sports == {"soccer", "tennis"}
+
+
+def test_logged_in_people_skip_login_and_signup(accounts, client):
+    accounts.signup()
+    assert client.get("/login").headers["Location"] == "/"
+    assert client.get("/signup?next=/me/events").headers["Location"] == "/me/events"
 
 
 def test_remember_me(accounts, client):
@@ -3279,6 +4240,7 @@ def test_open_to_anyone_or_other(accounts, client, app):
     assert b"This game is for people who chose Other." in client.post(f"/events/{game}/join", follow_redirects=True).data
     _as(accounts, "Olly")
     assert b"You&#39;re in" in client.post(f"/events/{game}/join", follow_redirects=True).data
+    accounts.logout()
     accounts.signup(email="officer@uw.edu")
     assert ">Anyone</span>" in client.get("/clubs/new").data.decode()
 
@@ -3309,7 +4271,7 @@ def test_sign_up_with_texts(client, app, monkeypatch):
                                  "password2": "purple-and-gold", "birth_date": "2005-01-15"})
     client.post("/signup/sports", data={"sports": ["soccer"]})
     page = client.get("/signup/texts").data.decode()
-    assert "Step 3 of 3" in page and "Reply STOP" in page and 'name="consent"' in page
+    assert "Step 3 of 4" in page and "Reply STOP" in page and 'name="consent"' in page
     assert b"Tick the box" in client.post("/signup/texts", data={"phone": "206-555-0142"}).data   # permission first
     assert b"doesn&#39;t look like a phone number" in client.post("/signup/texts",
                                                                   data={"phone": "12", "consent": "1"}).data

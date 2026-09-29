@@ -7,12 +7,14 @@ Yes takes the held spot; No frees it for someone else.
 Team vs team: the host's party is team 1. Another group "challenges" them by claiming team 2 the same
 way (the leader joins and holds spots for their friends).
 """
+from datetime import timedelta
+
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, session, url_for
-from itsdangerous import BadSignature, URLSafeSerializer
+from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 from .auth import login_required
 from .db import get_db
-from .events import event_title, get_event, query_events, spots_left, try_join
+from .events import KEPT_OUT, event_title, get_event, kept_out, not_for_me, query_events, spots_left, try_join
 from .links import public_url
 from .invites import HOLD_TIME, MAX_PARTY, held_spots, hold_spots, my_invite, now_param, team_counts
 from .sms import drop_queued_texts, queue_text
@@ -63,6 +65,13 @@ def _party_plan(event):
     mine = get_db().execute("SELECT team FROM rsvps WHERE event_id = ? AND user_id = ?",
                             (event["id"], me)).fetchone()
     invite = None if mine else my_invite(event["id"], me)
+    if not mine:  # joining now: the same rules as the Join button
+        if not_for_me(event):
+            return None, False, not_for_me(event)
+        if kept_out(event, invite):
+            return None, False, KEPT_OUT
+        if event["members_only"] and not event["i_am_member"]:
+            return None, False, f"This event is for {event['club_name']} members."
     if event["team_size"]:
         if mine:
             return mine["team"], False, None
@@ -154,7 +163,7 @@ def send_party(event, chosen, team, joining_now, note=""):
             return f"Only {for_friends} spot{'s' if for_friends != 1 else ''} left for friends."
         title, first = event_title(event), g.user["full_name"].split()[0]
         if joining_now:
-            db.execute("INSERT INTO rsvps (event_id, user_id, created_at, team) VALUES (?, ?, ?, ?)",
+            db.execute("INSERT OR IGNORE INTO rsvps (event_id, user_id, created_at, team) VALUES (?, ?, ?, ?)",
                        (event["id"], me, now_param(), team))
             mine = my_invite(event["id"], me)
             if mine:  # I was invited myself: that invite is answered now
@@ -279,8 +288,11 @@ def can_party_up(event):
 # app's secret key, so nobody can make one for a game they aren't in, or pretend to be someone else.
 # Game 0 = just "join me on Sportive Circle" (you become friends).
 
+LINK_MAX_AGE = timedelta(days=14)  # a forwarded or leaked link stops working after this
+
+
 def _signer():
-    return URLSafeSerializer(current_app.secret_key, salt="invite-link")
+    return URLSafeTimedSerializer(current_app.secret_key, salt="invite-link")
 
 
 def invite_link(event_id=0):
@@ -290,9 +302,9 @@ def invite_link(event_id=0):
 
 def _read_link(token):
     try:
-        event_id, inviter_id = _signer().loads(token)
+        event_id, inviter_id = _signer().loads(token, max_age=LINK_MAX_AGE.total_seconds())
         return int(event_id), int(inviter_id)
-    except (BadSignature, ValueError, TypeError):
+    except (BadSignature, ValueError, TypeError):  # SignatureExpired is a BadSignature
         return None
 
 
@@ -302,19 +314,24 @@ def _open_game(event_id):
     return rows[0] if rows else None
 
 
-@bp.route("/join/<token>")
+@bp.route("/join/<token>", methods=("GET", "POST"))
 def open_invite_link(token):
+    """Opening the link only shows what it's for. Joining takes a tap (a POST), so a link hidden in an image or
+    opened by a link preview can't put anyone in a game or make them friends."""
     link = _read_link(token)
     inviter = get_db().execute("SELECT id, full_name FROM users WHERE id = ? AND verified = 1 AND suspended = 0",
                                (link[1],)).fetchone() if link else None
     if inviter is None:
         flash("That invite link doesn't work anymore.", "error")
         return redirect(url_for("index"))
-    if g.get("user") is not None:
+    if g.get("user") is not None and request.method == "POST":
         return redirect(accept_invite_link(g.user, token) or url_for("index"))
     event = _open_game(link[0]) if link[0] else None
-    session["invite_link"] = token  # used right after they sign up or log in (auth.log_in)
-    return render_template("events/invite_link.html", inviter=inviter, event=event)
+    if g.get("user") is None:
+        session["invite_link"] = token  # used right after they sign up or log in (auth.log_in)
+    elif inviter["id"] == g.user["id"]:
+        return redirect(url_for("events.detail", event_id=event["id"]) if event else url_for("social.friends"))
+    return render_template("events/invite_link.html", inviter=inviter, event=event, token=token)
 
 
 def accept_invite_link(user, token):
@@ -336,7 +353,7 @@ def accept_invite_link(user, token):
         db.execute("""UPDATE friendships SET status = 'accepted' WHERE (requester_id = ? AND addressee_id = ?)
                       OR (requester_id = ? AND addressee_id = ?)""", (inviter_id, user["id"], user["id"], inviter_id))
     else:
-        db.execute("INSERT INTO friendships (requester_id, addressee_id, status, created_at) VALUES (?, ?, 'accepted', ?)",
+        db.execute("INSERT OR IGNORE INTO friendships (requester_id, addressee_id, status, created_at) VALUES (?, ?, 'accepted', ?)",
                    (inviter_id, user["id"], now_param()))
     db.commit()
     event = _open_game(event_id)
@@ -350,6 +367,18 @@ def accept_invite_link(user, token):
                               (event_id, inviter_id)).fetchone()
     if inviter_team is None:  # the friend left the game since sending the link
         flash("Your friend isn't in that game anymore.", "info")
+        return url_for("events.detail", event_id=event_id)
+    if event["is_private"] and inviter_id != event["host_id"]:
+        # Same rule as "Invite friends" in a private game: the host says yes before a player's friend gets in.
+        db.execute("""INSERT OR REPLACE INTO invites (event_id, inviter_id, guest_id, team, status, note, created_at,
+                                                      expires_at) VALUES (?, ?, ?, ?, 'requested', '', ?, ?)""",
+                   (event_id, inviter_id, user["id"], inviter_team["team"], now_param(), now_param()))
+        inviter = db.execute("SELECT full_name FROM users WHERE id = ?", (inviter_id,)).fetchone()
+        notify(event["host_id"], "invites",
+               f"{inviter['full_name'].split()[0]} wants to bring {first} to {event_title(event)}.",
+               url_for("events.detail", event_id=event_id) + "#requests", key=f"request:{event_id}:{inviter_id}")
+        db.commit()
+        flash(f"Asked {event['host_name'].split()[0]}, the host. You'll get the invite once they say yes.", "info")
         return url_for("events.detail", event_id=event_id)
     # The link counts as an invite (so a private game's password isn't needed), then join like anyone else.
     db.execute("""INSERT OR REPLACE INTO invites (event_id, inviter_id, guest_id, team, status, created_at, expires_at)

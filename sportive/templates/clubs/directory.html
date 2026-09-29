@@ -3,9 +3,7 @@
 {% block content %}
 {% from "_macros.html" import clubs_tabs, club_logo %}
 {{ clubs_tabs('find') }}
-<header class="feed-hello">
-  <h1 class="page-title">Clubs</h1>
-</header>
+<h1 class="page-title">Clubs</h1>
 
 <form method="get" class="card filters" role="search" aria-label="Find a club">
   {% if g.user %}
@@ -60,6 +58,6 @@
   {% endfor %}
 </div>
 {% if clubs and g.user %}
-  <p class="center muted">Run a UW club that's not here yet? <a href="{{ url_for('clubs.create') }}">Register it →</a></p>
+  <p class="center muted register-hint">Run a UW club that's not here yet? <a href="{{ url_for('clubs.create') }}">Register it →</a></p>
 {% endif %}
 {% endblock %}

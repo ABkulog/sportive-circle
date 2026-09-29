@@ -7,19 +7,22 @@ Safety rules:
 - Blocking someone stops all messages and friend requests between you, both ways.
 - Event chats are only for people going to that event.
 """
+import json
 from datetime import timedelta
 
 from flask import (Blueprint, abort, current_app, flash, g, jsonify, redirect, render_template, request,
-                   url_for)
+                   session, url_for)
 
 from .auth import login_required, safe_next
 from .db import get_db
+from .textutil import multi_line
 from .timeutil import fmt_clock, fmt_when, now_local, to_db
 
 bp = Blueprint("social", __name__)
 
 MAX_MESSAGE_LENGTH = 1000
 MAX_MESSAGES_PER_MINUTE = 20  # stops spam floods
+MAX_DRAFT_COOKIE_BYTES = 2500
 
 
 # ---------------------------------------------------------------- helpers
@@ -66,9 +69,12 @@ def friends_of(user_id):
 
 
 def shared_an_event(a, b):
+    """They played a game together (it has ended). Just joining a stranger's game doesn't unlock messaging:
+    the game's group chat is there for planning it."""
     return get_db().execute(
-        """SELECT 1 FROM rsvps r1 JOIN rsvps r2 ON r1.event_id = r2.event_id
-           WHERE r1.user_id = ? AND r2.user_id = ? LIMIT 1""", (a, b)).fetchone() is not None
+        """SELECT 1 FROM rsvps r1 JOIN rsvps r2 ON r1.event_id = r2.event_id JOIN events e ON e.id = r1.event_id
+           WHERE r1.user_id = ? AND r2.user_id = ? AND e.cancelled = 0 AND e.ends_at < ? LIMIT 1""",
+        (a, b, to_db(now_local()))).fetchone() is not None
 
 
 def is_club_officer(user_id):
@@ -106,6 +112,12 @@ def block_user(me, other):
                (me, other, to_db(now_local())))
     db.execute("""DELETE FROM friendships WHERE (requester_id = ? AND addressee_id = ?)
                   OR (requester_id = ? AND addressee_id = ?)""", (me, other, other, me))
+    # They come off my upcoming games (and their open invites to them close), like the host removing them.
+    now = to_db(now_local())
+    db.execute("""DELETE FROM rsvps WHERE user_id = ? AND event_id IN
+                  (SELECT id FROM events WHERE host_id = ? AND cancelled = 0 AND ends_at >= ?)""", (other, me, now))
+    db.execute("""UPDATE invites SET status = 'canceled' WHERE guest_id = ? AND status IN ('pending', 'requested')
+                  AND event_id IN (SELECT id FROM events WHERE host_id = ?)""", (other, me))
 
 
 def too_many_messages(me):
@@ -120,7 +132,7 @@ def too_many_messages(me):
 
 def clean_body(text):
     """Returns (body, error)."""
-    body = (text or "").strip()
+    body = multi_line(text)
     if not body:
         return None, "Type a message first."
     if len(body) > MAX_MESSAGE_LENGTH:
@@ -128,6 +140,18 @@ def clean_body(text):
     if too_many_messages(g.user["id"]):
         return None, "Whoa, slow down! Wait a minute before sending more messages."
     return body, None
+
+
+def keep_draft(text):
+    """A message that couldn't be sent goes back in the box after the redirect, instead of vanishing."""
+    body = (text or "")[:MAX_MESSAGE_LENGTH]
+    if len(json.dumps(body)) <= MAX_DRAFT_COOKIE_BYTES:  # the session is a cookie (browsers cap them at 4 KB)
+        session["chat_draft"] = {"path": request.path, "body": body}
+
+
+def take_draft():
+    draft = session.pop("chat_draft", None)
+    return draft["body"] if draft and draft.get("path") == request.path else ""
 
 
 def event_chat_unread():
@@ -144,7 +168,8 @@ def event_chat_unread():
                        JOIN rsvps r ON r.event_id = m.event_id AND r.user_id = ?
                        LEFT JOIN event_chat_seen s ON s.event_id = m.event_id AND s.user_id = ?
                        WHERE m.sender_id != ? AND m.id > COALESCE(s.last_id, 0)
-                       GROUP BY m.event_id""", (recent, me, me, me)):
+                         AND m.sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
+                       GROUP BY m.event_id""", (recent, me, me, me, me)):
                 g.chat_unread[row["event_id"]] = row["n"]
     return g.chat_unread
 
@@ -311,7 +336,7 @@ def send_request(user_id):
         db.commit()
         flash("You're friends now!", "celebrate")
     elif status == "none":
-        db.execute("INSERT INTO friendships (requester_id, addressee_id, created_at) VALUES (?, ?, ?)",
+        db.execute("INSERT OR IGNORE INTO friendships (requester_id, addressee_id, created_at) VALUES (?, ?, ?)",
                    (me, user_id, to_db(now_local())))
         db.commit()
         flash("Friend request sent!", "success")
@@ -350,7 +375,7 @@ def block(user_id):
     if user_id != me:
         block_user(me, user_id)
         get_db().commit()
-        flash("Blocked. They can't message you or send you friend requests anymore.", "info")
+        flash("Blocked. They can't message you, send you friend requests or join your games anymore.", "info")
     return redirect(url_for("profile.view", user_id=user_id))
 
 
@@ -361,7 +386,19 @@ def unblock(user_id):
     db.execute("DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?", (g.user["id"], user_id))
     db.commit()
     flash("Unblocked.", "info")
+    if request.form.get("from") == "blocked":
+        return redirect(url_for("social.blocked_people"))
     return redirect(url_for("profile.view", user_id=user_id))
+
+
+@bp.route("/settings/blocked")
+@login_required
+def blocked_people():
+    """Everyone I've blocked, so I can find and unblock them without remembering who they were."""
+    people = get_db().execute(
+        """SELECT u.id, u.full_name, u.avatar_updated, b.created_at FROM blocks b JOIN users u ON u.id = b.blocked_id
+           WHERE b.blocker_id = ? ORDER BY b.created_at DESC""", (g.user["id"],)).fetchall()
+    return render_template("settings/blocked.html", people=people)
 
 
 # ---------------------------------------------------------- direct messages
@@ -384,11 +421,15 @@ def inbox():
     return render_template("social/inbox.html", conversations=conversations)
 
 
+MAX_SHOWN_MESSAGES = 500  # a chat shows its newest 500 messages, oldest first
+
+
 def _thread_rows(me, other, after=0):
     return get_db().execute(
-        """SELECT m.*, u.full_name, u.avatar_updated FROM direct_messages m JOIN users u ON u.id = m.sender_id
-           WHERE m.id > ? AND ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?))
-           ORDER BY m.id LIMIT 500""", (after, me, other, other, me)).fetchall()
+        f"""SELECT * FROM (
+               SELECT m.*, u.full_name, u.avatar_updated FROM direct_messages m JOIN users u ON u.id = m.sender_id
+               WHERE m.id > ? AND ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?))
+               ORDER BY m.id DESC LIMIT {MAX_SHOWN_MESSAGES}) ORDER BY id""", (after, me, other, other, me)).fetchall()
 
 
 def _mark_read(me, other):
@@ -411,6 +452,7 @@ def thread(user_id):
             body, error = clean_body(request.form.get("body"))
             if error:
                 flash(error, "error")
+                keep_draft(request.form.get("body"))
             else:
                 db = get_db()
                 db.execute("INSERT INTO direct_messages (sender_id, recipient_id, body, created_at) VALUES (?, ?, ?, ?)",
@@ -420,7 +462,7 @@ def thread(user_id):
     _mark_read(me, user_id)
     rows = _thread_rows(me, user_id) if not is_blocked_between(me, user_id) else []
     return render_template("social/thread.html", other=other, messages=[message_json(r, me, 'dm') for r in rows],
-                           allowed=allowed, poll_url=url_for("social.thread_poll", user_id=user_id),
+                           allowed=allowed, poll_url=url_for("social.thread_poll", user_id=user_id), draft=take_draft(),
                            blocked=i_blocked(me, user_id))
 
 
@@ -448,8 +490,12 @@ def _event_for_chat(event_id):
 
 def _chat_rows(event_id, after=0):
     return get_db().execute(
-        """SELECT m.*, u.full_name, u.avatar_updated FROM event_messages m JOIN users u ON u.id = m.sender_id
-           WHERE m.event_id = ? AND m.id > ? ORDER BY m.id LIMIT 500""", (event_id, after)).fetchall()
+        f"""SELECT * FROM (
+               SELECT m.*, u.full_name, u.avatar_updated FROM event_messages m JOIN users u ON u.id = m.sender_id
+               WHERE m.event_id = ? AND m.id > ?
+                 AND m.sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
+               ORDER BY m.id DESC LIMIT {MAX_SHOWN_MESSAGES}) ORDER BY id""",
+        (event_id, after, g.user["id"])).fetchall()
 
 
 def _mark_chat_seen(event_id, rows):
@@ -472,6 +518,7 @@ def event_chat(event_id):
         body, error = clean_body(request.form.get("body"))
         if error:
             flash(error, "error")
+            keep_draft(request.form.get("body"))
         elif event["cancelled"]:
             flash("This game was canceled, so its chat is closed.", "error")
         else:
@@ -486,7 +533,7 @@ def event_chat(event_id):
     return render_template("social/event_chat.html", event=event, people=people,
                            messages=[message_json(r, g.user["id"], 'event_message') for r in rows],
                            poll_url=url_for("social.event_chat_poll", event_id=event_id),
-                           when=fmt_when(event["starts_at"]))
+                           when=fmt_when(event["starts_at"]), draft=take_draft())
 
 
 @bp.route("/events/<int:event_id>/chat/poll")
