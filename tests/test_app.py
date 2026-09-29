@@ -1766,7 +1766,7 @@ def test_security_headers_everywhere(client):
 def test_no_inline_scripts_in_any_template():
     import pathlib
     for template in pathlib.Path("sportive/templates").rglob("*.html"):
-        text = template.read_text()
+        text = template.read_text(encoding="utf-8")
         assert not re.search(r"\son(submit|click|change|input|load)=", text), template
         assert not re.search(r"<script>", text), template
 
@@ -1842,7 +1842,7 @@ def test_dropdowns_are_alphabetical():
 def test_no_gold_dot_under_the_active_tab_and_css_updates_reach_phones(accounts, client):
     """Testers: the yellow dot under the selected tab covered the tab's text on iPhones."""
     import pathlib
-    css = pathlib.Path("sportive/static/style.css").read_text()
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
     assert ".tab-icon::after" not in css and ".tab.is-active .tab-icon::after" not in css
     accounts.signup()
     page = client.get("/").data.decode()
@@ -1854,7 +1854,7 @@ def test_hidden_always_hides():
     """Fields hidden by JavaScript (like tryout spots on Casual games) must really disappear,
     even when their class sets display: grid or flex."""
     import pathlib
-    assert "[hidden] { display: none !important; }" in pathlib.Path("sportive/static/style.css").read_text()
+    assert "[hidden] { display: none !important; }" in pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
 
 
 # ------------------------------------------------------------ bug hunt (Sept 27, 2026)
@@ -1953,7 +1953,7 @@ def test_chat_title_uses_the_live_need_players_title(accounts, client):
 
 def test_hidden_pill_inputs_cant_widen_the_page():
     import pathlib
-    css = pathlib.Path("sportive/static/style.css").read_text()
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
     assert ".segmented input, .chip-check input, .choice-pill input {" in css and "width: 1px; height: 1px" in css
 
 
