@@ -2349,6 +2349,10 @@ def test_fine_print_has_a_style():
     assert _css_classes_used_but_undefined(["fine-print"]) == []
 
 
+def test_limited_badge_tag_stands_out():
+    assert _css_classes_used_but_undefined(["tag-limited"]) == []
+
+
 def test_need_players_create_option_is_highlighted():
     assert _css_classes_used_but_undefined(["create-gold"]) == []
 

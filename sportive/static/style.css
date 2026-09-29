@@ -603,6 +603,7 @@ form[data-wizard] .form-step { display: none; }
 .badge-tag { display: inline-block; margin-top: 3px; font-size: .64rem; font-weight: 700; letter-spacing: .03em;
   text-transform: uppercase; color: var(--muted); }
 .tag-og { color: var(--gold-text); }
+.tag-limited { color: var(--accent); }
 .badge-count { font-weight: 500; font-size: .85rem; color: var(--muted); }
 .locker-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px;
   position: sticky; top: 64px; z-index: 5; padding: 10px 14px; background: var(--bg); }
