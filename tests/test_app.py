@@ -2361,6 +2361,16 @@ def test_filtering_the_feed_keeps_need_players_posts_in_the_results(accounts, cl
     assert 'id="soon-title"' not in filtered and "No games yet" not in filtered
 
 
+def test_skill_filter_includes_all_levels_games(accounts, client):
+    accounts.signup(email="host@uw.edu")
+    client.post("/events/new", data=event_form(title="Everyone welcome run", skill_level="All levels"))
+    client.post("/events/new", data=event_form(title="Sweaty comp run", skill_level="Competitive"))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    page = client.get("/?scope=all&skill=Casual").data.decode()
+    assert "Everyone welcome run" in page and "Sweaty comp run" not in page
+
+
 def test_empty_feed_says_when_the_filters_are_the_reason(accounts, client):
     accounts.signup()
     page = client.get("/?scope=all&sport=soccer&when=today").data.decode()

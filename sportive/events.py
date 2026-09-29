@@ -263,7 +263,8 @@ def feed():
         where.append("e.location = :location")
         params["location"] = filters["location"]
     if filters["skill"] in SKILL_LEVELS:
-        where.append("e.skill_level = :skill")
+        # "All levels" games welcome every level, so they match any level someone picks.
+        where.append("e.skill_level IN (:skill, 'All levels')")
         params["skill"] = filters["skill"]
     if filters["open"] in OPEN_SPOT_CHOICES:
         # "We're a group of 5": games with at least that many spots anyone can take right now.
