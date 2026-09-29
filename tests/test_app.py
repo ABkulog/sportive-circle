@@ -2953,6 +2953,20 @@ def test_only_friends_can_be_invited(accounts, client, app):
         assert get_db().execute("SELECT status FROM invites").fetchone()[0] == "canceled"
 
 
+def test_pending_invites_show_on_my_events(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Saturday doubles")))
+    client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"]]})
+    _as(accounts, "Jordan")
+    page = client.get("/me/events").data.decode()
+    assert "<h2>Invited</h2>" in page and "Saturday doubles" in page
+    client.post(f"/events/{game}/invite/answer", data={"answer": "yes"})
+    page = client.get("/me/events").data.decode()
+    assert "<h2>Invited</h2>" not in page and "Saturday doubles" in page     # now under Going
+
+
 def test_private_game_needs_the_password_unless_invited(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Jordan", "Sam")
     _friends(app, ids["Maya"], ids["Jordan"])

@@ -1044,8 +1044,12 @@ def my_events():
     going = query_events(
         ["e.host_id != :me", "e.ends_at >= :now",
          "EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"], now)
+    invited = query_events(
+        ["e.cancelled = 0", "e.ends_at >= :now", NOT_BLOCKED,
+         "NOT EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)",
+         "EXISTS (SELECT 1 FROM invites i WHERE i.event_id = e.id AND i.guest_id = :me AND i.status = 'pending')"], now)
     past = query_events(
         ["e.ends_at < :now", "e.cancelled = 0",
          "EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"],
         now, order="e.starts_at DESC", limit=10)
-    return render_template("events/mine.html", hosting=hosting, going=going, past=past)
+    return render_template("events/mine.html", hosting=hosting, going=going, invited=invited, past=past)
