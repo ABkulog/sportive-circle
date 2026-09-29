@@ -2349,6 +2349,11 @@ def test_fine_print_has_a_style():
     assert _css_classes_used_but_undefined(["fine-print"]) == []
 
 
+def test_small_segmented_control_is_compact():
+    import pathlib
+    assert ".segmented.small span" in pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+
+
 def test_limited_badge_tag_stands_out():
     assert _css_classes_used_but_undefined(["tag-limited"]) == []
 
