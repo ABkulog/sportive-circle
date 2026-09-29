@@ -2349,6 +2349,10 @@ def test_fine_print_has_a_style():
     assert _css_classes_used_but_undefined(["fine-print"]) == []
 
 
+def test_need_players_create_option_is_highlighted():
+    assert _css_classes_used_but_undefined(["create-gold"]) == []
+
+
 def test_focus_ring_is_visible_on_the_purple_header_and_hero():
     import pathlib
     css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
