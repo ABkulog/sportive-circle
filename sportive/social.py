@@ -110,6 +110,12 @@ def block_user(me, other):
                (me, other, to_db(now_local())))
     db.execute("""DELETE FROM friendships WHERE (requester_id = ? AND addressee_id = ?)
                   OR (requester_id = ? AND addressee_id = ?)""", (me, other, other, me))
+    # They come off my upcoming games (and their open invites to them close), like the host removing them.
+    now = to_db(now_local())
+    db.execute("""DELETE FROM rsvps WHERE user_id = ? AND event_id IN
+                  (SELECT id FROM events WHERE host_id = ? AND cancelled = 0 AND ends_at >= ?)""", (other, me, now))
+    db.execute("""UPDATE invites SET status = 'canceled' WHERE guest_id = ? AND status IN ('pending', 'requested')
+                  AND event_id IN (SELECT id FROM events WHERE host_id = ?)""", (other, me))
 
 
 def too_many_messages(me):
@@ -314,7 +320,7 @@ def block(user_id):
     if user_id != me:
         block_user(me, user_id)
         get_db().commit()
-        flash("Blocked. They can't message you or send you friend requests anymore.", "info")
+        flash("Blocked. They can't message you, send you friend requests or join your games anymore.", "info")
     return redirect(url_for("profile.view", user_id=user_id))
 
 

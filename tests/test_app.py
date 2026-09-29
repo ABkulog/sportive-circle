@@ -1331,6 +1331,19 @@ def test_event_group_chat(accounts, client, app):
     assert [m["body"] for m in msgs] == ["on my way!"]
 
 
+def test_blocking_takes_them_off_your_upcoming_games(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    client.post(f"/events/{event_id}/join")
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post(f"/block/{_user_id(app, 'player@uw.edu')}")
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (event_id,)).fetchone()[0] == 1
+
+
 def test_game_chat_hides_people_you_blocked(accounts, client, app):
     accounts.signup(email="host@uw.edu")
     event_id = event_id_from(client.post("/events/new", data=event_form()))
