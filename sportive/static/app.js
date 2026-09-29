@@ -187,4 +187,32 @@
       photoPreview.replaceChildren(image);
     });
   }
+
+  // Every password box gets an eye button to peek at what you typed (tap again to hide it).
+  const EYE = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor"' +
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7' +
+    'S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="M4 4l16 16"/></svg>';
+  document.querySelectorAll('input[type="password"]').forEach((input) => {
+    const wrap = document.createElement("span");
+    wrap.className = "password-wrap";
+    input.replaceWith(wrap);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "peek";
+    button.innerHTML = EYE;  // our own fixed icon, never text someone typed
+    button.setAttribute("aria-label", "Show password");
+    button.setAttribute("aria-pressed", "false");
+    button.addEventListener("click", () => {
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      button.setAttribute("aria-pressed", String(show));
+      button.setAttribute("aria-label", show ? "Hide password" : "Show password");
+      input.focus();
+    });
+    wrap.append(input, button);
+  });
+  // Hide them again before sending, so the browser offers to save it as a password as usual.
+  document.addEventListener("submit", (event) => {
+    event.target.querySelectorAll(".password-wrap input").forEach((input) => { input.type = "password"; });
+  }, true);
 })();

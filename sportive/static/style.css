@@ -836,3 +836,13 @@ h1 .team-pill { font-size: .78rem; margin-left: 4px; }
 .login-extras .check input { width: 20px; height: 20px; accent-color: var(--purple); flex: none; }
 .login-extras .field-link { min-height: 44px; display: inline-flex; align-items: center; }
 .step-label { margin: 0 0 4px; font-size: .8rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+
+/* The eye button inside password boxes (app.js adds it). */
+.password-wrap { position: relative; display: block; }
+.password-wrap input { width: 100%; padding-right: 48px; }
+.peek { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); width: 44px; height: 44px;
+        display: grid; place-items: center; border: 0; background: none; color: var(--muted); cursor: pointer;
+        border-radius: 8px; padding: 0; }
+.peek:hover, .peek[aria-pressed="true"] { color: var(--purple); }
+.peek .eye-slash { display: none; }
+.peek[aria-pressed="true"] .eye-slash { display: inline; }  /* crossed out while showing: tap to hide */
