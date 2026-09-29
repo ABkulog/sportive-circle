@@ -241,6 +241,11 @@ def feed():
     filters = {key: request.args.get(key, "") for key in ("scope", "sport", "location", "skill", "when", "open")}
     if filters["scope"] not in ("interests", "all", "full"):
         filters["scope"] = "interests" if my_sports else "all"
+    # Values from an old or hand-edited link that aren't real choices are ignored, not counted as filters.
+    for key, choices in (("sport", SPORTS), ("location", LOCATIONS), ("skill", SKILL_LEVELS),
+                         ("when", ("today", "week", "month")), ("open", OPEN_SPOT_CHOICES)):
+        if filters[key] not in choices:
+            filters[key] = ""
 
     now = now_local()
     where = ["e.cancelled = 0", "e.ends_at >= :now", NOT_BLOCKED, games_open_to_me(), MEMBERS_ONLY_FOR_MEMBERS]
@@ -271,8 +276,6 @@ def feed():
         # (not private games, which need a password, or team games, which are joined as a team).
         where.append(f"e.is_private = 0 AND e.team_size IS NULL AND (e.max_players IS NULL OR {spots_left_sql} >= :min_open)")
         params["min_open"] = int(filters["open"])
-    else:
-        filters["open"] = ""
     if filters["when"] == "today":
         where.append("e.starts_at < :until")
         params["until"] = to_db(datetime.combine(now.date() + timedelta(days=1), time()))

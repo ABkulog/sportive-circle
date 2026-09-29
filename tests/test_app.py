@@ -2999,6 +2999,12 @@ def test_open_spots_filter(accounts, client, app):
     assert "Small run" in client.get("/?scope=all&open=1").data.decode()      # "need just one more" works
 
 
+def test_nonsense_filter_values_dont_count_as_filters(accounts, client):
+    accounts.signup()
+    page = client.get("/?scope=all&sport=zzz&location=Mars&skill=Pro&when=never&open=99").data.decode()
+    assert "Filters ·" not in page and "Clear filters" not in page and "No games yet" in page
+
+
 def test_open_spots_filter_skips_games_a_group_cant_just_join(accounts, client, app):
     _people(accounts, app, "Maya", "Me")
     _as(accounts, "Maya")
