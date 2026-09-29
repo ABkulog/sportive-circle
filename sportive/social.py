@@ -344,11 +344,15 @@ def inbox():
     return render_template("social/inbox.html", conversations=conversations)
 
 
+MAX_SHOWN_MESSAGES = 500  # a chat shows its newest 500 messages, oldest first
+
+
 def _thread_rows(me, other, after=0):
     return get_db().execute(
-        """SELECT m.*, u.full_name, u.avatar_updated FROM direct_messages m JOIN users u ON u.id = m.sender_id
-           WHERE m.id > ? AND ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?))
-           ORDER BY m.id LIMIT 500""", (after, me, other, other, me)).fetchall()
+        f"""SELECT * FROM (
+               SELECT m.*, u.full_name, u.avatar_updated FROM direct_messages m JOIN users u ON u.id = m.sender_id
+               WHERE m.id > ? AND ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?))
+               ORDER BY m.id DESC LIMIT {MAX_SHOWN_MESSAGES}) ORDER BY id""", (after, me, other, other, me)).fetchall()
 
 
 def _mark_read(me, other):
@@ -408,8 +412,10 @@ def _event_for_chat(event_id):
 
 def _chat_rows(event_id, after=0):
     return get_db().execute(
-        """SELECT m.*, u.full_name, u.avatar_updated FROM event_messages m JOIN users u ON u.id = m.sender_id
-           WHERE m.event_id = ? AND m.id > ? ORDER BY m.id LIMIT 500""", (event_id, after)).fetchall()
+        f"""SELECT * FROM (
+               SELECT m.*, u.full_name, u.avatar_updated FROM event_messages m JOIN users u ON u.id = m.sender_id
+               WHERE m.event_id = ? AND m.id > ? ORDER BY m.id DESC LIMIT {MAX_SHOWN_MESSAGES}) ORDER BY id""",
+        (event_id, after)).fetchall()
 
 
 def _mark_chat_seen(event_id, rows):

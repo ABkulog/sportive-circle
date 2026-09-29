@@ -1469,6 +1469,19 @@ def test_visitors_get_simple_menu(client):
     assert 'class="appnav"' not in page and "/clubs" in page and "How it works" in page
 
 
+def test_long_chats_show_the_newest_messages(accounts, client, app):
+    accounts.signup()
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    me = _user_id(app, "dubs@uw.edu")
+    with app.app_context():
+        get_db().executemany("INSERT INTO event_messages (event_id, sender_id, body, created_at) VALUES (?, ?, ?, ?)",
+                             [(event_id, me, f"msg-{i:04d}", "2026-09-01 10:00") for i in range(520)])
+        get_db().commit()
+    page = client.get(f"/events/{event_id}/chat").data.decode()
+    assert "msg-0519" in page and "msg-0000" not in page
+    assert page.index("msg-0100") < page.index("msg-0519")        # still oldest first
+
+
 def test_chats_hide_the_tab_bar_on_phones(accounts, client):
     accounts.signup()
     event_id = event_id_from(client.post("/events/new", data=event_form()))
