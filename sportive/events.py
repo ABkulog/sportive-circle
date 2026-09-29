@@ -267,8 +267,9 @@ def feed():
         where.append("e.skill_level IN (:skill, 'All levels')")
         params["skill"] = filters["skill"]
     if filters["open"] in OPEN_SPOT_CHOICES:
-        # "We're a group of 5": games with at least that many spots anyone can take right now.
-        where.append(f"(e.max_players IS NULL OR {spots_left_sql} >= :min_open)")
+        # "We're a group of 5": games with at least that many spots anyone can take right now
+        # (not private games, which need a password, or team games, which are joined as a team).
+        where.append(f"e.is_private = 0 AND e.team_size IS NULL AND (e.max_players IS NULL OR {spots_left_sql} >= :min_open)")
         params["min_open"] = int(filters["open"])
     else:
         filters["open"] = ""

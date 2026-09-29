@@ -2999,6 +2999,19 @@ def test_open_spots_filter(accounts, client, app):
     assert "Small run" in client.get("/?scope=all&open=1").data.decode()      # "need just one more" works
 
 
+def test_open_spots_filter_skips_games_a_group_cant_just_join(accounts, client, app):
+    _people(accounts, app, "Maya", "Me")
+    _as(accounts, "Maya")
+    client.post("/events/new", data=event_form(title="Secret run", players="12", is_private="1", password="hoops"))
+    client.post("/events/new", data=event_form(title="Team clash", players="10", team_size="5"))
+    client.post("/events/new", data=event_form(title="Open run", players="12"))
+    _as(accounts, "Me")
+    five = client.get("/?scope=all&open=5").data.decode()
+    assert "Open run" in five and "Secret run" not in five and "Team clash" not in five
+    everything = client.get("/?scope=all").data.decode()
+    assert "Secret run" in everything and "Team clash" in everything
+
+
 def test_full_games_have_their_own_tab(accounts, client, app):
     """Nobody can join a full game, so the feed hides it; the Full tab still shows them."""
     _people(accounts, app, "Maya", "Me", "Sam")
