@@ -529,6 +529,18 @@ def test_dev_mode_gets_its_own_persistent_secret_key(tmp_path):
     assert len(first.secret_key) >= 32
 
 
+def test_bell_times_say_how_long_ago(monkeypatch):
+    from datetime import datetime
+    from sportive import timeutil
+    monkeypatch.setattr(timeutil, "now_local", lambda: datetime(2026, 9, 29, 15, 0))
+    assert timeutil.fmt_ago("2026-09-29 15:00:40") == "just now"
+    assert timeutil.fmt_ago("2026-09-29 14:35") == "25 min ago"
+    assert timeutil.fmt_ago("2026-09-29 09:00") == "6 hr ago"
+    assert timeutil.fmt_ago("2026-09-28 22:00") == "yesterday"
+    assert timeutil.fmt_ago("2026-09-25 10:00") == "4 days ago"
+    assert timeutil.fmt_ago("2026-08-01 10:00") == "Aug 1"
+
+
 def test_dates_show_year_when_not_this_year(monkeypatch):
     from datetime import datetime
     from sportive import timeutil

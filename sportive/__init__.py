@@ -12,7 +12,7 @@ from . import (auth, clubs, db, events, feedback, mail, moderation, notification
 from .constants import (DEFAULT_PLAYERS, LOCATIONS, OPEN_TO, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS,
                         MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .photos import MAX_UPLOAD_MB
-from .timeutil import fmt_clock, fmt_relative, fmt_when, now_local, same_day, to_db
+from .timeutil import fmt_ago, fmt_clock, fmt_relative, fmt_when, now_local, same_day, to_db
 
 DEV_SECRET_KEY = "dev-only-change-me"  # the old shared default: refused everywhere now
 MIN_SECRET_KEY_LENGTH = 32
@@ -151,7 +151,7 @@ def _add_template_helpers(app):
         open_report_count=moderation.open_report_count, pending_club_count=clubs.pending_club_count,
         is_team=moderation.is_team, current_theme=settings.current_theme,
     )
-    app.jinja_env.filters.update(when=fmt_when, clock=fmt_clock, relative=fmt_relative)
+    app.jinja_env.filters.update(when=fmt_when, clock=fmt_clock, relative=fmt_relative, ago=fmt_ago)
 
 
 def _version_static_files(app):

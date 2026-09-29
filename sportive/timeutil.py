@@ -67,5 +67,25 @@ def fmt_relative(value):
     return f"in {days} days"
 
 
+def fmt_ago(value):
+    """For things that already happened (a notice, a message): 'just now', '5 min ago', '3 hr ago',
+    'yesterday', '4 days ago', then the date."""
+    dt = from_db(value[:16])  # some rows (made by SQLite) also have seconds
+    now = now_local()
+    minutes = int((now - dt).total_seconds() // 60)
+    if minutes < 1:
+        return "just now"
+    if minutes < 60:
+        return f"{minutes} min ago"
+    if minutes < 24 * 60 and dt.date() == now.date():
+        return f"{minutes // 60} hr ago"
+    days = (now.date() - dt.date()).days
+    if days == 1:
+        return "yesterday"
+    if days < 7:
+        return f"{days} days ago"
+    return f"{dt.strftime('%b')} {dt.day}" + (f", {dt.year}" if dt.year != now.year else "")
+
+
 def same_day(a, b):
     return from_db(a).date() == from_db(b).date()
