@@ -3164,3 +3164,11 @@ def test_reserve_spots_on_a_full_game_says_why(accounts, client, app):
     assert f"/events/{full_id}/party" not in client.get(f"/events/{full_id}").data.decode()  # no Reserve button
     page = client.get(f"/events/{full_id}/party", follow_redirects=True).data.decode()
     assert "This game is full, so there&#39;s no spot to reserve" in page
+
+
+def test_no_huskylink_wording_left_for_clubs(accounts, client):
+    """HuskyLink isn't asked for anymore, so it shouldn't show up in the club form or on the home page."""
+    assert "HuskyLink" not in client.get("/").data.decode()
+    accounts.signup()
+    form = client.get("/clubs/new").data.decode()
+    assert "HuskyLink" not in form and "Registered Student Organization" in form

@@ -1,7 +1,7 @@
 """Clubs: verified, active UW clubs only. Anyone can browse them; any Husky can join.
 
-To keep out random or inactive clubs, officers *register* their club with proof (its
-official HuskyLink or UW Recreation page) and an admin approves it before it goes public.
+To keep out random or inactive clubs, officers *register* their club with proof (at least one of
+its social accounts, like its Instagram) and an admin approves it before it goes public.
 The registration form also captures what each club is actually like (tryouts? dues?
 experience? gear?), so students know exactly what they're signing up for.
 """
@@ -35,7 +35,7 @@ MAX_PENDING_PER_PERSON = 3
 # The choices on the registration form (and the "Quick facts" on a club's page).
 CLUB_KINDS = {
     "rec_club": "UW Recreation Rec Club",
-    "rso": "Registered Student Organization (HuskyLink)",
+    "rso": "Registered Student Organization",
 }
 FOCUS = {"competitive": "Competitive", "recreational": "Recreational", "instructional": "Instructional (learn the sport)",
          "mixed": "A mix"}

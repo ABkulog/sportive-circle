@@ -169,7 +169,7 @@ erDiagram
         int id PK
         text name UK
         text status "pending / approved / rejected"
-        text verification_url "HuskyLink or UW Rec"
+        text verification_url "old: HuskyLink or UW Rec (no longer asked)"
         text joining "open / tryouts / application"
     }
     club_members {
@@ -236,7 +236,7 @@ second group claims team 2 with the same flow ("Challenge").
 ```mermaid
 stateDiagram-v2
     [*] --> pending: officer registers (official page + all details)
-    pending --> approved: admin checks HuskyLink / UW Rec
+    pending --> approved: admin checks its social accounts
     pending --> rejected: admin sends a note
     rejected --> pending: officer fixes and resubmits
     approved --> pending: name or official page changes
