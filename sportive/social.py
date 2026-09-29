@@ -270,7 +270,7 @@ def send_request(user_id):
         db.commit()
         flash("You're friends now!", "celebrate")
     elif status == "none":
-        db.execute("INSERT INTO friendships (requester_id, addressee_id, created_at) VALUES (?, ?, ?)",
+        db.execute("INSERT OR IGNORE INTO friendships (requester_id, addressee_id, created_at) VALUES (?, ?, ?)",
                    (me, user_id, to_db(now_local())))
         db.commit()
         flash("Friend request sent!", "success")

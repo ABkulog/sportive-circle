@@ -159,7 +159,7 @@ def send_party(event, chosen, team, joining_now, note=""):
             return f"Only {for_friends} spot{'s' if for_friends != 1 else ''} left for friends."
         title, first = event_title(event), g.user["full_name"].split()[0]
         if joining_now:
-            db.execute("INSERT INTO rsvps (event_id, user_id, created_at, team) VALUES (?, ?, ?, ?)",
+            db.execute("INSERT OR IGNORE INTO rsvps (event_id, user_id, created_at, team) VALUES (?, ?, ?, ?)",
                        (event["id"], me, now_param(), team))
             mine = my_invite(event["id"], me)
             if mine:  # I was invited myself: that invite is answered now
@@ -346,7 +346,7 @@ def accept_invite_link(user, token):
         db.execute("""UPDATE friendships SET status = 'accepted' WHERE (requester_id = ? AND addressee_id = ?)
                       OR (requester_id = ? AND addressee_id = ?)""", (inviter_id, user["id"], user["id"], inviter_id))
     else:
-        db.execute("INSERT INTO friendships (requester_id, addressee_id, status, created_at) VALUES (?, ?, 'accepted', ?)",
+        db.execute("INSERT OR IGNORE INTO friendships (requester_id, addressee_id, status, created_at) VALUES (?, ?, 'accepted', ?)",
                    (inviter_id, user["id"], now_param()))
     db.commit()
     event = _open_game(event_id)

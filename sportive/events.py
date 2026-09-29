@@ -813,8 +813,9 @@ def try_join(event, password=None, team=None):
     db = get_db()
     # The capacity check and the insert happen in one statement, so two people tapping "Join" at the
     # same moment can't both take the last spot. Spots held for other invited friends don't count as open.
+    # OR IGNORE: a double tap (or two tabs) must not crash on the one-RSVP-per-person rule.
     cur = db.execute(
-        f"""INSERT INTO rsvps (event_id, user_id, created_at, team)
+        f"""INSERT OR IGNORE INTO rsvps (event_id, user_id, created_at, team)
             SELECT e.id, :me, :now, :team FROM events e
             WHERE e.id = :id AND (e.max_players IS NULL OR
                   e.extra_players + (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id)
@@ -827,6 +828,8 @@ def try_join(event, password=None, team=None):
         {"me": me, "id": event["id"], "now": to_db(now_local()), "hold_now": now_param(), "team": team})
     if not cur.rowcount:
         db.commit()
+        if db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (event["id"], me)).fetchone():
+            return False, "You're already going."
         return False, "Sorry, this game is full."
     if invite:
         db.execute("UPDATE invites SET status = 'accepted' WHERE id = ?", (invite["id"],))

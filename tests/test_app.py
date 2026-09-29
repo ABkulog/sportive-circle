@@ -182,6 +182,21 @@ def test_join_leave_and_capacity(accounts, client):
     assert b"You&#39;re in!" in client.post(f"/events/{event_id}/join", follow_redirects=True).data
 
 
+def test_double_tapping_join_doesnt_crash(accounts, client, app):
+    from flask import g
+    from sportive import events
+    accounts.signup(email="host@uw.edu")
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    player = _user_id(app, "player@uw.edu")
+    with app.test_request_context():
+        g.user = get_db().execute("SELECT * FROM users WHERE id = ?", (player,)).fetchone()
+        stale = events.get_event(event_id)           # the page as it was before the first tap landed
+        assert events.try_join(stale)[0] is True
+        assert events.try_join(stale) == (False, "You're already going.")
+
+
 def test_database_uses_wal_and_waits_for_locks(app):
     with app.app_context():
         assert get_db().execute("PRAGMA journal_mode").fetchone()[0] == "wal"
