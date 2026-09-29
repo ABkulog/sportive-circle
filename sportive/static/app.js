@@ -188,7 +188,7 @@
     });
   }
 
-  // The "Need help?" bubble: shown until someone taps its ×, then hidden on this device for good.
+  // The "Help?" bubble: shown until someone taps its ×, then hidden on this device for good.
   const helpBubble = document.querySelector("[data-help-bubble]");
   if (helpBubble) {
     let closed = false;

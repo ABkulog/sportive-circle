@@ -443,7 +443,13 @@ section.card h2, details.card h2 { margin-top: 0; }
 .form { display: grid; gap: 14px; margin: 16px 0; }
 .row { display: grid; gap: 14px; }
 @media (min-width: 520px) { .row { grid-template-columns: 1fr 1fr; } }
-.row-pair { grid-template-columns: 1fr 1fr; gap: 10px; }  /* side by side even on phones (sign up fits one screen) */
+.row-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }  /* side by side even on phones */
+/* iPhone Safari gives date boxes a fixed built-in width that ignores the column, so two side by side overlapped
+   (sign up, iPhone 16). Let them shrink like any other box. */
+input[type="date"], input[type="time"], input[type="datetime-local"] {
+  -webkit-appearance: none; appearance: none; min-width: 0; max-width: 100%; min-height: 46px; display: block;
+}
+input::-webkit-date-and-time-value { text-align: left; margin: 0; }
 .field { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
 .field > span, .field legend { font-weight: 600; font-size: .9rem; padding: 0; margin-bottom: 6px; }
 input, select, textarea {
@@ -847,7 +853,7 @@ h1 .team-pill { font-size: .78rem; margin-left: 4px; }
 .peek .eye-slash { display: none; }
 .peek[aria-pressed="true"] .eye-slash { display: inline; }  /* crossed out while showing: tap to hide */
 
-/* "Need help?" bubble (bottom right, above the phone tab bar). */
+/* "Help?" bubble (bottom right, above the phone tab bar). */
 .help-bubble { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 25;
                display: flex; align-items: center; background: var(--bg); border: 1px solid var(--control-line);
                border-radius: 999px; box-shadow: 0 4px 14px rgba(50, 0, 110, .18); }

@@ -3033,9 +3033,9 @@ def test_remember_me(accounts, client):
 
 
 def test_help_bubble_can_be_closed(accounts, client):
-    """A small "Need help?" bubble links to the FAQ and has an × (app.js remembers it's closed)."""
+    """A small "Help?" bubble links to the FAQ and has an × (app.js remembers it's closed)."""
     home = client.get("/").data.decode()
-    assert "data-help-bubble" in home and 'href="/faq"' in home and "data-help-close" in home
+    assert "data-help-bubble" in home and "<span>Help?</span>" in home and "data-help-close" in home
     for page in ("/login", "/signup", "/faq"):  # not on sign-up screens or the help page itself
         assert "data-help-bubble" not in client.get(page).data.decode()
     accounts.signup()
