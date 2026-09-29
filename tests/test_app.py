@@ -3150,6 +3150,18 @@ def test_invite_link_for_people_who_already_have_an_account(accounts, client, ap
     assert b"doesn&#39;t work anymore" in client.get("/join/WzEsIDJd.forged", follow_redirects=True).data
 
 
+def test_invite_links_expire(accounts, client, app, monkeypatch):
+    from datetime import timedelta as td
+    from sportive import parties
+    accounts.signup(email="maya@uw.edu", name="Maya Chen")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    link = _invite_path(client.get(f"/events/{game}").data.decode())
+    accounts.logout()
+    assert b"Maya wants you in their game" in client.get(link).data
+    monkeypatch.setattr(parties, "LINK_MAX_AGE", td(seconds=-1))
+    assert b"doesn&#39;t work anymore" in client.get(link, follow_redirects=True).data
+
+
 def test_invite_friends_to_the_app_makes_you_friends(accounts, client, app):
     accounts.signup(email="maya@uw.edu", name="Maya Chen")
     link = _invite_path(client.get("/friends").data.decode())

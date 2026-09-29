@@ -7,8 +7,10 @@ Yes takes the held spot; No frees it for someone else.
 Team vs team: the host's party is team 1. Another group "challenges" them by claiming team 2 the same
 way (the leader joins and holds spots for their friends).
 """
+from datetime import timedelta
+
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, session, url_for
-from itsdangerous import BadSignature, URLSafeSerializer
+from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 from .auth import login_required
 from .db import get_db
@@ -279,8 +281,11 @@ def can_party_up(event):
 # app's secret key, so nobody can make one for a game they aren't in, or pretend to be someone else.
 # Game 0 = just "join me on Sportive Circle" (you become friends).
 
+LINK_MAX_AGE = timedelta(days=14)  # a forwarded or leaked link stops working after this
+
+
 def _signer():
-    return URLSafeSerializer(current_app.secret_key, salt="invite-link")
+    return URLSafeTimedSerializer(current_app.secret_key, salt="invite-link")
 
 
 def invite_link(event_id=0):
@@ -290,9 +295,9 @@ def invite_link(event_id=0):
 
 def _read_link(token):
     try:
-        event_id, inviter_id = _signer().loads(token)
+        event_id, inviter_id = _signer().loads(token, max_age=LINK_MAX_AGE.total_seconds())
         return int(event_id), int(inviter_id)
-    except (BadSignature, ValueError, TypeError):
+    except (BadSignature, ValueError, TypeError):  # SignatureExpired is a BadSignature
         return None
 
 
