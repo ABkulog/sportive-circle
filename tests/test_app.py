@@ -215,6 +215,19 @@ def test_saving_notification_settings_keeps_hidden_kinds_on(accounts, client, ap
     assert chosen["club_requests"] and chosen["suggestion_trends"]   # not on the page, so not switched off
 
 
+def test_opening_the_bell_leaves_switched_off_notices_unread(accounts, client, app):
+    from sportive.notifications import KINDS, notify
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    client.post("/settings/notifications", data={k.key: "1" for k in KINDS if k.key != "invites"})
+    with app.test_request_context():
+        notify(me, "invites", "Maya wants you in Hoops", "/events/1")
+        get_db().commit()
+    client.get("/notifications")
+    with app.app_context():
+        assert get_db().execute("SELECT read_at FROM notices").fetchone()[0] is None
+
+
 def test_database_uses_wal_and_waits_for_locks(app):
     with app.app_context():
         assert get_db().execute("PRAGMA journal_mode").fetchone()[0] == "wal"

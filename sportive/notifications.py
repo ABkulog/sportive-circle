@@ -264,7 +264,11 @@ def bell():
     items = bell_items()
     notices = [notice for notice in recent_notices(me) if chosen[notice["kind"]]]
     db = get_db()
-    db.execute("UPDATE notices SET read_at = ? WHERE user_id = ? AND read_at IS NULL", (to_db(now_local()), me))
+    # Only what was shown counts as read: a kind switched off now still shows up if it's switched back on.
+    shown_kinds = [kind for kind in NOTICE_KINDS if chosen[kind]]
+    if shown_kinds:
+        db.execute(f"UPDATE notices SET read_at = ? WHERE user_id = ? AND read_at IS NULL"
+                   f" AND kind IN ({', '.join('?' for _ in shown_kinds)})", (to_db(now_local()), me, *shown_kinds))
     db.commit()
     g.pop("notification_counts", None)  # the bell in the top bar shows 0 on this page
     return render_template("notifications/bell.html", items=items, notices=notices, kinds=KIND_BY_KEY)
