@@ -1,4 +1,4 @@
-// Keeps the "Location" list and the "Players" dropdown in sync with the chosen sport.
+// Keeps the "Location" list and the "Players" number in sync with the chosen sport.
 // The server checks the same rules (constants.py), so this is only for convenience.
 (function () {
   const rulesElement = document.getElementById("sport-rules");
@@ -23,15 +23,14 @@
     else if (!allowed.includes(current)) location.value = "";
   }
 
-  // "Players": 2 up to the sport's most; a new sport starts at its usual size (5v5 basketball = 10).
+  // "Players": any number the host needs. Picking another sport suggests its usual size (5v5 basketball = 10),
+  // unless the host already typed their own number.
+  let typedPlayers = false;
+  if (players) players.addEventListener("input", () => { typedPlayers = true; });
   function updatePlayers() {
     const rule = rules[sport.value];
     if (!players || !rule) return;
-    const keep = sport.value === lastSport ? players.value : String(rule.default);
-    const options = [];
-    for (let n = 2; n <= rule.max; n += 1) options.push(new Option(String(n), String(n), false, String(n) === keep));
-    players.replaceChildren(...options);
-    if (!players.value) players.value = String(rule.default);
+    if (sport.value !== lastSport && !typedPlayers) players.value = String(rule.default);
     lastSport = sport.value;
   }
 

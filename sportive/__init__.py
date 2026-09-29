@@ -9,7 +9,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from . import (auth, clubs, db, events, feedback, mail, moderation, notifications, pages, parties, profile,
                reminders, settings, social, stats)
 from .constants import (DEFAULT_PLAYERS, LOCATIONS, OPEN_TO, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS,
-                        SPORT_MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
+                        MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .photos import MAX_UPLOAD_MB
 from .timeutil import fmt_clock, fmt_relative, fmt_when, now_local, same_day, to_db
 
@@ -111,8 +111,8 @@ def _add_template_helpers(app):
         # forms and lists
         csrf_field=auth.csrf_field, SPORTS=SPORTS, SPORT_EMOJI=SPORT_EMOJI, LOCATIONS=LOCATIONS,
         SKILL_LEVELS=SKILL_LEVELS,
-        SPORT_TEAM_SIZES=SPORT_TEAM_SIZES, SPORT_MAX_PLAYERS=SPORT_MAX_PLAYERS, DEFAULT_PLAYERS=DEFAULT_PLAYERS,
-        SPORT_RULES={key: {"label": label, "locations": SPORT_LOCATIONS[key], "max": SPORT_MAX_PLAYERS[key],
+        SPORT_TEAM_SIZES=SPORT_TEAM_SIZES, MAX_PLAYERS=MAX_PLAYERS, DEFAULT_PLAYERS=DEFAULT_PLAYERS,
+        SPORT_RULES={key: {"label": label, "locations": SPORT_LOCATIONS[key],
                            "teams": SPORT_TEAM_SIZES.get(key, []), "default": DEFAULT_PLAYERS.get(key, 10),
                            "tips": {place: tip for (sport, place), tip in PLACE_TIPS.items() if sport == key}}
                      for key, label in SPORTS.items()},

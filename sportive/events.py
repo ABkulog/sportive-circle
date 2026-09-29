@@ -12,7 +12,7 @@ from .badges import sync_badges
 from .clubs import featured_clubs, suggested_clubs
 from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, OFF_CAMPUS, OPEN_TO, OPEN_TO_GENDERS,
                         STATED_GENDERS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
-                        SKILL_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, SPORT_MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
+                        SKILL_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .db import get_db, user_sports
 from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots, my_invite,
                       now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 
 MIN_PASSWORD, MAX_PASSWORD = 4, 30     # private games
 MAX_DAYS_AHEAD = 365
-OPEN_SPOT_CHOICES = ("2", "3", "4", "5", "10")  # the "Open spots" filter on Home
+OPEN_SPOT_CHOICES = ("1", "2", "3", "4", "5", "10")  # the "Open spots" filter on Home
 QUICK_WINDOW = timedelta(hours=3)      # quick posts starting this soon go to the top of the feed
 UP_NEXT_WINDOW = timedelta(hours=2)    # your own events starting this soon get a banner on the feed
 
@@ -222,7 +222,7 @@ def feed():
 
     my_sports = user_sports(g.user["id"])
     filters = {key: request.args.get(key, "") for key in ("scope", "sport", "location", "skill", "when", "open")}
-    if filters["scope"] not in ("interests", "all"):
+    if filters["scope"] not in ("interests", "all", "full"):
         filters["scope"] = "interests" if my_sports else "all"
 
     now = now_local()
@@ -236,6 +236,12 @@ def feed():
         names = [f":s{i}" for i in range(len(my_sports))]
         where.append(f"e.sport IN ({', '.join(names)})")
         params.update({f"s{i}": sport for i, sport in enumerate(my_sports)})
+    # Full games are hidden (nobody can join them) except in the "Full" tab. Your own games always show.
+    spots_left_sql = (f"(e.max_players - e.extra_players - {HELD}"
+                      " - (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id))")
+    is_full = f"(e.max_players IS NOT NULL AND {spots_left_sql} <= 0)"
+    mine = "(e.host_id = :me OR EXISTS (SELECT 1 FROM rsvps m WHERE m.event_id = e.id AND m.user_id = :me))"
+    where.append(f"({is_full} AND NOT {mine})" if filters["scope"] == "full" else f"(NOT {is_full} OR {mine})")
     if filters["location"] in LOCATIONS:
         where.append("e.location = :location")
         params["location"] = filters["location"]
@@ -244,8 +250,7 @@ def feed():
         params["skill"] = filters["skill"]
     if filters["open"] in OPEN_SPOT_CHOICES:
         # "We're a group of 5": games with at least that many spots anyone can take right now.
-        where.append(f"(e.max_players IS NULL OR e.max_players - e.extra_players - {HELD}"
-                     " - (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id) >= :min_open)")
+        where.append(f"(e.max_players IS NULL OR {spots_left_sql} >= :min_open)")
         params["min_open"] = int(filters["open"])
     else:
         filters["open"] = ""
@@ -406,15 +411,14 @@ def default_title(sport, location):
 def read_players(form, sport, team_size, event=None):
     """How many can play, and how many friends not on the app are already coming.
     Returns (max_players, extra_players, error). "Players" includes the host; in team vs team it's both teams."""
-    cap = SPORT_MAX_PLAYERS[sport]
     # Friends who aren't on the app get an invite link after posting (so they're counted once they join).
     extra = event["extra_players"] if event is not None else 0
     if team_size:
         return 2 * team_size, 0, None
     raw = form.get("players", "").strip()
-    players = int(raw) if raw.isdigit() else (DEFAULT_PLAYERS.get(sport, cap) if not raw else 0)
-    if not 2 <= players <= cap:
-        return None, 0, f"{SPORTS[sport]} games can have 2 to {cap} players."
+    players = int(raw) if raw.isdigit() else (DEFAULT_PLAYERS.get(sport, 10) if not raw else 0)
+    if not 2 <= players <= MAX_PLAYERS:
+        return None, 0, f"Pick 2 to {MAX_PLAYERS} players (you included)."
     taken = (event["going_count"] + event["extra_players"]) if event is not None else 1 + extra
     if players < taken:
         return None, 0, (f"{taken} people are already in, so it can't be fewer players than that." if event

@@ -199,18 +199,15 @@ def badge_locker():
 @bp.route("/profile/edit", methods=("GET", "POST"))
 @login_required
 def edit():
+    """Edit profile, screen 1: about you. "Next" saves it and goes on to socials and sports."""
     me = g.user
     if request.method == "POST":
         form = request.form
         full_name = one_line(form.get("full_name"))
         grad_year = form.get("grad_year", "").strip()
         bio = form.get("bio", "").strip()
-        sports = [s for s in form.getlist("sports") if s in SPORTS]
         pronouns = one_line(form.get("pronouns"))
         gender = form.get("gender", "")
-        socials = {key: one_line(form.get(key)).lstrip("@") for key in PERSON_SOCIALS}
-        bad_social = next((key for key, value in socials.items()
-                           if value and not re.fullmatch(SOCIALS[key][2], value)), None)
 
         error = None
         if not full_name:
@@ -225,29 +222,45 @@ def edit():
             error = f"Keep pronouns under {MAX_PRONOUNS} characters."
         elif gender not in GENDERS:
             error = "Please pick an option for gender."
-        elif bad_social:
-            error = f"That {SOCIALS[bad_social][0]} username doesn't look right. Just the username, like @dubs."
 
         if error is None:
             db = get_db()
             db.execute("""UPDATE users SET full_name = :full_name, grad_year = :grad_year, bio = :bio,
-                              pronouns = :pronouns, gender = :gender,
-                              instagram = :instagram, snapchat = :snapchat, tiktok = :tiktok, x_handle = :x_handle
-                          WHERE id = :id""",
+                              pronouns = :pronouns, gender = :gender WHERE id = :id""",
                        {"full_name": full_name, "grad_year": int(grad_year) if grad_year else None, "bio": bio,
-                        "pronouns": pronouns, "gender": gender, **socials,
-                        "id": me["id"]})
-            set_user_sports(me["id"], sports)
+                        "pronouns": pronouns, "gender": gender, "id": me["id"]})
             db.commit()
-            flash("Profile saved.", "success")
-            return redirect(url_for("profile.view", user_id=me["id"]))
+            return redirect(url_for("profile.edit_sports"))  # screen 2: socials and sports
         flash(error, "error")
     else:
         form = MultiDict([("full_name", me["full_name"]), ("grad_year", me["grad_year"] or ""), ("bio", me["bio"]),
-                          ("pronouns", me["pronouns"]), ("gender", me["gender"])]
-                         + [(key, me[key]) for key in PERSON_SOCIALS]
-                         + [("sports", s) for s in user_sports(me["id"])])
-    return render_template("profile/edit.html", form=form, max_grad_year=now_local().year + 8, genders=GENDERS,
+                          ("pronouns", me["pronouns"]), ("gender", me["gender"])])
+    return render_template("profile/edit.html", form=form, max_grad_year=now_local().year + 8, genders=GENDERS)
+
+
+@bp.route("/profile/edit/sports", methods=("GET", "POST"))
+@login_required
+def edit_sports():
+    """Edit profile, screen 2: your socials and the sports you play (also where "Pick your sports" links go)."""
+    me = g.user
+    if request.method == "POST":
+        form = request.form
+        socials = {key: one_line(form.get(key)).lstrip("@") for key in PERSON_SOCIALS}
+        bad_social = next((key for key, value in socials.items()
+                           if value and not re.fullmatch(SOCIALS[key][2], value)), None)
+        if bad_social:
+            flash(f"That {SOCIALS[bad_social][0]} username doesn't look right. Just the username, like @dubs.", "error")
+        else:
+            db = get_db()
+            db.execute("UPDATE users SET instagram = :instagram, snapchat = :snapchat, tiktok = :tiktok,"
+                       " x_handle = :x_handle WHERE id = :id", {**socials, "id": me["id"]})
+            set_user_sports(me["id"], [s for s in form.getlist("sports") if s in SPORTS])
+            db.commit()
+            flash("Profile saved.", "success")
+            return redirect(url_for("profile.view", user_id=me["id"]))
+    else:
+        form = MultiDict([(key, me[key]) for key in PERSON_SOCIALS] + [("sports", s) for s in user_sports(me["id"])])
+    return render_template("profile/edit_sports.html", form=form,
                            socials={key: SOCIALS[key][0] for key in PERSON_SOCIALS})
 
 

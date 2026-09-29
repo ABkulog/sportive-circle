@@ -4,18 +4,24 @@
 <a class="back-link" href="{{ url_for('settings.home') }}">← Settings</a>
 <div class="card form-card">
   <h1>Notifications</h1>
-  <p class="muted">Each thing shows up in one place. Switch off what you don't want. No pop-ups.</p>
+  <p class="muted">Switch off what you don't want. No pop-ups.</p>
   <form method="post" class="form">
     {{ csrf_field() }}
-    <ul class="switch-list">
-      {% for kind in kinds %}
-        <li><label class="switch-row">
-          <span class="switch-text"><span><span aria-hidden="true">{{ kind.emoji }}</span> {{ kind.label }}</span>
-            <small class="muted">Shows on {{ places[kind.place] }}</small></span>
-          <input type="checkbox" class="switch" name="{{ kind.key }}" value="1" {% if chosen[kind.key] %}checked{% endif %}>
-        </label></li>
-      {% endfor %}
-    </ul>
+    {# One heading per place things show up, instead of repeating "Shows on the bell" on every row. #}
+    {% for place, heading in places.items() %}
+      {% set here = kinds|selectattr('place', 'equalto', place)|list %}
+      {% if here %}
+        <h2 class="switch-heading">{{ heading }}</h2>
+        <ul class="switch-list">
+          {% for kind in here %}
+            <li><label class="switch-row">
+              <span class="switch-text">{{ kind.label }}</span>
+              <input type="checkbox" class="switch" name="{{ kind.key }}" value="1" {% if chosen[kind.key] %}checked{% endif %}>
+            </label></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endfor %}
     <p class="muted fine-print">Game reminder emails are in <a href="{{ url_for('settings.home') }}">Settings</a>.</p>
     <button class="btn btn-block">Save</button>
   </form>

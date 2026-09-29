@@ -47,7 +47,7 @@ small enough for one student to maintain. Each area of the app is its own module
 | File | What it does |
 |---|---|
 | `sportive/__init__.py` | Builds the app: settings, blueprints, error pages, security headers. |
-| `sportive/constants.py` | Sports, campus places, map pins, player caps. **Edit this to add a sport or place.** |
+| `sportive/constants.py` | Sports, campus places, map pins, usual game sizes. **Edit this to add a sport or place.** |
 | `sportive/schema.sql`, `db.py` | Database tables and automatic upgrades for existing databases. |
 | `sportive/auth.py` | Sign up, email codes, log in/out, forgot password, CSRF. |
 | `sportive/events.py` | Feed and filters, events (private, team vs team), Need players, joining, change notices, calendar files. |

@@ -6,8 +6,10 @@
   <h1>Need players</h1>
   <p class="muted" data-show="public" {% if form.get('is_private') == '1' %}hidden{% endif %}>Goes to the top of everyone's feed.</p>
   <p class="muted" data-show="private" {% if form.get('is_private') != '1' %}hidden{% endif %}>Only people you invite or give the password to can join.</p>
-  <form method="post" class="form" data-sport-form>
+  <form method="post" class="form" data-sport-form data-wizard>
     {{ csrf_field() }}
+    <section class="wizard-step">
+    <h2 class="form-step"><span>1</span> The game</h2>
     <div class="row">
       {{ select('sport', 'Sport', SPORTS.items(), form.get('sport', ''), 'Choose a sport') }}
       <label class="field"><span>Where</span>
@@ -22,20 +24,32 @@
       {{ select('starts_in', 'Starting', start_options, form.get('starts_in', '30')) }}
       {{ select('duration', 'For', durations, form.get('duration', '60')) }}
     </div>
-    {{ who_can_join(form) }}
-    {{ format_field(form) }}
-    {{ open_to_field(form) }}
-    {{ players_block(form, friends) }}
     <label class="field" data-show="public" {% if form.get('is_private') == '1' %}hidden{% endif %}><span>Skill level</span>
       <select name="skill_level">
         {% for level in SKILL_LEVELS %}<option value="{{ level }}" {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
       </select>
     </label>
+    </section>
+    <section class="wizard-step">
+    <h2 class="form-step"><span>2</span> Who can join</h2>
+    {{ who_can_join(form) }}
+    {{ format_field(form) }}
+    {{ open_to_field(form) }}
+    </section>
+    <section class="wizard-step">
+    <h2 class="form-step"><span>3</span> Players</h2>
+    {{ players_block(form, friends) }}
     <label class="field"><span>Note <em>(optional)</em></span>
       <textarea name="note" maxlength="500" rows="2" placeholder="Court 2, look for the blue shirts">{{ form.get('note', '') }}</textarea></label>
-    <button class="btn btn-gold btn-block">Post it</button>
+    </section>
+    <div class="wizard-nav" hidden>
+      <button type="button" class="btn btn-ghost" data-wizard-back>← Back</button>
+      <button type="button" class="btn" data-wizard-next>Next →</button>
+    </div>
+    <button class="btn btn-gold btn-block" data-wizard-submit>Post it</button>
   </form>
 </div>
 <script type="application/json" id="sport-rules">{{ SPORT_RULES|tojson }}</script>
 <script src="{{ url_for('static', filename='forms.js') }}" defer></script>
+<script src="{{ url_for('static', filename='wizard.js') }}" defer></script>
 {% endblock %}

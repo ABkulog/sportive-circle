@@ -1,11 +1,11 @@
-"""Per-sport numbers for tuning SPORT_MAX_PLAYERS in constants.py once real people use the app.
+"""Per-sport numbers (how big games really are) for tuning DEFAULT_PLAYERS in constants.py.
 
     .venv/bin/flask --app main sport-stats
 """
 import click
 from flask.cli import with_appcontext
 
-from .constants import SPORT_MAX_PLAYERS, SPORTS
+from .constants import DEFAULT_PLAYERS, SPORTS
 from .db import get_db
 from .timeutil import now_local, to_db
 
@@ -41,12 +41,12 @@ def sport_stats_command():
     if not rows:
         click.echo("No finished events yet. Check back once people have played some games.")
         return
-    click.echo(f"{'Sport':<22}{'Events':>7}{'Cap':>6}{'Avg limit':>11}{'Avg players':>13}{'Most':>6}{'Full':>7}")
+    click.echo(f"{'Sport':<22}{'Events':>7}{'Usual':>6}{'Avg limit':>11}{'Avg players':>13}{'Most':>6}{'Full':>7}")
     for row in rows:
         avg_limit = f"{row['avg_limit']:.1f}" if row["avg_limit"] is not None else "-"
         click.echo(
-            f"{SPORTS.get(row['sport'], row['sport']):<22}{row['events']:>7}{SPORT_MAX_PLAYERS.get(row['sport'], 0):>6}"
+            f"{SPORTS.get(row['sport'], row['sport']):<22}{row['events']:>7}{DEFAULT_PLAYERS.get(row['sport'], 0):>6}"
             f"{avg_limit:>11}{row['avg_players']:>13.1f}{row['most_players']:>6}{row['share_full']:>7.0%}"
         )
-    click.echo("\nIf games in a sport often fill up, its cap may be too low; if 'Most' never gets")
-    click.echo("near the cap, you can lower it. Change the caps in sportive/constants.py.")
+    click.echo("\nIf 'Avg limit' is far from 'Usual', change that sport's starting number (DEFAULT_PLAYERS)")
+    click.echo("in sportive/constants.py. Hosts can always pick any number.")

@@ -12,6 +12,7 @@
   --gold: #b7a57a;             /* Husky Gold: the line under the header, bars under titles */
   --gold-light: #e8e3d3;       /* Husky Gold (web): soft highlights */
   --gold-text: #85754d;        /* Heritage Gold: gold text that's readable on white */
+  --gold-ink: #5c4f2e;         /* darker gold for small text on a gold-tinted chip */
   --spirit-gold: #ffc700;      /* Spirit Gold: tiny accents only */
   --accent: var(--purple);
   --accent-soft: #f1edf8;      /* a whisper of purple for boxes that need attention */
@@ -45,6 +46,7 @@
   --purple-strong: #d9ccf5;
   --gold-light: #2e2918;
   --gold-text: #cdbd92;
+  --gold-ink: #cdbd92;
   --accent: #b9a3e8;
   --accent-soft: #262035;
   --bg: #15121c;
@@ -70,6 +72,7 @@
     --purple-strong: #d9ccf5;
     --gold-light: #2e2918;
     --gold-text: #cdbd92;
+    --gold-ink: #cdbd92;
     --accent: #b9a3e8;
     --accent-soft: #262035;
     --bg: #15121c;
@@ -236,14 +239,15 @@ section.band > .section-title:first-child { margin-top: 0; }
 .top-icons .count-dot { position: absolute; top: 4px; right: 2px; }
 /* On narrow phones the icons need the room: show just the paw logo (4 icons below 370px, 5 for admins below 412px). */
 @media (max-width: 370px) { body.has-app-nav .topbar .brand > span { display: none; } }
+@media (max-width: 360px) { .topbar .brand > span { display: none; } }  /* small phones: logo only, no sideways scroll */
 @media (max-width: 412px) { .topbar-inner.five-icons .brand > span { display: none; } }
 .nav { display: flex; align-items: center; gap: 16px; }
 .nav a, .nav .link-button { color: var(--text); font-weight: 600; font-size: .95rem; }
-.topbar .nav a, .topbar .nav .link-button { color: #fff; }
+.topbar .nav a, .topbar .nav .link-button { color: #fff; min-height: 40px; display: inline-flex; align-items: center; }
 .nav form { margin: 0; }
 .nav a { white-space: nowrap; }
 @media (max-width: 520px) { .nav .wide-only { display: none; } }
-.nav-cta { background: var(--gold); color: var(--purple-strong) !important; padding: 7px 14px; border-radius: 6px; }
+.nav-cta { background: var(--gold); color: var(--purple-strong) !important; padding: 0 14px; border-radius: 6px; }
 .nav-cta:hover { background: var(--gold-light); text-decoration: none; }
 
 /* ============================== App navigation ==============================
@@ -330,7 +334,7 @@ body.hide-tabs { padding-bottom: 0; }
 .badge-success { color: var(--success); }
 .badge-danger { color: var(--danger); }
 .badge-purple, .badge-club, .badge-level { color: var(--accent); }
-.badge-gold { color: var(--gold-text); background: var(--gold-light); }
+.badge-gold { color: var(--gold-ink); background: var(--gold-light); }
 .badge-muted { color: var(--muted); }
 .badge-verified { color: var(--success); }
 .going-pill, .done-pill { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--success); }
@@ -642,7 +646,8 @@ form[data-wizard] .form-step { display: none; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
 .clamp.is-open { display: block; }
 .club-actions { margin-top: 14px; }
-.action-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: start; }
+.action-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: start; }
+.action-pair .btn { white-space: normal; text-align: center; }  /* small phones: long labels wrap, never overflow */
 .action-pair form { margin: 0; }
 .action-pair .btn, .action-pair summary.btn { width: 100%; }
 .join-panel > summary { list-style: none; }
@@ -734,7 +739,7 @@ form[data-wizard] .form-step { display: none; }
 /* Landing hero: UW purple with gold, the one big splash of color in the app. */
 .husky-hero { margin: -16px -16px 0; padding: 36px 20px 28px; color: #fff; border-radius: 0;
   background: var(--header); border-bottom: 6px solid var(--gold); }
-.husky-hero .eyebrow { color: var(--gold); }
+.husky-hero .eyebrow { color: var(--gold-light); }  /* Husky Gold is too faint for small text on purple */
 .husky-hero h1 { color: #fff; text-transform: uppercase; letter-spacing: .01em; }
 .husky-hero .gold { color: var(--gold); }
 .husky-hero .lead { color: rgba(255, 255, 255, .85); }
@@ -762,8 +767,9 @@ form[data-wizard] .form-step { display: none; }
 .step-number { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--surface);
   display: grid; place-items: center; font-size: 1.1rem; font-weight: 700; }
 .faq { border: 0; padding: 0; }
-.faq details { border-bottom: 1px solid var(--line); padding: 12px 0; }
-.faq summary { font-weight: 600; }
+.faq details { border-bottom: 1px solid var(--line); padding: 0; }
+.faq summary { font-weight: 600; padding: 12px 0; min-height: 44px; box-sizing: border-box; }
+.faq details p { padding-bottom: 12px; }
 .faq details p { margin: 8px 0 0; color: var(--muted); }
 .how-cta { text-align: center; padding: 28px 0 8px; }
 .step-number { background: var(--purple); color: var(--on-accent); }
@@ -867,3 +873,21 @@ body.hide-tabs .help-bubble { display: none; }
               line-height: 1; cursor: pointer; border-radius: 0 999px 999px 0; padding: 0 6px 0 0; }
 .help-close:hover { color: var(--text); }
 @media (min-width: 1000px) { body.has-app-nav .help-bubble { bottom: 24px; right: 24px; } }
+
+/* Links that sit on their own line need a finger-sized target. */
+.contact-list a { display: inline-block; padding: 10px 0; }
+.hero-links { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+.hero-links a { display: inline-block; padding: 10px 0; }
+.report-card { min-width: 0; overflow-wrap: anywhere; }  /* long links and emails wrap inside admin cards */
+body.has-help main.page { padding-bottom: 76px; }  /* the last card can scroll above the Help? bubble */
+
+/* Finger-sized targets (audit: anything a thumb taps should be at least ~40px). */
+.topbar .brand { min-height: 44px; min-width: 44px; }
+.card-chat { min-width: 40px; min-height: 40px; align-items: center; justify-content: center; margin: -8px -8px -8px 0; }
+.btn-small { min-height: 36px; }
+button.link-button { min-height: 36px; }
+.more-menu > summary { min-height: 40px; display: inline-flex; align-items: center; }
+.home-tabs a { min-width: 44px; text-align: center; }
+.past-list a { display: inline-block; padding: 8px 0; }
+.switch-heading { font-size: .8rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+                  color: var(--muted); margin: 10px 0 0; }

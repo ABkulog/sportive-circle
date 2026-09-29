@@ -86,7 +86,7 @@
 
   <div class="badges profile-sports">
     {% for s in sports %}<span class="chip">{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</span>
-    {% else %}<span class="muted">{% if me %}<a href="{{ url_for('profile.edit') }}">Pick your sports</a>{% else %}No sports picked yet.{% endif %}</span>{% endfor %}
+    {% else %}<span class="muted">{% if me %}<a href="{{ url_for('profile.edit_sports') }}">Pick your sports</a>{% else %}No sports picked yet.{% endif %}</span>{% endfor %}
   </div>
 </section>
 

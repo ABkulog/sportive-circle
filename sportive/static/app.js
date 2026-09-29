@@ -39,12 +39,22 @@
     const outside = from && !inside ? from.pathname + from.search : null;
     try {
       if (outside) sessionStorage.setItem(key, outside);
-      const saved = sessionStorage.getItem(key);
-      if (saved) link.href = saved;
+      // Coming back from one of this page's own pages (its chat, its edit page): go where we came from before.
+      // Opened from nowhere (a typed or shared link): the link's own place, never an old leftover.
+      const saved = outside || (inside ? sessionStorage.getItem(key) : null);
+      if (!from) sessionStorage.removeItem(key);
+      if (saved) goBackTo(link, saved);
     } catch (e) {
-      if (outside) link.href = outside;  // storage blocked: the page right before still works
+      if (outside) goBackTo(link, outside);  // storage blocked: the page right before still works
     }
   });
+  // "← Profile" must never lead somewhere else: if Back goes to another page, it just says "Back".
+  function goBackTo(link, path) {
+    const labelled = new URL(link.href, location.href);
+    const target = new URL(path, location.href);
+    if (target.pathname !== labelled.pathname) link.textContent = "← Back";
+    link.href = path;
+  }
 
   // <form data-dialog="id">: show that <dialog> first (e.g. "No problem!" after "Add later"); its
   // button sends the form. Without JavaScript the form just sends right away.
@@ -193,9 +203,13 @@
   if (helpBubble) {
     let closed = false;
     try { closed = localStorage.getItem("helpBubbleClosed") === "1"; } catch (error) { /* private mode */ }
+    // Forms (edit profile, create a game...) keep their Save/Next button uncovered.
+    if (document.querySelector("main .form-card, main form.form")) closed = true;
     helpBubble.hidden = closed;
+    document.body.classList.toggle("has-help", !closed);  // room at the bottom so it never covers the last item
     helpBubble.querySelector("[data-help-close]").addEventListener("click", () => {
       helpBubble.hidden = true;
+      document.body.classList.remove("has-help");
       try { localStorage.setItem("helpBubbleClosed", "1"); } catch (error) { /* private mode */ }
     });
   }

@@ -32,9 +32,9 @@ Feature: Games
     Then they see "can't be played at Denny Field"
 
   @FR-EVT-3
-  Scenario: A game can't be bigger than the sport allows
-    When "Maya" tries to host basketball for 30 players
-    Then they see "Basketball games can have 2 to 10 players."
+  Scenario: A game can't have more than 100 players (hosts pick any number below that)
+    When "Maya" tries to host basketball for 300 players
+    Then they see "Pick 2 to 100 players"
 
   @FR-EVT-4
   Scenario: Need players goes to the top of the feed

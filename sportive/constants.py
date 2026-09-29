@@ -137,27 +137,9 @@ SPORT_LOCATIONS = {
 # Each sport's places in the same (alphabetical) order as the full list.
 SPORT_LOCATIONS = {sport: sorted(places, key=LOCATIONS.index) for sport, places in SPORT_LOCATIONS.items()}
 
-# Most players one event can have, including the host. First guesses: run
-# `flask --app main sport-stats` once people are using the app and adjust these.
-SPORT_MAX_PLAYERS = {
-    "basketball": 10,   # 5v5
-    "soccer": 22,       # 11v11
-    "football": 22,     # 11v11 (most pickup games are smaller, like 7v7 flag)
-    "volleyball": 12,   # 6v6
-    "spikeball": 8,     # 2v2 per net; room for a second net or people rotating in
-    "ultimate": 14,     # 7v7
-    "tennis": 4,        # doubles
-    "pickleball": 8,    # doubles, with people rotating in (or 2 courts)
-    "running": 20,
-    "climbing": 8,
-    "gym": 4,
-    "rowing": 10,
-    "snow": 10,
-    "hiking": 15,
-    "biking": 15,
-    "esports": 10,
-    "other": 30,
-}
+# Hosts pick how many players they need, whatever the sport (every game is different). This is only a
+# sanity limit against typos.
+MAX_PLAYERS = 100
 
 # Team vs team: the sizes that make sense for each sport (players per team). Sports that aren't played as two
 # teams (running, hiking, the gym...) aren't listed, so they don't offer team vs team at all.

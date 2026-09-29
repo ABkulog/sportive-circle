@@ -40,8 +40,8 @@ KINDS = [
     Kind("club_requests", "🙋", "People asking to join your club", "clubs", "officers"),
     Kind("suggestion_trends", "💡", "Suggestion topics 3+ people bring up", "admin", "admins"),
 ]
-PLACE_NAMES = {"bell": "the 🔔 bell", "messages": "the ✉️ icon", "friends": "the 👥 icon", "clubs": "the Clubs tab",
-               "admin": "the 🛡️ icon"}
+PLACE_NAMES = {"bell": "In the bell", "messages": "On the messages icon", "friends": "On the friends icon",
+               "clubs": "On the Clubs tab", "admin": "On the admin icon"}
 NOTICE_KINDS = ("invites", "game_updates", "account")  # saved as notices (the rest are counted)
 NOTICE_DAYS = 30  # the bell shows notices from the last month
 KIND_BY_KEY = {kind.key: kind for kind in KINDS}

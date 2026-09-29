@@ -114,7 +114,7 @@ def test_event_validation(accounts, client):
         b"can&#39;t be before now": event_form(starts_at=form_time(timedelta(hours=-2)),
                                                ends_at=form_time(timedelta(hours=1))),
         b"Please choose a location.": event_form(location="Moon"),
-        b"Basketball games can have 2 to 10 players.": event_form(players="1"),
+        b"Pick 2 to 100 players": event_form(players="1"),
     }
     for message, data in cases.items():
         assert message in client.post("/events/new", data=data).data, message
@@ -220,8 +220,10 @@ def test_login_next_cannot_redirect_offsite(accounts, client):
 
 def test_profile_edit(accounts, client):
     accounts.signup()
-    client.post("/profile/edit", data={"full_name": "Dubs II", "grad_year": "2029",
-                                       "bio": "Hoops daily", "sports": ["climbing"]})
+    step1 = client.post("/profile/edit", data={"full_name": "Dubs II", "grad_year": "2029", "bio": "Hoops daily"})
+    assert step1.headers["Location"] == "/profile/edit/sports"              # screen 2: sports
+    assert 'value="basketball" checked' in client.get("/profile/edit/sports").data.decode()  # kept from sign up
+    client.post("/profile/edit/sports", data={"sports": ["climbing"]})
     page = client.get("/me/events").data  # any page works; check the profile itself:
     with client.application.app_context():
         user_id = get_db().execute("SELECT id FROM users").fetchone()[0]
@@ -486,18 +488,22 @@ def test_sport_can_only_be_played_at_its_places(accounts, client):
 
 
 def test_every_sport_has_rules():
-    from sportive.constants import LOCATIONS, SPORT_LOCATIONS, SPORT_MAX_PLAYERS, SPORTS
-    assert set(SPORT_LOCATIONS) == set(SPORTS) == set(SPORT_MAX_PLAYERS)
+    from sportive.constants import DEFAULT_PLAYERS, LOCATIONS, SPORT_LOCATIONS, SPORTS
+    assert set(SPORT_LOCATIONS) == set(SPORTS) == set(DEFAULT_PLAYERS)
     assert all(place in LOCATIONS for places in SPORT_LOCATIONS.values() for place in places)
 
 
-def test_player_cap_per_sport(accounts, client, app):
+def test_host_picks_any_number_of_players(accounts, client, app):
+    """The user: "there shouldn't be a cap on each sport... it depends how many each person needs." """
     accounts.signup()
-    assert b"Basketball games can have 2 to 10 players." in client.post(
-        "/events/new", data=event_form(players="11")).data
+    big = event_id_from(client.post("/events/new", data=event_form(title="Big run", players="30")))  # fine for hoops
     event_id = event_id_from(client.post("/events/new", data=event_form(players="")))  # blank = the usual size
     with app.app_context():
-        assert get_db().execute("SELECT max_players FROM events WHERE id = ?", (event_id,)).fetchone()[0] == 10  # 5v5
+        sizes = dict(get_db().execute("SELECT id, max_players FROM events").fetchall())
+    assert sizes[big] == 30 and sizes[event_id] == 10                                    # 5v5 by default
+    assert b"Pick 2 to 100 players" in client.post("/events/new", data=event_form(players="101")).data
+    page = client.get("/events/new").data.decode()
+    assert 'name="players" type="number"' in page and 'max="100"' in page
 
 
 def test_quick_post_player_cap(accounts, client):
@@ -506,7 +512,7 @@ def test_quick_post_player_cap(accounts, client):
         "sport": "tennis", "location": "IMA North Tennis Courts", "skill_level": "All levels",
         "starts_in": "15", "duration": "60", "players": "5",
     }).data
-    assert b"Tennis games can have 2 to 4 players." in page
+    assert b"Pick 2 to 100 players" not in page and b"can have 2 to" not in page   # 5 for tennis is the host's call
 
 
 def test_forms_include_sport_rules(accounts, client):
@@ -1648,17 +1654,19 @@ def test_same_names_can_be_told_apart(accounts, client, app):
 def test_profile_pronouns_gender_and_socials(accounts, client, app):
     accounts.signup(name="Maya Chen")
     me = _user_id(app, "dubs@uw.edu")
-    form = {"full_name": "Maya Chen", "grad_year": "2028", "bio": "", "sports": ["soccer"], "pronouns": "she/her",
-            "gender": "woman", "instagram": "@maya.hoops", "snapchat": "", "tiktok": "", "x_handle": ""}
+    form = {"full_name": "Maya Chen", "grad_year": "2028", "bio": "", "pronouns": "she/her", "gender": "woman"}
+    socials = {"sports": ["soccer"], "instagram": "@maya.hoops", "snapchat": "", "tiktok": "", "x_handle": ""}
     client.post("/profile/edit", data=form)
+    client.post("/profile/edit/sports", data=socials)                 # screen 2: socials and sports
     page = client.get(f"/u/{me}").data.decode()
     assert "Class of 2028 · she/her · Woman" in page
     assert 'href="https://instagram.com/maya.hoops"' in page and "@maya.hoops" in page
-    bad = client.post("/profile/edit", data={**form, "instagram": "not a handle!"}, follow_redirects=True).data
-    assert b"Instagram username doesn" in bad
+    bad = client.post("/profile/edit/sports", data={**socials, "instagram": "not a handle!"}).data
+    assert b"Instagram username doesn" in bad and b'value="not a handle!"' in bad   # kept, so it can be fixed
     assert b"pick an option for gender" in client.post("/profile/edit", data={**form, "gender": "robot"},
                                                           follow_redirects=True).data
-    client.post("/profile/edit", data={**form, "pronouns": "", "gender": "", "instagram": ""})
+    client.post("/profile/edit", data={**form, "pronouns": "", "gender": ""})
+    client.post("/profile/edit/sports", data={**socials, "instagram": ""})
     page = client.get(f"/u/{me}").data.decode()
     assert "she/her" not in page and "Woman" not in page and "instagram.com" not in page   # all optional
 
@@ -2466,9 +2474,9 @@ def test_team_vs_team(accounts, client, app):
 
 def test_team_sizes_fit_the_sport(accounts, client, app):
     """Testers: "If I pick basketball, why would I play 9v9?" And "Anyone can join" next to Private made no sense."""
-    from sportive.constants import SPORT_MAX_PLAYERS, SPORT_TEAM_SIZES
+    from sportive.constants import MAX_PLAYERS, SPORT_TEAM_SIZES
     for sport, sizes in SPORT_TEAM_SIZES.items():
-        assert sizes and max(sizes) * 2 <= SPORT_MAX_PLAYERS[sport], sport
+        assert sizes and max(sizes) * 2 <= MAX_PLAYERS, sport
     accounts.signup()
     page = client.get("/events/new?sport=basketball").data.decode()
     assert "Anyone can join" not in page and ">Regular game<" in page
@@ -2490,6 +2498,25 @@ def test_open_spots_filter(accounts, client, app):
     assert "Big run" in five and "Small run" not in five
     assert "Small run" in client.get("/?scope=all&open=2").data.decode()
     assert "Small run" in client.get("/?scope=all&open=junk").data.decode()   # nonsense = no filter
+    assert "Small run" in client.get("/?scope=all&open=1").data.decode()      # "need just one more" works
+
+
+def test_full_games_have_their_own_tab(accounts, client, app):
+    """Nobody can join a full game, so the feed hides it; the Full tab still shows them."""
+    _people(accounts, app, "Maya", "Me", "Sam")
+    _as(accounts, "Maya")
+    full_id = event_id_from(client.post("/events/new", data=event_form(title="Packed run", players="2")))
+    client.post("/events/new", data=event_form(title="Roomy run", players="10"))
+    _as(accounts, "Sam")
+    client.post(f"/events/{full_id}/join")                        # Maya + Sam = 2 of 2: full
+    feed = client.get("/?scope=all").data.decode()
+    assert "Packed run" in feed and ">Full</span>" in feed           # Sam is in it: his own games always show
+    assert "Packed run" not in client.get("/?scope=full").data.decode()
+    _as(accounts, "Me")
+    feed = client.get("/?scope=all").data.decode()
+    assert "Roomy run" in feed and "Packed run" not in feed          # full: hidden from everyone else
+    full = client.get("/?scope=full").data.decode()
+    assert "Packed run" in full and "Roomy run" not in full and "Full games" in full
 
 
 def test_blocked_people_cant_party_into_your_game(accounts, client, app):
@@ -2700,12 +2727,11 @@ def test_picking_friends_counts_them_once_not_as_extra_spots(accounts, client, a
     assert b"Everyone&#39;s already coming" in full.data
 
 
-def test_players_dropdown_follows_the_sport(accounts, client):
+def test_players_start_at_the_sports_usual_size(accounts, client):
     accounts.signup()
     page = client.get("/events/new?sport=basketball").data.decode()
-    options = re.findall(r'<select name="players" data-players>(.*?)</select>', page, re.S)[0]
-    assert '<option value="10" selected>' in options and '<option value="11"' not in options   # 5v5, max 10
-    assert '"default": 10' in page                             # forms.js picks each sport's usual size
+    assert re.search(r'name="players" type="number"[^>]*value="10"', page)   # 5v5 suggested, any number allowed
+    assert '"default": 10' in page                             # forms.js suggests each sport's usual size
 
 
 def _set_gender(app, user_id, gender):
@@ -2893,9 +2919,10 @@ def test_settings_page_is_separate_from_edit_profile(accounts, client, app):
     me = _user_id(app, "dubs@uw.edu")
     assert ">Settings</a>" in client.get(f"/u/{me}").data.decode()
     page = client.get("/settings").data.decode()
-    for part in ("Edit profile", "Notifications", "Change password", "Look", "Email me an hour before", "Log out",
+    for part in ("Notifications", "Change password", "Look", "Email me an hour before", "Log out",
                  "Delete my account"):
         assert part in page, part
+    assert "/profile/edit" not in page                                 # Edit profile lives on the profile page
     edit = client.get("/profile/edit").data.decode()
     assert "Change password" not in edit and "email_reminders" not in edit and "Delete my account" not in edit
     client.post("/settings/reminders", data={})                       # switch reminder emails off
@@ -2934,7 +2961,7 @@ def test_each_notification_shows_in_one_place(accounts, client, app):
     accounts.signup()
     settings = client.get("/settings/notifications").data.decode()
     assert settings.count('class="switch"') == 9          # club requests (officers) and trends (admins) hidden
-    assert "Shows on the ✉️ icon" in settings and "Shows on the 🔔 bell" in settings
+    assert settings.count("In the bell") == 1 and "On the messages icon" in settings   # one heading per place
 
 
 def _invite_path(page):

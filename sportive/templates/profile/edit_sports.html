@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import sport_checkboxes %}
+{% block title %}Socials and sports{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('profile.edit') }}">← Edit profile</a>
+<div class="card form-card">
+  <p class="step-label">2 of 2</p>
+  <h1>Socials and sports</h1>
+  <form method="post" class="form">
+    {{ csrf_field() }}
+    <fieldset class="field">
+      <legend>Your socials <em>(optional, shown under your bio)</em></legend>
+      <div class="row row-pair">
+        {% for key, label in socials.items() %}
+          <input name="{{ key }}" maxlength="40" value="{{ form.get(key) or '' }}" placeholder="{{ label }}"
+                 aria-label="{{ label }} username" autocapitalize="off" spellcheck="false">
+        {% endfor %}
+      </div>
+    </fieldset>
+    {{ sport_checkboxes(form) }}
+    <button class="btn btn-block">Save</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% from "_macros.html" import sport_checkboxes, avatar %}
+{% from "_macros.html" import avatar %}
 {% block title %}Edit profile{% endblock %}
 {% block content %}
 <a class="back-link" href="{{ url_for('profile.view', user_id=g.user.id) }}" data-back>← Profile</a>
 <div class="card form-card">
+  <p class="step-label">1 of 2</p>
   <h1>Edit profile</h1>
   <a class="edit-photo" href="{{ url_for('profile.photo_upload') }}">
     {{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 72) }}
@@ -12,31 +13,19 @@
     {{ csrf_field() }}
     <label class="field"><span>Full name</span>
       <input name="full_name" value="{{ form.get('full_name', '') }}" required></label>
-    <label class="field"><span>Graduation year <em>(optional)</em></span>
-      <input name="grad_year" type="number" min="1950" max="{{ max_grad_year }}" value="{{ form.get('grad_year', '') }}"></label>
-    <div class="row">
+    <div class="row row-pair">
+      <label class="field"><span>Grad year <em>(optional)</em></span>
+        <input name="grad_year" type="number" min="1950" max="{{ max_grad_year }}" value="{{ form.get('grad_year', '') }}"></label>
       <label class="field"><span>Pronouns <em>(optional)</em></span>
         <input name="pronouns" maxlength="20" value="{{ form.get('pronouns', '') }}" placeholder="she/her"></label>
-      <label class="field"><span>Gender <em>(optional, only used for games open to women or men)</em></span>
-        <select name="gender">
-          {% for value, label in genders.items() %}<option value="{{ value }}" {% if form.get('gender', '') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
-        </select></label>
     </div>
+    <label class="field"><span>Gender <em>(optional, only for women's or men's games)</em></span>
+      <select name="gender">
+        {% for value, label in genders.items() %}<option value="{{ value }}" {% if form.get('gender', '') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select></label>
     <label class="field"><span>Bio <em>(optional)</em></span>
       <textarea name="bio" maxlength="300" rows="3" placeholder="Always down for pickup hoops">{{ form.get('bio', '') }}</textarea></label>
-    <fieldset class="field socials-field">
-      <legend>Your socials <em>(optional, shown under your bio)</em></legend>
-      <div class="row">
-        {% for key, label in socials.items() %}
-          <label class="field"><span>{{ label }}</span>
-            <input name="{{ key }}" maxlength="40" value="{{ form.get(key, '') }}" placeholder="@username" autocapitalize="off" spellcheck="false"></label>
-        {% endfor %}
-      </div>
-    </fieldset>
-    {{ sport_checkboxes(form) }}
-    <button class="btn btn-block">Save</button>
+    <button class="btn btn-block">Next</button>
   </form>
 </div>
-
-<p class="center"><a href="{{ url_for('settings.home') }}">Notifications, look, password and your account are in Settings</a></p>
 {% endblock %}

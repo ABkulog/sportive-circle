@@ -598,8 +598,9 @@ def host_day_long(world, host):
 @when(parsers.parse('"{name}" adds her Instagram "{handle}" and the pronouns "{pronouns}"'))
 def add_socials(world, name, handle, pronouns):
     person = world.person(name)
-    world.saw(person.client.post("/profile/edit", data={
-        "full_name": person.name, "grad_year": "", "bio": "", "pronouns": pronouns, "gender": "",
+    person.client.post("/profile/edit", data={"full_name": person.name, "grad_year": "", "bio": "",
+                                              "pronouns": pronouns, "gender": ""})
+    world.saw(person.client.post("/profile/edit/sports", data={
         "instagram": handle, "snapchat": "", "tiktok": "", "x_handle": ""}, follow_redirects=True), person.client)
 
 

@@ -67,15 +67,14 @@
 {% macro players_block(form, friends=None, event=None) %}
   {# Players = everyone who can play, you included. "Who's coming?" = the friends already in: picked from the
      app (their spots are held, or they're invited if it's private) or just counted if they aren't on the app.
-     forms.js keeps the dropdown to the sport's limit and writes "You + 2 friends = 3 of 10 · need 7 more". #}
+     The host picks any number (every game is different); a new sport starts at its usual size.
+     forms.js writes "You + 2 friends = 3 of 10 · need 7 more". #}
   {% set sport = form.get('sport', '') %}
-  {% set cap = SPORT_MAX_PLAYERS.get(sport, 30) %}
   {% set chosen = (form.get('players') or DEFAULT_PLAYERS.get(sport, 10))|string %}
   {% set team_game = event.team_size if event else form.get('team_size') %}
   <label class="field" data-show="regular" {% if team_game %}hidden{% endif %}><span>Players <em>(including you)</em></span>
-    <select name="players" data-players>
-      {% for n in range(2, cap + 1) %}<option value="{{ n }}" {% if chosen == n|string %}selected{% endif %}>{{ n }}</option>{% endfor %}
-    </select></label>
+    <input name="players" type="number" inputmode="numeric" min="2" max="{{ MAX_PLAYERS }}" value="{{ chosen }}"
+           required data-players></label>
   {% if not event %}
     {% set private = form.get('is_private') == '1' %}
     <fieldset class="field who-coming">
