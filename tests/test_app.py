@@ -1922,6 +1922,37 @@ def test_empty_chat_shows_a_real_empty_state(accounts, client):
     assert "Say hi!" not in closed and "No messages." in closed      # a closed chat doesn't invite a message
 
 
+def test_deleting_a_host_keeps_the_games_other_people_played(accounts, client, app):
+    from sportive.timeutil import to_db
+    accounts.signup(email="host@uw.edu")
+    played = event_id_from(client.post("/events/new", data=event_form(title="Last week's run")))
+    alone = event_id_from(client.post("/events/new", data=event_form(title="Nobody came")))
+    upcoming = event_id_from(client.post("/events/new", data=event_form(title="Next week's run")))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    client.post(f"/events/{played}/join")
+    client.post(f"/events/{upcoming}/join")
+    with app.app_context():
+        db = get_db()
+        past = now_local() - timedelta(days=7)
+        db.execute("UPDATE events SET starts_at = ?, ends_at = ? WHERE id IN (?, ?)",
+                   (to_db(past), to_db(past + timedelta(hours=1)), played, alone))
+        db.commit()
+    accounts.logout()
+    accounts.login(email="host@uw.edu")
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
+    with app.app_context():
+        db = get_db()
+        left = {row[0] for row in db.execute("SELECT id FROM events")}
+        assert left == {played}                           # history kept; the rest goes with the account
+        former = db.execute("SELECT u.email, u.verified FROM events e JOIN users u ON u.id = e.host_id").fetchone()
+        assert former["email"] == "former-member@sportive.invalid" and former["verified"] == 0
+    accounts.login(email="player@uw.edu")
+    assert "Last week&#39;s run" in client.get("/me/events").data.decode()
+    assert client.get(f"/events/{played}").status_code == 200
+    assert b"Former member" not in client.get("/friends?q=Former").data
+
+
 def test_only_officer_cant_delete_account(accounts, client, app):
     club = _approved_club(accounts, client, app)
     accounts.signup(email="fan@uw.edu")

@@ -310,6 +310,7 @@ def change_password():
 
 
 CONFIRM_WORD = "DELETE"
+FORMER_MEMBER_EMAIL = "former-member@sportive.invalid"  # not @uw.edu, so nobody can sign up as it
 
 
 def what_you_would_lose(user_id):
@@ -346,6 +347,23 @@ def clubs_that_go_with_me(user_id):
     return get_db().execute(SOLE_OFFICER.format("NOT"), (user_id,)).fetchall()
 
 
+def keep_games_other_people_played(user_id):
+    """Finished games this person hosted are part of everyone else's history (Past games, badges,
+    Top Dawgs), so they're handed to a hidden "Former member" account instead of being deleted.
+    That account is unverified with no usable password, so it can't log in or show up anywhere."""
+    db = get_db()
+    played = """host_id = :me AND cancelled = 0 AND ends_at < :now
+                AND EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = events.id AND r.user_id != :me)"""
+    params = {"me": user_id, "now": to_db(now_local())}
+    if not db.execute(f"SELECT 1 FROM events WHERE {played}", params).fetchone():
+        return
+    row = db.execute("SELECT id FROM users WHERE email = ?", (FORMER_MEMBER_EMAIL,)).fetchone()
+    params["former"] = row["id"] if row else db.execute(
+        "INSERT INTO users (email, password_hash, full_name, verified) VALUES (?, '!', 'Former member', 0)",
+        (FORMER_MEMBER_EMAIL,)).lastrowid
+    db.execute(f"UPDATE events SET host_id = :former WHERE {played}", params)
+
+
 @bp.route("/profile/delete", methods=("GET", "POST"))
 @login_required
 def delete_account():
@@ -372,7 +390,8 @@ def delete_account():
     db = get_db()
     for club in clubs_that_go_with_me(g.user["id"]):
         db.execute("DELETE FROM clubs WHERE id = ?", (club["id"],))
-    # ON DELETE CASCADE (schema.sql) also removes your sports, RSVPs and hosted events.
+    keep_games_other_people_played(g.user["id"])
+    # ON DELETE CASCADE (schema.sql) also removes your sports, RSVPs and the rest of your hosted events.
     db.execute("DELETE FROM users WHERE id = ?", (g.user["id"],))
     db.commit()
     session.clear()
