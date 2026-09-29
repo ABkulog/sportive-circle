@@ -12,7 +12,7 @@ from itsdangerous import BadSignature, URLSafeSerializer
 
 from .auth import login_required
 from .db import get_db
-from .events import event_title, get_event, query_events, spots_left, try_join
+from .events import event_title, get_event, not_for_me, query_events, spots_left, try_join
 from .links import public_url
 from .invites import HOLD_TIME, MAX_PARTY, held_spots, hold_spots, my_invite, now_param, team_counts
 from .notifications import notify
@@ -62,6 +62,11 @@ def _party_plan(event):
     mine = get_db().execute("SELECT team FROM rsvps WHERE event_id = ? AND user_id = ?",
                             (event["id"], me)).fetchone()
     invite = None if mine else my_invite(event["id"], me)
+    if not mine:  # joining now: the same rules as the Join button
+        if not_for_me(event):
+            return None, False, not_for_me(event)
+        if event["members_only"] and not event["i_am_member"]:
+            return None, False, f"This event is for {event['club_name']} members."
     if event["team_size"]:
         if mine:
             return mine["team"], False, None

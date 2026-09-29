@@ -2871,6 +2871,23 @@ def test_games_can_be_open_to_a_group_like_uw_rec_hours(accounts, client, app):
     assert client.post(f"/events/{women}/players/{ids['Maya']}/remove").status_code == 403   # only the host
 
 
+def test_party_up_cant_get_around_who_a_game_is_for(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Mo", "Pal")
+    _set_gender(app, ids["Maya"], "woman")
+    _set_gender(app, ids["Mo"], "man")
+    _friends(app, ids["Mo"], ids["Pal"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(
+        open_to="women", sport="gym", location="IMA (Intramural Activities Building)", players="4")))
+    _as(accounts, "Mo")
+    assert b"This game is for women." in client.get(f"/events/{game}/party", follow_redirects=True).data
+    client.post(f"/events/{game}/party", data={"friend": [ids["Pal"]]})
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (game, ids["Mo"])).fetchone() is None
+        assert db.execute("SELECT COUNT(*) FROM invites WHERE event_id = ?", (game,)).fetchone()[0] == 0
+
+
 def test_private_games_are_open_to_whoever_the_host_invites(accounts, client, app):
     accounts.signup()
     game = event_id_from(client.post("/events/new", data=event_form(is_private="1", password="dawgs1234",
