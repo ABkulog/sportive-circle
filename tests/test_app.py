@@ -2349,6 +2349,14 @@ def test_fine_print_has_a_style():
     assert _css_classes_used_but_undefined(["fine-print"]) == []
 
 
+def test_long_unbroken_titles_wrap_instead_of_widening_the_page():
+    import pathlib
+    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
+    assert "h1, h2, h3 { line-height: 1.2; margin: 0 0 .5rem; overflow-wrap: break-word; }" in css
+    for rule in (".event-title {", ".club-name {"):
+        assert "overflow-wrap: anywhere" in css.split(rule, 1)[1].split("}", 1)[0], rule
+
+
 def test_templates_dont_use_class_names_with_no_style():
     import pathlib
     templates = " ".join(p.read_text(encoding="utf-8") for p in pathlib.Path("sportive/templates").rglob("*.html"))

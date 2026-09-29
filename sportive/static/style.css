@@ -105,7 +105,7 @@ body {
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
-h1, h2, h3 { line-height: 1.2; margin: 0 0 .5rem; }
+h1, h2, h3 { line-height: 1.2; margin: 0 0 .5rem; overflow-wrap: break-word; }
 h1 { font-family: var(--display); font-weight: 800; font-size: 1.6rem; letter-spacing: .005em; color: var(--heading); }
 h2 { font-size: 1.05rem; font-weight: 700; }
 h3 { font-size: .95rem; font-weight: 700; }
@@ -396,7 +396,7 @@ section.card h2, details.card h2 { margin-top: 0; }
   display: grid; place-items: center; font-size: 1.45rem; }
 .event-emoji.big { width: 60px; height: 60px; font-size: 1.9rem; }
 .event-body { flex: 1; min-width: 0; }
-.event-title { display: block; font-weight: 650; color: var(--text); line-height: 1.3; }
+.event-title { display: block; font-weight: 650; color: var(--text); line-height: 1.3; overflow-wrap: anywhere; }
 .event-link::after { content: ""; position: absolute; inset: 0; }  /* whole row is tappable */
 .event-link:hover { text-decoration: none; }
 .event-card:hover .event-title { text-decoration: underline; }
@@ -643,7 +643,7 @@ form[data-wizard] .form-step { display: none; }
 .club-share-row .icon { width: 18px; height: 18px; vertical-align: -3px; }
 .club-logo-wrap { display: grid; justify-items: center; gap: 4px; flex: none; }
 .logo-edit { display: inline-block; padding: 8px 6px; font-size: .8rem; font-weight: 600; }
-.club-name { font-weight: 700; }
+.club-name { font-weight: 700; overflow-wrap: anywhere; }
 .club-desc { font-size: .88rem; }
 .club-search { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
 .club-hero { border: 0; padding: 0; }
