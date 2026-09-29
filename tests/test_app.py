@@ -2154,6 +2154,14 @@ def test_error_flashes_interrupt_screen_readers(accounts, client):
     assert '<div class="flash flash-error" role="alert">Wrong email or password.</div>' in page
 
 
+def test_wrong_password_keeps_the_email_and_focuses_the_password(accounts, client):
+    accounts.signup()
+    accounts.logout()
+    page = accounts.login(password="wrong-password").data.decode()
+    assert 'value="dubs@uw.edu"' in page
+    assert re.search(r'name="password"[^>]*autofocus', page)
+
+
 def test_error_page_shows_the_specific_reason(client, app):
     from flask import abort
 

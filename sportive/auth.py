@@ -389,7 +389,8 @@ def login():
             return redirect(url_for("auth.verify"))
         else:
             return redirect(log_in(user, remember=request.form.get("remember") == "1"))
-    return render_template("auth/login.html", next_url=next_url)
+    return render_template("auth/login.html", next_url=next_url,
+                           email=request.form.get("email", "").strip()[:254])
 
 
 # --------------------------------------------------------- forgot password

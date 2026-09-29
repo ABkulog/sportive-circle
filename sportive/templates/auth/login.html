@@ -8,9 +8,9 @@
     {{ csrf_field() }}
     <input type="hidden" name="next" value="{{ next_url }}">
     <label class="field"><span>UW email</span>
-      <input name="email" type="email" placeholder="netid@uw.edu" autocomplete="email" required autofocus></label>
+      <input name="email" type="email" value="{{ email }}" placeholder="netid@uw.edu" autocomplete="email" required{% if not email %} autofocus{% endif %}></label>
     <label class="field"><span>Password</span>
-      <input name="password" type="password" autocomplete="current-password" required></label>
+      <input name="password" type="password" autocomplete="current-password" required{% if email %} autofocus{% endif %}></label>
     <div class="login-extras">
       <label class="check"><input type="checkbox" name="remember" value="1" checked> Remember me</label>
       <a class="field-link" href="{{ url_for('auth.forgot_password') }}">Forgot password?</a>
