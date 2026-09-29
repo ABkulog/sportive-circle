@@ -1889,6 +1889,17 @@ def test_only_officer_cant_delete_account(accounts, client, app):
         assert get_db().execute("SELECT COUNT(*) FROM users WHERE email = 'captain@uw.edu'").fetchone()[0] == 1
 
 
+def test_make_officer_only_reports_success_when_it_worked(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu")
+    client.post(f"/clubs/{club}/follow")               # a follower, not a member
+    fan = _user_id(app, "fan@uw.edu")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    page = client.post(f"/clubs/{club}/officers/{fan}", follow_redirects=True).data.decode()
+    assert "Only confirmed members can be made officers" in page and "officer now" not in page
+
+
 def test_pending_club_doesnt_block_deleting_the_account(accounts, client, app):
     accounts.signup(email="captain@uw.edu")
     client.post("/clubs/new", data=CLUB)

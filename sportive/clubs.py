@@ -602,10 +602,16 @@ def make_officer(club_id, user_id):
     if my_role(club_id) != "officer":
         abort(403)
     db = get_db()
-    db.execute("UPDATE club_members SET role = 'officer' WHERE club_id = ? AND user_id = ? AND role = 'member'",
-               (club_id, user_id))
+    changed = db.execute("UPDATE club_members SET role = 'officer' WHERE club_id = ? AND user_id = ? AND role = 'member'",
+                         (club_id, user_id)).rowcount
+    if changed:
+        club = get_club(club_id)
+        _dm(g.user["id"], user_id, f"⭐ You're now an officer of {club['name']}. You can edit the club, post updates "
+                                   f"and confirm new members. {_club_link(club_id)}")
+        flash("They're an officer now.", "success")
+    else:
+        flash("Only confirmed members can be made officers. They may have left the club.", "error")
     db.commit()
-    flash("They're an officer now.", "success")
     return redirect(url_for("clubs.view", club_id=club_id) + "#members")
 
 
