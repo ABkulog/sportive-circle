@@ -128,7 +128,7 @@
       <ul class="people officer-list">
         {% for o in officers %}
           <li class="post-game-row">
-            <a class="person" href="{{ url_for('profile.view', user_id=o.id) }}">{{ avatar(o.id, o.full_name, o.avatar_updated, 32) }}<span>{{ o.full_name }}<small class="muted person-extra">Officer</small></span></a>
+            <a class="person" href="{{ url_for('profile.view', user_id=o.id) }}">{{ avatar(o.id, o.full_name, o.avatar_updated, 32) }}<span>{{ o.full_name }}<small class="muted person-extra">{{ 'Owner' if o.id == club.created_by else 'Officer' }}</small></span></a>
             {% if o.id != g.user.id %}<a class="btn btn-small btn-ghost" href="{{ url_for('social.thread', user_id=o.id) }}">Message</a>{% endif %}
           </li>
         {% endfor %}

@@ -6,16 +6,21 @@
 <div class="card form-card">
   <h1>Officers</h1>
   <p class="muted">Officers can edit the club, post updates, make club events and confirm new members.
-    Only you (you registered {{ club.name }}) can add or remove officers.</p>
+    Only the owner (you) can add or remove officers, or hand the club to another officer with <strong>Make owner</strong>.</p>
 
   <ul class="people officer-admin">
     {% for o in officers %}
       <li class="post-game-row">
-        <a class="person" href="{{ url_for('profile.view', user_id=o.id) }}">{{ avatar(o.id, o.full_name, o.avatar_updated, 36) }}<span>{{ o.full_name }}<small class="muted person-extra">{{ 'Registered the club' if o.id == club.created_by else o.email }}</small></span></a>
+        <a class="person" href="{{ url_for('profile.view', user_id=o.id) }}">{{ avatar(o.id, o.full_name, o.avatar_updated, 36) }}<span>{{ o.full_name }}<small class="muted person-extra">{{ 'Owner' if o.id == club.created_by else o.email }}</small></span></a>
         {% if o.id != club.created_by %}
-          <form method="post" data-confirm="Take officer rights away from {{ o.full_name }}? They stay a member.">
-            {{ csrf_field() }}<input type="hidden" name="user" value="{{ o.id }}"><input type="hidden" name="action" value="remove">
-            <button class="link-button danger-link">Remove officer</button></form>
+          <span class="officer-actions">
+            <form method="post" data-confirm="Make {{ o.full_name }} the owner of {{ club.name }}? They'll manage officers instead of you. You stay an officer.">
+              {{ csrf_field() }}<input type="hidden" name="user" value="{{ o.id }}"><input type="hidden" name="action" value="owner">
+              <button class="link-button">Make owner</button></form>
+            <form method="post" data-confirm="Take officer rights away from {{ o.full_name }}? They stay a member.">
+              {{ csrf_field() }}<input type="hidden" name="user" value="{{ o.id }}"><input type="hidden" name="action" value="remove">
+              <button class="link-button danger-link">Remove officer</button></form>
+          </span>
         {% else %}
           <span class="badge badge-purple">Owner</span>
         {% endif %}
