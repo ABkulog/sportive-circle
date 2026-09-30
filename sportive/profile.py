@@ -392,6 +392,9 @@ def delete_account():
         db.execute("DELETE FROM clubs WHERE id = ?", (club["id"],))
     keep_games_other_people_played(g.user["id"])
     # ON DELETE CASCADE (schema.sql) also removes your sports, RSVPs and the rest of your hosted events.
+    # These two are kept by email address, not account, so they go by hand.
+    db.execute("DELETE FROM login_failures WHERE email = ?", (g.user["email"],))
+    db.execute("DELETE FROM email_codes WHERE inbox = ?", (g.user["email"].split("@")[0],))
     db.execute("DELETE FROM users WHERE id = ?", (g.user["id"],))
     db.commit()
     session.clear()

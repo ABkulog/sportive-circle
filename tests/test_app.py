@@ -4944,3 +4944,20 @@ def test_being_blocked_or_suspended_clears_their_messages_from_my_inbox(accounts
     client.post(f"/messages/{ids['Sam']}", data={"body": "still there?"})
     with app.app_context():
         assert not get_db().execute("SELECT 1 FROM direct_messages WHERE recipient_id = ?", (ids["Sam"],)).fetchone()
+
+
+def test_deleting_an_account_clears_its_login_and_code_records(accounts, client, app):
+    accounts.signup()
+    accounts.logout()
+    client.post("/login", data={"email": "dubs@uw.edu", "password": "wrong-password"})
+    accounts.login()
+    client.post("/login", data={"email": "dubs@uw.edu", "password": "wrong-again"})   # logged in: ignored
+    with app.app_context():
+        get_db().execute("INSERT INTO login_failures (ip, email, failed_at) VALUES ('1.2.3.4', 'dubs@uw.edu', ?)",
+                         (to_db(now_local()),))
+        get_db().commit()
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
+    with app.app_context():
+        db = get_db()
+        assert not db.execute("SELECT 1 FROM login_failures WHERE email = 'dubs@uw.edu'").fetchone()
+        assert not db.execute("SELECT 1 FROM email_codes WHERE inbox = 'dubs'").fetchone()

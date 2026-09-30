@@ -224,11 +224,14 @@
   const photoInput = document.getElementById("photo-input");
   const photoPreview = document.getElementById("photo-preview");
   if (photoInput && photoPreview) {
+    let previewUrl = null;
     photoInput.addEventListener("change", () => {
       const file = photoInput.files[0];
       if (!file) return;
+      if (previewUrl) URL.revokeObjectURL(previewUrl);  // the last pick's copy isn't needed anymore
+      previewUrl = URL.createObjectURL(file);
       const image = new Image();
-      image.src = URL.createObjectURL(file);
+      image.src = previewUrl;
       image.alt = "";
       image.className = "avatar-img";
       image.style.setProperty("--size", "150px");

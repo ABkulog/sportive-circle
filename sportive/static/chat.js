@@ -18,6 +18,7 @@
       avatar.className = "chat-avatar";
       avatar.href = message.profile;
       avatar.tabIndex = -1;
+      avatar.setAttribute("aria-label", message.name ? `${message.name}'s profile` : "Profile");
       if (message.avatar) {
         const image = document.createElement("img");
         image.src = message.avatar;
