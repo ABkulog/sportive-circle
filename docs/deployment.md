@@ -121,14 +121,16 @@ A new `SECRET_KEY` logs everyone out once and turns off invite links that were a
 
 ## 5. Backups
 
-The whole app is one file: `sportive_circle.db` on the disk. Render snapshots paid disks every day
-automatically (Dashboard → your service → Disks). For an extra copy, from the service's **Shell** tab:
+The whole app is one file: `sportive_circle.db` on the disk.
 
-```bash
-sqlite3 /data/sportive_circle.db ".backup '/data/backups/sportive-$(date +%F).db'"
-```
+- **Every day, automatically:** the app copies it to `/data/backups/sportive-YYYY-MM-DD.db` and keeps the
+  last 7 days (`sportive/backups.py`, run by the same background loop as reminders). Nothing to set up.
+- **Before a risky change**, make one right away from the service's **Shell** tab: `flask --app wsgi backup`
+- **Render's disk snapshots** (Dashboard → your service → Disks) protect against losing the disk itself,
+  which the daily copies (on the same disk) can't. Keep them on.
+- Now and then, download a copy somewhere off the server.
 
-Keep a few days of copies, and copy them somewhere off the server now and then.
+To restore: stop the service, copy a backup over `/data/sportive_circle.db`, start it again.
 
 ## 6. After launch
 

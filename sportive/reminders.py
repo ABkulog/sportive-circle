@@ -16,6 +16,7 @@ import click
 from flask import Blueprint, abort, current_app, jsonify, request
 from flask.cli import with_appcontext
 
+from .backups import backup_round
 from .constants import SPORTS
 from .db import get_db
 from .mail import compose, send_email
@@ -117,11 +118,13 @@ def reminder_round(app):
 
 
 def start_reminder_loop(app):
-    """Check for due reminders every few minutes in the background, for as long as the site runs."""
+    """Check for due reminders every few minutes in the background, for as long as the site runs
+    (and make the day's database backup, backups.py)."""
     def loop():
         time.sleep(random.uniform(30, 90))  # let the site finish starting; the copies don't all check at once
         while True:
             reminder_round(app)
+            backup_round(app)  # once a day; a quick "already done today?" check otherwise
             time.sleep(CHECK_EVERY.total_seconds())
 
     threading.Thread(target=loop, name="reminders", daemon=True).start()

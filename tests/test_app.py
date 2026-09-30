@@ -5042,3 +5042,24 @@ def test_first_day_fixes(accounts, client, app):
     client.post("/clubs/new", data=CLUB)
     page = client.get(f"/clubs/{_club_id(app, CLUB['name'])}").data.decode()
     assert "once the club is verified" in page and "Post an update" not in page
+
+
+def test_daily_database_backup(accounts, app, tmp_path, monkeypatch):
+    import sqlite3
+    from sportive import backups
+    accounts.signup()
+    app.config["BACKUP_DIR"] = str(tmp_path / "backups")
+    with app.app_context():
+        first = backups.make_backup()
+        assert first and first.endswith(f"sportive-{now_local():%Y-%m-%d}.db")
+        assert backups.make_backup() is None                             # once a day
+        copy = sqlite3.connect(first)
+        assert copy.execute("SELECT email FROM users").fetchone()[0] == "dubs@uw.edu"   # a real, readable copy
+        copy.close()
+        for day in range(1, 10):                                         # older copies from past days
+            (tmp_path / "backups" / f"sportive-2026-01-{day:02d}.db").write_bytes(b"old")
+        backups.remove_old_backups(str(tmp_path / "backups"))
+        kept = sorted(p.name for p in (tmp_path / "backups").iterdir())
+        assert len(kept) == backups.KEEP and kept[-1] == first.rsplit("/", 1)[1]
+        (tmp_path / "backups" / f"sportive-{now_local():%Y-%m-%d}.db.lock").write_bytes(b"")
+        assert backups.make_backup(force=True) is None                   # the other copy of the site is on it
