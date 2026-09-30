@@ -4984,3 +4984,34 @@ def test_club_decisions_made_twice_at_once_only_apply_once(accounts, client, app
     with app.app_context():
         assert get_db().execute("SELECT status FROM clubs WHERE id = ?", (club,)).fetchone()[0] == "approved"
     assert len(emails) == 1
+
+
+def test_texting_failures_are_handled(accounts, client, app, monkeypatch):
+    """Twilio errors never break a page: a STOP reply turns texts off, other failures are logged and explained."""
+    from sportive import sms
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+
+    def fail(code):
+        def send(to, body):
+            raise sms.SmsError(code, "failed")
+        return send
+    monkeypatch.setattr(sms, "send_sms", fail(30003))                  # e.g. an unreachable number
+    page = client.post("/settings/texts", data={"action": "send", "phone": "206-555-0142", "consent": "1"},
+                       follow_redirects=True).data.decode()
+    assert "couldn&#39;t text that number" in page
+    monkeypatch.setattr(sms, "send_sms", fail(sms.OPTED_OUT))
+    with app.app_context():
+        get_db().execute("UPDATE users SET sms_sent_at = NULL WHERE id = ?", (me,))   # past the one-minute wait
+        get_db().commit()
+    page = client.post("/settings/texts", data={"action": "send", "phone": "206-555-0142", "consent": "1"},
+                       follow_redirects=True).data.decode()
+    assert "replied STOP" in page
+    with app.app_context():                                            # a confirmed number that later replies STOP
+        db = get_db()
+        db.execute("UPDATE users SET phone = '+12065550142', phone_verified = 1, sms_updates = 1 WHERE id = ?", (me,))
+        db.commit()
+        assert sms.text_user(me, "Game moved") is False
+        assert db.execute("SELECT sms_updates FROM users WHERE id = ?", (me,)).fetchone()[0] == 0   # respected
+        monkeypatch.setattr(sms, "send_sms", fail(500))
+        assert sms.text_code(me, "123456", "password reset") is False  # never raises
