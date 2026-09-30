@@ -851,7 +851,11 @@ def detail(event_id):
                         "held": held_spots(event_id, team=team)} for team in (1, 2)}
     my_rsvp = get_db().execute("SELECT remind_minutes FROM rsvps WHERE event_id = ? AND user_id = ?",
                                (event_id, me)).fetchone()
+    # The "put it on your home screen" card: only on the first game they ever joined (Home has it too).
+    first_game = get_db().execute("SELECT event_id FROM rsvps WHERE user_id = ? ORDER BY created_at, event_id LIMIT 1",
+                                  (me,)).fetchone()
     return render_template("events/detail.html", event=event, attendees=attendees, inside=inside,
+                           first_game=bool(first_game) and first_game["event_id"] == event_id,
                            my_reminder=my_rsvp["remind_minutes"] if my_rsvp else None, remind_choices=REMIND_CHOICES,
                            ended=from_db(event["ends_at"]) < now_local(),
                            share_url=public_url("events.detail", event_id=event_id),

@@ -24,7 +24,7 @@ from .notifications import mark_seen
 from .phones import phone_from_form
 from .photos import make_avatar
 from .sms import text_user
-from .textutil import fold, multi_line, one_line
+from .textutil import fold, multi_line, one_line, social_handle
 from .timeutil import from_db, now_local, to_db
 
 bp = Blueprint("clubs", __name__)
@@ -158,7 +158,7 @@ def read_club_form(form, club_id=None, phone_on_file=""):
     data.update({key: get(key) for key in ("description", "how_to_join")})
     for key in SOCIALS:
         value = get(key)
-        data[key] = value if value.startswith("https://") else value.lstrip("@")
+        data[key] = value if key in ("facebook", "youtube") else social_handle(key, value)  # those two: a link
     data["competes"] = 1 if form.get("competes") else 0
     typed_phone = form.get("contact_phone", "").strip()
     data["contact_phone"] = (phone_from_form(form.get("contact_phone_country"), typed_phone) or ""

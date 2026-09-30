@@ -17,7 +17,7 @@ from .badges import (GIVEN_BADGES, ROLE_BADGES, SHOWCASE_SLOTS, TESTER, catalog,
 from .clubs import SOCIALS
 from .moderation import admin_required, is_admin
 from .notifications import mark_seen, notify
-from .textutil import has_a_letter, multi_line, one_line, person_name
+from .textutil import has_a_letter, multi_line, one_line, person_name, social_handle
 from .social import can_message, friendship_status, i_blocked, is_blocked_between
 from .timeutil import now_local, to_db
 
@@ -43,12 +43,12 @@ def person_socials(user):
 
 
 def clean_social(key, value):
-    """What people type or paste -> just the username. LinkedIn: a pasted profile link works too."""
+    """What people type or paste -> just the username. A pasted profile link works too."""
     value = one_line(value).strip()
     if key == "linkedin":
         value = re.sub(r"^(https?://)?([a-z]{2,3}\.)?linkedin\.com/in/", "", value, flags=re.I).strip("/")
         return value.split("?")[0].split("/")[0]
-    return value.lstrip("@")
+    return social_handle(key, value)
 
 # Pages you can still open before adding a profile picture.
 ALLOWED_WITHOUT_PHOTO = {"auth.signup_number", "profile.photo_upload", "profile.photo_skip", "profile.photo", "profile.delete_account",

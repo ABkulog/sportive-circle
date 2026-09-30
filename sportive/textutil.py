@@ -1,4 +1,5 @@
 """Small text helpers for things people type."""
+import re
 import secrets
 import unicodedata
 
@@ -65,3 +66,18 @@ def same_secret(sent, expected):
 def typed_code(text):
     """A 6-digit code as typed: full-width digits from Chinese/Japanese keyboards become 0-9."""
     return unicodedata.normalize("NFKC", text or "").strip()
+
+
+HANDLE_SITES = {"instagram": r"instagram\.com", "tiktok": r"tiktok\.com", "snapchat": r"snapchat\.com/add",
+                "x_handle": r"(x|twitter)\.com"}
+
+
+def social_handle(key, value):
+    """A username as people really type or paste it: "@maya", "instagram.com/maya", or
+    "https://www.instagram.com/maya/?hl=en" -> "maya"."""
+    value = one_line(value).strip()
+    site = HANDLE_SITES.get(key)
+    if site:
+        value = re.sub(rf"^(https?://)?(www\.|m\.)?{site}/", "", value, flags=re.I)
+        value = value.split("?")[0].split("#")[0].strip("/").split("/")[0]
+    return value.lstrip("@")

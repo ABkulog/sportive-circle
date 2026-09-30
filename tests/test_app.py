@@ -5282,6 +5282,8 @@ def test_youre_in_screen_after_sign_up(accounts, client, app):
     assert 'data-next="/"' in client.get("/welcome?next=https://evil.example").data.decode()   # never off-site
     game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
     assert "Want your games one tap away?" in client.get(f"/events/{game}").data.decode()
+    second = event_id_from(client.post("/events/new", data=event_form(title="More hoops")))
+    assert "Want your games one tap away?" not in client.get(f"/events/{second}").data.decode()   # first game only
 
 
 def test_log_in_or_reset_with_either_uw_address(accounts, client, app):
@@ -5296,3 +5298,13 @@ def test_log_in_or_reset_with_either_uw_address(accounts, client, app):
     client.post("/forgot", data={"email": "DUBS@u.washington.edu"})
     with app.app_context():
         assert get_db().execute("SELECT verify_code FROM users WHERE email = 'dubs@uw.edu'").fetchone()[0]
+
+
+def test_pasted_social_links_become_usernames(accounts, client, app):
+    accounts.signup()
+    client.post("/profile/edit/sports", data={"instagram": "https://www.instagram.com/maya.hoops/?hl=en",
+                                              "tiktok": "tiktok.com/@maya", "x_handle": "twitter.com/maya",
+                                              "sports": ["basketball"]})
+    with app.app_context():
+        row = get_db().execute("SELECT instagram, tiktok, x_handle FROM users").fetchone()
+    assert (row["instagram"], row["tiktok"], row["x_handle"]) == ("maya.hoops", "maya", "maya")
