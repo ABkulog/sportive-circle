@@ -5240,3 +5240,18 @@ def test_logging_in_from_a_club_page_comes_back_to_it(accounts, client, app):
     assert f"next=%2Fclubs%2F{club}" in login or f"next=/clubs/{club}" in login
     assert client.post(login, data={"email": "fan@uw.edu", "password": "purple-and-gold"}).headers["Location"] \
         == f"/clubs/{club}"
+
+
+def test_place_check_hides_members_only_games_from_outsiders(accounts, client, app):
+    club = _club_with_member(accounts, client, app)
+    form = event_form(title="Secret practice", sport="spikeball", location="The Quad", is_private="members",
+                      club=str(club))
+    game = event_id_from(client.post(f"/events/new?club={club}", data=form))
+    with app.app_context():
+        e = get_db().execute("SELECT location, starts_at, ends_at FROM events WHERE id = ?", (game,)).fetchone()
+    accounts.logout()
+    accounts.signup(email="outsider@uw.edu", name="Out Sider")
+    found = client.get("/events/place-check", query_string={
+        "location": e["location"], "starts_at": e["starts_at"][:16].replace(" ", "T"),
+        "ends_at": e["ends_at"][:16].replace(" ", "T")}).get_json()
+    assert found["games"] and all("Secret practice" not in g["title"] and g["going"] is None for g in found["games"])

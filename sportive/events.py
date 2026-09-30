@@ -337,7 +337,7 @@ def feed():
     need_players = [] if filtering else [
         e for e in query_events(
             ["e.cancelled = 0", "e.is_quick = 1", "e.ends_at >= :now", "e.starts_at <= :soon", NOT_BLOCKED,
-             games_open_to_me(),
+             games_open_to_me(), MEMBERS_ONLY_FOR_MEMBERS,
              # a game well under way isn't a call for players any more (unless it's yours to find)
              "(e.starts_at >= :late OR EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me))",
              # a private post isn't a call to everyone: only its players and invited friends see it up top

@@ -298,6 +298,15 @@
     });
   }
 
+  // "⋯" menus (<details class="more-menu">): Esc closes the open one and puts focus back on its button.
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    const open = document.querySelector("details.more-menu[open]");
+    if (!open) return;
+    open.open = false;
+    open.querySelector("summary").focus();
+  });
+
   // <form data-autosave>: each switch saves the moment it's flipped, in the background (no reload, no jump
   // back to the top). If that fails, the form is sent the normal way.
   document.querySelectorAll("form[data-autosave]").forEach((form) => {

@@ -52,17 +52,16 @@ def rec_reservations(location, starts, ends):
 
 def games_at(location, starts, ends, exclude=None):
     """Other Sportive Circle games at this place overlapping starts-ends. Private games only show as
-    'a private game' (their details are for the people in them)."""
-    from .events import event_title, query_events  # events.py imports this module
+    'a private game' / 'a club game' (their details are for the people in them)."""
+    from .events import can_see_inside, event_title, query_events  # events.py imports this module
     rows = query_events(["e.location = :loc", "e.cancelled = 0", "e.starts_at < :ends", "e.ends_at > :starts",
                          "e.id != :exclude"],
                         {"loc": location, "starts": starts, "ends": ends, "exclude": exclude or 0}, limit=10)
     games = []
     for e in rows:
-        mine = e["host_id"] == g.user["id"] or e["i_am_going"] or e["i_am_invited"]
-        hidden = e["is_private"] and not mine
+        hidden = not can_see_inside(e)  # private, or members-only and I'm not in the club
         games.append({
-            "title": "A private game" if hidden else event_title(e),
+            "title": ("A private game" if e["is_private"] else "A club game") if hidden else event_title(e),
             "when": time_range(e["starts_at"], e["ends_at"]),
             "going": None if hidden else e["going_count"] + e["extra_players"],
             "max": None if hidden else e["max_players"],
