@@ -5028,3 +5028,17 @@ def test_being_removed_and_game_changes_are_separate_notices(accounts, client, a
     with app.app_context():
         keys = [r[0] for r in get_db().execute("SELECT key FROM notices WHERE user_id = ?", (ids["Sam"],))]
     assert f"removed:{game}" in keys and f"change:{game}" not in keys
+
+
+def test_first_day_fixes(accounts, client, app):
+    """Skipping texts at sign-up doesn't bring the texts card straight back; a waiting club says when posting opens."""
+    client.post("/signup", data={"full_name": "New Husky", "email": "fresh@uw.edu", "password": "purple-and-gold",
+                                 "password2": "purple-and-gold", "birth_date": "2005-01-15"})
+    client.post("/signup/sports", data={"sports": ["basketball"]})
+    client.post("/signup/texts", data={"phone": ""})                   # "Skip, email only"
+    client.post("/verify", data={"code": accounts.code_for("fresh@uw.edu")})
+    accounts.upload_photo()
+    assert "New: game updates by text" not in client.get("/").data.decode()
+    client.post("/clubs/new", data=CLUB)
+    page = client.get(f"/clubs/{_club_id(app, CLUB['name'])}").data.decode()
+    assert "once the club is verified" in page and "Post an update" not in page

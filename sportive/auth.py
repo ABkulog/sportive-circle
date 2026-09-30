@@ -358,6 +358,8 @@ def signup_texts():
         return redirect(url_for("auth.verify"))
     if request.method == "POST":
         raw = request.form.get("phone", "")
+        # They answered here, so the "New: texts" card on Home doesn't ask again.
+        get_db().execute("UPDATE users SET texts_card_done = 1 WHERE id = ?", (user["id"],))
         if not raw.strip():
             get_db().execute("UPDATE users SET phone = '' WHERE id = ?", (user["id"],))
             get_db().commit()

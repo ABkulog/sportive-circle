@@ -151,7 +151,9 @@
 
   {# Updates: the club's posts #}
   <section class="tab-panel" data-tab-panel="updates" id="announcements" role="tabpanel">
-    {% if role == 'officer' %}
+    {% if role == 'officer' and club.status != 'approved' %}
+      <p class="muted">You can post updates once the club is verified.</p>
+    {% elif role == 'officer' %}
       <form method="post" action="{{ url_for('clubs.post', club_id=club.id) }}" class="form club-post-form">
         {{ csrf_field() }}
         <textarea name="body" rows="2" maxlength="1000" placeholder="Post an update…" required aria-label="Update"></textarea>
