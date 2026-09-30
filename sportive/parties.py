@@ -171,6 +171,9 @@ def send_party(event, chosen, team, joining_now, note=""):
                 notify(mine["inviter_id"], "invites", f"{first} is in for {title}.",
                        url_for("events.detail", event_id=event["id"]), key=f"reply:{event['id']}:{me}")
         link = url_for("events.detail", event_id=event["id"])
+        if event["team_size"] and team == 2 and joining_now and me != event["host_id"]:  # the host hears of a challenge
+            notify(event["host_id"], "invites", f"{first}'s team challenged {title}.", link,
+                   key=f"challenge:{event['id']}")
         if not ask_host:
             hold_spots(event["id"], me, chosen, team,
                        f"{first} wants you in {title} ({fmt_when(event['starts_at'])}). You down?", link)

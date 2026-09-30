@@ -3194,6 +3194,8 @@ def test_team_vs_team(accounts, client, app):
     with app.app_context():
         teams = dict(get_db().execute("SELECT user_id, team FROM rsvps WHERE event_id = ?", (game,)).fetchall())
     assert teams == {ids["Maya"]: 1, ids["Mo"]: 1, ids["Jordan"]: 2, ids["Jay"]: 2}
+    _as(accounts, "Maya")                                                    # the host heard about the challenge
+    assert "Jordan&#39;s team challenged 2v2 run" in client.get("/notifications").data.decode()
 
 
 def test_team_sizes_fit_the_sport(accounts, client, app):
