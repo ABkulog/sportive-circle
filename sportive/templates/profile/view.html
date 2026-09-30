@@ -21,8 +21,8 @@
           {{ avatar(user.id, user.full_name, user.avatar_updated, 84) }}</button>
       {% endif %}
       <dialog id="photo-big" class="photo-lightbox" aria-label="{{ user.full_name }}'s photo">
-        <img src="{{ url_for('profile.photo', user_id=user.id, v=user.avatar_updated) }}" alt="{{ user.full_name }}"
-             width="640" height="640" draggable="false">
+        <div class="photo-big" role="img" aria-label="{{ user.full_name }}"
+             style="background-image: url('{{ url_for('profile.photo', user_id=user.id, v=user.avatar_updated) }}')"></div>
         <button type="button" class="photo-close" aria-label="Close">&times;</button>
       </dialog>
     {% else %}

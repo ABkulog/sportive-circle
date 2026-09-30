@@ -21,7 +21,8 @@
             data-id="{{ m.id }}" data-sender="{{ m.sender }}" data-day="{{ m.day }}" data-time="{{ m.time }}">
           {% if not m.mine %}
             <a href="{{ m.profile }}" class="chat-avatar" tabindex="-1" aria-label="{{ m.name }}'s profile">
-              {%- if m.avatar %}<img src="{{ m.avatar }}" alt="">{% else %}<span>{{ m.initial }}</span>{% endif -%}
+              {%- if m.avatar %}<span class="chat-avatar-photo" data-src="{{ m.avatar }}" style="background-image: url('{{ m.avatar }}')"></span>
+              {%- else %}<span>{{ m.initial }}</span>{% endif -%}
             </a>
           {% endif %}
           <div class="chat-bubble{% if m.photo and not m.body %} is-photo{% endif %}">

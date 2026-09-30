@@ -70,11 +70,11 @@
       avatar.href = message.profile;
       avatar.tabIndex = -1;
       avatar.setAttribute("aria-label", message.name ? `${message.name}'s profile` : "Profile");
-      if (message.avatar) {
-        const image = el("img");
-        image.src = message.avatar;
-        image.alt = "";
-        avatar.appendChild(image);
+      if (message.avatar) {  // a background, not an <img>, so it can't be long-pressed and saved
+        const photo = el("span", "chat-avatar-photo");
+        photo.dataset.src = message.avatar;
+        photo.style.backgroundImage = `url("${encodeURI(message.avatar)}")`;
+        avatar.appendChild(photo);
       } else {
         avatar.appendChild(el("span", "", message.initial));
       }
@@ -190,6 +190,8 @@
   viewer.setAttribute("aria-modal", "true");
   viewer.setAttribute("aria-label", "Photo");
   const viewerImage = el("img");
+  const viewerAvatar = el("div", "lightbox-avatar");  // profile pictures: a background, so no "Save image"
+  viewerAvatar.setAttribute("role", "img");
   const viewerCount = el("span", "lightbox-count");
   const viewerButton = (className, label, text) => {
     const button = el("button", className, text);
@@ -200,12 +202,12 @@
   const closeButton = viewerButton("lightbox-close", "Close", "×");
   const prevButton = viewerButton("lightbox-prev", "Previous photo", "‹");
   const nextButton = viewerButton("lightbox-next", "Next photo", "›");
-  viewer.append(viewerImage, viewerCount, closeButton, prevButton, nextButton);
+  viewer.append(viewerImage, viewerAvatar, viewerCount, closeButton, prevButton, nextButton);
   document.body.appendChild(viewer);
   let shown = [], at = 0, openedFrom = null;
   const showPhoto = (i) => {
     at = (i + shown.length) % shown.length;
-    viewerImage.src = shown[at].src;
+    if (!viewer.classList.contains("is-avatar")) viewerImage.src = shown[at].src;
     viewerImage.alt = shown[at].alt;
     const many = shown.length > 1;
     viewerCount.textContent = many ? `${at + 1} / ${shown.length}` : "";
@@ -213,6 +215,12 @@
   };
   function openViewer(photos, i, isAvatar = false) {
     viewer.classList.toggle("is-avatar", isAvatar);  // profile pictures can't be long-pressed to save
+    viewerImage.hidden = isAvatar;
+    viewerAvatar.hidden = !isAvatar;
+    if (isAvatar) {
+      viewerAvatar.style.backgroundImage = `url("${encodeURI(photos[0].src)}")`;
+      viewerAvatar.setAttribute("aria-label", photos[0].alt);
+    }
     openedFrom = document.activeElement;
     if (openedFrom && openedFrom.blur) openedFrom.blur();  // puts the keyboard away
     shown = photos;
@@ -263,13 +271,13 @@
   list.addEventListener("click", (event) => {
     const avatar = event.target.closest(".chat-avatar");
     if (!avatar) return;
-    const image = avatar.querySelector("img");
+    const image = avatar.querySelector(".chat-avatar-photo");
     if (!image) return;  // no picture (initials): straight to the profile
     event.preventDefault();
     if (avatarTap && avatarTap.avatar === avatar) {
       clearTimeout(avatarTap.timer);
       avatarTap = null;
-      const big = new URL(image.src, location.href);
+      const big = new URL(image.dataset.src, location.href);
       big.searchParams.delete("s");
       openViewer([{ src: big.href, alt: avatar.getAttribute("aria-label") || "Profile picture" }], 0, true);
       return;

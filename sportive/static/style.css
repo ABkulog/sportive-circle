@@ -944,13 +944,13 @@ button.link-button { min-height: 36px; }
 .photo-zoom { border: 0; padding: 0; background: none; cursor: zoom-in; border-radius: 50%; }
 .photo-lightbox { border: 0; padding: 0; background: transparent; max-width: none; max-height: none; overflow: visible; }
 .photo-lightbox::backdrop { background: rgb(0 0 0 / .85); }
-.photo-lightbox img { display: block; width: min(86vw, 420px); height: auto; aspect-ratio: 1; border-radius: 50%;
+.photo-lightbox img, .photo-big { display: block; width: min(86vw, 420px); height: auto; aspect-ratio: 1; border-radius: 50%;
                       object-fit: cover; box-shadow: 0 10px 40px rgb(0 0 0 / .5); cursor: zoom-out; }
 .photo-close { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 12px; width: 44px; height: 44px;
                border: 0; border-radius: 50%; background: rgb(255 255 255 / .15); color: #fff; font-size: 1.6rem;
                line-height: 1; cursor: pointer; }
 @media (prefers-reduced-motion: no-preference) {
-  .photo-lightbox[open] img { animation: photo-pop .18s ease-out; }
+  .photo-lightbox[open] .photo-big { animation: photo-pop .18s ease-out; }
   @keyframes photo-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 }
 
@@ -1174,3 +1174,10 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 /* Profile pictures can't be long-pressed to save or share (no "Save image" menu), in lists, chats or big */
 .avatar-img, .chat-avatar img, .photo-lightbox img, .lightbox.is-avatar img {
   -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-user-drag: none; }
+/* Profile pictures are backgrounds (not images), so there's nothing to long-press and save */
+.avatar-photo { display: inline-block; vertical-align: middle; }
+.avatar-photo, .photo-big, .chat-avatar-photo, .lightbox-avatar { background-size: cover; background-position: center;
+  background-repeat: no-repeat; -webkit-touch-callout: none; user-select: none; }
+.chat-avatar-photo { display: block; width: 100%; height: 100%; }
+.lightbox-avatar { width: min(86vw, 420px); aspect-ratio: 1; border-radius: 50%; }
+.lightbox-avatar[hidden], .lightbox img[hidden] { display: none; }

@@ -4114,7 +4114,7 @@ def test_tap_someones_photo_to_see_it_big(accounts, client, app):
     accounts.signup(email="me@uw.edu")
     page = client.get(f"/u/{maya}").data.decode()
     assert 'data-zoom="photo-big"' in page and '<dialog id="photo-big" class="photo-lightbox"' in page
-    assert f'/u/{maya}/photo?v=' in page and 'width="640"' in page
+    assert f"background-image: url('/u/{maya}/photo?v=" in page and '<img' not in page.split('id="photo-big"')[1][:300]
 
 
 def test_a_game_full_because_of_a_reserved_spot_is_hidden(accounts, client, app):
