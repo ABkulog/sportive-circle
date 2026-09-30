@@ -14,6 +14,7 @@
     const form = event.target;
     const message = form.dataset && form.dataset.confirm;
     if (message && !window.confirm(message)) { event.preventDefault(); return; }
+    if (event.defaultPrevented) return;  // sent another way (e.g. a chat sends in the background)
     // A double tap shouldn't post twice: lock the buttons of a form that's already sending
     // (GET forms like search and filters are harmless, so they stay free).
     if (form.method === "post") {

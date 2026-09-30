@@ -5494,3 +5494,18 @@ def test_photos_in_chats_and_friendlier_chats(accounts, client, app):
     assert client.get(f"/chat-photos/{chat_photo}").status_code == 404   # not in that game
     _as(accounts, "Stranger")
     assert client.get(f"/chat-photos/{dm_photo}").status_code == 404
+
+
+def test_chats_send_without_reloading_the_page(accounts, client, app):
+    """The chat page sends in the background (X-Chat-Send) and gets a small answer instead of a reload."""
+    ids = _people(accounts, app, "Maya", "Sam")
+    _friends(app, ids["Maya"], ids["Sam"])
+    _as(accounts, "Maya")
+    sent = client.post(f"/messages/{ids['Sam']}", data={"body": "Down to play?"}, headers={"X-Chat-Send": "1"})
+    assert sent.status_code == 200 and sent.get_json() == {"ok": True, "error": None}
+    empty = client.post(f"/messages/{ids['Sam']}", data={"body": "  "}, headers={"X-Chat-Send": "1"}).get_json()
+    assert empty["ok"] is False and "Type a message" in empty["error"]
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    assert client.post(f"/events/{game}/chat", data={"body": "On my way"},
+                       headers={"X-Chat-Send": "1"}).get_json()["ok"] is True
+    assert client.post(f"/messages/{ids['Sam']}", data={"body": "No script"}).status_code == 302   # still works

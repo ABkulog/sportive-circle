@@ -49,6 +49,7 @@
       <div class="chat-quick" aria-label="Quick replies">
         {% for text in QUICK[kind] %}<button type="button" class="chip" data-quick="{{ text }}">{{ text }}</button>{% endfor %}
       </div>
+      <p class="chat-error" data-chat-error role="alert" hidden></p>
       <form method="post" action="{{ action }}" class="chat-composer" id="composer" enctype="multipart/form-data">
         {{ csrf_field() }}
         <label class="chat-attach" title="Send a photo">

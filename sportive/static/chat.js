@@ -104,8 +104,8 @@
     list.appendChild(item);
   }
 
-  async function poll() {
-    if (document.hidden) return;
+  async function poll(now) {
+    if (document.hidden && !now) return;
     try {
       const response = await fetch(`${box.dataset.pollUrl}?after=${lastId}`, { headers: { Accept: "application/json" } });
       if (new URL(response.url).pathname.startsWith("/login")) { location.reload(); return; }  // logged out
@@ -140,9 +140,44 @@
       }
     });
     textarea.addEventListener("input", grow);
-    // Nothing to send (no words, no photo): don't send an empty message.
-    textarea.form.addEventListener("submit", (event) => {
-      if (!textarea.value.trim() && !hasPhoto()) { event.preventDefault(); textarea.focus(); }
+    // Sending happens in the background: the page doesn't reload, the box empties and keeps the keyboard up,
+    // and the message shows right away. (Without JavaScript the form still posts the normal way.)
+    const form = textarea.form;
+    const sendButton = form.querySelector(".chat-send");
+    const errorLine = box.querySelector("[data-chat-error]");
+    const showError = (text) => { if (errorLine) { errorLine.textContent = text || ""; errorLine.hidden = !text; } };
+    let sending = false;
+    // Tapping Send shouldn't take the focus from the box (on phones that would close the keyboard).
+    sendButton.addEventListener("pointerdown", (event) => event.preventDefault());
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!textarea.value.trim() && !hasPhoto()) { textarea.focus(); return; }  // nothing to send
+      if (sending) return;
+      sending = true;
+      sendButton.disabled = true;
+      try {
+        const response = await fetch(form.action, { method: "POST", body: new FormData(form),
+                                                    headers: { "X-Chat-Send": "1", Accept: "application/json" } });
+        if (new URL(response.url).pathname.startsWith("/login")) { location.reload(); return; }  // logged out
+        if (response.status === 413) { showError("That photo is too big. Pick one under 8 MB."); return; }
+        const answer = await response.json();
+        if (answer.ok) {
+          textarea.value = "";
+          grow();
+          if (photoInput) photoInput.dispatchEvent(new Event("chat:clear"));
+          showError(null);
+          await poll(true);
+          scrollDown();
+        } else {
+          showError(answer.error);
+        }
+      } catch (error) {
+        showError("Couldn't send. Check your connection and try again.");
+      } finally {
+        sending = false;
+        sendButton.disabled = false;
+        textarea.focus();
+      }
     });
     // Quick replies fill the box (you can still change them before sending).
     box.querySelectorAll("[data-quick]").forEach((chip) => {
@@ -171,5 +206,6 @@
       if (textarea) textarea.focus();
     });
     attached.querySelector("[data-chat-unattach]").addEventListener("click", clear);
+    photoInput.addEventListener("chat:clear", clear);  // sent
   }
 })();

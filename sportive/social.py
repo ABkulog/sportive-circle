@@ -173,6 +173,17 @@ def day_label(value):
     return f"{day:%a, %b} {day.day}" + (f", {day.year}" if day.year != today.year else "")
 
 
+def chat_sent(error, back):
+    """After sending: the chat page sends in the background (chat.js asks with X-Chat-Send) and gets a small
+    answer, so the page doesn't reload; without JavaScript, the page reloads with the message (or the problem)."""
+    if request.headers.get("X-Chat-Send"):
+        return jsonify(ok=error is None, error=error)
+    if error:
+        flash(error, "error")
+        keep_draft(request.form.get("body"))
+    return redirect(back)
+
+
 def keep_draft(text):
     """A message that couldn't be sent goes back in the box after the redirect, instead of vanishing."""
     body = (text or "")[:MAX_MESSAGE_LENGTH]
@@ -508,21 +519,20 @@ def thread(user_id):
     other = get_user(user_id)
     allowed = can_message(me, user_id)
     if request.method == "POST":
+        error = None
         if not allowed:
-            flash("You can message friends, people you've played with, and club officers.", "error")
+            error = "You can message friends, people you've played with, and club officers."
         else:
             photo_id, error = read_chat_photo()
             body, error = (None, error) if error else clean_body(request.form.get("body"), photo=bool(photo_id))
             if error:
                 get_db().rollback()
-                flash(error, "error")
-                keep_draft(request.form.get("body"))
             else:
                 db = get_db()
                 db.execute("INSERT INTO direct_messages (sender_id, recipient_id, body, created_at, photo_id)"
                            " VALUES (?, ?, ?, ?, ?)", (me, user_id, body, to_db(now_local()), photo_id))
                 db.commit()
-        return redirect(url_for("social.thread", user_id=user_id) + "#composer")
+        return chat_sent(error, url_for("social.thread", user_id=user_id) + "#composer")
     _mark_read(me, user_id)
     rows = _thread_rows(me, user_id) if not is_blocked_between(me, user_id) else []
     return render_template("social/thread.html", other=other, messages=[message_json(r, me, 'dm') for r in rows],
@@ -583,16 +593,14 @@ def event_chat(event_id):
         body, error = (None, error) if error else clean_body(request.form.get("body"), photo=bool(photo_id))
         if error:
             get_db().rollback()
-            flash(error, "error")
-            keep_draft(request.form.get("body"))
         elif event["cancelled"]:
-            flash("This game was canceled, so its chat is closed.", "error")
+            error = "This game was canceled, so its chat is closed."
         else:
             db = get_db()
             db.execute("INSERT INTO event_messages (event_id, sender_id, body, created_at, photo_id) VALUES (?, ?, ?, ?, ?)",
                        (event_id, g.user["id"], body, to_db(now_local()), photo_id))
             db.commit()
-        return redirect(url_for("social.event_chat", event_id=event_id) + "#composer")
+        return chat_sent(error, url_for("social.event_chat", event_id=event_id) + "#composer")
     rows = _chat_rows(event_id)
     _mark_chat_seen(event_id, rows)
     people = get_db().execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (event_id,)).fetchone()[0]
