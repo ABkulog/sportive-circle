@@ -64,7 +64,8 @@ def games_at(location, starts, ends, exclude=None):
         games.append({
             "title": "A private game" if hidden else event_title(e),
             "when": time_range(e["starts_at"], e["ends_at"]),
-            "going": e["going_count"] + e["extra_players"], "max": e["max_players"],
+            "going": None if hidden else e["going_count"] + e["extra_players"],
+            "max": None if hidden else e["max_players"],
             "url": None if hidden else url_for("events.detail", event_id=e["id"]),
         })
     return games

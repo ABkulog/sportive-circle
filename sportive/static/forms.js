@@ -239,7 +239,7 @@
         const item = el("li");
         const name = game.url ? el("a", "", game.title) : el("span", "", game.title);
         if (game.url) { name.href = game.url; name.target = "_blank"; }
-        item.append(name, ` · ${game.when} · ${game.going}${game.max ? "/" + game.max : ""} going`);
+        item.append(name, ` · ${game.when}` + (game.going == null ? "" : ` · ${game.going}${game.max ? "/" + game.max : ""} going`));
         list.appendChild(item);
       });
       box.appendChild(list);

@@ -705,13 +705,18 @@ def officers(club_id):
                 db.commit()
                 flash(f"{first} is the owner now. You're still an officer.", "success")
                 return redirect(url_for("clubs.view", club_id=club_id))
+            else:
+                flash("You're already the owner.", "info")
         elif action == "remove":
             if user_id == club["created_by"]:
                 flash("The owner stays an officer. To step down, make another officer the owner first.", "error")
             else:
-                db.execute("UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ? AND role = 'officer'",
-                           (club_id, user_id))
-                flash(f"{first} is a member now, not an officer.", "success")
+                changed = db.execute("UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ?"
+                                     " AND role = 'officer'", (club_id, user_id)).rowcount
+                if changed:
+                    flash(f"{first} is a member now, not an officer.", "success")
+                else:
+                    flash(f"{first} isn't an officer.", "error")
         db.commit()
         return redirect(url_for("clubs.officers", club_id=club_id))
     current = db.execute(

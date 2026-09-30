@@ -4857,3 +4857,32 @@ def test_private_data_isnt_cached_and_scripts_only_come_from_the_map_folder(acco
     assert "script-src 'self' https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/;" in csp
     assert client.get("/static/style.css").headers.get("Cache-Control") != "no-store"
 
+
+
+def test_officer_page_messages_match_what_happened(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="stranger@uw.edu", name="Stran Ger")
+    stranger = _user_id(app, "stranger@uw.edu")
+    captain = _user_id(app, "captain@uw.edu")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    page = client.post(f"/clubs/{club}/officers", data={"user": stranger, "action": "remove"},
+                       follow_redirects=True).data.decode()
+    assert "isn&#39;t an officer" in page and "is a member now" not in page
+    page = client.post(f"/clubs/{club}/officers", data={"user": captain, "action": "owner"},
+                       follow_redirects=True).data.decode()
+    assert "already the owner" in page
+
+
+def test_place_check_hides_private_game_headcounts(accounts, client, app):
+    _people(accounts, app, "Maya", "Sam")
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(is_private="1", password="abcd-efgh")))
+    with app.app_context():
+        e = get_db().execute("SELECT location, starts_at, ends_at FROM events WHERE id = ?", (game,)).fetchone()
+    _as(accounts, "Sam")
+    found = client.get("/events/place-check", query_string={"location": e["location"],
+                                                            "starts_at": e["starts_at"][:16].replace(" ", "T"),
+                                                            "ends_at": e["ends_at"][:16].replace(" ", "T")}).get_json()
+    private = [x for x in found["games"] if x["title"] == "A private game"]
+    assert private and private[0]["going"] is None and private[0]["max"] is None and private[0]["url"] is None

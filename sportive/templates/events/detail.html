@@ -68,7 +68,7 @@
           <ul class="whats-on-games">
             {% for game in on.games %}
               <li>{% if game.url %}<a href="{{ game.url }}">{{ game.title }}</a>{% else %}{{ game.title }}{% endif %}
-                · {{ game.when }} · {{ game.going }}{% if game.max %}/{{ game.max }}{% endif %} going</li>
+                · {{ game.when }}{% if game.going is not none %} · {{ game.going }}{% if game.max %}/{{ game.max }}{% endif %} going{% endif %}</li>
             {% endfor %}
           </ul>
         {% endif %}
