@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<h1 class="page-title">Admin</h1>
+{% set reports, clubs, trending = open_report_count(), pending_club_count(), tab_badges().admin %}
+<div class="create-grid admin-home">
+  <a class="card create-option" href="{{ url_for('moderation.admin_reports') }}">
+    <span class="create-emoji" aria-hidden="true">🛡️</span><strong>Reports</strong>
+    <span class="muted">{{ reports ~ ' open' if reports else 'Nothing to check' }}</span></a>
+  <a class="card create-option" href="{{ url_for('clubs.review_queue') }}">
+    <span class="create-emoji" aria-hidden="true">🚩</span><strong>Club requests</strong>
+    <span class="muted">{{ clubs ~ ' waiting' if clubs else 'None waiting' }}</span></a>
+  <a class="card create-option" href="{{ url_for('placecheck.admin_rec') }}">
+    <span class="create-emoji" aria-hidden="true">🏟️</span><strong>UW Rec reservations</strong>
+    <span class="muted">{{ upcoming_rec ~ ' coming up' if upcoming_rec else 'None added yet' }}</span></a>
+  <a class="card create-option" href="{{ url_for('feedback.admin_suggestions') }}">
+    <span class="create-emoji" aria-hidden="true">💡</span><strong>Suggestions</strong>
+    <span class="muted">{{ trending ~ ' trending' if trending else 'Ideas people sent' }}</span></a>
+</div>
+{% endblock %}

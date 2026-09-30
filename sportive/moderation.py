@@ -140,6 +140,16 @@ def admin_required(view):
     return wrapped
 
 
+@bp.route("/admin")
+@admin_required
+def admin_home():
+    """One place for everything admins look after (the Admin tab and the shield icon open it)."""
+    from .timeutil import now_local, to_db
+    upcoming = get_db().execute("SELECT COUNT(*) FROM rec_reservations WHERE ends_at >= ?",
+                                (to_db(now_local()),)).fetchone()[0]
+    return render_template("moderation/home.html", upcoming_rec=upcoming)
+
+
 @bp.route("/admin/reports")
 @admin_required
 def admin_reports():

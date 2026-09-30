@@ -5310,3 +5310,16 @@ def test_pasted_social_links_become_usernames(accounts, client, app):
     with app.app_context():
         row = get_db().execute("SELECT instagram, tiktok, x_handle FROM users").fetchone()
     assert (row["instagram"], row["tiktok"], row["x_handle"]) == ("maya.hoops", "maya", "maya")
+
+
+def test_one_admin_tab_with_everything(accounts, client, app):
+    accounts.signup(email="boss@uw.edu", name="Boss Husky")
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    home = client.get("/").data.decode()
+    assert 'href="/admin"' in home and ">Reports</span>" not in home and ">Club requests</span>" not in home
+    page = client.get("/admin").data.decode()
+    for part in ("Reports", "Club requests", "UW Rec reservations", "Suggestions"):
+        assert part in page
+    accounts.logout()
+    accounts.signup(email="normal@uw.edu")
+    assert client.get("/admin").status_code == 404                       # not for everyone
