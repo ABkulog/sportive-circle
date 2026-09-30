@@ -184,7 +184,7 @@ def read_club_form(form, club_id=None, phone_on_file=""):
     # Everything is required: people deciding whether to join need the full picture, and a way to reach you.
     required = {
         "join_question": "a question for people who want to join",
-        "meets": "when you practice", "location": "where you practice",
+        "meets": "when you practice or have events", "location": "where you meet",
         "dues": "your dues (type Free if there are none)", "gear": "what gear people need (or None needed)",
         "how_to_join": "how new members get started",
         "club_email": "a club email (so students and our team can reach you)",
@@ -194,7 +194,7 @@ def read_club_form(form, club_id=None, phone_on_file=""):
             return problem(key, f"Please add {label}. Every answer helps people decide to join and reach you.")
     if len(data["join_question"]) > 150:
         return problem("join_question", "Keep your question for new members under 150 characters.")
-    for key, limit, label in (("meets", 120, "When you practice"), ("location", 120, "Where"), ("dues", 60, "Dues"),
+    for key, limit, label in (("meets", 120, "When you practice / have events"), ("location", 120, "Where"), ("dues", 60, "Dues"),
                               ("gear", 120, "Gear"), ("how_to_join", 500, "How to join")):
         if len(data[key]) > limit:
             return problem(key, f"Keep '{label}' under {limit} characters.")

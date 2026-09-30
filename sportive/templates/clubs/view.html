@@ -105,7 +105,7 @@
         <li><small>Joining</small><strong>{{ joining[club.joining] }}</strong></li>
         <li><small>Experience</small><strong>{{ experience[club.experience] }}</strong></li>
         <li><small>Dues</small><strong>{{ club.dues or 'Free' }}</strong></li>
-        <li><small>Practices</small><strong>{{ club.meets or 'Ask the club' }}</strong></li>
+        <li><small>Practices / events</small><strong>{{ club.meets or 'Ask the club' }}</strong></li>
         <li><small>Where</small><strong>{{ club.location or 'Ask the club' }}</strong></li>
         <li><small>Who can join</small><strong>{{ who[club.who_can_join] }}</strong></li>
         {% if club.gear %}<li><small>Gear</small><strong>{{ club.gear }}</strong></li>{% endif %}

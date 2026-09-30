@@ -42,10 +42,10 @@
     {{ choice('who_can_join', who, "Who can join?") }}
     </section>
     <section class="wizard-step" data-step="3">
-    <h2 class="form-step"><span>3</span> Practices & costs</h2>
+    <h2 class="form-step"><span>3</span> Practices / events & costs</h2>
     <div class="row row-pair">
-      <label class="field"><span>When you practice</span>
-        <input name="meets" maxlength="120" value="{{ form.get('meets', '') }}" placeholder="Tue & Thu 7-9 PM" required></label>
+      <label class="field"><span>When you practice / have events</span>
+        <input name="meets" maxlength="120" value="{{ form.get('meets', '') }}" placeholder="Tue & Thu 7-9 PM, or monthly events" required></label>
       <label class="field"><span>Where</span>
         <input name="location" maxlength="120" value="{{ form.get('location', '') }}" list="places" placeholder="Denny Field" required></label>
       <datalist id="places">{% for place in locations %}<option value="{{ place }}">{% endfor %}</datalist>
