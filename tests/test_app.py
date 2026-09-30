@@ -4104,11 +4104,12 @@ def test_players_pick_when_their_reminder_comes(accounts, client, app, monkeypat
 
 
 def test_tap_someones_photo_to_see_it_big(accounts, client, app):
-    """Like Instagram: on someone else's profile their photo opens big (and closes again); yours opens the editor."""
+    """Like Instagram: on someone else's profile their photo opens big (and closes again); on yours one tap opens
+    the editor and a double tap shows it big."""
     accounts.signup(email="maya@uw.edu", name="Maya Chen")
     maya = _user_id(app, "maya@uw.edu")
     mine = client.get(f"/u/{maya}").data.decode()
-    assert 'data-zoom="photo-big"' not in mine and "/profile/photo" in mine
+    assert 'href="/profile/photo" data-zoom="photo-big"' in mine and "data-zoom-double" in mine
     accounts.logout()
     accounts.signup(email="me@uw.edu")
     page = client.get(f"/u/{maya}").data.decode()

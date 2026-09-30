@@ -369,12 +369,26 @@
     });
   });
 
-  // <button data-zoom="dialog-id">: a profile photo opens big; a tap anywhere (or Esc) closes it again.
-  document.querySelectorAll("[data-zoom]").forEach((button) => {
-    const dialog = document.getElementById(button.dataset.zoom);
+  // Profile pictures: no right-click / long-press menu (so no "Save image"); see style.css for iPhones.
+  document.addEventListener("contextmenu", (event) => {
+    if (event.target.closest(".avatar-img, .chat-avatar, .photo-lightbox, .lightbox.is-avatar")) event.preventDefault();
+  });
+
+  // data-zoom="dialog-id": a profile photo opens big; a tap anywhere (or Esc) closes it again. (The second tap
+  // of a double tap doesn't count, so a double tap opens it too.) On your own profile (data-zoom-double) a
+  // single tap still goes to "change photo" and a double tap shows it big.
+  document.querySelectorAll("[data-zoom]").forEach((trigger) => {
+    const dialog = document.getElementById(trigger.dataset.zoom);
     if (!dialog || typeof dialog.showModal !== "function") return;
-    button.addEventListener("click", () => dialog.showModal());
-    dialog.addEventListener("click", () => dialog.close());
+    let openedAt = 0, pending = null;
+    const open = () => { openedAt = Date.now(); dialog.showModal(); };
+    trigger.addEventListener("click", (event) => {
+      if (!("zoomDouble" in trigger.dataset)) { open(); return; }
+      event.preventDefault();
+      if (pending) { clearTimeout(pending); pending = null; open(); return; }
+      pending = setTimeout(() => { pending = null; location.href = trigger.href; }, 280);
+    });
+    dialog.addEventListener("click", () => { if (Date.now() - openedAt > 400) dialog.close(); });
   });
 
   // Pull down at the top of a page to refresh it (phones). Not while typing, not with unsaved changes in a

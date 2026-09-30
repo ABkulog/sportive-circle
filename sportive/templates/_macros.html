@@ -172,7 +172,7 @@
 {% macro avatar(user_id, name, version, size=40) %}
   {%- if version -%}
     <img class="avatar-img" src="{{ url_for('profile.photo', user_id=user_id, v=version, s=96 if size <= 48 else (160 if size <= 80 else None)) }}"
-         alt="" width="{{ size }}" height="{{ size }}" style="--size: {{ size }}px" loading="lazy">
+         alt="" width="{{ size }}" height="{{ size }}" style="--size: {{ size }}px" loading="lazy" draggable="false">
   {%- else -%}
     <span class="avatar-img avatar-initial" style="--size: {{ size }}px" aria-hidden="true">{{ name|initial }}</span>
   {%- endif -%}

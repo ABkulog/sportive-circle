@@ -211,7 +211,8 @@
     viewerCount.textContent = many ? `${at + 1} / ${shown.length}` : "";
     prevButton.hidden = nextButton.hidden = !many;
   };
-  function openViewer(photos, i) {
+  function openViewer(photos, i, isAvatar = false) {
+    viewer.classList.toggle("is-avatar", isAvatar);  // profile pictures can't be long-pressed to save
     openedFrom = document.activeElement;
     if (openedFrom && openedFrom.blur) openedFrom.blur();  // puts the keyboard away
     shown = photos;
@@ -270,7 +271,7 @@
       avatarTap = null;
       const big = new URL(image.src, location.href);
       big.searchParams.delete("s");
-      openViewer([{ src: big.href, alt: avatar.getAttribute("aria-label") || "Profile picture" }], 0);
+      openViewer([{ src: big.href, alt: avatar.getAttribute("aria-label") || "Profile picture" }], 0, true);
       return;
     }
     if (avatarTap) clearTimeout(avatarTap.timer);

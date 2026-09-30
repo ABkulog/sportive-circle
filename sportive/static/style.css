@@ -1171,3 +1171,6 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .lightbox-count { position: absolute; top: calc(20px + env(safe-area-inset-top, 0px)); left: 0; right: 0; text-align: center;
   color: #fff; font-size: .9rem; pointer-events: none; }
 @media (hover: none) { .lightbox .lightbox-prev, .lightbox .lightbox-next { display: none; } }  /* phones: swipe */
+/* Profile pictures can't be long-pressed to save or share (no "Save image" menu), in lists, chats or big */
+.avatar-img, .chat-avatar img, .photo-lightbox img, .lightbox.is-avatar img {
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-user-drag: none; }

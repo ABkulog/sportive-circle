@@ -5,17 +5,24 @@
 {% set me = user.id == g.user.id %}
 <section class="profile">
   <div class="profile-top">
-    {% if me %}
-      <a class="profile-photo" href="{{ url_for('profile.photo_upload') }}" aria-label="Profile picture">
+    {% if me and not user.avatar_updated %}
+      <a class="profile-photo" href="{{ url_for('profile.photo_upload') }}" aria-label="Add a profile picture">
         {{ avatar(user.id, user.full_name, user.avatar_updated, 84) }}</a>
     {% elif user.avatar_updated %}
-      {# Tap to see it big (like Instagram); tap again to close. #}
-      <button type="button" class="profile-photo photo-zoom" data-zoom="photo-big"
-              aria-label="See {{ user.full_name.split()[0] }}'s photo bigger">
-        {{ avatar(user.id, user.full_name, user.avatar_updated, 84) }}</button>
+      {# Tap (or double-tap) to see it big, like Instagram; tap again to close. Your own: tap to change it,
+         double-tap to see it big. #}
+      {% if me %}
+        <a class="profile-photo photo-zoom" href="{{ url_for('profile.photo_upload') }}" data-zoom="photo-big"
+           data-zoom-double aria-label="Profile picture (tap to change, double-tap to see it big)">
+          {{ avatar(user.id, user.full_name, user.avatar_updated, 84) }}</a>
+      {% else %}
+        <button type="button" class="profile-photo photo-zoom" data-zoom="photo-big"
+                aria-label="See {{ user.full_name.split()[0] }}'s photo bigger">
+          {{ avatar(user.id, user.full_name, user.avatar_updated, 84) }}</button>
+      {% endif %}
       <dialog id="photo-big" class="photo-lightbox" aria-label="{{ user.full_name }}'s photo">
         <img src="{{ url_for('profile.photo', user_id=user.id, v=user.avatar_updated) }}" alt="{{ user.full_name }}"
-             width="640" height="640">
+             width="640" height="640" draggable="false">
         <button type="button" class="photo-close" aria-label="Close">&times;</button>
       </dialog>
     {% else %}
