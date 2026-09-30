@@ -990,3 +990,8 @@ button.link-button { min-height: 36px; }
 @keyframes bell-count-pop { from { transform: scale(0); } to { transform: scale(1); } }
 .phone-row { display: grid; grid-template-columns: minmax(96px, auto) minmax(0, 1fr); gap: 8px; }
 .phone-row select { width: auto; }
+
+/* "Put it on your home screen" tip on Home (iPhone Safari only) */
+.install-tip { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; }
+.install-tip p { margin: 0; flex: 1; font-size: .92rem; }
+.install-tip .help-close { flex: none; }

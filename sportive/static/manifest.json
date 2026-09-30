@@ -1,0 +1,14 @@
+{
+  "name": "Sportive Circle",
+  "short_name": "Sportive Circle",
+  "description": "Pickup games and UW clubs, for Huskies.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4b2e83",
+  "icons": [
+    {"src": "/static/apple-touch-icon.png", "sizes": "180x180", "type": "image/png"},
+    {"src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml"}
+  ]
+}

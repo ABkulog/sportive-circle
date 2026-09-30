@@ -15,6 +15,8 @@
   <meta name="color-scheme" content="{{ {'light': 'light', 'dark': 'dark', 'system': 'light dark'}[theme] }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
   <meta name="apple-mobile-web-app-title" content="Sportive Circle">
+  <meta name="apple-mobile-web-app-capable" content="yes">{# opens full screen from the home screen #}
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   {# Search engines and link previews (iMessage, Instagram, GroupMe). The canonical link keeps Google on the
      real address (PUBLIC_URL, e.g. sportivecircle.com) even when the page is opened some other way. #}
   {% set site = config.PUBLIC_URL.rstrip('/') %}

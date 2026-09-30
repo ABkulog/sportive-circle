@@ -5,6 +5,12 @@
 {{ home_tabs('feed') }}
 <h1 class="page-title">{{ hello }}</h1>
 
+{# iPhone Safari only (app.js shows it): how to keep the app one tap away. × hides it on this phone for good. #}
+<div class="card install-tip" data-install-tip hidden>
+  <p><strong>Put it on your home screen</strong><br>
+    <span class="muted">In Safari, tap Share, then Add to Home Screen. It opens like an app.</span></p>
+  <button type="button" class="help-close" data-install-close aria-label="Close this tip">&times;</button>
+</div>
 {% if texts_card %}
   {# One-time "what's new" for people who joined before texts: add a number right here. #}
   {% from "_macros.html" import phone_field %}

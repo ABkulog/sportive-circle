@@ -255,6 +255,21 @@
     });
   }
 
+  // "Put it on your home screen": iPhone Safari only, not once it's already opened from the home screen.
+  const installTip = document.querySelector("[data-install-tip]");
+  if (installTip) {
+    const ua = navigator.userAgent;
+    const iosSafari = /iPhone|iPad|iPod/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|Instagram|FBAN|FBAV/.test(ua);
+    const installed = navigator.standalone || window.matchMedia("(display-mode: standalone)").matches;
+    let closed = false;
+    try { closed = localStorage.getItem("installTipClosed") === "1"; } catch (error) { /* private mode */ }
+    installTip.hidden = !iosSafari || installed || closed;
+    installTip.querySelector("[data-install-close]").addEventListener("click", () => {
+      installTip.hidden = true;
+      try { localStorage.setItem("installTipClosed", "1"); } catch (error) { /* private mode */ }
+    });
+  }
+
   // <form data-autosave>: each switch saves the moment it's flipped, in the background (no reload, no jump
   // back to the top). If that fails, the form is sent the normal way.
   document.querySelectorAll("form[data-autosave]").forEach((form) => {

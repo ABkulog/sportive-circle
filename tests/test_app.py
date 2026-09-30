@@ -5074,3 +5074,12 @@ def test_update_texts_fit_in_one_plain_text():
     long = one_text("Maya wants you in Sunday sunrise soccer at the Husky Soccer Field with the whole crew, bring "
                     "cleats and water, we're playing two halves of forty minutes. Your spot is held for 30 min: " + link)
     assert len(long) <= SMS_LIMIT and long.endswith("... " + link) and long.isascii()
+
+
+def test_home_screen_app_setup(accounts, client):
+    """The site opens like an app from the home screen; iPhone users get a one-time tip (shown by app.js)."""
+    accounts.signup()
+    home = client.get("/").data.decode()
+    assert 'rel="manifest"' in home and "data-install-tip hidden" in home and "Add to Home Screen" in home
+    manifest = client.get("/static/manifest.json").get_json()
+    assert manifest["display"] == "standalone" and manifest["start_url"] == "/"
