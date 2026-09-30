@@ -934,4 +934,4 @@ def review(club_id, decision):
                          notice=(f"{club['name']} was sent back: “{note}” Update it and resend.",
                                  url_for("clubs.view", club_id=club_id)))
         flash(f"Sent {club['name']} back to the officers with your note.", "info")
-    return redirect(url_for("clubs.review_queue"))
+    return redirect(url_for("clubs.review_queue", status=club["status"]))  # the tab the admin was on

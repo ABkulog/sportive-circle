@@ -154,7 +154,8 @@ def admin_reports():
            FROM reports r
            LEFT JOIN users reporter ON reporter.id = r.reporter_id
            LEFT JOIN users reported ON reported.id = r.reported_user_id
-           WHERE r.status = ? ORDER BY r.id DESC LIMIT 200""", (status,)).fetchall()
+           WHERE r.status = ? ORDER BY CASE WHEN r.status = 'open' THEN r.id ELSE -r.id END LIMIT 200""",
+        (status,)).fetchall()  # open: oldest first, so none waits forever; done ones: newest first
     flagged = db.execute(
         """SELECT u.id, u.full_name, u.email, u.suspended, COUNT(DISTINCT r.reporter_id) AS reporters
            FROM reports r JOIN users u ON u.id = r.reported_user_id
