@@ -4677,7 +4677,7 @@ def test_club_owner_adds_and_removes_officers(accounts, client, app):
     client.post(f"/clubs/{club}/officers", data={"user": ids["Sam"], "action": "remove"})
     kept = client.post(f"/clubs/{club}/officers", data={"user": ids["Maya"], "action": "remove"},
                        follow_redirects=True).data.decode()
-    assert "stays an officer" in kept
+    assert "The owner stays an officer" in kept
     with app.app_context():
         roles = dict(get_db().execute("SELECT user_id, role FROM club_members WHERE club_id = ?", (club,)).fetchall())
     assert roles[ids["Sam"]] == "member" and roles[ids["Maya"]] == "officer"
@@ -4691,3 +4691,34 @@ def test_forms_have_back_buttons(accounts, client, app):
     assert 'class="back-link"' in client.get("/events/new").data.decode()
     assert f'href="/clubs/{club}" data-back' in client.get(f"/events/new?club={club}").data.decode()
     assert 'class="back-link"' in client.get("/need-players").data.decode()
+
+
+def test_owner_hands_the_club_to_another_officer(accounts, client, app):
+    """The user: the owner can switch the owner role to an officer (e.g. whoever registered it hands it over)."""
+    ids = _people(accounts, app, "Maya", "John", "Sam")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Maya")
+    page = client.get(f"/clubs/{club}/officers").data.decode()
+    assert 'value="owner"' not in page                                          # only other officers get the button
+    refused = client.post(f"/clubs/{club}/officers", data={"user": ids["Sam"], "action": "owner"},
+                          follow_redirects=True).data.decode()
+    assert "Make them an officer first" in refused                            # not an officer yet
+    client.post(f"/clubs/{club}/officers", data={"user": ids["John"], "action": "add"})
+    assert 'value="owner"' in client.get(f"/clubs/{club}/officers").data.decode()
+    done = client.post(f"/clubs/{club}/officers", data={"user": ids["John"], "action": "owner"},
+                       follow_redirects=True).data.decode()
+    assert "John is the owner now" in done
+    with app.app_context():
+        owner = get_db().execute("SELECT created_by FROM clubs WHERE id = ?", (club,)).fetchone()[0]
+        maya_role = get_db().execute("SELECT role FROM club_members WHERE club_id = ? AND user_id = ?",
+                                     (club, ids["Maya"])).fetchone()[0]
+    assert owner == ids["John"] and maya_role == "officer"                   # Maya stays an officer
+    assert client.get(f"/clubs/{club}/officers").status_code == 403           # ...but can't manage officers now
+    _as(accounts, "John")
+    assert "You&#39;re now the owner of" in client.get(f"/messages/{ids['Maya']}").data.decode()
+    officers_page = client.get(f"/clubs/{club}/officers").data.decode()
+    assert 'value="owner"' in officers_page                                      # John can hand it back to Maya
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Maya"], "action": "remove"})
+    with app.app_context():
+        assert get_db().execute("SELECT role FROM club_members WHERE club_id = ? AND user_id = ?",
+                                (club, ids["Maya"])).fetchone()[0] == "member"  # the old owner can be removed now

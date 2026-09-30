@@ -649,8 +649,9 @@ def make_officer(club_id, user_id):
 @bp.route("/clubs/<int:club_id>/officers", methods=("GET", "POST"))
 @login_required
 def officers(club_id):
-    """The owner (who registered the club) adds officers by searching any Husky by name or UW NetID, and takes
-    officer rights away. Officers can edit the club, post updates, make club events and confirm members."""
+    """The owner (who registered the club, or who it was handed to) adds officers by searching any Husky by name or
+    UW NetID, takes officer rights away, and can hand ownership to another officer. Officers can edit the club,
+    post updates, make club events and confirm members."""
     from .social import MIN_SEARCH_LENGTH, search_people  # social.py is loaded after this module
     club = get_club(club_id)
     if not is_owner(club):
@@ -672,9 +673,22 @@ def officers(club_id):
                 _dm(g.user["id"], user_id, f"⭐ You're now an officer of {club['name']}. You can edit the club, post "
                                            f"updates, make club events and confirm new members. {_club_link(club_id)}")
             flash(f"{first} is an officer now.", "success")
+        elif action == "owner":
+            # Hand the club over: they must already be an officer. The old owner stays an officer.
+            is_officer = db.execute("SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ? AND role = 'officer'",
+                                    (club_id, user_id)).fetchone()
+            if not is_officer:
+                flash("Make them an officer first, then you can make them the owner.", "error")
+            elif user_id != club["created_by"]:
+                db.execute("UPDATE clubs SET created_by = ? WHERE id = ?", (user_id, club_id))
+                _dm(g.user["id"], user_id, f"👑 You're now the owner of {club['name']}. You can add or remove officers "
+                                           f"and hand the club to someone else later. {_club_link(club_id)}")
+                db.commit()
+                flash(f"{first} is the owner now. You're still an officer.", "success")
+                return redirect(url_for("clubs.view", club_id=club_id))
         elif action == "remove":
             if user_id == club["created_by"]:
-                flash("The person who registered the club stays an officer.", "error")
+                flash("The owner stays an officer. To step down, make another officer the owner first.", "error")
             else:
                 db.execute("UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ? AND role = 'officer'",
                            (club_id, user_id))
