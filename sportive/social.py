@@ -512,6 +512,35 @@ def _mark_read(me, other):
     db.commit()
 
 
+def dm_status(me, other):
+    """What shows under my newest DM, if the newest message is mine: "Seen" once they've opened it, else
+    "Delivered". Like WhatsApp, "Seen" only shows when both people have read receipts on."""
+    db = get_db()
+    last = db.execute("""SELECT id, sender_id, read_at FROM direct_messages
+                         WHERE (sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?)
+                         ORDER BY id DESC LIMIT 1""", (me, other, other, me)).fetchone()
+    if last is None or last["sender_id"] != me:
+        return None
+    receipts = db.execute("SELECT MIN(read_receipts) FROM users WHERE id IN (?, ?)", (me, other)).fetchone()[0]
+    return {"id": last["id"], "text": "Seen" if last["read_at"] and receipts else "Delivered"}
+
+
+def group_status(event_id, me):
+    """Under my newest message in a game chat: "Seen" once everyone else going has seen it, else "Delivered".
+    (Always on: the read receipts setting is for DMs.)"""
+    db = get_db()
+    last = db.execute("""SELECT id, sender_id FROM event_messages WHERE event_id = ?
+                           AND sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
+                         ORDER BY id DESC LIMIT 1""", (event_id, me)).fetchone()
+    if last is None or last["sender_id"] != me:
+        return None
+    others, behind = db.execute(
+        """SELECT COUNT(*), COALESCE(SUM(COALESCE(s.last_id, 0) < :last), 0) FROM rsvps r
+           LEFT JOIN event_chat_seen s ON s.event_id = r.event_id AND s.user_id = r.user_id
+           WHERE r.event_id = :event AND r.user_id != :me""", {"last": last["id"], "event": event_id, "me": me}).fetchone()
+    return {"id": last["id"], "text": "Seen" if others and not behind else "Delivered"}
+
+
 @bp.route("/messages/<int:user_id>", methods=("GET", "POST"))
 @login_required
 def thread(user_id):
@@ -537,7 +566,7 @@ def thread(user_id):
     rows = _thread_rows(me, user_id) if not is_blocked_between(me, user_id) else []
     return render_template("social/thread.html", other=other, messages=[message_json(r, me, 'dm') for r in rows],
                            allowed=allowed, poll_url=url_for("social.thread_poll", user_id=user_id), draft=take_draft(),
-                           blocked=i_blocked(me, user_id))
+                           blocked=i_blocked(me, user_id), status=dm_status(me, user_id))
 
 
 @bp.route("/messages/<int:user_id>/poll")
@@ -549,7 +578,7 @@ def thread_poll(user_id):
         return jsonify(messages=[])
     rows = _thread_rows(me, user_id, request.args.get("after", 0, type=int))
     _mark_read(me, user_id)
-    return jsonify(messages=[message_json(r, me, 'dm') for r in rows])
+    return jsonify(messages=[message_json(r, me, 'dm') for r in rows], status=dm_status(me, user_id))
 
 
 # -------------------------------------------------------------- event chat
@@ -607,7 +636,8 @@ def event_chat(event_id):
     return render_template("social/event_chat.html", event=event, people=people,
                            messages=[message_json(r, g.user["id"], 'event_message') for r in rows],
                            poll_url=url_for("social.event_chat_poll", event_id=event_id),
-                           when=fmt_when(event["starts_at"]), draft=take_draft())
+                           when=fmt_when(event["starts_at"]), draft=take_draft(),
+                           status=group_status(event_id, g.user["id"]))
 
 
 @bp.route("/events/<int:event_id>/chat/poll")
@@ -618,7 +648,8 @@ def event_chat_poll(event_id):
         abort(403)
     rows = _chat_rows(event_id, request.args.get("after", 0, type=int))
     _mark_chat_seen(event_id, rows)
-    return jsonify(messages=[message_json(r, g.user["id"], 'event_message') for r in rows])
+    return jsonify(messages=[message_json(r, g.user["id"], 'event_message') for r in rows],
+                   status=group_status(event_id, g.user["id"]))
 
 
 @bp.route("/chat-photos/<int:photo_id>")

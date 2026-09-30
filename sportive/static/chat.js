@@ -60,7 +60,9 @@
       && previous.dataset.day === message.day && list.lastElementChild === previous;
     if (sameGroup) previous.classList.add("is-grouped");  // its photo and time move to this new last one
     const item = el("li", "chat-msg" + (message.mine ? " is-mine" : "") + (sameGroup ? "" : " starts-group"));
+    item.dataset.id = message.id;
     item.dataset.sender = message.sender;
+    item.dataset.time = message.time;
     item.dataset.day = message.day;
     if (!message.mine) {
       const avatar = el("a", "chat-avatar");
@@ -119,17 +121,47 @@
     list.appendChild(item);
   }
 
+  // "Seen" / "Delivered" under my newest message (only when the newest message is mine).
+  function showStatus(status) {
+    list.querySelectorAll(".chat-seen").forEach((node) => node.remove());
+    const newest = [...list.querySelectorAll(".chat-msg")].pop();
+    if (!status || !newest || newest.dataset.id !== String(status.id)) return;
+    newest.querySelector(".chat-meta").appendChild(el("span", "chat-seen", status.text));
+  }
+
+  // Swipe left on the messages to see when each one was sent (the times sit just off the right edge).
+  let swipe = null;
+  list.addEventListener("touchstart", (event) => {
+    swipe = { x: event.touches[0].clientX, y: event.touches[0].clientY, sideways: null };
+  }, { passive: true });
+  list.addEventListener("touchmove", (event) => {
+    if (!swipe) return;
+    const dx = event.touches[0].clientX - swipe.x, dy = event.touches[0].clientY - swipe.y;
+    if (swipe.sideways === null && Math.abs(dx) + Math.abs(dy) > 10) swipe.sideways = Math.abs(dx) > Math.abs(dy);
+    if (!swipe.sideways) return;
+    list.classList.add("show-times");
+    list.style.setProperty("--swipe", Math.max(-88, Math.min(0, dx)) + "px");
+  }, { passive: true });
+  const endSwipe = () => {
+    swipe = null;
+    list.classList.remove("show-times");
+    list.style.removeProperty("--swipe");
+  };
+  list.addEventListener("touchend", endSwipe);
+  list.addEventListener("touchcancel", endSwipe);
+
   async function poll(now) {
     if (document.hidden && !now) return;
     try {
       const response = await fetch(`${box.dataset.pollUrl}?after=${lastId}`, { headers: { Accept: "application/json" } });
       if (new URL(response.url).pathname.startsWith("/login")) { location.reload(); return; }  // logged out
       if (!response.ok) return;
-      const { messages } = await response.json();
-      if (!messages.length) return;
+      const { messages, status } = await response.json();
+      if (!messages.length) { showStatus(status); return; }
       const wasNearBottom = nearBottom();
       messages.forEach(render);
       lastId = messages[messages.length - 1].id;
+      showStatus(status);
       if (empty) empty.hidden = true;
       box.classList.remove("is-empty");
       if (wasNearBottom) scrollDown();

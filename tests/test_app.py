@@ -1407,6 +1407,52 @@ def test_event_group_chat(accounts, client, app):
     assert [m["body"] for m in msgs] == ["on my way!"]
 
 
+def test_seen_and_delivered_like_whatsapp(accounts, client, app):
+    """Under my newest DM: Delivered, then Seen once they open it; read receipts off (either person) hides Seen
+    both ways. Game chats: Seen only once everyone else going has seen it, whatever the setting."""
+    accounts.signup(email="a@uw.edu")
+    accounts.logout()
+    accounts.signup(email="b@uw.edu")
+    a, b = _user_id(app, "a@uw.edu"), _user_id(app, "b@uw.edu")
+    _played_games(app, "soccer", [a, b])
+    client.post(f"/messages/{a}", data={"body": "you up for tonight?"})
+    status = lambda url: client.get(url).get_json()["status"]
+    assert status(f"/messages/{a}/poll")["text"] == "Delivered"
+    assert b'class="chat-seen">Delivered' in client.get(f"/messages/{a}").data
+    accounts.logout()
+    accounts.login(email="a@uw.edu")
+    assert status(f"/messages/{b}/poll") is None          # their message is the newest: nothing under it
+    accounts.logout()
+    accounts.login(email="b@uw.edu")
+    assert status(f"/messages/{a}/poll")["text"] == "Seen"
+    client.post("/settings/receipts", data={})             # off: no Seen for me either
+    assert status(f"/messages/{a}/poll")["text"] == "Delivered"
+    client.post("/settings/receipts", data={"read_receipts": "1"})
+    assert status(f"/messages/{a}/poll")["text"] == "Seen"
+    accounts.logout()
+    accounts.login(email="a@uw.edu")
+    client.post("/settings/receipts", data={})             # the other person off: no Seen either
+    accounts.logout()
+    accounts.login(email="b@uw.edu")
+    assert status(f"/messages/{a}/poll")["text"] == "Delivered"
+
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    for email in ("c@uw.edu", "d@uw.edu"):
+        accounts.logout()
+        accounts.signup(email=email)
+        client.post(f"/events/{event_id}/join")
+    client.post(f"/events/{event_id}/chat", data={"body": "on my way"})   # d writes; b and c haven't seen it
+    chat_status = lambda: status(f"/events/{event_id}/chat/poll")
+    assert chat_status()["text"] == "Delivered"
+    for email in ("b@uw.edu", "c@uw.edu"):   # b has read receipts on, c too; a's "off" is only for DMs
+        accounts.logout()
+        accounts.login(email=email)
+        assert chat_status() is None
+    accounts.logout()
+    accounts.login(email="d@uw.edu")
+    assert chat_status()["text"] == "Seen"
+
+
 def test_blocking_takes_them_off_your_upcoming_games(accounts, client, app):
     accounts.signup(email="host@uw.edu")
     event_id = event_id_from(client.post("/events/new", data=event_form()))

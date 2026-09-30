@@ -63,6 +63,19 @@ def weekly():
     return redirect(url_for("settings.home"))
 
 
+@bp.route("/settings/receipts", methods=("POST",))
+@login_required
+def receipts():
+    """Read receipts in DMs. Off works both ways, like WhatsApp: people don't see when you've read their
+    messages, and you don't see when they've read yours. Game chats always show "Seen"."""
+    on = 1 if request.form.get("read_receipts") else 0
+    db = get_db()
+    db.execute("UPDATE users SET read_receipts = ? WHERE id = ?", (on, g.user["id"]))
+    db.commit()
+    flash("Read receipts are on." if on else "Read receipts are off.", "success")
+    return redirect(url_for("settings.home"))
+
+
 @bp.route("/settings/texts", methods=("GET", "POST"))
 @login_required
 def texts():

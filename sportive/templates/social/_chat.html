@@ -1,11 +1,13 @@
-{# Shared chat box: messages + composer. kind: 'dm' (two people: no names on bubbles) or 'game' (a group).
+{# Shared chat box: messages + composer. Swipe left on the messages to see every message's time (like WhatsApp);
+   status: "Seen"/"Delivered" under my newest message (social.dm_status / group_status).
+   kind: 'dm' (two people: no names on bubbles) or 'game' (a group).
    Messages in a row from one person are grouped: their photo and the time show once, at the end of the group
    (chat.js keeps this up to date as new messages arrive). #}
 {% set QUICK = {
   'dm': ["Down to play? 🏀", "What time?", "I'm in!", "Where are we meeting?"],
   'game': ["On my way 🏃", "Running 5 min late", "I'm here!", "Who's bringing a ball?"],
 } %}
-{% macro chat_box(messages, poll_url, action, can_send, placeholder, empty_text, draft='', kind='game') %}
+{% macro chat_box(messages, poll_url, action, can_send, placeholder, empty_text, draft='', kind='game', status=None) %}
   <div class="chat card{% if not messages %} is-empty{% endif %}" data-poll-url="{{ poll_url }}" data-kind="{{ kind }}"
        data-last-id="{{ messages[-1].id if messages else 0 }}">
     <ol class="chat-messages" id="chat-messages" aria-live="polite">
@@ -16,7 +18,7 @@
         <li class="chat-msg{% if m.mine %} is-mine{% endif %}
                    {%- if not prev or prev.sender != m.sender or prev.day != m.day %} starts-group{% endif %}
                    {%- if nxt and nxt.sender == m.sender and nxt.day == m.day %} is-grouped{% endif %}"
-            data-sender="{{ m.sender }}" data-day="{{ m.day }}">
+            data-id="{{ m.id }}" data-sender="{{ m.sender }}" data-day="{{ m.day }}" data-time="{{ m.time }}">
           {% if not m.mine %}
             <a href="{{ m.profile }}" class="chat-avatar" tabindex="-1" aria-label="{{ m.name }}'s profile">
               {%- if m.avatar %}<img src="{{ m.avatar }}" alt="">{% else %}<span>{{ m.initial }}</span>{% endif -%}
@@ -35,6 +37,7 @@
               </a>
             {% endif %}
             <span class="chat-meta"><time>{{ m.time }}</time>
+              {%- if status and status.id == m.id %}<span class="chat-seen">{{ status.text }}</span>{% endif %}
               {%- if m.report %}<details class="chat-more"><summary aria-label="More options for this message">⋯</summary>
                 <a href="{{ m.report }}">Report</a></details>{% endif %}</span>
           </div>

@@ -1132,3 +1132,13 @@ html.chat-pinned #main > .chat { flex: 1; min-height: 0; margin-bottom: 0; }
 body:has(.chat[data-poll-url]) .site-footer { display: none; }  /* chats fill the screen: no footer underneath */
 body.hide-tabs.has-help main.page { padding-bottom: 16px; }  /* the Help? bubble is hidden here, so no room for it */
 .chat-error { margin: 0; padding: 6px 12px 0; color: var(--danger); font-size: .85rem; }
+/* Swipe left on a chat to see each message's time (chat.js); "Seen"/"Delivered" under my newest message */
+.chat-messages { overflow-x: hidden; touch-action: pan-y; }
+.chat-msg, .chat-msg.is-mine { position: relative; transition: transform .2s ease; max-width: none; width: 100%;
+  margin-left: 0; }  /* full-width rows, so the swipe-in times sit at the edge */
+.chat-msg .chat-bubble { max-width: 78%; }
+.chat-msg::after { content: attr(data-time); position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
+  margin-left: 24px; font-size: .72rem; color: var(--muted); white-space: nowrap; }  /* past the list padding: hidden until a swipe */
+.chat-messages.show-times .chat-msg { transform: translateX(var(--swipe, 0)); transition: none; }
+.chat-seen { font-size: .72rem; opacity: .85; }
+.chat-seen::before { content: "· "; }
