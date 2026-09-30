@@ -21,28 +21,28 @@
         <small class="muted place-tip" data-place-tip></small>
       </label>
     </div>
-    <div class="row">
+    <div class="row row-pair">
       {{ select('starts_in', 'Starting', start_options, form.get('starts_in', '30')) }}
       {{ select('duration', 'For', durations, form.get('duration', '60')) }}
     </div>
     {{ place_check(form.get('sport', '')) }}
+    </section>
+    <section class="wizard-step">
+    <h2 class="form-step"><span>2</span> Who can join</h2>
+    {{ who_can_join(form) }}
     <label class="field" data-show="public" {% if form.get('is_private') == '1' %}hidden{% endif %}><span>Skill level</span>
       <select name="skill_level">
         {% for level in SKILL_LEVELS %}<option value="{{ level }}" {% if form.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>{% endfor %}
       </select>
     </label>
-    </section>
-    <section class="wizard-step">
-    <h2 class="form-step"><span>2</span> Who can join</h2>
-    {{ who_can_join(form) }}
     {{ format_field(form) }}
     {{ open_to_field(form) }}
+    <label class="field"><span>Note <em>(optional)</em></span>
+      <textarea name="note" maxlength="500" rows="2" placeholder="Court 2, look for the blue shirts">{{ form.get('note', '') }}</textarea></label>
     </section>
     <section class="wizard-step">
     <h2 class="form-step"><span>3</span> Participants</h2>
     {{ players_block(form, friends, allow_no_limit=False) }}
-    <label class="field"><span>Note <em>(optional)</em></span>
-      <textarea name="note" maxlength="500" rows="2" placeholder="Court 2, look for the blue shirts">{{ form.get('note', '') }}</textarea></label>
     </section>
     <div class="wizard-nav" hidden>
       <button type="button" class="btn btn-ghost" data-wizard-back>← Back</button>

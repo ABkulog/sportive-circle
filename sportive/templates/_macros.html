@@ -248,7 +248,7 @@
   {# The host checks the place is free, like anyone telling their group chat "let's play here". We don't check. #}
   <p class="place-check" role="note">
     <strong>Heads up: check the <span data-place-space>{{ SPORT_SPACE.get(sport, 'place') if sport else 'place' }}</span> is free then.</strong>
-    It could be booked, full, or closed for an event. Sportive Circle doesn't reserve or check places, so that's on the host.
+    It could be booked or closed. We don't reserve places.
   </p>
   {# Filled in as the host picks a place and time: UW Rec reservations, and other games there then. #}
   <div class="whats-on" data-whats-on data-url="{{ url_for('placecheck.place_check') }}" aria-live="polite" hidden></div>

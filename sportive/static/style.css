@@ -1008,3 +1008,15 @@ button.link-button { min-height: 36px; }
 .rec-add summary h2 { margin: 0; font-size: 1rem; color: var(--purple); }
 .rec-add summary h2::before { content: "+ "; }
 .rec-add[open] summary h2::before { content: "− "; }
+/* Short phones (iPhone 8/SE): forms a little tighter so the whole step fits without scrolling */
+@media (max-height: 700px) {
+  .form { gap: 10px; margin: 10px 0; }
+  .field { gap: 4px; }
+  .form-card h1 { margin-bottom: 4px; }
+  input, select { padding-top: 9px; padding-bottom: 9px; }
+  input[type="date"], input[type="time"], input[type="datetime-local"] { min-height: 42px; }
+  .club-qr { width: min(210px, 60vw); }
+  .friend-picks { max-height: 116px; }  /* about 2 friends; the rest scroll inside the box */
+  .edit-photo { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; margin: 0 0 6px; }
+  .edit-photo .avatar-img { --size: 52px !important; }
+}

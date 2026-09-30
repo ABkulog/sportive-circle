@@ -107,6 +107,7 @@
         if (e.tagName === "A" && win.getComputedStyle(e).display === "inline" && e.closest("p, li, small, .muted, .fine-print, footer")) continue; // links inside sentences
         if (e.tagName === "LABEL" || e.tagName === "TEXTAREA") continue;
         if (r.right <= 0 || r.bottom <= 0) continue; // parked off-screen until focused (e.g. "Skip to content")
+        if (win.getComputedStyle(e, "::after").position === "absolute") continue; // stretched over its whole card
         if (r.height < 32 || r.width < 24) add("small-tap-target", `${label(e)} ${Math.round(r.width)}x${Math.round(r.height)}`);
       }
     }

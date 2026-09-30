@@ -4517,7 +4517,7 @@ def test_hosts_are_told_to_check_the_place_is_free(accounts, client, app):
     accounts.signup()
     for page in ("/events/new", "/need-players"):
         html = client.get(page).data.decode()
-        assert "Heads up: check the" in html and "doesn't reserve or check places" in html
+        assert "Heads up: check the" in html and "We don't reserve places" in html
     html = client.get("/events/new").data.decode()
     assert '"space"' in html and '"courts"' in html and '"trail"' in html  # the word follows the sport (forms.js)
     assert "make sure the place is free" in client.get("/terms").data.decode()

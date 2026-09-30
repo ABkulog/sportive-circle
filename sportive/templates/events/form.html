@@ -6,7 +6,7 @@
 <div class="card form-card">
   <h1>{{ 'Edit event' if event else 'Create event' }}</h1>
   {% if club %}<p class="club-banner">For <strong>{{ club.name }}</strong>. Open to all levels.</p>{% endif %}
-  {# Three short steps (no scrolling on a phone); without JavaScript it's one form. #}
+  {# Four short steps (no scrolling on a phone); without JavaScript it's one form. #}
   <form method="post" class="form" data-sport-form data-wizard {% if event %}data-event-id="{{ event.id }}"{% endif %} {% if event and event.team_size %}data-team-game{% endif %}>
     {{ csrf_field() }}
     {% if club %}<input type="hidden" name="club" value="{{ club.id }}">{% endif %}
@@ -24,6 +24,11 @@
       </label>
       {% endif %}
     </div>
+    <label class="field"><span>Note <em>(optional)</em></span>
+      <textarea name="note" maxlength="500" rows="2" placeholder="Court 3, bring a light and a dark shirt">{{ form.get('note', '') }}</textarea></label>
+    </section>
+    <section class="wizard-step">
+    <h2 class="form-step"><span>2</span> Where and when</h2>
     <label class="field"><span>Location</span>
       <select name="location" required>
         <option value="">Choose a place</option>
@@ -40,7 +45,7 @@
     {{ place_check(form.get('sport', '')) }}
     </section>
     <section class="wizard-step">
-    <h2 class="form-step"><span>2</span> Who can join</h2>
+    <h2 class="form-step"><span>3</span> Who can join</h2>
     {{ who_can_join(form, club=club or (event and event.club_id)) }}
     {% if club %}
       <label class="field"><span>Repeat</span>
@@ -58,10 +63,8 @@
     {% if not club and not (event and event.club_id) %}{{ open_to_field(form) }}{% endif %}
     </section>
     <section class="wizard-step">
-    <h2 class="form-step"><span>3</span> Participants</h2>
+    <h2 class="form-step"><span>4</span> Participants</h2>
     {{ players_block(form, friends, event) }}
-    <label class="field"><span>Note <em>(optional)</em></span>
-      <textarea name="note" maxlength="500" rows="2" placeholder="Court 3, bring a light and a dark shirt">{{ form.get('note', '') }}</textarea></label>
     </section>
     <div class="wizard-nav" hidden>
       <button type="button" class="btn btn-ghost" data-wizard-back>← Back</button>

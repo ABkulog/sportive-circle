@@ -19,7 +19,7 @@
       <label class="field"><span>Pronouns <em>(optional)</em></span>
         <input name="pronouns" maxlength="20" value="{{ form.get('pronouns', '') }}" placeholder="she/her"></label>
     </div>
-    <label class="field"><span>Gender <em>(optional, only for women's or men's games)</em></span>
+    <label class="field"><span>Gender <em>(optional, for women's or men's games)</em></span>
       <select name="gender">
         {% for value, label in genders.items() %}<option value="{{ value }}" {% if form.get('gender', '') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
       </select></label>
