@@ -603,16 +603,22 @@ def decide(club_id, user_id, decision):
     if row is None:
         abort(404)
     me = g.user["id"]
+    same = "AND role = ?"  # only if nobody decided it in the meantime (two officers at once)
     if decision == "approve" and row["role"] in WAITING_ROLES:
-        db.execute("UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ?", (club_id, user_id))
+        if not db.execute(f"UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ? {same}",
+                          (club_id, user_id, row["role"])).rowcount:
+            flash("Someone already decided this one.", "info")
+            return redirect(url_for("clubs.view", club_id=club_id) + "#requests")
         made_it = "You made the team! " if row["role"] == "tryout" else ""
         _dm(me, user_id, f"✅ {made_it}You're officially a member of {club['name']}. Welcome! "
                          f"{SPORT_EMOJI[club['sport']]} {_club_link(club_id)}")
         flash("Confirmed. They're a member now.", "success")
     elif decision == "decline" and row["role"] in WAITING_ROLES:
         # They stay a follower, so they still see what the club is up to.
-        db.execute("UPDATE club_members SET role = 'follower', message = '' WHERE club_id = ? AND user_id = ?",
-                   (club_id, user_id))
+        if not db.execute(f"UPDATE club_members SET role = 'follower', message = '' WHERE club_id = ? AND user_id = ?"
+                          f" {same}", (club_id, user_id, row["role"])).rowcount:
+            flash("Someone already decided this one.", "info")
+            return redirect(url_for("clubs.view", club_id=club_id) + "#requests")
         if row["role"] == "tryout":
             body = (f"Thanks so much for trying out for {club['name']}! We couldn't offer you a spot this time, "
                     "but we'd love to see you again next season. You're still following the club. 💜")
@@ -699,7 +705,10 @@ def officers(club_id):
             if not is_officer:
                 flash("Make them an officer first, then you can make them the owner.", "error")
             elif user_id != club["created_by"]:
-                db.execute("UPDATE clubs SET created_by = ? WHERE id = ?", (user_id, club_id))
+                if not db.execute("UPDATE clubs SET created_by = ? WHERE id = ? AND created_by = ?",
+                                  (user_id, club_id, club["created_by"])).rowcount:  # handed over meanwhile
+                    flash("The club was already handed to someone else.", "error")
+                    return redirect(url_for("clubs.view", club_id=club_id))
                 _dm(g.user["id"], user_id, f"👑 You're now the owner of {club['name']}. You can add or remove officers "
                                            f"and hand the club to someone else later. {_club_link(club_id)}")
                 db.commit()
@@ -874,9 +883,13 @@ def review(club_id, decision):
         flash("Add a short note so the officers know what to fix.", "error")
         return back
     db = get_db()
+    moved = lambda status, saved_note: db.execute(  # only if nobody else decided in the meantime
+        "UPDATE clubs SET status = ?, review_note = ?, reviewed_at = ? WHERE id = ? AND status = ?",
+        (status, saved_note, to_db(now_local()), club_id, club["status"])).rowcount
     if decision in ("deny", "remove", "restore"):
-        db.execute("UPDATE clubs SET status = ?, review_note = ?, reviewed_at = ? WHERE id = ?",
-                   (new_status, note if decision == "remove" else club["review_note"], to_db(now_local()), club_id))
+        if not moved(new_status, note if decision == "remove" else club["review_note"]):
+            flash("That club already moved on. Here's where it is now.", "info")
+            return back
         db.commit()
         if decision == "deny":
             flash(f"Denied {club['name']}. It's hidden and can't be resent.", "info")
@@ -892,8 +905,9 @@ def review(club_id, decision):
                                      + " It's hidden until it's approved again.", url_for("clubs.view", club_id=club_id)))
             flash(f"Removed {club['name']} from the club list. It's on the waiting list now.", "info")
         return redirect(url_for("clubs.review_queue", status=new_status))
-    db.execute("UPDATE clubs SET status = ?, review_note = ?, reviewed_at = ? WHERE id = ?",
-               ("approved" if decision == "approve" else "rejected", note, to_db(now_local()), club_id))
+    if not moved("approved" if decision == "approve" else "rejected", note):
+        flash("That club already moved on. Here's where it is now.", "info")
+        return back
     db.commit()
     link = _club_link(club_id)
     if decision == "approve":

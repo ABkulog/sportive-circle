@@ -1,7 +1,7 @@
 """Notifications: the 🔔 bell, and numbers on the icons.
 
 Everything new shows up in exactly ONE place, so nothing is counted twice:
-- on its own icon when it has a home there: messages (✉️), friend requests (👥), club news (Clubs tab);
+- on its own icon when it has a home there: messages (✉️), friend requests (👥), club updates (Clubs tab);
 - in the bell for everything else: invites, changes to your games, game chats, Need players posts, badges.
 
 Each kind can be switched on or off in Settings -> Notifications. Nothing is pushed or emailed from here.
@@ -93,7 +93,7 @@ def _latest(kind):
 
 
 def mark_seen(kind):
-    """Call when someone opens the place a notification points to (e.g. the News tab)."""
+    """Call when someone opens the place a notification points to (e.g. the club updates page)."""
     if g.get("user") is None:
         return
     _set_marker(g.user["id"], kind, _latest(kind))

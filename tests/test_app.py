@@ -4961,3 +4961,26 @@ def test_deleting_an_account_clears_its_login_and_code_records(accounts, client,
         db = get_db()
         assert not db.execute("SELECT 1 FROM login_failures WHERE email = 'dubs@uw.edu'").fetchone()
         assert not db.execute("SELECT 1 FROM email_codes WHERE inbox = 'dubs'").fetchone()
+
+
+def test_club_decisions_made_twice_at_once_only_apply_once(accounts, client, app, monkeypatch):
+    """Two admins deciding the same club at the same moment: both read "waiting", but only the first decision
+    lands and only its email goes out. The second admin is told it already moved on."""
+    from sportive import clubs
+    emails = []
+    monkeypatch.setattr(clubs, "send_email", lambda to, subject, body, html=None: emails.append(subject))
+    accounts.signup(email="captain@uw.edu", name="Cap Tain")
+    client.post("/clubs/new", data=CLUB)
+    club = _club_id(app, CLUB["name"])
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu", name="Ad Min")
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    with app.app_context():
+        stale = dict(get_db().execute("SELECT * FROM clubs WHERE id = ?", (club,)).fetchone())
+    monkeypatch.setattr(clubs, "get_club", lambda club_id: stale)    # both admins loaded the club while waiting
+    client.post(f"/admin/clubs/{club}/approve")
+    page = client.post(f"/admin/clubs/{club}/reject", data={"note": "Fix it"}, follow_redirects=True).data.decode()
+    assert "already moved on" in page
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM clubs WHERE id = ?", (club,)).fetchone()[0] == "approved"
+    assert len(emails) == 1
