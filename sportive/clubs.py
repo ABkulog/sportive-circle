@@ -24,7 +24,7 @@ from .notifications import mark_seen
 from .phones import phone_from_form
 from .photos import make_avatar
 from .sms import text_user
-from .textutil import multi_line, one_line
+from .textutil import fold, multi_line, one_line
 from .timeutil import from_db, now_local, to_db
 
 bp = Blueprint("clubs", __name__)
@@ -249,9 +249,9 @@ def directory():
         where.append("EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me)")
     else:
         where.append("c.status = 'approved'")
-    if q:
-        where.append("(c.name LIKE :q OR c.description LIKE :q)")
-        params["q"] = f"%{q}%"
+    for n, word in enumerate(fold(q).split()[:5]):  # every word, any order, accents and capitals ignored
+        where.append(f"fold(c.name || ' ' || c.description || ' ' || c.sport) LIKE :w{n} ESCAPE '\\'")
+        params[f"w{n}"] = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
     if sport in SPORTS:
         where.append("c.sport = :sport")
         params["sport"] = sport

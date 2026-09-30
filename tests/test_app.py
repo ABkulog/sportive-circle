@@ -4339,7 +4339,7 @@ def test_notifications_show_when_they_happened(accounts, client, app):
     home = client.get("/").data.decode()
     assert 'class="bell-link"' in home and '<span class="count-dot">1</span>' in home     # the number on the bell
     page = client.get("/notifications").data.decode()
-    assert "5 min ago" in page and "happening now" not in page
+    assert ("5 min ago" in page or "6 min ago" in page) and "happening now" not in page   # a minute may tick over
 
 
 def test_a_reserved_spot_is_texted(accounts, client, app, monkeypatch):
@@ -5221,3 +5221,11 @@ def test_a_suspended_owner_doesnt_strand_their_club_or_friend_requests(accounts,
     client.post(f"/friends/accept/{captain}")
     with app.app_context():
         assert get_db().execute("SELECT status FROM friendships").fetchone()[0] == "pending"
+
+
+def test_club_search_matches_words_in_any_order(accounts, client, app):
+    _approved_club(accounts, client, app, name="Club Ultimate Frisbee")
+    accounts.signup(email="finder@uw.edu")
+    for q in ("ultimate club", "FRISBEE", "ultimate", "club%"):
+        page = client.get("/clubs", query_string={"q": q}).data.decode()
+        assert ("Club Ultimate Frisbee" in page) == (q != "club%"), q    # a % is a letter, not a wildcard
