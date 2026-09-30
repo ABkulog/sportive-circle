@@ -321,10 +321,11 @@ def open_invite_link(token):
         return redirect(url_for("index"))
     if g.get("user") is not None and request.method == "POST":
         return redirect(accept_invite_link(g.user, token) or url_for("index"))
-    event = _open_game(link[0]) if link[0] else None
-    if g.get("user") is None:
+    if request.method == "POST":  # logged out and tapped "Sign up and join" / "I have an account"
         session["invite_link"] = token  # used right after they sign up or log in (auth.log_in)
-    elif inviter["id"] == g.user["id"]:
+        return redirect(url_for("auth.login" if request.form.get("go") == "login" else "auth.signup"))
+    event = _open_game(link[0]) if link[0] else None
+    if g.get("user") is not None and inviter["id"] == g.user["id"]:
         return redirect(url_for("events.detail", event_id=event["id"]) if event else url_for("social.friends"))
     return render_template("events/invite_link.html", inviter=inviter, event=event, token=token)
 

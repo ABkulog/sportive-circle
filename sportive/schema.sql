@@ -354,3 +354,35 @@ CREATE TABLE IF NOT EXISTS rec_reservations (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_rec_reservations ON rec_reservations(location, starts_at);
+
+-- Every email code we send (sign-up and password reset), for the per-day limit: a few codes a day means
+-- a few wrong guesses a day, so nobody can guess their way into an account or a UW address.
+CREATE TABLE IF NOT EXISTS email_codes (
+    inbox   TEXT NOT NULL,           -- the NetID part of the email (netid@uw.edu and @u.washington.edu share it)
+    sent_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_email_codes ON email_codes(inbox, sent_at);
+
+-- When we last emailed a club's officers about someone asking to join, so asking, leaving and asking again
+-- doesn't flood their inbox (one email per person per club per day; the request still shows in the club).
+CREATE TABLE IF NOT EXISTS club_join_emails (
+    club_id INTEGER NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    sent_at TEXT NOT NULL,
+    PRIMARY KEY (club_id, user_id)
+);
+
+-- Wrong passwords at login, by device address. A lockout only blocks the address the wrong guesses came from,
+-- so nobody can lock someone else out of their account by typing wrong passwords for it.
+CREATE TABLE IF NOT EXISTS login_failures (
+    ip        TEXT NOT NULL,
+    email     TEXT NOT NULL,
+    failed_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_login_failures ON login_failures(ip, failed_at);
+
+-- Logins that were logged out (the cookie's id), so a copied cookie stops working after "Log out".
+CREATE TABLE IF NOT EXISTS ended_sessions (
+    sid      TEXT PRIMARY KEY,
+    ended_at TEXT NOT NULL
+);

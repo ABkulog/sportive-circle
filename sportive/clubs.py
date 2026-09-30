@@ -9,6 +9,7 @@ import io
 import logging
 import re
 import secrets
+from datetime import timedelta
 
 from flask import Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
@@ -24,7 +25,7 @@ from .phones import phone_from_form
 from .photos import make_avatar
 from .sms import text_user
 from .textutil import multi_line, one_line
-from .timeutil import now_local, to_db
+from .timeutil import from_db, now_local, to_db
 
 bp = Blueprint("clubs", __name__)
 log = logging.getLogger(__name__)
@@ -143,9 +144,10 @@ def featured_clubs(limit=6):
            FROM clubs c WHERE c.status = 'approved' ORDER BY member_count DESC, c.name LIMIT ?""", (limit,)).fetchall()
 
 
-def read_club_form(form, club_id=None):
+def read_club_form(form, club_id=None, phone_on_file=""):
     """Validate the registration/edit form. Returns (data, error, field): `field` is the input
-    with the problem, so the step-by-step form can open right on it."""
+    with the problem, so the step-by-step form can open right on it. `phone_on_file` is kept when an
+    officer who can't see it (only admins and whoever registered the club can) leaves the phone box empty."""
     get = lambda key: form.get(key, "").strip()
     single = lambda key: one_line(form.get(key))  # names, emails, links: no line breaks
     data = {key: single(key) for key in ("name", "sport", "meets", "location", "contact_url", "club_kind",
@@ -156,7 +158,9 @@ def read_club_form(form, club_id=None):
         value = get(key)
         data[key] = value if value.startswith("https://") else value.lstrip("@")
     data["competes"] = 1 if form.get("competes") else 0
-    data["contact_phone"] = phone_from_form(form.get("contact_phone_country"), form.get("contact_phone")) or ""
+    typed_phone = form.get("contact_phone", "").strip()
+    data["contact_phone"] = (phone_from_form(form.get("contact_phone_country"), typed_phone) or ""
+                             if typed_phone else phone_on_file)
     members = get("member_estimate")
 
     def problem(field, message):
@@ -451,7 +455,13 @@ def create():
 def _club_form_page(form, club, error_field, unchanged=False):
     return render_template("clubs/form.html", form=form, club=club, locations=LOCATIONS, kinds=CLUB_KINDS,
                            focus=FOCUS, joining=JOINING, experience=EXPERIENCE, who=WHO_CAN_JOIN,
-                           min_members=MIN_ACTIVE_MEMBERS, error_field=error_field, unchanged=unchanged)
+                           min_members=MIN_ACTIVE_MEMBERS, error_field=error_field, unchanged=unchanged,
+                           phone_hidden=bool(club) and not can_see_club_phone(club))
+
+
+def can_see_club_phone(club):
+    """The club's phone is for our team: admins, and the club's owner. Other officers can replace it."""
+    return is_admin() or club["created_by"] == g.user["id"]
 
 
 @bp.route("/clubs/<int:club_id>/edit", methods=("GET", "POST"))
@@ -466,7 +476,7 @@ def edit(club_id):
     error_field = None
     if request.method == "POST":
         form = request.form
-        data, error, error_field = read_club_form(form, club_id)
+        data, error, error_field = read_club_form(form, club_id, phone_on_file=club["contact_phone"])
         if error is None and club["status"] == "rejected" and all(data[key] == club[key] for key in FIELDS):
             # Sent back with a note: resending it exactly as it was would just get the same answer.
             return _club_form_page(form, club, None, unchanged=True)
@@ -486,6 +496,8 @@ def edit(club_id):
         flash(error, "error")
     else:
         form = MultiDict({key: club[key] for key in FIELDS})
+        if not can_see_club_phone(club):
+            form["contact_phone"] = ""
         form.setlist("competes", ["1"] if club["competes"] else [])
     return _club_form_page(form, club, error_field)
 
@@ -547,11 +559,18 @@ def join(club_id):
                   ON CONFLICT(club_id, user_id) DO UPDATE SET role = excluded.role, message = excluded.message,
                                                           joined_at = excluded.joined_at""",
                (club_id, g.user["id"], new_role, message, to_db(now_local())))
+    # Let the officers know there's someone new (once a day per person, so leaving and asking again isn't spam).
+    emailed = db.execute("SELECT sent_at FROM club_join_emails WHERE club_id = ? AND user_id = ?",
+                         (club_id, g.user["id"])).fetchone()
+    officers = []
+    if not emailed or from_db(emailed["sent_at"]) < now_local() - timedelta(days=1):
+        db.execute("INSERT OR REPLACE INTO club_join_emails (club_id, user_id, sent_at) VALUES (?, ?, ?)",
+                   (club_id, g.user["id"], to_db(now_local())))
+        officers = db.execute("""SELECT u.id, u.email FROM club_members m JOIN users u ON u.id = m.user_id
+                                 WHERE m.club_id = ? AND m.role = 'officer'""", (club_id,)).fetchall()
     db.commit()
-    # Let the officers know there's someone new.
     what = "signed up for tryouts" if new_role == "tryout" else "wants to join"
-    for officer in db.execute("""SELECT u.id, u.email FROM club_members m JOIN users u ON u.id = m.user_id
-                                 WHERE m.club_id = ? AND m.role = 'officer'""", (club_id,)).fetchall():
+    for officer in officers:
         text_user(officer["id"], f"{g.user['full_name']} {what} {club['name']}. Review: "
                                  f"{_club_link(club_id)}#requests")  # only if they turned texts on
         try:

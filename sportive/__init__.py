@@ -23,10 +23,10 @@ SITE_URL = "https://sportivecircle.com"  # the real address (Render also answers
 # library on cdnjs, so even if someone sneaks HTML into a name or message, it can't run code.
 CONTENT_SECURITY_POLICY = "; ".join([
     "default-src 'self'",
-    "script-src 'self' https://cdnjs.cloudflare.com",
-    "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
+    "script-src 'self' https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/",  # only the map library's folder
+    "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/ https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https://tile.openstreetmap.org https://cdnjs.cloudflare.com",
+    "img-src 'self' data: blob: https://tile.openstreetmap.org https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/",
     "connect-src 'self'",
     "frame-ancestors 'none'",
     "form-action 'self'",
@@ -191,8 +191,9 @@ def _security_headers(response):
     if request.is_secure:
         # Browsers only honor this over HTTPS; after that they refuse plain http:// for a year.
         headers.setdefault("Strict-Transport-Security", f"max-age={HSTS_MAX_AGE_SECONDS}; includeSubDomains")
-    if response.mimetype == "text/html":
-        headers.setdefault("Cache-Control", "no-store")  # pages show private info; don't keep copies
+    if request.endpoint not in ("static", "favicon", "touch_icon", "touch_icon_precomposed"):
+        # Pages, chat updates, rosters and calendar files show private info; don't keep copies.
+        headers.setdefault("Cache-Control", "no-store")
     return response
 
 

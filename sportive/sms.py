@@ -31,6 +31,7 @@ MAX_CODE_ATTEMPTS = 5
 RESEND_WAIT = timedelta(seconds=60)
 MAX_CODES_PER_DAY = 5    # code texts per person per day (texts cost money; stops abuse)
 MAX_TEXTS_PER_DAY = 20   # update texts per person per day
+MAX_CODES_PER_NUMBER = 3  # code texts to one number per day, whoever asks (texts to strangers cost money)
 CONSENT = ("Text me reminders and updates about my games. Msg & data rates may apply. "
            "Reply STOP to stop, HELP for help.")
 OPTED_OUT = 21610  # Twilio: this number replied STOP
@@ -134,9 +135,15 @@ def start_phone_check(user_id, phone):
         return f"We just texted a code. Wait {code_wait(user)} seconds to ask for another."
     if _sent_today(user_id, codes=True) >= MAX_CODES_PER_DAY:
         return "That's a lot of codes for one day. Try again tomorrow."
+    since = to_db(now_local() - timedelta(days=1))
+    if db.execute("SELECT COUNT(*) FROM sms_log WHERE phone = ? AND kind = 'code' AND created_at >= ?",
+                  (phone, since)).fetchone()[0] >= MAX_CODES_PER_NUMBER:
+        return "That number got a lot of codes today. Try again tomorrow."
     taken = db.execute("SELECT 1 FROM users WHERE phone = ? AND phone_verified = 1 AND id != ?",
                        (phone, user_id)).fetchone()
     if taken:
+        _log(user_id, phone, "code", False)  # counts toward the day's codes, so nobody can look up numbers
+        db.commit()
         return "That number is already used by another account."
     code = f"{secrets.randbelow(10**6):06d}"
     db.execute("""UPDATE users SET phone = ?, phone_verified = 0, sms_code = ?, sms_code_expires = ?,

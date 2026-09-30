@@ -19,8 +19,11 @@
     </form>
     <a class="btn btn-ghost btn-block" href="{{ url_for('index') }}">Not now</a>
   {% else %}
-    <a class="btn btn-large btn-block" href="{{ url_for('auth.signup') }}">Sign up{% if event %} and join{% endif %}</a>
-    <a class="btn btn-ghost btn-block" href="{{ url_for('auth.login') }}">I have an account</a>
+    <form method="post" action="{{ url_for('parties.open_invite_link', token=token) }}">
+      {{ csrf_field() }}
+      <button class="btn btn-large btn-block">Sign up{% if event %} and join{% endif %}</button>
+      <button class="btn btn-ghost btn-block" name="go" value="login">I have an account</button>
+    </form>
   {% endif %}
 </div>
 {% endblock %}

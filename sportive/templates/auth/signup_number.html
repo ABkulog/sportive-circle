@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Confirm your number{% endblock %}
+{% block content %}
+<div class="card form-card">
+  <p class="step-label">Step 3 of 4</p>
+  <h1>Check your texts</h1>
+  <p class="muted">We texted a 6-digit code to <strong>{{ masked_phone(phone) }}</strong>.</p>
+  <form method="post" class="form">
+    {{ csrf_field() }}
+    <label class="field"><span>Code from the text</span>
+      <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
+             class="code-input" required autofocus></label>
+    <button class="btn btn-block">Confirm my number</button>
+  </form>
+  <form method="post" class="center">
+    {{ csrf_field() }}<input type="hidden" name="skip" value="1">
+    <button class="link-button">Skip for now</button>
+  </form>
+</div>
+{% endblock %}

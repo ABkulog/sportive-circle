@@ -11,9 +11,9 @@
     {{ phone_field('phone', phone, country=country) }}
     <label class="toggle consent"><input type="checkbox" name="consent" value="1">
       <span>{{ SMS_CONSENT }}</span></label>
-    <p class="muted fine-print">We text a code to confirm the number. It's never shown to anyone, and you can turn texts
-      off anytime in Settings.</p>
-    <button class="btn btn-block">Text me a code</button>
+    <p class="muted fine-print">Once your email is confirmed, we text a code to confirm the number. It's never shown to
+      anyone, and you can turn texts off anytime in Settings.</p>
+    <button class="btn btn-block">Next</button>
   </form>
   <form method="post" class="center">
     {{ csrf_field() }}<input type="hidden" name="phone" value="">

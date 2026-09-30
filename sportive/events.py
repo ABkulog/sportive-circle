@@ -205,9 +205,17 @@ def read_game_options(form, sport, event=None):
     return is_private, password, team_size, None
 
 
+PASSWORD_WORDS = ("husky", "dawgs", "purple", "gold", "rally", "court", "field", "pitch", "spike", "smash",
+                  "dunk", "goal", "serve", "sprint", "relay", "lake", "rain", "cedar", "salmon", "orca",
+                  "summit", "ferry", "harbor", "maple", "comet", "rocket", "tiger", "falcon", "ember", "river",
+                  "canyon", "glacier", "thunder", "breeze", "nova", "pixel", "mango", "cobalt", "jade", "quartz")
+
+
 def suggested_password():
-    """A private game's password, filled in for the host (they can change it): easy to say out loud."""
-    return f"dawgs{secrets.randbelow(9000) + 1000}"
+    """A private game's password, filled in for the host (they can change it): easy to say out loud, and too many
+    options to guess (40 × 40 × 900, with 10 tries an hour)."""
+    first, second = (secrets.choice(PASSWORD_WORDS) for _ in range(2))
+    return f"{first}-{second}-{secrets.randbelow(900) + 100}"
 
 
 def created_message(is_private, reserve, public_text):

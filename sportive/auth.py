@@ -23,8 +23,11 @@ log = logging.getLogger(__name__)
 
 CODE_TTL = timedelta(minutes=15)
 MAX_CODE_ATTEMPTS = 5
+MAX_CODES_PER_DAY = 5  # email codes per inbox per day: with 5 tries each, 25 guesses a day at most
+TOO_MANY_CODES = "That's a lot of codes for one day. Try again tomorrow."
 RESEND_COOLDOWN = timedelta(seconds=60)
 MAX_FAILED_LOGINS = 10
+MAX_FAILED_LOGINS_PER_IP = 30  # wrong passwords from one address, across all accounts, per LOCKOUT window
 LOCKOUT = timedelta(minutes=15)
 MIN_AGE, MAX_AGE = 15, 123  # same age range as the original desktop app
 MIN_PASSWORD_LENGTH = 8
@@ -77,6 +80,10 @@ def load_logged_in_user():
         if g.user is not None and session.get("session_version", 0) != g.user["session_version"]:
             session.clear()  # logged out everywhere since this cookie was made (e.g. the password changed)
             g.user = None
+        elif g.user is not None and session.get("sid") and get_db().execute(
+                "SELECT 1 FROM ended_sessions WHERE sid = ?", (session["sid"],)).fetchone():
+            session.clear()  # this login was logged out; someone kept a copy of the cookie
+            g.user = None
 
 
 def end_other_sessions(user_id):
@@ -116,6 +123,7 @@ def log_in(user, remember=True):
     session.clear()
     session.permanent = remember  # stay logged in on your phone (see PERMANENT_SESSION_LIFETIME)
     session["user_id"] = user["id"]
+    session["sid"] = secrets.token_urlsafe(16)  # this login's id, so "Log out" can end it for good
     session["session_version"] = get_db().execute("SELECT session_version FROM users WHERE id = ?",
                                                   (user["id"],)).fetchone()[0]
     get_db().execute("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?", (user["id"],))
@@ -193,16 +201,28 @@ def code_recently_sent(email):
     return resend_wait(email) > 0
 
 
+def codes_left_today(email):
+    """How many more email codes this inbox can get today (MAX_CODES_PER_DAY in a rolling day)."""
+    since = to_db(now_local() - timedelta(days=1))
+    sent = get_db().execute("SELECT COUNT(*) FROM email_codes WHERE inbox = ? AND sent_at >= ?",
+                            (email.split("@")[0], since)).fetchone()[0]
+    return max(0, MAX_CODES_PER_DAY - sent)
+
+
 def start_verification(email, session_key="pending_email"):
+    """Email a new 6-digit code. Returns False (and sends nothing) once the day's codes are used up."""
+    session[session_key] = email
+    if not codes_left_today(email):
+        return False
     code = f"{secrets.randbelow(10**6):06d}"
     db = get_db()
+    db.execute("INSERT INTO email_codes (inbox, sent_at) VALUES (?, ?)", (email.split("@")[0], to_db(now_local())))
     db.execute(
         "UPDATE users SET verify_code = ?, verify_expires = ?, verify_sent_at = ?, verify_attempts = 0"
         " WHERE email = ?",
         (code, to_db(now_local() + CODE_TTL), now_to_the_second().strftime(SENT_AT_FORMAT), email),
     )
     db.commit()
-    session[session_key] = email
     return send_verification_email(email, code, "reset" if session_key == "reset_email" else "signup")
 
 
@@ -266,6 +286,8 @@ def signup():
         error = validate_signup(full_name, email, password, password2, grad_year, birth_date)
         if error is None and code_recently_sent(email):
             error = "We just sent a code to that email. Check your inbox, or wait a minute and try again."
+        if error is None and not codes_left_today(email):
+            error = TOO_MANY_CODES
         if error is None:
             db = get_db()
             # An unverified account never proved it owns the email, so it can be replaced.
@@ -318,9 +340,11 @@ def signup_sports():
 
 @bp.route("/signup/texts", methods=("GET", "POST"))
 def signup_texts():
-    """Sign-up step 3 (optional): get codes and game updates by text too. Asks for permission first."""
+    """Sign-up step 3 (optional): get codes and game updates by text too. Asks for permission first.
+    The number is only saved here: its code is texted once the UW email is confirmed, so texts (which cost
+    money) can't be sent from made-up accounts."""
     from .phones import phone_from_form
-    from .sms import sms_available, start_phone_check
+    from .sms import sms_available
     email = session.get("pending_email")
     user = email and get_db().execute("SELECT id, phone FROM users WHERE email = ? AND verified = 0",
                                       (email,)).fetchone()
@@ -331,6 +355,8 @@ def signup_texts():
     if request.method == "POST":
         raw = request.form.get("phone", "")
         if not raw.strip():
+            get_db().execute("UPDATE users SET phone = '' WHERE id = ?", (user["id"],))
+            get_db().commit()
             return redirect(url_for("auth.verify"))  # skipped: texts stay off
         phone = phone_from_form(request.form.get("phone_country"), raw)
         if phone is None:
@@ -338,12 +364,32 @@ def signup_texts():
         elif not request.form.get("consent"):
             flash("Tick the box to say it's OK to text you (or skip this step).", "error")
         else:
-            problem = start_phone_check(user["id"], phone)
-            if problem is None:
-                return redirect(url_for("auth.verify"))
-            flash(problem, "error")
+            get_db().execute("UPDATE users SET phone = ?, phone_verified = 0, sms_code = NULL WHERE id = ?",
+                             (phone, user["id"]))
+            get_db().commit()
+            return redirect(url_for("auth.verify"))
     return render_template("auth/signup_texts.html", phone=request.form.get("phone", ""),
                            country=request.form.get("phone_country"))
+
+
+@bp.route("/signup/number", methods=("GET", "POST"))
+@login_required
+def signup_number():
+    """Right after the email code: confirm the number they gave in step 3 with the code we just texted."""
+    from .sms import check_phone_code
+    user = g.user
+    if not user["phone"] or user["phone_verified"]:
+        return redirect(session.pop("after_number", None) or url_for("index"))
+    if request.method == "POST":
+        if request.form.get("skip"):
+            flash("No problem. You can confirm your number later in Settings → Texts.", "info")
+            return redirect(session.pop("after_number", None) or url_for("index"))
+        problem = check_phone_code(user["id"], request.form.get("code", "").strip())
+        if problem is None:
+            flash("Your number is confirmed. We'll text you reminders and updates.", "success")
+            return redirect(session.pop("after_number", None) or url_for("index"))
+        flash(problem, "error")
+    return render_template("auth/signup_number.html", phone=user["phone"])
 
 
 @bp.route("/verify", methods=("GET", "POST"))
@@ -378,23 +424,20 @@ def verify():
             from .notifications import start_markers  # imported here: notifications.py imports this module
             start_markers(user["id"])
             db.commit()
-            phone_code = request.form.get("phone_code", "").strip()
-            phone_problem = None
-            if phone_code and user["phone"] and not user["phone_verified"]:
-                from .sms import check_phone_code
-                phone_problem = check_phone_code(user["id"], phone_code)
             destination = log_in(user)
             flash(f"Welcome, {user['full_name'].split()[0]}!", "celebrate")
-            if phone_problem:
-                flash(f"{phone_problem} You can confirm your number in Settings → Texts.", "info")
-            elif phone_code:
-                flash("Your number is confirmed. We'll text you reminders and updates.", "success")
+            if user["phone"] and not user["phone_verified"]:
+                # The email is real now, so the number from step 3 gets its code.
+                from .sms import sms_available, start_phone_check
+                problem = start_phone_check(user["id"], user["phone"]) if sms_available() else "skip"
+                if problem is None:
+                    session["after_number"] = destination
+                    return redirect(url_for("auth.signup_number"))
+                if problem != "skip":
+                    flash(f"{problem} You can add your number in Settings → Texts.", "info")
             return redirect(destination)
         flash(error, "error")
-    pending_phone = get_db().execute("SELECT phone FROM users WHERE email = ? AND phone != '' AND phone_verified = 0"
-                                     " AND sms_code IS NOT NULL", (email,)).fetchone()
-    return render_template("auth/verify.html", email=email, wait=resend_wait(email),
-                           pending_phone=pending_phone["phone"] if pending_phone else None)
+    return render_template("auth/verify.html", email=email, wait=resend_wait(email))
 
 
 @bp.route("/verify/resend", methods=("POST",))
@@ -404,6 +447,9 @@ def resend_code():
         return redirect(url_for("auth.login"))
     if code_recently_sent(email):
         flash("We just sent a code. Give it a minute.", "error")
+        return redirect(url_for("auth.verify"))
+    if not codes_left_today(email):
+        flash(TOO_MANY_CODES, "error")
         return redirect(url_for("auth.verify"))
     if start_verification(email):  # on failure, send_verification_email already explained what happened
         flash("We sent you a new code.", "success")
@@ -424,15 +470,14 @@ def login():
         password = request.form.get("password", "")
         db = get_db()
         user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-        if user and user["locked_until"] and now_local() < from_db(user["locked_until"]):
+        ip = request.remote_addr or ""
+        if login_locked(ip, email):  # same answer whether or not the account exists
             flash("Too many wrong passwords. Try again in 15 minutes.", "error")
         elif not check_password_hash(user["password_hash"] if user else dummy_hash(), password) or user is None:
-            if user is not None:
-                failed = user["failed_logins"] + 1
-                locked = to_db(now_local() + LOCKOUT) if failed >= MAX_FAILED_LOGINS else None
-                db.execute("UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?",
-                           (0 if locked else failed, locked, user["id"]))
-                db.commit()
+            db.execute("DELETE FROM login_failures WHERE failed_at < ?", (to_db(now_local() - LOCKOUT),))
+            db.execute("INSERT INTO login_failures (ip, email, failed_at) VALUES (?, ?, ?)",
+                       (ip, email[:254], to_db(now_local())))
+            db.commit()
             flash("Wrong email or password.", "error")
         elif user["suspended"]:
             # They can't log in to message anyone, so give them an address that works from outside the app.
@@ -445,14 +490,28 @@ def login():
             if code_recently_sent(email):
                 session["pending_email"] = email
                 flash("Check your email for the code we sent you.", "info")
-            else:
-                start_verification(email)
+            elif start_verification(email):
                 flash("Check your email. We sent you a new code.", "info")
+            elif not codes_left_today(email):
+                flash(TOO_MANY_CODES, "error")
             return redirect(url_for("auth.verify"))
         else:
+            db.execute("DELETE FROM login_failures WHERE ip = ? AND email = ?", (ip, email))
             return redirect(log_in(user, remember=request.form.get("remember") == "1"))
     return render_template("auth/login.html", next_url=next_url,
                            email=request.form.get("email", "").strip()[:254])
+
+
+def login_locked(ip, email):
+    """Too many wrong passwords from this device address: for this account, or for any accounts at all.
+    Only that address waits; the account owner can still log in from their own phone."""
+    since = to_db(now_local() - LOCKOUT)
+    db = get_db()
+    for_account = db.execute("SELECT COUNT(*) FROM login_failures WHERE ip = ? AND email = ? AND failed_at >= ?",
+                             (ip, email, since)).fetchone()[0]
+    overall = db.execute("SELECT COUNT(*) FROM login_failures WHERE ip = ? AND failed_at >= ?",
+                         (ip, since)).fetchone()[0]
+    return for_account >= MAX_FAILED_LOGINS or overall >= MAX_FAILED_LOGINS_PER_IP
 
 
 # --------------------------------------------------------- forgot password
@@ -464,7 +523,8 @@ def forgot_password():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         user = get_db().execute("SELECT verified, suspended FROM users WHERE email = ?", (email,)).fetchone()
-        if user and user["verified"] and not user["suspended"] and not code_recently_sent(email):
+        if user and user["verified"] and not user["suspended"] and not code_recently_sent(email) \
+                and codes_left_today(email):  # (same answer either way: the page never says which)
             start_verification(email, session_key="reset_email")
             from .sms import text_code
             row = get_db().execute("SELECT id, verify_code FROM users WHERE email = ?", (email,)).fetchone()
@@ -570,5 +630,12 @@ def password_problem(password, password2):
 
 @bp.route("/logout", methods=("POST",))
 def logout():
+    if session.get("sid"):
+        db = get_db()
+        db.execute("DELETE FROM ended_sessions WHERE ended_at < ?",  # older ones have expired anyway
+                   (to_db(now_local() - current_app.permanent_session_lifetime),))
+        db.execute("INSERT OR IGNORE INTO ended_sessions (sid, ended_at) VALUES (?, ?)",
+                   (session["sid"], to_db(now_local())))
+        db.commit()
     session.clear()
     return redirect(url_for("index"))

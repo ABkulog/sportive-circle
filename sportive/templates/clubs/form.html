@@ -102,8 +102,9 @@
         <input name="member_estimate" type="number" min="{{ min_members }}" max="5000" value="{{ form.get('member_estimate', '') }}"
                placeholder="25" required></label>
     </div>
-    {{ phone_field('contact_phone', form.get('contact_phone', ''), 'Your phone number', required=True,
-                   hint='Only our team sees it, to reach you about this club.',
+    {{ phone_field('contact_phone', form.get('contact_phone', ''), 'Your phone number', required=not phone_hidden,
+                   hint=('We have a number on file. Type a new one only to change it.' if phone_hidden
+                         else 'Only our team sees it, to reach you about this club.'),
                    country=form.get('contact_phone_country')) }}
     <label class="toggle attest"><input type="checkbox" name="attest" value="1" required {% if club %}checked{% endif %}>
       <span>I'm a current officer of this club, and it's active this quarter.</span></label>

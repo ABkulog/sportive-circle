@@ -5,7 +5,7 @@ from io import BytesIO
 from conftest import event_id_from, make_image
 from sportive import create_app
 from sportive.db import get_db
-from sportive.timeutil import now_local
+from sportive.timeutil import now_local, to_db
 
 
 def form_time(delta):
@@ -3495,7 +3495,7 @@ def test_create_page_only_shows_what_makes_sense(accounts, client, app):
     for page in ("/events/new", "/need-players"):
         html = client.get(page).data.decode()
         assert "Who can join?" in html and ">Anyone<" in html and "🔒 Private" in html
-        assert re.search(r'name="password"[^>]*disabled|value="dawgs\d{4}"', html)   # ready-made, off until Private
+        assert re.search(r'name="password"[^>]*disabled|value="[a-z]+-[a-z]+-\d{3}"', html)   # ready-made, off until Private
         assert 'data-show="private"' in html and "get an invite, no password needed" in html
         assert 'name="players"' in html and "We have" not in html and "Max players" not in html
     # A private Need players post: no "we have / we need" or skill level sent, and that's fine.
@@ -3876,6 +3876,7 @@ def test_invite_link_signs_up_a_new_friend_and_puts_them_in_the_game(accounts, c
     accounts.logout()
     landing = client.get(link).data.decode()
     assert "Maya wants you in their game" in landing and "Friday hoops" in landing and "Sign up and join" in landing
+    assert client.post(link).headers["Location"] == "/signup"      # the tap is what saves the invite
     client.post("/signup", data={"full_name": "New Friend", "email": "new@uw.edu", "password": "purple-and-gold",
                                  "password2": "purple-and-gold", "birth_date": "2005-01-15"})
     done = client.post("/verify", data={"code": accounts.code_for("new@uw.edu")})
@@ -3909,7 +3910,10 @@ def test_invite_link_for_people_who_already_have_an_account(accounts, client, ap
     accounts.logout()
     accounts.signup(email="later@uw.edu", name="Later Gator")
     accounts.logout()
-    client.get(link)                                              # logged out: "I have an account" -> log in
+    client.get(link)                                              # only looking: logging in later doesn't join
+    assert accounts.login(email="later@uw.edu").headers["Location"] != f"/events/{game}"
+    accounts.logout()
+    assert client.post(link, data={"go": "login"}).headers["Location"] == "/login"   # "I have an account"
     assert accounts.login(email="later@uw.edu").headers["Location"] == f"/events/{game}"
     # A made-up or edited link does nothing.
     assert b"doesn&#39;t work anymore" in client.get("/join/WzEsIDJd.forged", follow_redirects=True).data
@@ -3939,6 +3943,7 @@ def test_invite_friends_to_the_app_makes_you_friends(accounts, client, app):
     assert "Invite friends to Sportive Circle" in client.get("/friends").data.decode()
     accounts.logout()
     assert "Maya wants you on Sportive Circle" in client.get(link).data.decode()
+    client.post(link)                                                   # "Sign up"
     client.post("/signup", data={"full_name": "Pal Friend", "email": "pal@uw.edu", "password": "purple-and-gold",
                                  "password2": "purple-and-gold", "birth_date": "2005-01-15"})
     client.post("/verify", data={"code": accounts.code_for("pal@uw.edu")})
@@ -4194,7 +4199,8 @@ def test_phone_numbers_are_cleaned_up():
 
 
 def test_sign_up_with_texts(client, app, monkeypatch):
-    """Optional step 3: a phone number with permission, confirmed with a texted code on the same code page."""
+    """Optional step 3: a phone number with permission. Its code is only texted once the UW email is confirmed
+    (texts cost money, so made-up accounts can't send any), then confirmed on the next screen."""
     sent = _texts(monkeypatch)
     client.post("/signup", data={"full_name": "Dubs Husky", "email": "dubs@uw.edu", "password": "purple-and-gold",
                                  "password2": "purple-and-gold", "birth_date": "2005-01-15"})
@@ -4205,12 +4211,18 @@ def test_sign_up_with_texts(client, app, monkeypatch):
     assert b"doesn&#39;t look like a phone number" in client.post("/signup/texts",
                                                                   data={"phone": "12", "consent": "1"}).data
     assert client.post("/signup/texts", data={"phone": "206-555-0142", "consent": "1"}).headers["Location"] == "/verify"
-    assert sent[-1][0] == "+12065550142" and "Sportive Circle code:" in sent[-1][1]
-    page = client.get("/verify").data.decode()
-    assert "Code we texted to (•••) •••-0142" in page and "Code from your email" in page
+    assert sent == []                                                  # nothing texted before the email is real
+    assert "Code from your email" in client.get("/verify").data.decode()
     with app.app_context():
-        row = get_db().execute("SELECT verify_code, sms_code FROM users").fetchone()
-    client.post("/verify", data={"code": row["verify_code"], "phone_code": row["sms_code"]})
+        email_code = get_db().execute("SELECT verify_code FROM users").fetchone()[0]
+    assert client.post("/verify", data={"code": email_code}).headers["Location"] == "/signup/number"
+    assert sent[-1][0] == "+12065550142" and "Sportive Circle code:" in sent[-1][1]
+    page = client.get("/signup/number").data.decode()
+    assert "(•••) •••-0142" in page and "Code from the text" in page and "Skip for now" in page
+    assert b"isn&#39;t right" in client.post("/signup/number", data={"code": "000000"}).data
+    with app.app_context():
+        sms_code = get_db().execute("SELECT sms_code FROM users").fetchone()[0]
+    assert client.post("/signup/number", data={"code": sms_code}).headers["Location"] == "/"
     with app.app_context():
         user = get_db().execute("SELECT verified, phone_verified, sms_updates, sms_consent_at FROM users").fetchone()
     assert user["verified"] == 1 and user["phone_verified"] == 1 and user["sms_updates"] == 1 and user["sms_consent_at"]
@@ -4722,3 +4734,126 @@ def test_owner_hands_the_club_to_another_officer(accounts, client, app):
     with app.app_context():
         assert get_db().execute("SELECT role FROM club_members WHERE club_id = ? AND user_id = ?",
                                 (club, ids["Maya"])).fetchone()[0] == "member"  # the old owner can be removed now
+# ---------------------------------------------------------------- security sweep fixes (bot 19)
+
+def test_email_codes_stop_after_five_a_day(accounts, client, app):
+    """Each code allows 5 tries, so 5 codes a day means 25 guesses a day at most (for resets and sign-ups)."""
+    accounts.signup(verify=False)
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE users SET verify_sent_at = NULL")          # past the one-minute wait
+        db.executemany("INSERT INTO email_codes (inbox, sent_at) VALUES ('dubs', ?)", [(to_db(now_local()),)] * 4)
+        db.commit()
+        code = db.execute("SELECT verify_code FROM users").fetchone()[0]
+    page = client.post("/verify/resend", follow_redirects=True).data.decode()
+    assert "a lot of codes for one day" in page
+    with app.app_context():
+        assert get_db().execute("SELECT verify_code FROM users").fetchone()[0] == code   # no new code
+    client.post("/verify", data={"code": code})
+    accounts.logout()
+    with app.app_context():
+        get_db().execute("UPDATE users SET verify_sent_at = NULL, verify_code = NULL")
+        get_db().commit()
+    client.post("/forgot", data={"email": "dubs@uw.edu"})              # same answer, but no new code today
+    with app.app_context():
+        assert get_db().execute("SELECT verify_code FROM users").fetchone()[0] is None
+
+
+def test_code_texts_are_limited_per_number_and_lookups_count(accounts, client, app, monkeypatch):
+    from sportive import sms
+    _texts(monkeypatch)
+    accounts.signup(email="owner@uw.edu")
+    client.post("/settings/texts", data={"action": "send", "phone": "206-555-0142", "consent": "1"})
+    with app.app_context():
+        code = get_db().execute("SELECT sms_code FROM users").fetchone()[0]
+    client.post("/settings/texts", data={"action": "confirm", "code": code})
+    accounts.logout()
+    accounts.signup(email="snoop@uw.edu")
+    snoop = _user_id(app, "snoop@uw.edu")
+    for _ in range(sms.MAX_CODES_PER_DAY):
+        client.post("/settings/texts", data={"action": "send", "phone": "206-555-0142", "consent": "1"})
+    page = client.post("/settings/texts", data={"action": "send", "phone": "206-555-0142", "consent": "1"},
+                       follow_redirects=True).data.decode()
+    assert "a lot of codes" in page                                     # lookups count toward the limits
+    with app.app_context():
+        get_db().execute("DELETE FROM sms_log WHERE user_id = ?", (snoop,))
+        get_db().executemany("INSERT INTO sms_log (user_id, phone, kind, ok, created_at) VALUES (NULL, ?, 'code', 1, ?)",
+                             [("+12065550199", to_db(now_local()))] * sms.MAX_CODES_PER_NUMBER)
+        get_db().commit()
+    page = client.post("/settings/texts", data={"action": "send", "phone": "206-555-0199", "consent": "1"},
+                       follow_redirects=True).data.decode()
+    assert "That number got a lot of codes today" in page
+
+
+def test_only_admins_and_the_registrant_see_the_club_phone(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu")
+    client.post(f"/clubs/{club}/join")
+    fan = _user_id(app, "fan@uw.edu")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    assert 'value="206-555-0142"' in client.get(f"/clubs/{club}/edit").data.decode()   # they typed it
+    client.post(f"/clubs/{club}/members/{fan}/approve")
+    client.post(f"/clubs/{club}/officers/{fan}")
+    accounts.logout()
+    accounts.login(email="fan@uw.edu")
+    form = client.get(f"/clubs/{club}/edit").data.decode()
+    assert 'value="206-555-0142"' not in form and "We have a number on file" in form
+    client.post(f"/clubs/{club}/edit", data={**CLUB, "contact_phone": "", "meets": "Wednesdays"})
+    with app.app_context():
+        row = get_db().execute("SELECT meets, contact_phone FROM clubs WHERE id = ?", (club,)).fetchone()
+    assert row["meets"] == "Wednesdays" and row["contact_phone"] == "+12065550142"   # kept when left empty
+
+
+def test_join_requests_email_officers_once_a_day(accounts, client, app, monkeypatch):
+    from sportive import clubs
+    emails = []
+    monkeypatch.setattr(clubs, "send_email", lambda to, subject, body, html=None: emails.append(subject))
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu")
+    for _ in range(5):
+        client.post(f"/clubs/{club}/join")
+        client.post(f"/clubs/{club}/leave")
+    assert len(emails) == 1
+
+
+def test_wrong_passwords_only_lock_out_the_device_they_came_from(accounts, client, app):
+    accounts.signup()
+    accounts.logout()
+    attacker = app.test_client()
+    for _ in range(10):
+        attacker.post("/login", data={"email": "dubs@uw.edu", "password": "wrong-password"},
+                      environ_base={"REMOTE_ADDR": "203.0.113.9"})
+    blocked = attacker.post("/login", data={"email": "dubs@uw.edu", "password": "purple-and-gold"},
+                            environ_base={"REMOTE_ADDR": "203.0.113.9"})
+    assert b"Too many wrong passwords" in blocked.data
+    no_account = attacker.post("/login", data={"email": "nobody@uw.edu", "password": "x"},
+                               environ_base={"REMOTE_ADDR": "203.0.113.9"})
+    for i in range(25):                                                 # many accounts from one address
+        attacker.post("/login", data={"email": f"nobody{i}@uw.edu", "password": "x"},
+                      environ_base={"REMOTE_ADDR": "203.0.113.9"})
+    assert b"Wrong email or password" in no_account.data
+    assert b"Too many wrong passwords" in attacker.post("/login", data={"email": "other@uw.edu", "password": "x"},
+                                                        environ_base={"REMOTE_ADDR": "203.0.113.9"}).data
+    assert accounts.login().status_code == 302                         # the owner still gets in from their phone
+
+
+def test_log_out_ends_a_copied_cookie(accounts, client, app):
+    accounts.signup()
+    copied = client.get_cookie("session").value
+    assert client.get("/settings").status_code == 200
+    accounts.logout()
+    thief = app.test_client()
+    thief.set_cookie("session", copied)
+    assert thief.get("/settings").status_code == 302                   # sent to log in
+
+
+def test_private_data_isnt_cached_and_scripts_only_come_from_the_map_folder(accounts, client):
+    accounts.signup()
+    game = event_id_from(client.post("/events/new", data=event_form()))
+    assert client.get(f"/events/{game}/calendar.ics").headers["Cache-Control"] == "no-store"
+    assert client.get(f"/events/{game}/chat/poll").headers["Cache-Control"] == "no-store"
+    csp = client.get("/").headers["Content-Security-Policy"]
+    assert "script-src 'self' https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/;" in csp
+    assert client.get("/static/style.css").headers.get("Cache-Control") != "no-store"
+
