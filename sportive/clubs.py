@@ -617,8 +617,11 @@ def leave(club_id):
     role = my_role(club_id)
     officers = db.execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'officer'",
                           (club_id,)).fetchone()[0]
+    club = get_club(club_id)
     if role == "officer" and officers == 1:
         flash("You're the only officer. Make someone else an officer before you leave.", "error")
+    elif role == "officer" and club["created_by"] == g.user["id"]:
+        flash("You're the owner. On Manage officers, make another officer the owner, then you can leave.", "error")
     elif role is not None:
         db.execute("DELETE FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, g.user["id"]))
         db.commit()
@@ -665,7 +668,10 @@ def officers(club_id):
         if person is None:
             abort(404)
         first = person["full_name"].split()[0]
-        if action == "add":
+        from .social import is_blocked_between  # social.py is loaded after this module
+        if action == "add" and is_blocked_between(g.user["id"], user_id):
+            flash("You can't add this person.", "error")
+        elif action == "add":
             db.execute("""INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, 'officer', ?)
                           ON CONFLICT(club_id, user_id) DO UPDATE SET role = 'officer'""",
                        (club_id, user_id, to_db(now_local())))
@@ -690,9 +696,15 @@ def officers(club_id):
             if user_id == club["created_by"]:
                 flash("The owner stays an officer. To step down, make another officer the owner first.", "error")
             else:
-                db.execute("UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ? AND role = 'officer'",
-                           (club_id, user_id))
-                flash(f"{first} is a member now, not an officer.", "success")
+                count = db.execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'officer'",
+                                   (club_id,)).fetchone()[0]
+                if count <= 1:
+                    flash("A club needs at least one officer. Add another officer first.", "error")
+                elif db.execute("UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ? "
+                                "AND role = 'officer'", (club_id, user_id)).rowcount:
+                    flash(f"{first} is a member now, not an officer.", "success")
+                else:
+                    flash(f"{first} isn't an officer.", "info")
         db.commit()
         return redirect(url_for("clubs.officers", club_id=club_id))
     current = db.execute(

@@ -426,7 +426,7 @@ def send_to_friends(event_id):
             flash("You can only send games to your friends.", "error")
         elif len(chosen) > MAX_PARTY:
             flash(f"You can send it to up to {MAX_PARTY} friends at once.", "error")
-        elif too_many_messages(me):
+        elif too_many_messages(me, len(chosen)):
             flash("Whoa, slow down! Wait a minute before sending more messages.", "error")
         else:
             body = note or f"Want to play? {event_title(event)}, {fmt_when(event['starts_at'])}."

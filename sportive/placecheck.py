@@ -151,9 +151,10 @@ def admin_rec_delete(reservation_id):
     if row is not None:
         if request.form.get("all"):  # the whole weekly series: same place, label and clock times
             db.execute("""DELETE FROM rec_reservations WHERE location = ? AND label = ? AND starts_at >= ?
-                          AND time(starts_at) = time(?) AND time(ends_at) = time(?)""",
+                          AND time(starts_at) = time(?) AND time(ends_at) = time(?)
+                          AND strftime('%w', starts_at) = strftime('%w', ?)""",
                        (row["location"], row["label"], to_db(now_local().replace(hour=0, minute=0)),
-                        row["starts_at"], row["ends_at"]))
+                        row["starts_at"], row["ends_at"], row["starts_at"]))
         else:
             db.execute("DELETE FROM rec_reservations WHERE id = ?", (reservation_id,))
         db.commit()

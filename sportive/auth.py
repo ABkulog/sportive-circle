@@ -330,8 +330,10 @@ def signup_texts():
         return redirect(url_for("auth.verify"))
     if request.method == "POST":
         raw = request.form.get("phone", "")
-        if not raw.strip():
-            return redirect(url_for("auth.verify"))  # skipped: texts stay off
+        if not raw.strip():  # skipped: texts stay off, and Home won't ask again ("New: texts" card)
+            get_db().execute("UPDATE users SET texts_card_done = 1 WHERE id = ?", (user["id"],))
+            get_db().commit()
+            return redirect(url_for("auth.verify"))
         phone = phone_from_form(request.form.get("phone_country"), raw)
         if phone is None:
             flash("That doesn't look like a phone number. Try (206) 555-0142.", "error")
