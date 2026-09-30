@@ -1069,3 +1069,50 @@ button.link-button { min-height: 36px; }
   .flyer { border-width: 4px; max-width: none; margin-top: 10mm; }
   body { background: #fff !important; }
 }
+
+/* Chats: days, grouped bubbles, photos, quick replies and the composer (social/_chat.html, chat.js) */
+.chat-messages { gap: 2px; }
+.chat-msg.starts-group { margin-top: 8px; }
+.chat-msg.is-grouped .chat-avatar { visibility: hidden; }
+.chat-msg.is-grouped time { display: none; }
+.chat-msg:not(.starts-group) .chat-name { display: none; }
+.chat-msg.is-grouped:not(.is-mine) .chat-bubble { border-bottom-left-radius: 6px; }
+.chat-msg.is-grouped.is-mine .chat-bubble { border-bottom-right-radius: 6px; }
+.chat-msg:not(.starts-group):not(.is-mine) .chat-bubble { border-top-left-radius: 6px; }
+.chat-msg:not(.starts-group).is-mine .chat-bubble { border-top-right-radius: 6px; }
+.chat-day { text-align: center; margin: 12px 0 4px; }
+.chat-day span { font-size: .72rem; font-weight: 600; color: var(--muted); background: var(--surface); padding: 3px 10px;
+  border-radius: 999px; }
+.chat-meta { display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 2px; font-size: .66rem; }
+.chat-bubble .chat-meta time { display: inline; margin: 0; opacity: .7; }
+.chat-more summary { list-style: none; cursor: pointer; padding: 0 4px; opacity: .55; line-height: 1; }
+.chat-more summary::-webkit-details-marker { display: none; }
+.chat-more[open] summary { opacity: 1; }
+.chat-more a { font-size: .75rem; padding: 2px 4px; color: inherit; text-decoration: underline; }
+.chat-photo { display: block; margin: 2px 0 4px; }
+.chat-photo img { display: block; max-width: min(240px, 60vw); max-height: 320px; width: auto; height: auto; border-radius: 12px; }
+.chat-bubble.is-photo { padding: 4px 4px 6px; }
+.chat-bubble.is-photo .chat-meta { padding: 0 6px; }
+.chat-quick { display: flex; gap: 6px; overflow-x: auto; padding: 8px 10px 0; border-top: 1px solid var(--line);
+  scrollbar-width: none; }
+.chat-quick::-webkit-scrollbar { display: none; }
+.chat-quick .chip { white-space: nowrap; font-size: .85rem; min-height: 32px; flex: none; }
+.chat-quick + .chat-composer { border-top: 0; }
+.chat-composer { align-items: flex-end; }
+.chat-attach { position: relative; flex: none; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center;
+  color: var(--purple); background: var(--accent-soft); cursor: pointer; }
+.chat-attach input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.chat-attach:focus-within { outline: 2px solid var(--purple); outline-offset: 2px; }
+.chat-input { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.chat-attached { position: relative; width: 72px; }
+.chat-attached img { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; display: block; }
+.chat-attached-remove { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--text); color: var(--bg); border: 0; font-size: 1rem; line-height: 1; cursor: pointer; }
+.chat-send { flex: none; width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--purple);
+  color: var(--on-accent); display: grid; place-items: center; cursor: pointer; }
+.chat-send:disabled { opacity: .5; }
+/* The chat fills the phone screen (the tab bar is hidden on chats): no tall empty box, no page scrolling */
+.chat-messages { height: calc(100dvh - 330px); min-height: 220px; max-height: none; }
+@media (min-width: 900px) { .chat-messages { height: min(62vh, 620px); } }
+.chat-msg.is-grouped .chat-bubble .chat-meta time { display: none; }  /* the time shows once, on the group's last */
+.scope-hint { margin: -4px 0 10px; font-size: .85rem; }

@@ -10,14 +10,15 @@ Safety rules:
 import json
 from datetime import timedelta
 
-from flask import (Blueprint, abort, current_app, flash, g, jsonify, redirect, render_template, request,
-                   session, url_for)
+from flask import (Blueprint, Response, abort, current_app, flash, g, jsonify, redirect, render_template,
+                   request, session, url_for)
 
 from .auth import login_required, safe_next
 from .constants import SPORT_EMOJI
 from .db import get_db
 from .textutil import fold, initial, multi_line, one_line
-from .timeutil import fmt_clock, fmt_when, now_local, to_db
+from .photos import make_chat_photo
+from .timeutil import fmt_clock, fmt_when, from_db, now_local, to_db
 
 bp = Blueprint("social", __name__)
 
@@ -133,16 +134,43 @@ def too_many_messages(me):
     return recent >= MAX_MESSAGES_PER_MINUTE
 
 
-def clean_body(text):
-    """Returns (body, error)."""
+def clean_body(text, photo=False):
+    """Returns (body, error). With a photo, the words are optional."""
     body = multi_line(text)
-    if not body:
+    if not body and not photo:
         return None, "Type a message first."
     if len(body) > MAX_MESSAGE_LENGTH:
         return None, f"Messages can be up to {MAX_MESSAGE_LENGTH} characters."
     if too_many_messages(g.user["id"]):
         return None, "Whoa, slow down! Wait a minute before sending more messages."
     return body, None
+
+
+def read_chat_photo():
+    """The photo picked in the chat box, saved (resized, hidden info removed): (photo id or None, error or None)."""
+    upload = request.files.get("photo")
+    if upload is None or not upload.filename:
+        return None, None
+    try:
+        image = make_chat_photo(upload.read())
+    except ValueError as error:
+        return None, str(error)
+    cur = get_db().execute("INSERT INTO chat_photos (uploader_id, image, created_at) VALUES (?, ?, ?)",
+                           (g.user["id"], image, to_db(now_local())))
+    return cur.lastrowid, None
+
+
+def day_label(value):
+    """"Today", "Yesterday", "Mon, Sep 28" or "Sep 28, 2025": the dividers between days in a chat."""
+    day = from_db(value).date()
+    today = now_local().date()
+    if day == today:
+        return "Today"
+    if day == today - timedelta(days=1):
+        return "Yesterday"
+    if (today - day).days < 7:
+        return day.strftime("%A")
+    return f"{day:%a, %b} {day.day}" + (f", {day.year}" if day.year != today.year else "")
 
 
 def keep_draft(text):
@@ -183,11 +211,14 @@ def message_json(row, me, kind):
         "id": row["id"],
         "mine": row["sender_id"] == me,
         "name": row["full_name"],
-        "avatar": (url_for("profile.photo", user_id=row["sender_id"], v=row["avatar_updated"])
+        "avatar": (url_for("profile.photo", user_id=row["sender_id"], v=row["avatar_updated"], s=96)
                    if row["avatar_updated"] else None),
         "initial": initial(row["full_name"]),
         "body": row["body"],
         "time": fmt_clock(row["created_at"]),
+        "day": day_label(row["created_at"]),
+        "sender": row["sender_id"],
+        "photo": url_for("social.chat_photo", photo_id=row["photo_id"]) if row["photo_id"] else None,
         "profile": url_for("profile.view", user_id=row["sender_id"]),
         "report": None if row["sender_id"] == me else url_for("moderation.report", target_type=kind, target_id=row["id"]),
         "game": shared_game(row),
@@ -480,14 +511,16 @@ def thread(user_id):
         if not allowed:
             flash("You can message friends, people you've played with, and club officers.", "error")
         else:
-            body, error = clean_body(request.form.get("body"))
+            photo_id, error = read_chat_photo()
+            body, error = (None, error) if error else clean_body(request.form.get("body"), photo=bool(photo_id))
             if error:
+                get_db().rollback()
                 flash(error, "error")
                 keep_draft(request.form.get("body"))
             else:
                 db = get_db()
-                db.execute("INSERT INTO direct_messages (sender_id, recipient_id, body, created_at) VALUES (?, ?, ?, ?)",
-                           (me, user_id, body, to_db(now_local())))
+                db.execute("INSERT INTO direct_messages (sender_id, recipient_id, body, created_at, photo_id)"
+                           " VALUES (?, ?, ?, ?, ?)", (me, user_id, body, to_db(now_local()), photo_id))
                 db.commit()
         return redirect(url_for("social.thread", user_id=user_id) + "#composer")
     _mark_read(me, user_id)
@@ -546,16 +579,18 @@ def event_chat(event_id):
         flash("Join the game to use its chat.", "info")
         return redirect(url_for("events.detail", event_id=event_id))
     if request.method == "POST":
-        body, error = clean_body(request.form.get("body"))
+        photo_id, error = (None, None) if event["cancelled"] else read_chat_photo()
+        body, error = (None, error) if error else clean_body(request.form.get("body"), photo=bool(photo_id))
         if error:
+            get_db().rollback()
             flash(error, "error")
             keep_draft(request.form.get("body"))
         elif event["cancelled"]:
             flash("This game was canceled, so its chat is closed.", "error")
         else:
             db = get_db()
-            db.execute("INSERT INTO event_messages (event_id, sender_id, body, created_at) VALUES (?, ?, ?, ?)",
-                       (event_id, g.user["id"], body, to_db(now_local())))
+            db.execute("INSERT INTO event_messages (event_id, sender_id, body, created_at, photo_id) VALUES (?, ?, ?, ?, ?)",
+                       (event_id, g.user["id"], body, to_db(now_local()), photo_id))
             db.commit()
         return redirect(url_for("social.event_chat", event_id=event_id) + "#composer")
     rows = _chat_rows(event_id)
@@ -576,3 +611,23 @@ def event_chat_poll(event_id):
     rows = _chat_rows(event_id, request.args.get("after", 0, type=int))
     _mark_chat_seen(event_id, rows)
     return jsonify(messages=[message_json(r, g.user["id"], 'event_message') for r in rows])
+
+
+@bp.route("/chat-photos/<int:photo_id>")
+@login_required
+def chat_photo(photo_id):
+    """A photo from a chat, only for the people in that chat (the two people in a DM, or the game's players)."""
+    me = g.user["id"]
+    db = get_db()
+    dm = db.execute("SELECT sender_id, recipient_id FROM direct_messages WHERE photo_id = ?", (photo_id,)).fetchone()
+    game = db.execute("SELECT event_id FROM event_messages WHERE photo_id = ?", (photo_id,)).fetchone()
+    allowed = (dm is not None and me in (dm["sender_id"], dm["recipient_id"])
+               and not is_blocked_between(dm["sender_id"], dm["recipient_id"])) or (
+        game is not None and db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?",
+                                        (game["event_id"], me)).fetchone() is not None)
+    row = db.execute("SELECT image FROM chat_photos WHERE id = ?", (photo_id,)).fetchone() if allowed else None
+    if row is None:
+        abort(404)
+    response = Response(row["image"], mimetype="image/jpeg")
+    response.headers["Cache-Control"] = "private, max-age=31536000, immutable"  # a photo never changes
+    return response

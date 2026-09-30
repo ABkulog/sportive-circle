@@ -11,7 +11,7 @@
   </div>
 </header>
 {{ chat_box(messages, poll_url, url_for('social.event_chat', event_id=event.id), not event.cancelled,
-            "Message the group…", "No messages yet. Say hi!", draft) }}
+            "Message the group…", "No messages yet. Say hi to the group!", draft, kind='game') }}
 {% if event.cancelled %}<p class="muted">This event was canceled, so the chat is closed.</p>{% endif %}
 {% endblock %}
 {% block body_class %}hide-tabs{% endblock %}

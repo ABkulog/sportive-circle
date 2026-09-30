@@ -48,12 +48,12 @@
 {% endif %}
 
 <section class="band home-section" aria-labelledby="games-title">
-<h2 class="home-section-title" id="games-title">{{ {'interests': 'Games for you', 'all': 'All games', 'full': 'Full games'}[filters.scope] }}</h2>
+<h2 class="home-section-title" id="games-title">{{ {'interests': 'Games in your sports', 'all': 'All games', 'full': 'Full games'}[filters.scope] }}</h2>
 {% set active_filters = [filters.sport, filters.when, filters.location, filters.skill, filters.open]|select|list|length %}
 <form method="get" class="filter-bar" aria-label="Filter games">
   <div class="segmented small" role="radiogroup" aria-label="Which sports">
     <label><input type="radio" name="scope" value="interests" {% if filters.scope == 'interests' %}checked{% endif %} data-autosubmit><span>My sports</span></label>
-    <label><input type="radio" name="scope" value="all" {% if filters.scope == 'all' %}checked{% endif %} data-autosubmit><span>All</span></label>
+    <label><input type="radio" name="scope" value="all" {% if filters.scope == 'all' %}checked{% endif %} data-autosubmit><span>All sports</span></label>
     <label><input type="radio" name="scope" value="full" {% if filters.scope == 'full' %}checked{% endif %} data-autosubmit><span>Full</span></label>
   </div>
   <details class="filter-more" {% if active_filters %}open{% endif %}>
@@ -86,6 +86,12 @@
     {% if active_filters %}<a class="clear-filters" href="{{ url_for('events.feed', scope=filters.scope) }}">Clear filters</a>{% endif %}
   </details>
 </form>
+{% if filters.scope == 'interests' and my_sports %}
+  {# Where "My sports" comes from, and how to change it. #}
+  <p class="scope-hint muted">Your sports:
+    {%- for sport in my_sports %} {{ SPORTS[sport] }}{{ ',' if not loop.last }}{% endfor %} ·
+    <a href="{{ url_for('profile.edit_sports') }}">Change</a></p>
+{% endif %}
 
 {% if filters.scope == 'interests' and not my_sports %}
   <p class="muted"><a href="{{ url_for('profile.edit_sports') }}">Pick your sports</a> to see games for you.</p>

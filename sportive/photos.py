@@ -1,4 +1,4 @@
-"""Turning uploaded photos into safe, small profile pictures."""
+"""Turning uploaded photos into safe, small pictures: profile photos, club logos and photos sent in chats."""
 from functools import lru_cache
 from io import BytesIO
 
@@ -17,18 +17,31 @@ TOO_BIG = "That picture is too big. Try a smaller one, or a screenshot of it."
 NOT_A_PHOTO = "That file isn't a photo we can use. Try a JPG or PNG picture."
 
 
+CHAT_PHOTO_SIZE = 1280  # the long side of a photo sent in a chat: sharp on a phone, ~150-300 KB
+
+
 def make_avatar(data):
     """Any photo -> a 640x640 JPEG: rotated upright, cropped to a square around the center,
     and re-encoded from scratch, so hidden metadata (like the GPS location phones add) is gone.
 
     Raises ValueError with a friendly message if the file isn't a usable photo.
     """
+    return _clean_photo(data, AVATAR_SIZE, square=True, quality=85)
+
+
+def make_chat_photo(data):
+    """A photo sent in a chat -> a JPEG at most 1280px on its long side, not cropped, upright, no hidden
+    metadata (like where it was taken). Raises ValueError with a friendly message like make_avatar."""
+    return _clean_photo(data, CHAT_PHOTO_SIZE, square=False, quality=80)
+
+
+def _clean_photo(data, size, square, quality):
     try:
         with Image.open(BytesIO(data)) as image:
             if image.format not in ALLOWED_FORMATS:
                 raise ValueError
             if image.format in ("JPEG", "MPO"):
-                image.draft("RGB", (AVATAR_SIZE * 2, AVATAR_SIZE * 2))
+                image.draft("RGB", (size * 2, size * 2))
             elif image.width * image.height > MAX_FULL_DECODE_PIXELS:
                 raise ValueError(TOO_BIG)
             image = ImageOps.exif_transpose(image)  # phones store "rotate me" in metadata
@@ -39,9 +52,12 @@ def make_avatar(data):
                 image = background
             else:
                 image = image.convert("RGB")
-            image = ImageOps.fit(image, (AVATAR_SIZE, AVATAR_SIZE), Image.LANCZOS)
+            if square:
+                image = ImageOps.fit(image, (size, size), Image.LANCZOS)
+            else:
+                image.thumbnail((size, size), Image.LANCZOS)  # keeps the shape; never makes it bigger
             output = BytesIO()
-            image.save(output, "JPEG", quality=85, optimize=True)
+            image.save(output, "JPEG", quality=quality, optimize=True)
             return output.getvalue()
     except ValueError as error:
         raise ValueError(TOO_BIG if str(error) == TOO_BIG else NOT_A_PHOTO) from None

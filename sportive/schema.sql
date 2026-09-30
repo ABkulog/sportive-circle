@@ -170,7 +170,8 @@ CREATE TABLE IF NOT EXISTS direct_messages (
     body         TEXT NOT NULL,
     created_at   TEXT NOT NULL,
     read_at      TEXT,
-    event_id     INTEGER REFERENCES events(id) ON DELETE SET NULL  -- a game shared with "Send to friends"
+    event_id     INTEGER REFERENCES events(id) ON DELETE SET NULL,  -- a game shared with "Send to friends"
+    photo_id     INTEGER REFERENCES chat_photos(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_dm_pair ON direct_messages(sender_id, recipient_id, id);
 CREATE INDEX IF NOT EXISTS idx_dm_unread ON direct_messages(recipient_id, read_at);
@@ -181,7 +182,8 @@ CREATE TABLE IF NOT EXISTS event_messages (
     event_id   INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
     sender_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     body       TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    photo_id   INTEGER REFERENCES chat_photos(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_event_messages ON event_messages(event_id, id);
 
@@ -396,4 +398,12 @@ CREATE INDEX IF NOT EXISTS idx_events_ends_at ON events(ends_at);
 CREATE TABLE IF NOT EXISTS app_state (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
+);
+
+-- Photos sent in messages and game chats (resized, hidden info removed: photos.make_chat_photo).
+CREATE TABLE IF NOT EXISTS chat_photos (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    uploader_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    image      BLOB NOT NULL,
+    created_at TEXT NOT NULL
 );

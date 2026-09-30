@@ -1,18 +1,32 @@
-{# Shared chat box: messages + composer. Needs: messages, poll_url, action (form URL), can_send, placeholder #}
-{% macro chat_box(messages, poll_url, action, can_send, placeholder, empty_text, draft='') %}
-  <div class="chat card{% if not messages %} is-empty{% endif %}" data-poll-url="{{ poll_url }}"
+{# Shared chat box: messages + composer. kind: 'dm' (two people: no names on bubbles) or 'game' (a group).
+   Messages in a row from one person are grouped: their photo and the time show once, at the end of the group
+   (chat.js keeps this up to date as new messages arrive). #}
+{% set QUICK = {
+  'dm': ["Down to play? 🏀", "What time?", "I'm in!", "Where are we meeting?"],
+  'game': ["On my way 🏃", "Running 5 min late", "I'm here!", "Who's bringing a ball?"],
+} %}
+{% macro chat_box(messages, poll_url, action, can_send, placeholder, empty_text, draft='', kind='game') %}
+  <div class="chat card{% if not messages %} is-empty{% endif %}" data-poll-url="{{ poll_url }}" data-kind="{{ kind }}"
        data-last-id="{{ messages[-1].id if messages else 0 }}">
     <ol class="chat-messages" id="chat-messages" aria-live="polite">
+      {% set day = namespace(label=None) %}
       {% for m in messages %}
-        <li class="chat-msg {% if m.mine %}is-mine{% endif %}">
+        {% set prev, nxt = loop.previtem, loop.nextitem %}
+        {% if m.day != day.label %}{% set day.label = m.day %}<li class="chat-day"><span>{{ m.day }}</span></li>{% endif %}
+        <li class="chat-msg{% if m.mine %} is-mine{% endif %}
+                   {%- if not prev or prev.sender != m.sender or prev.day != m.day %} starts-group{% endif %}
+                   {%- if nxt and nxt.sender == m.sender and nxt.day == m.day %} is-grouped{% endif %}"
+            data-sender="{{ m.sender }}" data-day="{{ m.day }}">
           {% if not m.mine %}
-            <a href="{{ m.profile }}" class="chat-avatar" aria-hidden="true" tabindex="-1">
+            <a href="{{ m.profile }}" class="chat-avatar" tabindex="-1" aria-label="{{ m.name }}'s profile">
               {%- if m.avatar %}<img src="{{ m.avatar }}" alt="">{% else %}<span>{{ m.initial }}</span>{% endif -%}
             </a>
           {% endif %}
-          <div class="chat-bubble">
-            {% if not m.mine %}<span class="chat-name">{{ m.name }}</span>{% endif %}
-            <p>{{ m.body }}</p>
+          <div class="chat-bubble{% if m.photo and not m.body %} is-photo{% endif %}">
+            {% if not m.mine and kind == 'game' %}<span class="chat-name">{{ m.name }}</span>{% endif %}
+            {% if m.photo %}<a class="chat-photo" href="{{ m.photo }}" target="_blank" rel="noopener">
+              <img src="{{ m.photo }}" alt="Photo from {{ m.name }}"></a>{% endif %}
+            {% if m.body %}<p>{{ m.body }}</p>{% endif %}
             {% if m.game %}
               <a class="chat-game{% if m.game.cancelled %} is-cancelled{% endif %}" href="{{ m.game.url }}">
                 <span class="chat-game-emoji" aria-hidden="true">{{ m.game.emoji }}</span>
@@ -20,8 +34,9 @@
                   <small>{{ 'Canceled' if m.game.cancelled else m.game.when }} · {{ m.game.where }}</small></span>
               </a>
             {% endif %}
-            <time>{{ m.time }}</time>
-            {% if m.report %}<a class="chat-report" href="{{ m.report }}">🚩 Report</a>{% endif %}
+            <span class="chat-meta"><time>{{ m.time }}</time>
+              {%- if m.report %}<details class="chat-more"><summary aria-label="More options for this message">⋯</summary>
+                <a href="{{ m.report }}">Report</a></details>{% endif %}</span>
           </div>
         </li>
       {% endfor %}
@@ -31,11 +46,27 @@
       <p class="muted">{{ empty_text if can_send else "No messages." }}</p>
     </div>
     {% if can_send %}
-      <form method="post" action="{{ action }}" class="chat-composer" id="composer">
+      <div class="chat-quick" aria-label="Quick replies">
+        {% for text in QUICK[kind] %}<button type="button" class="chip" data-quick="{{ text }}">{{ text }}</button>{% endfor %}
+      </div>
+      <form method="post" action="{{ action }}" class="chat-composer" id="composer" enctype="multipart/form-data">
         {{ csrf_field() }}
-        <textarea name="body" rows="1" maxlength="1000" placeholder="{{ placeholder }}" required
-                  aria-label="Message"{% if draft %} autofocus{% endif %}>{{ draft }}</textarea>
-        <button class="btn">Send</button>
+        <label class="chat-attach" title="Send a photo">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="visually-hidden">Send a photo</span>
+          <input type="file" name="photo" accept="image/*" data-chat-photo>
+        </label>
+        <div class="chat-input">
+          <div class="chat-attached" data-chat-attached hidden>
+            <img alt="The photo you picked" data-chat-preview>
+            <button type="button" class="chat-attached-remove" data-chat-unattach aria-label="Remove the photo">&times;</button>
+          </div>
+          <textarea name="body" rows="1" maxlength="1000" placeholder="{{ placeholder }}"
+                    aria-label="Message"{% if draft %} autofocus{% endif %}>{{ draft }}</textarea>
+        </div>
+        <button class="chat-send" aria-label="Send">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 12 20 4l-6 16-2.5-6.5L4 12Z" fill="currentColor"/></svg>
+        </button>
       </form>
     {% endif %}
   </div>

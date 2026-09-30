@@ -1646,7 +1646,7 @@ def test_report_messages_keeps_a_copy(accounts, client, app):
     accounts.logout()
     accounts.login(email="me@uw.edu")
     thread = client.get(f"/messages/{bad}").data.decode()
-    assert "🚩 Report" in thread
+    assert ">Report</a>" in thread                     # in the ⋯ menu on the message
     with app.app_context():
         message_id = get_db().execute("SELECT id FROM direct_messages").fetchone()[0]
     client.post(f"/report/dm/{message_id}", data={"reason": "harassment"})
@@ -1962,7 +1962,7 @@ def test_empty_chat_shows_a_real_empty_state(accounts, client):
     accounts.signup()
     game = event_id_from(client.post("/events/new", data=event_form()))
     page = client.get(f"/events/{game}/chat").data.decode()
-    assert 'class="chat card is-empty"' in page and "No messages yet. Say hi!" in page
+    assert 'class="chat card is-empty"' in page and "No messages yet. Say hi to the group!" in page
     client.post(f"/events/{game}/chat", data={"body": "Who's bringing a ball?"})
     assert "is-empty" not in client.get(f"/events/{game}/chat").data.decode()
     other = event_id_from(client.post("/events/new", data=event_form(title="Called off")))
@@ -5458,3 +5458,39 @@ def test_monday_email_games_this_week(accounts, client, app, monkeypatch):
     client.post("/settings/weekly", data={})                            # switch it off
     with app.app_context():
         assert get_db().execute("SELECT weekly_digest FROM users WHERE id = ?", (ids["Hooper"],)).fetchone()[0] == 0
+
+
+def test_photos_in_chats_and_friendlier_chats(accounts, client, app):
+    """Photos in DMs and game chats (resized, private to the chat), plus day dividers, quick replies and a ⋯ menu
+    instead of a Report link under every message."""
+    from io import BytesIO
+    ids = _people(accounts, app, "Maya", "Sam", "Stranger")
+    _friends(app, ids["Maya"], ids["Sam"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    photo = make_image(size=(3000, 2000), fmt="JPEG")
+    client.post(f"/messages/{ids['Sam']}", data={"body": "", "photo": (BytesIO(photo), "court.jpg")},
+                content_type="multipart/form-data")
+    client.post(f"/events/{game}/chat", data={"body": "Warm-up pic", "photo": (BytesIO(photo), "court.jpg")},
+                content_type="multipart/form-data")
+    bad = client.post(f"/messages/{ids['Sam']}", data={"body": "", "photo": (BytesIO(b"not a photo"), "x.jpg")},
+                      content_type="multipart/form-data", follow_redirects=True).data.decode()
+    assert "isn&#39;t a photo we can use" in bad
+    with app.app_context():
+        db = get_db()
+        dm_photo = db.execute("SELECT photo_id FROM direct_messages WHERE photo_id IS NOT NULL").fetchone()[0]
+        chat_photo = db.execute("SELECT photo_id FROM event_messages WHERE photo_id IS NOT NULL").fetchone()[0]
+        assert db.execute("SELECT COUNT(*) FROM chat_photos").fetchone()[0] == 2   # the bad file saved nothing
+    from PIL import Image
+    saved = client.get(f"/chat-photos/{dm_photo}")
+    assert saved.status_code == 200 and max(Image.open(BytesIO(saved.data)).size) == 1280   # made smaller
+    page = client.get(f"/events/{game}/chat").data.decode()
+    assert f"/chat-photos/{chat_photo}" in page and "Warm-up pic" in page and "Today" in page
+    assert "On my way" in page and 'name="photo"' in page and 'accept="image/*"' in page
+    _as(accounts, "Sam")
+    thread = client.get(f"/messages/{ids['Maya']}").data.decode()
+    assert f"/chat-photos/{dm_photo}" in thread and "Down to play?" in thread and "🚩 Report" not in thread
+    assert ">Report</a>" in thread                                    # tucked in the ⋯ menu
+    assert client.get(f"/chat-photos/{chat_photo}").status_code == 404   # not in that game
+    _as(accounts, "Stranger")
+    assert client.get(f"/chat-photos/{dm_photo}").status_code == 404
