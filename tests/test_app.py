@@ -4,6 +4,8 @@ import re
 from datetime import timedelta
 from io import BytesIO
 
+import pytest
+
 from conftest import event_id_from, make_image
 from sportive import create_app
 from sportive.db import get_db
@@ -5348,6 +5350,7 @@ def test_uw_rec_bookings_are_copied_by_themselves(accounts, client, app, monkeyp
             return page
         return json.dumps([rugby] if params["selectedFacilityId"].startswith("1") else [kendo])
     monkeypatch.setattr(uwrec, "_get", fake_get)
+    app.config["UW_REC_PAUSE"] = 0
     with app.app_context():
         db = get_db()
         db.execute("INSERT INTO rec_reservations (location, starts_at, ends_at, label, source, created_at)"
@@ -5360,9 +5363,58 @@ def test_uw_rec_bookings_are_copied_by_themselves(accounts, client, app, monkeyp
         assert [r["label"] for r in rows].count("Womxn's Rugby - Practice") == 3
         assert to_db(skip) not in [r["starts_at"] for r in rows]
         assert ("IMA (Intramural Activities Building)", "Gym B: Kendo - Practice") in [(r[0], r[1]) for r in rows]
+        assert uwrec.last_report()["status"] == "ok"
         monkeypatch.setattr(uwrec, "_get", lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
-        uwrec.sync_round(app)                                             # already done today: nothing happens
-        db.execute("DELETE FROM app_state"); db.commit()
-        uwrec.sync_round(app)                                             # UW Rec down: yesterday's copy stays
+        with pytest.raises(OSError):
+            uwrec.sync()                                                  # UW Rec down: yesterday's copy stays
         assert db.execute("SELECT COUNT(*) FROM rec_reservations WHERE source = 'feed'").fetchone()[0] == 4
         assert db.execute("SELECT COUNT(*) FROM rec_reservations WHERE source = 'admin'").fetchone()[0] == 1
+        assert uwrec.last_report()["status"] == "failed"
+
+
+
+# UW Rec's real data for Denny Field (Sept 30, 2026), and what UW Rec's own calendar showed for Oct 4-10:
+# rugby Mon 5 and Thu 8, 6-8 PM; HFS Fri 9, 4-7 PM. If the date math ever changes, this catches it.
+UW_REC_DENNY = [
+    {"Text": "Womxn's Rugby - Practice", "StartDate": "2026-10-01T18:00:00.000", "EndDate": "2026-10-01T20:00:00.000",
+     "RecurrenceRule": "FREQ=WEEKLY;UNTIL=20261218T040000Z;BYDAY=MO,TH;WKST=SU",
+     "RecurrenceException": "20261126T180000"},
+    {"Text": "HFS", "StartDate": "2026-10-09T16:00:00.000", "EndDate": "2026-10-09T19:00:00.000",
+     "RecurrenceRule": None, "RecurrenceException": None},
+]
+
+
+def test_uw_rec_dates_match_uw_recs_own_calendar():
+    from datetime import datetime
+    from sportive.uwrec import occurrences
+    until = datetime(2026, 12, 31)
+    rugby = occurrences(UW_REC_DENNY[0], until)
+    week = [(s.strftime("%a %b %d %H:%M"), e.strftime("%H:%M")) for s, e in rugby
+            if datetime(2026, 10, 4) <= s < datetime(2026, 10, 11)]
+    assert week == [("Mon Oct 05 18:00", "20:00"), ("Thu Oct 08 18:00", "20:00")]
+    assert datetime(2026, 11, 26, 18) not in [s for s, _ in rugby]           # Thanksgiving skipped
+    assert rugby[-1][0] == datetime(2026, 12, 17, 18)                          # last one: Dec 17 (UNTIL is UTC)
+    assert all(s.weekday() in (0, 3) and s.hour == 18 for s, _ in rugby)
+    assert occurrences(UW_REC_DENNY[1], until) == [(datetime(2026, 10, 9, 16), datetime(2026, 10, 9, 19))]
+
+
+def test_uw_rec_copy_refuses_what_it_cant_read_and_sudden_drops(app, monkeypatch):
+    from sportive import uwrec
+    app.config["UW_REC_PAUSE"] = 0
+    page = '<a href="/Facility/GetFacility?facilityId=11111111-1111-1111-1111-111111111111">Denny Field - Turf</a>'
+    start = (now_local() + timedelta(days=1)).replace(hour=18, minute=0, second=0, microsecond=0)
+    booking = lambda title, hours=2, rule=None: {"Text": title, "StartDate": start.strftime("%Y-%m-%dT%H:%M:%S"),
+                                                 "EndDate": (start + timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%S"),
+                                                 "RecurrenceRule": rule}
+    feed = {"items": [booking(f"Game {i}") for i in range(30)]
+                     + [booking("Monthly", rule="FREQ=MONTHLY;BYDAY=2TU"), booking("Too long", hours=40),
+                        booking("All-day tournament", hours=23)]}
+    monkeypatch.setattr(uwrec, "_get", lambda path, params=None: page if path == "/Facility"
+                        else json.dumps(feed["items"]))
+    with app.app_context():
+        assert uwrec.sync() == 31                                    # + the all-day one; monthly and 40 hours left out
+        report = uwrec.last_report()
+        assert report["status"] == "warnings" and len(report["problems"]) == 2
+        feed["items"] = [booking("Only one")]
+        assert uwrec.sync() == 0 and uwrec.last_report()["status"] == "kept"   # 1 vs 31: probably a broken page
+        assert get_db().execute("SELECT COUNT(*) FROM rec_reservations WHERE source = 'feed'").fetchone()[0] == 31

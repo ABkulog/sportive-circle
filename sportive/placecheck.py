@@ -145,19 +145,25 @@ def admin_rec():
                           " LIMIT 300", (now,)).fetchall()
     copied = db.execute("SELECT COUNT(*) FROM rec_reservations WHERE ends_at >= ? AND source = 'feed'",
                         (now,)).fetchone()[0]
-    from .uwrec import last_synced
+    from .uwrec import last_report, last_synced
     return render_template("placecheck/admin.html", places=[p for p in LOCATIONS if p in UW_REC_PLACES],
                            upcoming=upcoming, form=form, schedule=UW_REC_SCHEDULE, max_weeks=MAX_REPEAT_WEEKS,
-                           max_label=MAX_LABEL, time_range=time_range, copied=copied, synced=last_synced())
+                           max_label=MAX_LABEL, time_range=time_range, copied=copied, synced=last_synced(),
+                           report=last_report())
 
 
 @bp.route("/admin/uw-rec/sync", methods=("POST",))
 @admin_required
 def admin_rec_sync():
     """"Update now": copy UW Rec's schedule right away (it also happens by itself once a day)."""
-    from .uwrec import sync
+    from .uwrec import last_report, sync
     try:
-        flash(f"Updated: {sync()} bookings from UW Rec's schedule.", "success")
+        saved = sync()
+        report = last_report() or {}
+        if report.get("status") == "kept":
+            flash("Far fewer bookings came back than last time, so the last copy is kept. See below.", "error")
+        else:
+            flash(f"Updated: {saved} bookings from UW Rec's schedule.", "success")
     except Exception:
         log.exception("Couldn't copy UW Rec's schedule")
         flash("Couldn't reach UW Rec's schedule right now. The last copy is still used. Try again later.", "error")

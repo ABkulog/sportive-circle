@@ -1047,3 +1047,8 @@ button.link-button { min-height: 36px; }
 .welcome .btn { width: 100%; }
 .rec-feed { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; }
 .rec-feed p { margin: 0; }
+.rec-check { font-weight: 600; }
+.rec-ok { color: var(--success, #2e7d32); }
+.rec-warnings, .rec-kept, .rec-failed { color: var(--danger); }
+.rec-problems { padding: 10px 14px; font-size: .9rem; }
+.rec-problems summary { cursor: pointer; font-weight: 600; min-height: 32px; }

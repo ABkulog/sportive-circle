@@ -33,10 +33,21 @@
 
 <section class="card rec-feed">
   <p><strong>{{ copied }} booking{{ 's' if copied != 1 }} copied from UW Rec's schedule</strong><br>
-    <small class="muted">{% if synced %}Updated {{ synced|ago }}. {% endif %}It updates by itself every day.</small></p>
+    <small class="muted">{% if synced %}Updated {{ synced|ago }}. {% endif %}It updates by itself every day.</small>
+    {% if report %}<br><small class="rec-check rec-{{ report.status }}">{{ {
+      'ok': "Checked: every booking read fine.",
+      'warnings': "Checked: " ~ (report.problems|length + report.more) ~ " booking(s) couldn't be read and were left out.",
+      'kept': "Checked: far fewer bookings came back than last time, so the last copy is kept.",
+      'failed': "UW Rec's site didn't answer. The last copy is still used." }[report.status] }}</small>{% endif %}</p>
   <form method="post" action="{{ url_for('placecheck.admin_rec_sync') }}">
     {{ csrf_field() }}<button class="btn btn-small btn-ghost">Update now</button></form>
 </section>
+
+{% if report and report.problems %}
+  <details class="card rec-problems"><summary>What the check found ({{ report.problems|length + report.more }})</summary>
+    <ul>{% for p in report.problems %}<li>{{ p }}</li>{% endfor %}
+      {% if report.more %}<li>… and {{ report.more }} more</li>{% endif %}</ul></details>
+{% endif %}
 
 <section class="band">
   <h2>Added by hand</h2>
