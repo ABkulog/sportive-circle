@@ -1,4 +1,5 @@
 """Turning uploaded photos into safe, small profile pictures."""
+from functools import lru_cache
 from io import BytesIO
 
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -48,3 +49,16 @@ def make_avatar(data):
         raise ValueError(TOO_BIG) from None
     except (UnidentifiedImageError, OSError):
         raise ValueError(NOT_A_PHOTO) from None
+
+
+THUMB_SIZES = (96, 160)  # small circles in lists (up to 48px, and up to 80px on sharp phone screens)
+
+
+@lru_cache(maxsize=512)
+def thumbnail(jpeg, size):
+    """A smaller copy of a 640px avatar (a few KB instead of 40-90), remembered for repeat requests."""
+    with Image.open(BytesIO(jpeg)) as image:
+        small = image.convert("RGB").resize((size, size), Image.LANCZOS)
+        out = BytesIO()
+        small.save(out, "JPEG", quality=82, optimize=True)
+        return out.getvalue()

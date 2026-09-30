@@ -4,7 +4,8 @@
 <a class="back-link" href="{{ url_for('settings.home') }}">← Settings</a>
 <div class="card form-card">
   <h1>Notifications</h1>
-  <p class="muted">Switch off what you don't want. It saves right away. <span class="saved-note" data-autosave-status aria-live="polite"></span></p>
+  <p class="muted">Switch off what you don't want. It saves right away. Emails when a game you joined moves or is
+    canceled always go out, so you never show up at the wrong time. <span class="saved-note" data-autosave-status aria-live="polite"></span></p>
   <form method="post" class="form" data-autosave>
     {{ csrf_field() }}
     {# One heading per place things show up, instead of repeating "Shows on the bell" on every row. #}

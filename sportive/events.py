@@ -664,7 +664,7 @@ def cancel(event_id):
 def players_except_host(event):
     return get_db().execute(
         """SELECT u.id, u.email, u.full_name FROM rsvps r JOIN users u ON u.id = r.user_id
-           WHERE r.event_id = ? AND r.user_id != ?""", (event["id"], event["host_id"])).fetchall()
+           WHERE r.event_id = ? AND r.user_id != ? AND u.suspended = 0""", (event["id"], event["host_id"])).fetchall()
 
 
 def what_changed(event, data):

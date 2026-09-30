@@ -567,7 +567,7 @@ def join(club_id):
         db.execute("INSERT OR REPLACE INTO club_join_emails (club_id, user_id, sent_at) VALUES (?, ?, ?)",
                    (club_id, g.user["id"], to_db(now_local())))
         officers = db.execute("""SELECT u.id, u.email FROM club_members m JOIN users u ON u.id = m.user_id
-                                 WHERE m.club_id = ? AND m.role = 'officer'""", (club_id,)).fetchall()
+                                 WHERE m.club_id = ? AND m.role = 'officer' AND u.suspended = 0""", (club_id,)).fetchall()
     db.commit()
     what = "signed up for tryouts" if new_role == "tryout" else "wants to join"
     for officer in officers:
@@ -825,7 +825,7 @@ def _notify_officers(club, subject, heading, lines, button, notice):
                          reason=f"You're getting this because you're an officer of {club['name']}.")
     officers = get_db().execute(
         """SELECT u.id, u.email FROM club_members m JOIN users u ON u.id = m.user_id
-           WHERE m.club_id = ? AND m.role = 'officer'""", (club["id"],)).fetchall()
+           WHERE m.club_id = ? AND m.role = 'officer' AND u.suspended = 0""", (club["id"],)).fetchall()
     for row in officers:
         notify(row["id"], "club_review", notice[0], notice[1], key=f"club_review:{club['id']}")
     get_db().commit()

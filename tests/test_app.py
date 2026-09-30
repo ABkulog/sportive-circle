@@ -5134,3 +5134,34 @@ def test_calendar_file_updates_and_form_errors_open_the_right_step(accounts, cli
     page = client.post("/need-players", data={"sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
                                               "starts_in": "15", "duration": "60", "players": "5000"}).data.decode()
     assert 'data-error-field="players"' in page
+
+
+def test_small_photos_for_lists_and_long_cache_for_versioned_files(accounts, client):
+    accounts.signup()
+    home = client.get("/").data.decode()
+    me = re.search(r'/u/(\d+)', home).group(1)
+    full, thumb = client.get(f"/u/{me}/photo?v=1").data, client.get(f"/u/{me}/photo?v=1&s=96").data
+    assert len(thumb) < len(full) and thumb[:2] == b"\xff\xd8"          # a real, smaller JPEG
+    with client.application.test_request_context():
+        from flask import render_template_string
+        html = render_template_string('{% from "_macros.html" import avatar %}{{ avatar(1, "A B", "5", 32) }}')
+    assert "s=96" in html                                                  # small circles ask for the small one
+    css = re.search(r'href="(/static/style\.css\?v=\d+)"', home).group(1)
+    assert "max-age=31536000" in client.get(css).headers["Cache-Control"]
+
+
+def test_suspended_people_get_no_game_or_club_emails(accounts, client, app, monkeypatch):
+    from sportive import events
+    sent = []
+    monkeypatch.setattr(events, "send_email", lambda to, subject, body, html=None: sent.append(to))
+    ids = _people(accounts, app, "Host", "Player")
+    _as(accounts, "Host")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    _as(accounts, "Player")
+    client.post(f"/events/{game}/join")
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 1 WHERE id = ?", (ids["Player"],))
+        get_db().commit()
+    _as(accounts, "Host")
+    client.post(f"/events/{game}/cancel")
+    assert "player@uw.edu" not in sent

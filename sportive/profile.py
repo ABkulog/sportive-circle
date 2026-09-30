@@ -11,7 +11,7 @@ from .auth import MAX_NAME_LENGTH, check_current_password, end_other_sessions, h
 from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
 from .events import INSIDE_VISIBLE, SHOWN_UNLESS_FULL, celebrate_progress, query_events, tell_players_it_was_cancelled
-from .photos import make_avatar
+from .photos import THUMB_SIZES, make_avatar, thumbnail
 from .badges import (GIVEN_BADGES, ROLE_BADGES, SHOWCASE_SLOTS, TESTER, catalog, earned_badges, is_retired,
                      give_badge, rarity, set_showcase, showcase, sync_badges)
 from .clubs import SOCIALS
@@ -130,10 +130,16 @@ def photo_skip():
 @bp.route("/u/<int:user_id>/photo")
 @login_required
 def photo(user_id):
+    """The profile picture: 640px for the big view, or ?s=96 / ?s=160 for the small circles in lists (a
+    32px circle doesn't need a 640px photo: that's most of what a feed would download on a phone)."""
     row = get_db().execute("SELECT image FROM avatars WHERE user_id = ?", (user_id,)).fetchone()
     if row is None:
         abort(404)
-    response = Response(row["image"], mimetype="image/jpeg")
+    image = row["image"]
+    size = request.args.get("s", type=int)
+    if size in THUMB_SIZES:
+        image = thumbnail(image, size)
+    response = Response(image, mimetype="image/jpeg")
     # The URL changes whenever the picture does (?v=...), so it can be cached for a long time.
     response.headers["Cache-Control"] = "private, max-age=31536000, immutable"
     return response

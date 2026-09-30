@@ -196,6 +196,9 @@ def _security_headers(response):
     if request.endpoint not in ("static", "favicon", "touch_icon", "touch_icon_precomposed"):
         # Pages, chat updates, rosters and calendar files show private info; don't keep copies.
         headers.setdefault("Cache-Control", "no-store")
+    elif request.endpoint == "static" and request.args.get("v") and response.status_code == 200:
+        # ?v= changes whenever the file does (_version_static_files), so phones can keep it for a year.
+        headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return response
 
 
