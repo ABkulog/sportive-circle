@@ -35,7 +35,9 @@
     if (!list) return;
     const items = Array.from(list.querySelectorAll("[data-filter-name]"));
     const empty = list.querySelector("[data-filter-empty]");
-    const words = (text) => text.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    // Accents and capitals don't matter ("jose" finds "José"), the same as the searches on the server.
+    const words = (text) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
+      .split(/\s+/).filter(Boolean);
     const filter = () => {
       const typed = words(input.value);
       let shown = 0;

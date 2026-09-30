@@ -15,8 +15,8 @@
   </details>
   <details>
     <summary>Can I make a private game?</summary>
-    <p>Yes. Under <strong>Who can join?</strong> pick <strong>Private</strong>. Invite friends right there, and use
-      <strong>Share invite</strong> on the game page to send the link and password to anyone else.</p>
+    <p>Yes. Under <strong>Who can join?</strong> pick <strong>Private</strong>. Invite friends right there, or tap
+      <strong>Send invite link</strong> on the game page: whoever opens it gets in without the password.</p>
   </details>
   <details>
     <summary>What's team vs team?</summary>
@@ -29,6 +29,18 @@
   <details>
     <summary>Will I get spammed?</summary>
     <p>No. Pick what you hear about in <strong>Settings → Notifications</strong>.</p>
+  </details>
+  {% if sms_available() %}{# only once texts are set up (sms.py) #}
+  <details>
+    <summary>Can I get texts?</summary>
+    <p>Yes, if you want: add your number in <strong>Settings → Texts</strong> for reminders and game changes.
+      Reply STOP anytime.</p>
+  </details>
+  {% endif %}
+  <details>
+    <summary>Is there an app?</summary>
+    <p>Put it on your home screen and it opens like one. iPhone: in Safari, tap Share, then
+      <strong>Add to Home Screen</strong>. Android: tap <strong>Add</strong> when it's offered.</p>
   </details>
   <details>
     <summary>Who can see my email?</summary>
