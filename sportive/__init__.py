@@ -7,7 +7,7 @@ from datetime import timedelta
 from flask import Flask, render_template, request
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from . import (auth, clubs, db, events, feedback, mail, moderation, notifications, pages, parties, profile,
+from . import (auth, clubs, db, events, feedback, mail, moderation, notifications, pages, parties, placecheck, profile,
                phones, reminders, settings, sms, social, stats)
 from .constants import (SPORT_SPACE, DEFAULT_PLAYERS, LOCATIONS, OPEN_TO, OPEN_TO_BADGE, OPEN_TO_LABELS, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS,
                         MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
@@ -92,7 +92,7 @@ def create_app(test_config=None):
     db.init_app(app)
     sms.init_app(app)
     for blueprint in (auth.bp, events.bp, parties.bp, profile.bp, settings.bp, social.bp, clubs.bp, moderation.bp,
-                      notifications.bp, reminders.bp, feedback.bp):
+                      notifications.bp, reminders.bp, feedback.bp, placecheck.bp):
         app.register_blueprint(blueprint)
     pages.register(app)
     app.add_url_rule("/", endpoint="index", view_func=events.feed)
@@ -146,6 +146,7 @@ def _add_template_helpers(app):
                            "tips": {place: tip for (sport, place), tip in PLACE_TIPS.items() if sport == key}}
                      for key, label in SPORTS.items()},
         place_tip=lambda sport, place: PLACE_TIPS.get((sport, place)),
+        whats_on=placecheck.whats_on,
         # events
         spots_left=events.spots_left, event_title=events.event_title, place_map=events.place_map, same_day=same_day,
         can_quick_join=events.can_quick_join, can_party_up=parties.can_party_up,

@@ -4534,3 +4534,80 @@ def test_empty_messages_page_points_to_friends(accounts, client):
     accounts.signup()
     page = client.get("/messages").data.decode()
     assert "No messages yet." in page and "Search friends and chats" in page
+
+
+def _day_after_tomorrow(hour):
+    from sportive.timeutil import now_local
+    day = (now_local() + timedelta(days=2)).replace(hour=hour, minute=0)
+    return day.strftime("%Y-%m-%d"), day.strftime("%Y-%m-%dT%H:%M")
+
+
+def test_uw_rec_reservations_and_other_games_show_while_making_a_game(accounts, client, app):
+    """The user: show "UW Rec: reserved" (can't play there) and other games there then (busy, not taken)."""
+    app.config["ADMIN_EMAILS"] = "maya@uw.edu"
+    _people(accounts, app, "Maya", "Sam")
+    _as(accounts, "Maya")
+    date, six_pm = _day_after_tomorrow(18)
+    field = "Recreation Field 1 (by the IMA)"
+    assert b"UW Rec reservations" in client.get("/admin/uw-rec").data
+    done = client.post("/admin/uw-rec", data={"location": field, "label": "IM flag football", "date": date,
+                                              "start": "18:00", "end": "22:00", "weeks": "3"}, follow_redirects=True)
+    assert b"Added 3 reservations." in done.data
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rec_reservations").fetchone()[0] == 3
+    client.post("/events/new", data=event_form(title="Field pickup", sport="soccer", location=field,
+                                               starts_at=six_pm, ends_at=six_pm[:-5] + "19:00"))
+    _as(accounts, "Sam")
+    _, seven_pm = _day_after_tomorrow(19)
+    info = client.get("/events/place-check", query_string={"location": field, "starts_at": six_pm,
+                                                           "ends_at": seven_pm}).get_json()
+    assert info["uw_rec"] and info["schedule"].startswith("https://reg.recreation.uw.edu")
+    assert [r["label"] for r in info["reserved"]] == ["IM flag football"] and "10:00 PM" in info["reserved"][0]["when"]
+    assert [g["title"] for g in info["games"]] == ["Field pickup"] and info["games"][0]["going"] == 1
+    later = client.get("/events/place-check", query_string={"location": field, "starts_at": seven_pm[:-5] + "22:00",
+                                                            "ends_at": seven_pm[:-5] + "23:00"}).get_json()
+    assert later["reserved"] == [] and later["games"] == []                   # after both: nothing on
+    trail = client.get("/events/place-check", query_string={"location": "Burke-Gilman Trail", "starts_at": six_pm,
+                                                            "ends_at": seven_pm}).get_json()
+    assert not trail["uw_rec"] and trail["schedule"] is None                  # not a UW Rec place
+    assert client.get("/admin/uw-rec").status_code == 404                     # admins only
+
+
+def test_game_page_shows_what_else_is_on_there(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "maya@uw.edu"
+    _people(accounts, app, "Maya", "Sam")
+    _as(accounts, "Maya")
+    date, six_pm = _day_after_tomorrow(18)
+    field = "Recreation Field 1 (by the IMA)"
+    client.post("/admin/uw-rec", data={"location": field, "label": "Club rugby", "date": date,
+                                       "start": "17:00", "end": "19:00", "weeks": "1"})
+    mine = event_id_from(client.post("/events/new", data=event_form(title="Mine", sport="soccer", location=field,
+                                                                     starts_at=six_pm, ends_at=six_pm[:-5] + "19:00")))
+    _as(accounts, "Sam")
+    client.post("/events/new", data=event_form(title="Secret kick", sport="soccer", location=field, starts_at=six_pm,
+                                               ends_at=six_pm[:-5] + "19:00", is_private="1", password="dawgs26"))
+    _as(accounts, "Maya")
+    page = client.get(f"/events/{mine}").data.decode()
+    assert "UW Rec: reserved" in page and "Club rugby" in page and "Check the place is still free" in page
+    assert "A private game" in page and "Secret kick" not in page             # private details stay private
+
+
+def test_removing_a_weekly_uw_rec_reservation(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "maya@uw.edu"
+    _people(accounts, app, "Maya")
+    _as(accounts, "Maya")
+    date, _ = _day_after_tomorrow(18)
+    client.post("/admin/uw-rec", data={"location": "IMA (Intramural Activities Building)", "label": "IM hoops",
+                                       "date": date, "start": "18:00", "end": "21:00", "weeks": "4"})
+    with app.app_context():
+        first = get_db().execute("SELECT id FROM rec_reservations ORDER BY starts_at").fetchone()[0]
+    client.post(f"/admin/uw-rec/{first}/delete")
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rec_reservations").fetchone()[0] == 3
+        second = get_db().execute("SELECT id FROM rec_reservations ORDER BY starts_at").fetchone()[0]
+    client.post(f"/admin/uw-rec/{second}/delete", data={"all": "1"})
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rec_reservations").fetchone()[0] == 0
+    bad = client.post("/admin/uw-rec", data={"location": "Burke-Gilman Trail", "label": "x", "date": date,
+                                             "start": "18:00", "end": "19:00"}, follow_redirects=True)
+    assert b"Pick one of UW Rec" in bad.data

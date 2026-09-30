@@ -750,6 +750,15 @@ form[data-wizard] .form-step { display: none; }
 .place-check { margin: 4px 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft);
   border-left: 3px solid var(--gold); font-size: .88rem; color: var(--muted); }
 .place-check strong { display: block; color: var(--text); margin-bottom: 2px; }
+.whats-on { margin: 0 0 12px; font-size: .88rem; }
+.whats-on p { margin: 4px 0; }
+.whats-on-rec { padding: 8px 10px; border-radius: 10px; background: var(--gold-light); color: var(--gold-ink); }
+.whats-on-rec strong, .whats-on-rec a { color: inherit; }
+.whats-on-title { font-weight: 600; }
+.whats-on-games { margin: 2px 0 4px; padding-left: 18px; }
+.rec-list { list-style: none; padding: 0; margin: 0; }
+.rec-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.rec-actions { display: grid; justify-items: end; gap: 2px; }
 .texts-card h2 { margin: 0 0 4px; font-size: 1.1rem; }
 .held-why strong { color: var(--text); }
 .chat-report { display: block; padding: 4px 0 2px; min-height: 24px; font-size: .75rem; color: var(--muted); }

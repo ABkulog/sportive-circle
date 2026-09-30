@@ -340,3 +340,17 @@ CREATE TABLE IF NOT EXISTS sms_log (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sms_log_user ON sms_log(user_id, created_at);
+
+-- UW Recreation's own reservations (IM leagues, club practices, rentals), copied in by admins from UW Rec's
+-- schedule (Admin -> UW Rec). Shown to hosts so they know the courts/field are taken then (placecheck.py).
+CREATE TABLE IF NOT EXISTS rec_reservations (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    location   TEXT NOT NULL,
+    starts_at  TEXT NOT NULL,
+    ends_at    TEXT NOT NULL,
+    label      TEXT NOT NULL,
+    source     TEXT NOT NULL DEFAULT 'admin',   -- 'admin' (typed in) or 'feed' (if UW Rec ever shares one)
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rec_reservations ON rec_reservations(location, starts_at);

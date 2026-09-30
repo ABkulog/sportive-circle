@@ -6,7 +6,7 @@
   <h1>{{ 'Edit event' if event else 'Create event' }}</h1>
   {% if club %}<p class="club-banner">For <strong>{{ club.name }}</strong>. Open to all levels.</p>{% endif %}
   {# Three short steps (no scrolling on a phone); without JavaScript it's one form. #}
-  <form method="post" class="form" data-sport-form data-wizard {% if event and event.team_size %}data-team-game{% endif %}>
+  <form method="post" class="form" data-sport-form data-wizard {% if event %}data-event-id="{{ event.id }}"{% endif %} {% if event and event.team_size %}data-team-game{% endif %}>
     {{ csrf_field() }}
     {% if club %}<input type="hidden" name="club" value="{{ club.id }}">{% endif %}
     <section class="wizard-step">

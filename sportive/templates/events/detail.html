@@ -55,6 +55,28 @@
   {% if event.note and inside %}<p class="note">{{ event.note }}</p>{% endif %}
 
   {% if not event.cancelled and not ended %}
+    {% set on = whats_on(event.location, event.starts_at, event.ends_at, event.id) %}
+    {% if on.reserved or on.games %}
+      <section class="whats-on" aria-label="Also at this place">
+        {% for r in on.reserved %}
+          <p class="whats-on-rec"><strong>UW Rec: reserved</strong> {{ r.when }} · {{ r.label }}.
+            {% if is_host %}Check the place is still free, or move the game.{% endif %}
+            <a href="{{ on.schedule }}" target="_blank" rel="noopener">UW Rec's schedule</a></p>
+        {% endfor %}
+        {% if on.games %}
+          <p class="whats-on-title">Also on Sportive Circle here then:</p>
+          <ul class="whats-on-games">
+            {% for game in on.games %}
+              <li>{% if game.url %}<a href="{{ game.url }}">{{ game.title }}</a>{% else %}{{ game.title }}{% endif %}
+                · {{ game.when }} · {{ game.going }}{% if game.max %}/{{ game.max }}{% endif %} going</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </section>
+    {% endif %}
+  {% endif %}
+
+  {% if not event.cancelled and not ended %}
     {# 1. The one main action #}
     <div class="primary-action">
       {% if is_host %}
