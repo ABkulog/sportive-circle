@@ -140,6 +140,10 @@
       }
     });
     textarea.addEventListener("input", grow);
+    // Tapping the messages (not a photo, link or ⋯ menu) puts the keyboard away; tapping the box brings it back.
+    list.addEventListener("click", (event) => {
+      if (document.activeElement === textarea && !event.target.closest("a, button, summary, details")) textarea.blur();
+    });
     // Sending happens in the background: the page doesn't reload, the box empties and keeps the keyboard up,
     // and the message shows right away. (Without JavaScript the form still posts the normal way.)
     const form = textarea.form;
