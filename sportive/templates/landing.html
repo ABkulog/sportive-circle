@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import club_logo %}
+{% from "_macros.html" import club_logo, install_tip %}
 {% block title %}Play sports with Huskies{% endblock %}
 {% block content %}
 <section class="hero husky-hero">
@@ -12,6 +12,7 @@
     <a class="btn btn-large btn-outline-light" href="{{ url_for('auth.login') }}">Log in</a>
   </div>
 </section>
+{{ install_tip() }}
 
 <section class="how-strip" aria-label="How it works">
   <ol>

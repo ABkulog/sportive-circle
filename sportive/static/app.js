@@ -255,18 +255,40 @@
     });
   }
 
-  // "Put it on your home screen": iPhone Safari only, not once it's already opened from the home screen.
+  // "Put it on your home screen": Android/Chrome gets a one-tap Add (the browser's install prompt), iPhone
+  // Safari gets the two steps (Apple only lets the person do it). Never once it runs from the home screen.
   const installTip = document.querySelector("[data-install-tip]");
   if (installTip) {
-    const ua = navigator.userAgent;
-    const iosSafari = /iPhone|iPad|iPod/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|Instagram|FBAN|FBAV/.test(ua);
-    const installed = navigator.standalone || window.matchMedia("(display-mode: standalone)").matches;
+    const remember = () => { try { localStorage.setItem("installTipClosed", "1"); } catch (error) { /* private */ } };
     let closed = false;
     try { closed = localStorage.getItem("installTipClosed") === "1"; } catch (error) { /* private mode */ }
-    installTip.hidden = !iosSafari || installed || closed;
+    const installed = navigator.standalone || window.matchMedia("(display-mode: standalone)").matches;
+    const ua = navigator.userAgent;
+    const iosSafari = /iPhone|iPad|iPod/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|Instagram|FBAN|FBAV/.test(ua);
+    const show = (part) => {
+      if (closed || installed) return;
+      installTip.querySelector(`[data-install-${part}]`).hidden = false;
+      installTip.hidden = false;
+    };
+    if (iosSafari) show("ios");
+    let installPrompt = null;
+    window.addEventListener("beforeinstallprompt", (event) => {  // Chrome says it can be installed
+      event.preventDefault();
+      installPrompt = event;
+      installTip.querySelector("[data-install-button]").hidden = false;
+      show("android");
+    });
+    installTip.querySelector("[data-install-button]").addEventListener("click", async () => {
+      if (!installPrompt) return;
+      installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      installPrompt = null;
+      if (choice.outcome === "accepted") { installTip.hidden = true; remember(); }
+    });
+    window.addEventListener("appinstalled", () => { installTip.hidden = true; remember(); });
     installTip.querySelector("[data-install-close]").addEventListener("click", () => {
       installTip.hidden = true;
-      try { localStorage.setItem("installTipClosed", "1"); } catch (error) { /* private mode */ }
+      remember();
     });
   }
 

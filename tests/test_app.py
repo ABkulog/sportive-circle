@@ -5083,3 +5083,10 @@ def test_home_screen_app_setup(accounts, client):
     assert 'rel="manifest"' in home and "data-install-tip hidden" in home and "Add to Home Screen" in home
     manifest = client.get("/static/manifest.json").get_json()
     assert manifest["display"] == "standalone" and manifest["start_url"] == "/"
+    sizes = {icon["sizes"] for icon in manifest["icons"]}
+    assert {"192x192", "512x512"} <= sizes                             # what Android needs for one-tap Add
+    for icon in manifest["icons"]:
+        assert client.get(icon["src"]).status_code == 200
+    assert "data-install-button" in home
+    accounts.logout()
+    assert "data-install-tip" in client.get("/").data.decode()          # the landing page (QR code) too

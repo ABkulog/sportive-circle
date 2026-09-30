@@ -994,7 +994,9 @@ button.link-button { min-height: 36px; }
 .phone-row select { width: auto; }
 
 /* "Put it on your home screen" tip on Home (iPhone Safari only) */
-.install-tip { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; }
+.install-tip { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.install-icon { flex: none; border-radius: 10px; }
+.hero + .install-tip { margin: 12px 0 0; }
 .install-tip p { margin: 0; flex: 1; font-size: .92rem; }
 .install-tip .help-close { flex: none; }
 
