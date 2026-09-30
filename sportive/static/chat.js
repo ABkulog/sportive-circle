@@ -182,6 +182,101 @@
   }
   makeAlbums();
 
+  // Photo viewer: tapping a photo opens it full screen (not a new tab). Swipe or use the arrows to go through
+  // every photo in the chat; ×, Esc, a tap on the dark part or a swipe down closes it.
+  const viewer = el("div", "lightbox");
+  viewer.hidden = true;
+  viewer.setAttribute("role", "dialog");
+  viewer.setAttribute("aria-modal", "true");
+  viewer.setAttribute("aria-label", "Photo");
+  const viewerImage = el("img");
+  const viewerCount = el("span", "lightbox-count");
+  const viewerButton = (className, label, text) => {
+    const button = el("button", className, text);
+    button.type = "button";
+    button.setAttribute("aria-label", label);
+    return button;
+  };
+  const closeButton = viewerButton("lightbox-close", "Close", "×");
+  const prevButton = viewerButton("lightbox-prev", "Previous photo", "‹");
+  const nextButton = viewerButton("lightbox-next", "Next photo", "›");
+  viewer.append(viewerImage, viewerCount, closeButton, prevButton, nextButton);
+  document.body.appendChild(viewer);
+  let shown = [], at = 0, openedFrom = null;
+  const showPhoto = (i) => {
+    at = (i + shown.length) % shown.length;
+    viewerImage.src = shown[at].src;
+    viewerImage.alt = shown[at].alt;
+    const many = shown.length > 1;
+    viewerCount.textContent = many ? `${at + 1} / ${shown.length}` : "";
+    prevButton.hidden = nextButton.hidden = !many;
+  };
+  function openViewer(photos, i) {
+    openedFrom = document.activeElement;
+    if (openedFrom && openedFrom.blur) openedFrom.blur();  // puts the keyboard away
+    shown = photos;
+    showPhoto(i);
+    viewer.hidden = false;
+    closeButton.focus();
+  }
+  const closeViewer = () => {
+    viewer.hidden = true;
+    viewerImage.removeAttribute("src");
+  };
+  closeButton.addEventListener("click", closeViewer);
+  prevButton.addEventListener("click", () => showPhoto(at - 1));
+  nextButton.addEventListener("click", () => showPhoto(at + 1));
+  viewer.addEventListener("click", (event) => { if (event.target === viewer) closeViewer(); });
+  document.addEventListener("keydown", (event) => {
+    if (viewer.hidden) return;
+    if (event.key === "Escape") closeViewer();
+    else if (event.key === "ArrowLeft") showPhoto(at - 1);
+    else if (event.key === "ArrowRight") showPhoto(at + 1);
+  });
+  let viewerTouch = null;
+  viewer.addEventListener("touchstart", (event) => {
+    viewerTouch = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+  }, { passive: true });
+  viewer.addEventListener("touchend", (event) => {
+    if (!viewerTouch) return;
+    const dx = event.changedTouches[0].clientX - viewerTouch.x, dy = event.changedTouches[0].clientY - viewerTouch.y;
+    viewerTouch = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) showPhoto(at + (dx < 0 ? 1 : -1));
+    else if (dy > 80 && dy > Math.abs(dx)) closeViewer();
+  });
+  // Every photo in the chat, oldest first (album tiles open the same photos).
+  const chatPhotos = () => [...list.querySelectorAll(".chat-bubble > .chat-photo")].map((link) => {
+    const image = link.querySelector("img");
+    return { src: link.href, alt: image ? image.alt : "Photo" };
+  });
+  list.addEventListener("click", (event) => {
+    const link = event.target.closest(".chat-photo, .chat-album a");
+    if (!link || event.defaultPrevented) return;  // "+N" opens the album instead
+    event.preventDefault();
+    const photos = chatPhotos();
+    openViewer(photos, Math.max(0, photos.findIndex((photo) => photo.src === link.href)));
+  });
+
+  // Profile pictures: one tap opens their profile, a double tap shows the picture big.
+  let avatarTap = null;
+  list.addEventListener("click", (event) => {
+    const avatar = event.target.closest(".chat-avatar");
+    if (!avatar) return;
+    const image = avatar.querySelector("img");
+    if (!image) return;  // no picture (initials): straight to the profile
+    event.preventDefault();
+    if (avatarTap && avatarTap.avatar === avatar) {
+      clearTimeout(avatarTap.timer);
+      avatarTap = null;
+      const big = new URL(image.src, location.href);
+      big.searchParams.delete("s");
+      openViewer([{ src: big.href, alt: avatar.getAttribute("aria-label") || "Profile picture" }], 0);
+      return;
+    }
+    if (avatarTap) clearTimeout(avatarTap.timer);
+    avatarTap = { avatar, timer: setTimeout(() => { avatarTap = null; location.href = avatar.href; }, 280) };
+  });
+
   // "Seen" / "Delivered" under my newest message (only when the newest message is mine).
   function showStatus(status) {
     list.querySelectorAll(".chat-seen").forEach((node) => node.remove());

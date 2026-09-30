@@ -1156,3 +1156,18 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .chat-album img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .chat-album-more { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, .45);
   color: #fff; font-size: 1.5rem; font-weight: 700; }
+/* Photo viewer (chat.js): full screen, swipe or arrows between photos */
+.lightbox { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: rgba(0, 0, 0, .94);
+  padding: calc(56px + env(safe-area-inset-top, 0px)) 0 calc(56px + env(safe-area-inset-bottom, 0px)); touch-action: none; }
+.lightbox[hidden] { display: none; }
+.lightbox img { max-width: 100vw; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.lightbox button { position: absolute; display: grid; place-items: center; width: 44px; height: 44px; border: 0;
+  border-radius: 50%; background: rgba(255, 255, 255, .16); color: #fff; font-size: 1.7rem; line-height: 1; cursor: pointer; }
+.lightbox button:hover, .lightbox button:focus-visible { background: rgba(255, 255, 255, .3); }
+.lightbox button[hidden] { display: none; }
+.lightbox-close { top: calc(10px + env(safe-area-inset-top, 0px)); right: 12px; }
+.lightbox-prev { left: 10px; top: 50%; transform: translateY(-50%); }
+.lightbox-next { right: 10px; top: 50%; transform: translateY(-50%); }
+.lightbox-count { position: absolute; top: calc(20px + env(safe-area-inset-top, 0px)); left: 0; right: 0; text-align: center;
+  color: #fff; font-size: .9rem; pointer-events: none; }
+@media (hover: none) { .lightbox .lightbox-prev, .lightbox .lightbox-next { display: none; } }  /* phones: swipe */
