@@ -2,6 +2,7 @@
 {% from "_macros.html" import select, who_can_join, format_field, players_block, open_to_field, place_check %}
 {% block title %}{{ 'Edit event' if event else 'New event' }}{% endblock %}
 {% block content %}
+<a class="back-link" href="{{ url_for('events.detail', event_id=event.id) if event else (url_for('clubs.view', club_id=club.id) if club else url_for('events.feed')) }}" data-back>← Back</a>
 <div class="card form-card">
   <h1>{{ 'Edit event' if event else 'Create event' }}</h1>
   {% if club %}<p class="club-banner">For <strong>{{ club.name }}</strong>. Open to all levels.</p>{% endif %}

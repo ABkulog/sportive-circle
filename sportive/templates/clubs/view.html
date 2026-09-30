@@ -42,12 +42,14 @@
     {% elif club.status != 'approved' %}
       {% if role == 'officer' and club.status != 'denied' %}<a class="btn btn-ghost btn-block" href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit application</a>{% endif %}
     {% elif role in ('member', 'officer') %}
-      <div class="action-pair">
-        <span class="btn btn-ghost is-static">{{ 'Officer' if role == 'officer' else 'Member' }}</span>
-        {% if role == 'officer' %}
+      <p class="going-pill club-role">✓ You're {{ 'an officer' if role == 'officer' else 'a member' }}</p>
+      {% if role == 'officer' %}
+        <div class="action-pair">
           <a class="btn" href="{{ url_for('events.create', club=club.id) }}">+ Club event</a>
-        {% endif %}
-      </div>
+          <a class="btn btn-ghost" href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit club</a>
+        </div>
+        {% if owner %}<a class="btn btn-ghost btn-block manage-officers" href="{{ url_for('clubs.officers', club_id=club.id) }}">Manage officers</a>{% endif %}
+      {% endif %}
     {% elif role in ('requested', 'tryout') %}
       <div class="waiting-box">
         <strong>{{ 'Signed up for tryouts' if role == 'tryout' else 'Request sent' }}</strong>
@@ -232,8 +234,10 @@
               <details class="more-menu">
                 <summary aria-label="Options for {{ m.full_name }}">⋯</summary>
                 <div class="more-menu-panel right">
+                  {% if owner %}
                   <form method="post" action="{{ url_for('clubs.make_officer', club_id=club.id, user_id=m.id) }}">
                     {{ csrf_field() }}<button class="link-button">Make officer</button></form>
+                  {% endif %}
                   <form method="post" action="{{ url_for('clubs.decide', club_id=club.id, user_id=m.id, decision='remove') }}"
                         data-confirm="Remove {{ m.full_name }} from the club?">
                     {{ csrf_field() }}<button class="link-button danger-link">Remove</button></form>

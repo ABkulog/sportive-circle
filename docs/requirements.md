@@ -114,6 +114,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-CLUB-9 | Club events can repeat weekly (up to 12 weeks, for practices) and can be for members only (only members see them in their feed or can join; others see "Join the club"). | Must | ✅ |
 | FR-CLUB-10 | A new club event is posted to the club's updates automatically, with a link, so followers and members hear about it. | Should | ✅ |
 | FR-CLUB-11 | Officers see members' UW emails, can copy them all and download the roster as a spreadsheet (CSV). Members don't see each other's emails. | Should | ✅ |
+| FR-CLUB-12 | The person who registered a club is its owner: only they add officers (searching anyone on the app by name or UW NetID, on Manage officers) or take officer rights away; they always stay an officer. Other officers edit the club, post, make club events and confirm members. If the owner is no longer an officer, any officer can manage officers. | Must | ✅ |
 
 ### Friends and messages (SOC)
 

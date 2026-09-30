@@ -94,6 +94,23 @@ def my_role(club_id):
     return row["role"] if row else None
 
 
+def is_owner(club):
+    """The person who registered the club runs its officer list. If they're no longer an officer (left, or
+    deleted their account), any officer can, so a club is never stuck. Admins always can."""
+    if g.get("user") is None:
+        return False
+    if is_admin():
+        return True
+    if my_role(club["id"]) != "officer":
+        return False
+    owner = club["created_by"]
+    if owner == g.user["id"]:
+        return True
+    still_officer = get_db().execute("SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ? AND role = 'officer'",
+                                     (club["id"], owner)).fetchone() if owner else None
+    return still_officer is None
+
+
 def can_see(club):
     """Approved clubs are public. Pending/rejected ones: only their officers and admins."""
     return club["status"] == "approved" or my_role(club["id"]) == "officer" or is_admin()
@@ -282,7 +299,7 @@ def view(club_id):
         {"club": club_id, "now": to_db(now_local()), "me": g.user["id"] if g.get("user") else 0,
          "hold_now": to_db(now_local())}).fetchall()
     return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
-                           role=role, requests=requests, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
+                           role=role, owner=is_owner(club), requests=requests, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
                            socials=social_links(club),
                            joining=JOINING,
                            experience=EXPERIENCE, who=WHO_CAN_JOIN_LABELS)
@@ -613,7 +630,7 @@ def leave(club_id):
 @bp.route("/clubs/<int:club_id>/officers/<int:user_id>", methods=("POST",))
 @login_required
 def make_officer(club_id, user_id):
-    if my_role(club_id) != "officer":
+    if not is_owner(get_club(club_id)):
         abort(403)
     db = get_db()
     changed = db.execute("UPDATE club_members SET role = 'officer' WHERE club_id = ? AND user_id = ? AND role = 'member'",
@@ -627,6 +644,52 @@ def make_officer(club_id, user_id):
         flash("Only confirmed members can be made officers. They may have left the club.", "error")
     db.commit()
     return redirect(url_for("clubs.view", club_id=club_id) + "#members")
+
+
+@bp.route("/clubs/<int:club_id>/officers", methods=("GET", "POST"))
+@login_required
+def officers(club_id):
+    """The owner (who registered the club) adds officers by searching any Husky by name or UW NetID, and takes
+    officer rights away. Officers can edit the club, post updates, make club events and confirm members."""
+    from .social import MIN_SEARCH_LENGTH, search_people  # social.py is loaded after this module
+    club = get_club(club_id)
+    if not is_owner(club):
+        abort(403)
+    db = get_db()
+    if request.method == "POST":
+        user_id = request.form.get("user", type=int)
+        action = request.form.get("action")
+        person = db.execute("SELECT id, full_name FROM users WHERE id = ? AND verified = 1 AND suspended = 0",
+                            (user_id,)).fetchone()
+        if person is None:
+            abort(404)
+        first = person["full_name"].split()[0]
+        if action == "add":
+            db.execute("""INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, 'officer', ?)
+                          ON CONFLICT(club_id, user_id) DO UPDATE SET role = 'officer'""",
+                       (club_id, user_id, to_db(now_local())))
+            if user_id != g.user["id"]:
+                _dm(g.user["id"], user_id, f"⭐ You're now an officer of {club['name']}. You can edit the club, post "
+                                           f"updates, make club events and confirm new members. {_club_link(club_id)}")
+            flash(f"{first} is an officer now.", "success")
+        elif action == "remove":
+            if user_id == club["created_by"]:
+                flash("The person who registered the club stays an officer.", "error")
+            else:
+                db.execute("UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ? AND role = 'officer'",
+                           (club_id, user_id))
+                flash(f"{first} is a member now, not an officer.", "success")
+        db.commit()
+        return redirect(url_for("clubs.officers", club_id=club_id))
+    current = db.execute(
+        """SELECT u.id, u.full_name, u.avatar_updated, u.email FROM club_members m JOIN users u ON u.id = m.user_id
+           WHERE m.club_id = ? AND m.role = 'officer' ORDER BY u.id = ? DESC, u.full_name""",
+        (club_id, club["created_by"] or 0)).fetchall()
+    q = one_line(request.args.get("q", ""))[:60]
+    officer_ids = {o["id"] for o in current}
+    results = [p for p in search_people(g.user["id"], q) if p["id"] not in officer_ids] if q else []
+    return render_template("clubs/officers.html", club=club, officers=current, q=q, results=results,
+                           min_search=MIN_SEARCH_LENGTH)
 
 
 # --------------------------------------------------------- updates feed
