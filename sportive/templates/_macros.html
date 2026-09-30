@@ -255,13 +255,13 @@
 {% endmacro %}
 
 
-{% macro install_tip() %}
+{% macro install_tip(title='Put it on your home screen') %}
   {# "Put it on your home screen" (app.js decides): Android/Chrome gets a one-tap Install button (the browser's own
      prompt); iPhone Safari gets the two steps, since Apple lets only the person add it. Hidden everywhere else, once
      it's installed, and after × on this device. #}
   <div class="card install-tip" data-install-tip hidden>
     <img src="{{ url_for('static', filename='icon-192.png') }}" alt="" width="44" height="44" class="install-icon">
-    <p><strong>Put it on your home screen</strong><br>
+    <p><strong>{{ title }}</strong><br>
       <span class="muted" data-install-ios hidden>In Safari, tap Share, then Add to Home Screen.</span>
       <span class="muted" data-install-android hidden>One tap and it opens like an app.</span></p>
     <button type="button" class="btn btn-small" data-install-button hidden>Add</button>

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import avatar, icon %}
+{% from "_macros.html" import avatar, icon, install_tip %}
 {% block title %}{{ event_title(event) }}{% endblock %}
 {% set place = place_map(event.location) %}
 {% block head %}
@@ -17,6 +17,7 @@
 {% set left = spots_left(event) %}
 {% set is_host = event.host_id == g.user.id %}
 <a class="back-link" href="{{ url_for('events.feed') }}" data-back>← Back</a>
+{% if event.i_am_going %}{{ install_tip(title="Want your games one tap away?") }}{% endif %}
 <article class="card detail">
   <div class="detail-head">
     <div class="event-emoji big" aria-hidden="true">{{ SPORT_EMOJI[event.sport] }}</div>

@@ -257,44 +257,81 @@
     });
   }
 
-  // "Put it on your home screen": Android/Chrome gets a one-tap Add (the browser's install prompt), iPhone
-  // Safari gets the two steps (Apple only lets the person do it). Never once it runs from the home screen.
+  // Putting the app on the home screen. Android/Chrome gets a one-tap Add (the browser's install prompt);
+  // iPhone Safari gets the two steps (Apple only lets the person do it). Never once it runs from the home screen,
+  // nor in browsers that can't (laptops, Instagram/Snapchat's). × hides the card; it comes back once after a week.
+  const ua = navigator.userAgent;
+  const iosSafari = /iPhone|iPad|iPod/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|Instagram|FBAN|FBAV|Snapchat/.test(ua);
+  const installed = navigator.standalone || window.matchMedia("(display-mode: standalone)").matches;
+  let installPrompt = null;
+  const installListeners = [];
+  window.addEventListener("beforeinstallprompt", (event) => {  // Chrome says it can be installed
+    event.preventDefault();
+    installPrompt = event;
+    installListeners.forEach((listener) => listener());
+  });
+  const install = async () => {
+    if (!installPrompt) return false;
+    installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    installPrompt = null;
+    return choice.outcome === "accepted";
+  };
+  const store = {
+    get(key) { try { return localStorage.getItem(key); } catch (error) { return null; } },
+    set(key, value) { try { localStorage.setItem(key, value); } catch (error) { /* private mode */ } },
+  };
+  const WEEK = 7 * 24 * 60 * 60 * 1000;
+
   const installTip = document.querySelector("[data-install-tip]");
-  if (installTip) {
-    const remember = () => { try { localStorage.setItem("installTipClosed", "1"); } catch (error) { /* private */ } };
-    let closed = false;
-    try { closed = localStorage.getItem("installTipClosed") === "1"; } catch (error) { /* private mode */ }
-    const installed = navigator.standalone || window.matchMedia("(display-mode: standalone)").matches;
-    const ua = navigator.userAgent;
-    const iosSafari = /iPhone|iPad|iPod/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|Instagram|FBAN|FBAV/.test(ua);
+  if (installTip && !installed) {
+    const closes = Number(store.get("installTipCloses") || (store.get("installTipClosed") === "1" ? 1 : 0));
+    const closedAt = Number(store.get("installTipClosedAt") || 0);
+    const allowed = closes === 0 || (closes === 1 && Date.now() - closedAt > WEEK);
     const show = (part) => {
-      if (closed || installed) return;
+      if (!allowed) return;
       installTip.querySelector(`[data-install-${part}]`).hidden = false;
       installTip.hidden = false;
     };
     if (iosSafari) show("ios");
-    let installPrompt = null;
-    window.addEventListener("beforeinstallprompt", (event) => {  // Chrome says it can be installed
-      event.preventDefault();
-      installPrompt = event;
-      installTip.querySelector("[data-install-button]").hidden = false;
-      show("android");
-    });
+    const offerAndroid = () => { installTip.querySelector("[data-install-button]").hidden = false; show("android"); };
+    if (installPrompt) offerAndroid(); else installListeners.push(offerAndroid);
     installTip.querySelector("[data-install-button]").addEventListener("click", async () => {
-      if (!installPrompt) return;
-      installPrompt.prompt();
-      const choice = await installPrompt.userChoice;
-      installPrompt = null;
-      if (choice.outcome === "accepted") { installTip.hidden = true; remember(); }
+      if (await install()) installTip.hidden = true;
     });
-    window.addEventListener("appinstalled", () => { installTip.hidden = true; remember(); });
+    installTip.querySelector("[data-install-close]").addEventListener("click", () => {
+      installTip.hidden = true;
+      store.set("installTipCloses", String(closes + 1));
+      store.set("installTipClosedAt", String(Date.now()));
+    });
     // Back to this page from the history: the browser's install offer isn't carried over, so hide the button.
     window.addEventListener("pageshow", (event) => {
       if (event.persisted && !installPrompt) installTip.querySelector("[data-install-button]").hidden = true;
     });
-    installTip.querySelector("[data-install-close]").addEventListener("click", () => {
-      installTip.hidden = true;
-      remember();
+  }
+  window.addEventListener("appinstalled", () => {
+    if (installTip) installTip.hidden = true;
+    store.set("installTipCloses", "2");
+  });
+
+  // "You're in!" (right after sign-up): the steps for this phone, or straight on where it can't be done.
+  const welcome = document.querySelector("[data-welcome]");
+  if (welcome) {
+    const next = welcome.dataset.next || "/";
+    const addButton = welcome.querySelector("[data-welcome-add]");
+    const offerAndroid = () => { addButton.hidden = false; };
+    if (installed) {
+      location.replace(next);
+    } else if (iosSafari) {
+      welcome.querySelector("[data-welcome-ios]").hidden = false;
+    } else if (installPrompt) {
+      offerAndroid();
+    } else {
+      installListeners.push(offerAndroid);
+      setTimeout(() => { if (addButton.hidden) location.replace(next); }, 1500);  // nothing to offer here
+    }
+    addButton.addEventListener("click", async () => {
+      if (await install()) location.replace(next);
     });
   }
 

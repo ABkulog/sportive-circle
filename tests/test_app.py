@@ -768,14 +768,14 @@ def test_new_users_must_add_a_photo(accounts, client):
     assert client.get("/events/new").headers["Location"] == "/profile/photo"
     assert client.get("/how-it-works").status_code == 200  # still allowed
     response = accounts.upload_photo()
-    assert response.headers["Location"] == "/events/new"  # back to the page they tried to open
+    assert response.headers["Location"] == _after_sign_up("/events/new")  # back to the page they tried to open
     assert client.get("/").status_code == 200
 
 
 def test_first_photo_goes_straight_home(accounts, client):
     accounts.signup(photo=False)
     client.get("/")  # the feed is the normal landing spot, so no special destination
-    assert accounts.upload_photo().headers["Location"] == "/"
+    assert accounts.upload_photo().headers["Location"] == _after_sign_up("/")
 
 
 def test_photo_is_resized_and_location_data_removed(accounts, client, app):
@@ -837,7 +837,7 @@ def test_shared_link_survives_photo_step(accounts, client):
     accounts.logout()
     accounts.signup(email="new@uw.edu", photo=False)
     client.get(f"/events/{event_id}")
-    assert accounts.upload_photo().headers["Location"] == f"/events/{event_id}"
+    assert accounts.upload_photo().headers["Location"] == _after_sign_up(f"/events/{event_id}")
 
 
 def test_deleting_account_removes_photo(accounts, client, app):
@@ -899,7 +899,7 @@ def test_add_photo_later(accounts, client):
     # "Add later" opens a "No problem" pop-up on the same page, with Continue inside it.
     assert 'data-dialog="later-dialog"' in page and "No problem" in page and "data-dialog-continue" in page
     response = client.post("/profile/photo/skip")
-    assert response.headers["Location"] == "/"
+    assert response.headers["Location"] == _after_sign_up("/")
     feed = client.get("/")
     assert feed.status_code == 200 and b"photo-nudge" not in feed.data  # no banner following you around
 
@@ -932,7 +932,7 @@ def test_add_later_keeps_shared_link(accounts, client):
     accounts.logout()
     accounts.signup(email="new@uw.edu", photo=False)
     client.get(f"/events/{event_id}")
-    assert client.post("/profile/photo/skip").headers["Location"] == f"/events/{event_id}"
+    assert client.post("/profile/photo/skip").headers["Location"] == _after_sign_up(f"/events/{event_id}")
 
 
 def test_reminder_email_is_friendly(accounts, client, app, monkeypatch):
@@ -1155,6 +1155,11 @@ def test_celebration_and_footer(accounts, client):
 
 
 # ------------------------------------------------------------ badges
+
+def _after_sign_up(destination):
+    """The last sign-up step goes to the one-time "You're in!" screen, which then continues to `destination`."""
+    return f"/welcome?next={destination}"
+
 
 def _user_id(app, email):
     with app.app_context():
@@ -5265,3 +5270,15 @@ def test_club_page_shows_outsiders_only_a_count_of_members_only_events(accounts,
     accounts.logout()
     page = client.get(f"/clubs/{club}").data.decode()                            # a visitor from a QR code
     assert "Secret practice" not in page and "1 event for members" in page
+
+
+def test_youre_in_screen_after_sign_up(accounts, client, app):
+    """The last sign-up step shows how to put the app on the home screen once, then goes where they were headed."""
+    accounts.signup(photo=False)
+    done = accounts.upload_photo()
+    assert done.headers["Location"] == _after_sign_up("/")
+    page = client.get(done.headers["Location"]).data.decode()
+    assert "You're in!" in page and "Add to Home Screen" in page and 'data-next="/"' in page and "Maybe later" in page
+    assert 'data-next="/"' in client.get("/welcome?next=https://evil.example").data.decode()   # never off-site
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    assert "Want your games one tap away?" in client.get(f"/events/{game}").data.decode()

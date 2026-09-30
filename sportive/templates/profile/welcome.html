@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}You're in{% endblock %}
+{% block content %}
+<div class="card form-card center welcome" data-welcome data-next="{{ next }}">
+  <img src="{{ url_for('static', filename='icon-192.png') }}" alt="" width="88" height="88" class="welcome-icon">
+  <h1>You're in!</h1>
+  <p class="muted">Put Sportive Circle on your home screen. It opens like an app, one tap away.</p>
+  <ol class="welcome-steps" data-welcome-ios hidden>
+    <li><span class="step-number">1</span><span>Tap <span class="share-icon" aria-label="Share">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span> <strong>Share</strong> at the bottom of Safari</span></li>
+    <li><span class="step-number">2</span><span>Tap <strong>Add to Home Screen</strong></span></li>
+  </ol>
+  <button type="button" class="btn btn-large btn-block" data-welcome-add hidden>Add to home screen</button>
+  <a class="btn btn-ghost btn-block" href="{{ next }}">Maybe later</a>
+</div>
+{% endblock %}
+
+{% block body_class %}hide-tabs{% endblock %}

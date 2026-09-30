@@ -94,8 +94,7 @@ def photo_upload():
                 db.commit()
                 if first_time:
                     flash("Looking good. You're all set!", "celebrate")
-                    destination = session.pop("after_photo", None)
-                    return redirect(safe_next(destination) if destination else url_for("events.feed"))
+                    return redirect(after_sign_up())
                 flash("Photo updated.", "success")
                 return redirect(url_for("profile.view", user_id=g.user["id"]))
     return render_template("profile/photo.html", first_time=first_time)
@@ -123,8 +122,21 @@ def photo_skip():
     notify(g.user["id"], "account", "Add a profile photo so people know who they're playing with.",
            url_for("profile.photo_upload"), key="tip:photo")
     db.commit()
+    return redirect(after_sign_up())
+
+
+def after_sign_up():
+    """The last sign-up step is done: the one-time "You're in!" screen (home screen), then where they were going."""
     destination = session.pop("after_photo", None)
-    return redirect(safe_next(destination) if destination else url_for("events.feed"))
+    return url_for("profile.welcome", next=safe_next(destination.rstrip("?")) if destination else url_for("events.feed"))
+
+
+@bp.route("/welcome")
+@login_required
+def welcome():
+    """"You're in!": how to put the app on the home screen (iPhone: the two taps; Android: one button). app.js
+    skips straight on where that isn't possible (laptops, in-app browsers, already installed)."""
+    return render_template("profile/welcome.html", next=safe_next(request.args.get("next", "")))
 
 
 @bp.route("/u/<int:user_id>/photo")
