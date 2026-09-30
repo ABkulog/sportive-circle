@@ -57,7 +57,10 @@
     target.focus({ preventScroll: true });
   }
 
+  let lastNext = 0;
   next.addEventListener("click", () => {
+    if (Date.now() - lastNext < 400) return;  // a fast double tap moves one step, not two
+    lastNext = Date.now();
     if (!stepIsValid()) return;
     show(current + 1);
     focusStep();

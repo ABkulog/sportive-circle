@@ -5186,3 +5186,15 @@ def test_expired_records_are_cleaned_up_but_messages_stay(accounts, client, app)
         assert backups.clean_up_old_records() >= 3
         assert not db.execute("SELECT 1 FROM notices WHERE text = 'old'").fetchone()
         assert db.execute("SELECT 1 FROM direct_messages WHERE body = 'old but kept'").fetchone()
+
+
+def test_weekly_practices_skip_the_hour_clocks_jump_over(accounts, client, app):
+    club = _club_with_member(accounts, client, app)
+    form = event_form(title="Late practice", sport="spikeball", location="The Quad", repeat="3", club=str(club),
+                      starts_at="2027-03-07T02:30", ends_at="2027-03-07T03:00")
+    page = client.post(f"/events/new?club={club}", data=form, follow_redirects=True).data.decode()
+    with app.app_context():
+        starts = [r[0][:16] for r in get_db().execute(
+            "SELECT starts_at FROM events WHERE club_id = ? AND title = 'Late practice' ORDER BY starts_at", (club,))]
+    assert starts == ["2027-03-07 02:30", "2027-03-21 02:30"]            # Mar 14 2:30 AM doesn't exist
+    assert "One week was skipped" in page

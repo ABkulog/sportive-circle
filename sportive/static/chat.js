@@ -77,6 +77,7 @@
     if (document.hidden) return;
     try {
       const response = await fetch(`${box.dataset.pollUrl}?after=${lastId}`, { headers: { Accept: "application/json" } });
+      if (new URL(response.url).pathname.startsWith("/login")) { location.reload(); return; }  // logged out
       if (!response.ok) return;
       const { messages } = await response.json();
       if (!messages.length) return;

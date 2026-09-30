@@ -544,14 +544,21 @@ def create():
             reserve, error = read_reservations(form, room)
         if error is None:
             event_id = insert_event(data, reserve)
+            posted, skipped = 1, 0
             for week in range(1, repeat):  # the same practice every week after the first
-                later = dict(data, starts_at=to_db(from_db(data["starts_at"]) + timedelta(weeks=week)),
-                             ends_at=to_db(from_db(data["ends_at"]) + timedelta(weeks=week)))
-                insert_event(later)
+                starts = from_db(data["starts_at"]) + timedelta(weeks=week)
+                ends = from_db(data["ends_at"]) + timedelta(weeks=week)
+                if not (exists_in_seattle(starts) and exists_in_seattle(ends)):
+                    skipped += 1  # that week's clock time doesn't exist (clocks jump ahead in March)
+                    continue
+                insert_event(dict(data, starts_at=to_db(starts), ends_at=to_db(ends)))
+                posted += 1
             if club is not None:
-                post_club_event(club, event_id, data, repeat)
-                flash(f"Posted {repeat} weekly events. Your followers see it in Club updates." if repeat > 1 else
+                post_club_event(club, event_id, data, posted)
+                flash(f"Posted {posted} weekly events. Your followers see it in Club updates." if posted > 1 else
                       "Posted! Your followers see it in Club updates.", "celebrate")
+                if skipped:
+                    flash("One week was skipped: clocks jump ahead that night, so that time doesn't exist.", "info")
             else:
                 flash(created_message(data["is_private"], reserve, "Your game is up!"), "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))

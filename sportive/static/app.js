@@ -286,6 +286,10 @@
       if (choice.outcome === "accepted") { installTip.hidden = true; remember(); }
     });
     window.addEventListener("appinstalled", () => { installTip.hidden = true; remember(); });
+    // Back to this page from the history: the browser's install offer isn't carried over, so hide the button.
+    window.addEventListener("pageshow", (event) => {
+      if (event.persisted && !installPrompt) installTip.querySelector("[data-install-button]").hidden = true;
+    });
     installTip.querySelector("[data-install-close]").addEventListener("click", () => {
       installTip.hidden = true;
       remember();
@@ -300,7 +304,8 @@
       try {
         const response = await fetch(form.action || location.href, { method: "POST", body: new FormData(form),
                                                                       credentials: "same-origin" });
-        if (!response.ok) throw new Error(response.statusText);
+        // Logged out meanwhile: the server answers with the log-in page. Send it the normal way (to log in).
+        if (!response.ok || new URL(response.url).pathname.startsWith("/login")) throw new Error("not saved");
         if (status) status.textContent = "Saved";
       } catch (error) {
         form.submit();
