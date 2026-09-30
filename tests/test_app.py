@@ -5229,3 +5229,14 @@ def test_club_search_matches_words_in_any_order(accounts, client, app):
     for q in ("ultimate club", "FRISBEE", "ultimate", "club%"):
         page = client.get("/clubs", query_string={"q": q}).data.decode()
         assert ("Club Ultimate Frisbee" in page) == (q != "club%"), q    # a % is a letter, not a wildcard
+
+
+def test_logging_in_from_a_club_page_comes_back_to_it(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu")
+    accounts.logout()
+    page = client.get(f"/clubs/{club}").data.decode()                    # opened from a QR code, logged out
+    login = re.search(r'<a href="(/login[^"]*)">Log in</a>', page).group(1).replace("&amp;", "&")
+    assert f"next=%2Fclubs%2F{club}" in login or f"next=/clubs/{club}" in login
+    assert client.post(login, data={"email": "fan@uw.edu", "password": "purple-and-gold"}).headers["Location"] \
+        == f"/clubs/{club}"
