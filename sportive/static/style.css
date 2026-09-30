@@ -123,7 +123,8 @@ small { font-size: .82rem; }
 .register-hint { margin: 24px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .skip-link { position: absolute; left: -9999px; }
-.skip-link:focus { left: 12px; top: 12px; z-index: 100; background: var(--bg); color: var(--text); padding: 8px 12px; border-radius: 8px; }
+.skip-link:focus { left: 12px; top: 12px; z-index: 100; background: var(--bg); color: var(--text); padding: 12px 14px;
+  border-radius: 8px; min-height: 44px; box-sizing: border-box; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* On the purple top bar and hero the purple ring would be invisible: use gold there. */
 .topbar :focus-visible, .husky-hero :focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
@@ -748,8 +749,9 @@ form[data-wizard] .form-step { display: none; }
 .whats-on-title { font-weight: 600; }
 .whats-on-games { margin: 2px 0 4px; padding-left: 18px; }
 .rec-list { list-style: none; padding: 0; margin: 0; }
-.rec-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
-.rec-actions { display: grid; justify-items: end; gap: 2px; }
+.rec-row { display: grid; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.rec-actions { display: flex; gap: 16px; }
+.rec-actions .link-button { min-height: 32px; }
 .texts-card h2 { margin: 0 0 4px; font-size: 1.1rem; }
 .held-why strong { color: var(--text); }
 .chat-report { display: block; padding: 4px 0 2px; min-height: 24px; font-size: .75rem; color: var(--muted); }
@@ -995,3 +997,14 @@ button.link-button { min-height: 36px; }
 .install-tip { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; }
 .install-tip p { margin: 0; flex: 1; font-size: .92rem; }
 .install-tip .help-close { flex: none; }
+
+/* The smallest phones (iPhone SE): the Create choices fit without scrolling */
+@media (max-height: 600px) {
+  .create-grid { gap: 8px; }
+  .create-option { padding: 9px 14px; }
+}
+.rec-add summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; list-style: none; }
+.rec-add summary::-webkit-details-marker { display: none; }
+.rec-add summary h2 { margin: 0; font-size: 1rem; color: var(--purple); }
+.rec-add summary h2::before { content: "+ "; }
+.rec-add[open] summary h2::before { content: "− "; }

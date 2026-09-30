@@ -3,12 +3,12 @@
 {% block content %}
 {% from "_macros.html" import admin_nav %}{{ admin_nav('uwrec') }}
 <h1 class="page-title">UW Rec reservations</h1>
-<p class="muted">Copy in when UW Rec has a court or field reserved (IM leagues, club practices, rentals), from
-  <a href="{{ schedule }}" target="_blank" rel="noopener">UW Rec's schedule</a>. Hosts see them while making a game
-  there, as “UW Rec: reserved”. Only admins can see this page.</p>
+<p class="muted">Copy in UW Rec's reservations from <a href="{{ schedule }}" target="_blank" rel="noopener">its
+  schedule</a>. Hosts see them as “UW Rec: reserved”.</p>
 
-<div class="card form-card">
-  <h2>Add a reservation</h2>
+{# Folded away once there's a list, so the page fits a phone; open when there's nothing yet or a form error. #}
+<details class="card form-card rec-add" {% if not upcoming or form %}open{% endif %}>
+  <summary><h2>Add a reservation</h2></summary>
   <form method="post" class="form">
     {{ csrf_field() }}
     <label class="field"><span>Place</span>
@@ -29,7 +29,7 @@
       </select></label>
     <button class="btn btn-block">Add</button>
   </form>
-</div>
+</details>
 
 <section class="band">
   <h2>Coming up</h2>
