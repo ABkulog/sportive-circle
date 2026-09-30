@@ -135,7 +135,7 @@ def test_event_validation(accounts, client):
         b"can&#39;t be before now": event_form(starts_at=form_time(timedelta(hours=-2)),
                                                ends_at=form_time(timedelta(hours=1))),
         b"Please choose a location.": event_form(location="Moon"),
-        b"Pick 2 to 100 participants": event_form(players="1"),
+        b"Pick 2 to 1000 participants": event_form(players="1"),
     }
     for message, data in cases.items():
         assert message in client.post("/events/new", data=data).data, message
@@ -714,9 +714,9 @@ def test_host_picks_any_number_of_players(accounts, client, app):
     with app.app_context():
         sizes = dict(get_db().execute("SELECT id, max_players FROM events").fetchall())
     assert sizes[big] == 30 and sizes[event_id] == 10                                    # 5v5 by default
-    assert b"Pick 2 to 100 participants" in client.post("/events/new", data=event_form(players="101")).data
+    assert b"Pick 2 to 1000 participants" in client.post("/events/new", data=event_form(players="1001")).data
     page = client.get("/events/new").data.decode()
-    assert 'name="players" type="number"' in page and 'max="100"' in page
+    assert 'name="players" type="number"' in page and 'max="1000"' in page
     assert "Participants <em>(including you)</em>" in page and "<span>3</span> Participants</h2>" in page
 
 
@@ -726,7 +726,7 @@ def test_quick_post_player_cap(accounts, client):
         "sport": "tennis", "location": "IMA North Tennis Courts", "skill_level": "All levels",
         "starts_in": "15", "duration": "60", "players": "5",
     }).data
-    assert b"Pick 2 to 100 participants" not in page and b"can have 2 to" not in page   # 5 for tennis is the host's call
+    assert b"Pick 2 to 1000 participants" not in page and b"can have 2 to" not in page   # 5 for tennis is the host's call
 
 
 def test_forms_include_sport_rules(accounts, client):
@@ -4611,3 +4611,33 @@ def test_removing_a_weekly_uw_rec_reservation(accounts, client, app):
     bad = client.post("/admin/uw-rec", data={"location": "Burke-Gilman Trail", "label": "x", "date": date,
                                              "start": "18:00", "end": "19:00"}, follow_redirects=True)
     assert b"Pick one of UW Rec" in bad.data
+
+
+def test_events_can_have_no_limit_or_up_to_1000(accounts, client, app):
+    """The user: club events can have more than 100 people; hosts choose a number or no limit."""
+    accounts.signup()
+    page = client.get("/events/new").data.decode()
+    assert 'name="no_limit"' in page and 'max="1000"' in page
+    assert 'name="no_limit"' not in client.get("/need-players").data.decode()   # Need players always counts down
+    big = event_id_from(client.post("/events/new", data=event_form(title="Elm Hall Run", players="500")))
+    assert "of 500" in client.get(f"/events/{big}").data.decode()
+    open_run = event_id_from(client.post("/events/new", data=event_form(title="Hall social", no_limit="1",
+                                                                        players="")))
+    with app.app_context():
+        assert get_db().execute("SELECT max_players FROM events WHERE id = ?", (open_run,)).fetchone()[0] is None
+    detail = client.get(f"/events/{open_run}").data.decode()
+    assert "spot" not in detail.split("Participants")[1].split("</dd>")[0]        # no "x spots left"
+    edit = client.get(f"/events/{open_run}/edit").data.decode()
+    assert 'name="no_limit" value="1" data-no-limit checked' in edit
+    too_big = client.post("/events/new", data=event_form(title="Typo", players="1001"), follow_redirects=True)
+    assert b"Pick 2 to 1000 participants" in too_big.data
+
+
+def test_anyone_can_join_a_no_limit_event(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Sam", "Jordan")
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hall run", no_limit="1", players="")))
+    for name in ("Sam", "Jordan"):
+        _as(accounts, name)
+        assert b"You&#39;re in" in client.post(f"/events/{game}/join", follow_redirects=True).data
+    assert "Hall run" in client.get("/?scope=all").data.decode()

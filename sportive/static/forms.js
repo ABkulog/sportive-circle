@@ -57,6 +57,16 @@
   updateSpace();
 })();
 
+// "No limit": the number box switches off (and isn't sent) while it's ticked.
+(function () {
+  const box = document.querySelector("[data-no-limit]");
+  const players = document.querySelector("[data-players]");
+  if (!box || !players) return;
+  const update = () => { players.disabled = box.checked; };
+  box.addEventListener("change", update);
+  update();
+})();
+
 // "You + 2 friends = 3 of 10 · need 7 more": the math for the "Who's coming?" part, as you tick friends.
 (function () {
   const form = document.querySelector("form[data-sport-form]");
@@ -75,10 +85,15 @@
         + (mine > team ? ` · that's ${mine - team} too many` : "");
       return;
     }
-    const total = parseInt(players && players.value, 10) || 0;
     const coming = 1 + friends;
     let text = "You";
     if (friends) text += ` + ${plural(friends, "friend")}`;
+    if (players && players.disabled) {  // "No limit"
+      math.textContent = `${text} = ${coming} going · no limit`;
+      math.classList.remove("is-over");
+      return;
+    }
+    const total = parseInt(players && players.value, 10) || 0;
     text += ` = ${coming} of ${total}`;
     const need = total - coming;
     text += need > 0 ? ` · need ${need} more` : need === 0 ? " · full" : ` · that's ${-need} too many`;
@@ -121,7 +136,11 @@
     card.querySelectorAll("[data-show]").forEach((element) => {
       const show = element.dataset.show.split(" ").every((rule) => on[rule]);
       element.hidden = !show;
-      element.querySelectorAll("input, select, textarea").forEach((input) => { input.disabled = !show; });
+      const noLimit = form.querySelector("[data-no-limit]");
+      element.querySelectorAll("input, select, textarea").forEach((input) => {
+        // The number box stays off while "No limit" is ticked.
+        input.disabled = !show || (input.matches("[data-players]") && Boolean(noLimit && noLimit.checked));
+      });
     });
     if (teamField) {
       const sizes = (rules[sport.value] && rules[sport.value].teams) || [];

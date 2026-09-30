@@ -39,7 +39,7 @@
     </section>
     <section class="wizard-step">
     <h2 class="form-step"><span>3</span> Participants</h2>
-    {{ players_block(form, friends) }}
+    {{ players_block(form, friends, allow_no_limit=False) }}
     <label class="field"><span>Note <em>(optional)</em></span>
       <textarea name="note" maxlength="500" rows="2" placeholder="Court 2, look for the blue shirts">{{ form.get('note', '') }}</textarea></label>
     </section>
