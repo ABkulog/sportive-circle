@@ -1855,7 +1855,7 @@ def test_confirmed_member_gets_welcome_message(accounts, client, app):
     accounts.logout()
     accounts.login(email="fan@uw.edu")
     assert "You&#39;re officially a member" in client.get(f"/messages/{_user_id(app, 'captain@uw.edu')}").data.decode()
-    assert ">Member</span>" in client.get(f"/clubs/{club}").data.decode()
+    assert "You're a member" in client.get(f"/clubs/{club}").data.decode()
 
 
 def test_all_club_info_is_required(accounts, client):
@@ -4641,3 +4641,53 @@ def test_anyone_can_join_a_no_limit_event(accounts, client, app):
         _as(accounts, name)
         assert b"You&#39;re in" in client.post(f"/events/{game}/join", follow_redirects=True).data
     assert "Hall run" in client.get("/?scope=all").data.decode()
+
+
+def _club_with_officer(accounts, client, app, owner="Maya"):
+    """An approved club registered by `owner` (so they're its first officer). Returns its id. Ends logged out."""
+    _as(accounts, owner)
+    client.post("/clubs/new", data=CLUB)
+    club = _club_id(app, CLUB["name"])
+    _approve(app, club)
+    accounts.logout()
+    return club
+
+
+def test_club_owner_adds_and_removes_officers(accounts, client, app):
+    """The user: the person who registered the club gives officer rights to other users."""
+    ids = _people(accounts, app, "Maya", "Sam", "Jordan")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Maya")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Manage officers" in page and "You're an officer" in page and "is-static" not in page
+    found = client.get(f"/clubs/{club}/officers?q=sam").data.decode()
+    assert "Sam Husky" in found and "Make officer" in found               # anyone on the app, not only members
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Sam"], "action": "add"})
+    with app.app_context():
+        role = get_db().execute("SELECT role FROM club_members WHERE club_id = ? AND user_id = ?",
+                                (club, ids["Sam"])).fetchone()[0]
+    assert role == "officer"
+    _as(accounts, "Sam")                                                   # an officer, but not the owner:
+    assert "You&#39;re now an officer of " + CLUB["name"] in client.get(f"/messages/{ids['Maya']}").data.decode()
+    assert client.get(f"/clubs/{club}/edit").status_code == 200            # can edit the club
+    assert client.get(f"/clubs/{club}/officers").status_code == 403        # can't hand out officer rights
+    assert "Manage officers" not in client.get(f"/clubs/{club}").data.decode()
+    assert client.post(f"/clubs/{club}/officers/{ids['Jordan']}").status_code == 403
+    _as(accounts, "Maya")
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Sam"], "action": "remove"})
+    kept = client.post(f"/clubs/{club}/officers", data={"user": ids["Maya"], "action": "remove"},
+                       follow_redirects=True).data.decode()
+    assert "stays an officer" in kept
+    with app.app_context():
+        roles = dict(get_db().execute("SELECT user_id, role FROM club_members WHERE club_id = ?", (club,)).fetchall())
+    assert roles[ids["Sam"]] == "member" and roles[ids["Maya"]] == "officer"
+
+
+def test_forms_have_back_buttons(accounts, client, app):
+    _people(accounts, app, "Maya")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Maya")
+    assert f'href="/clubs/{club}" data-back>← Back' in client.get(f"/clubs/{club}/edit").data.decode()
+    assert 'class="back-link"' in client.get("/events/new").data.decode()
+    assert f'href="/clubs/{club}" data-back' in client.get(f"/events/new?club={club}").data.decode()
+    assert 'class="back-link"' in client.get("/need-players").data.decode()

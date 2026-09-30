@@ -749,6 +749,8 @@ form[data-wizard] .form-step { display: none; }
 .chat-game.is-cancelled strong { text-decoration: line-through; }
 .send-friends { margin-top: 8px; }
 .texts-card { margin: 12px 0 16px; }
+.club-role { margin: 0 0 8px; }
+.manage-officers { margin-top: 8px; }
 .place-check { margin: 4px 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft);
   border-left: 3px solid var(--gold); font-size: .88rem; color: var(--muted); }
 .place-check strong { display: block; color: var(--text); margin-bottom: 2px; }
