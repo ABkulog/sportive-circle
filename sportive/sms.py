@@ -14,6 +14,7 @@ import json
 import logging
 import re
 import secrets
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -194,6 +195,26 @@ def remove_phone(user_id):
 
 # ---------------------------------------------------------------- updates
 
+SMS_LIMIT = 160       # one text's worth of plain characters; longer (or any emoji) costs 2-3 texts
+PREFIX = "Sportive Circle: "
+PLAIN = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"', "–": "-", "—": "-", "…": "...", "·": "-",
+                       "→": "->", "\u00a0": " "})
+
+
+def one_text(body):
+    """Fit an update into one plain text: emoji dropped, accents and curly quotes made plain (José -> Jose),
+    and the words shortened if needed. A link at the end is never cut."""
+    body = unicodedata.normalize("NFKD", body.translate(PLAIN))
+    body = "".join(ch for ch in body if 32 <= ord(ch) < 127 or ch == "\n")  # plain characters only
+    body = re.sub(r"[ ]{2,}", " ", body).replace(" .", ".").strip()
+    room = SMS_LIMIT - len(PREFIX)
+    if len(body) <= room:
+        return PREFIX + body
+    link = re.search(r"\s(https?://\S+)$", body)
+    words, tail = (body[:link.start()], " " + link.group(1)) if link else (body, "")
+    keep = max(0, room - len(tail) - 3)
+    return PREFIX + words[:keep].rstrip(" ,.:;-") + "..." + tail
+
 def text_user(user_id, body, kind="update"):
     """Text someone an update, only if they confirmed their number and want texts. Never raises. The caller
     doesn't need to commit (this commits its own log line)."""
@@ -207,7 +228,7 @@ def text_user(user_id, body, kind="update"):
     if _sent_today(user_id, codes=False) >= MAX_TEXTS_PER_DAY:
         return False
     try:
-        send_sms(user["phone"], f"Sportive Circle: {body}")
+        send_sms(user["phone"], one_text(body))
         ok = True
     except Exception as error:
         ok = False

@@ -5063,3 +5063,14 @@ def test_daily_database_backup(accounts, app, tmp_path, monkeypatch):
         assert len(kept) == backups.KEEP and kept[-1] == first.rsplit("/", 1)[1]
         (tmp_path / "backups" / f"sportive-{now_local():%Y-%m-%d}.db.lock").write_bytes(b"")
         assert backups.make_backup(force=True) is None                   # the other copy of the site is on it
+
+
+def test_update_texts_fit_in_one_plain_text():
+    """Texts over 160 plain characters, or with any emoji, cost 2-3 texts each: every update fits in one."""
+    from sportive.sms import SMS_LIMIT, one_text
+    short = one_text("José changed 🏀 Friday hoops – now 7:00 PM at the IMA.")
+    assert short == "Sportive Circle: Jose changed Friday hoops - now 7:00 PM at the IMA."
+    link = "https://sportivecircle.com/events/1234"
+    long = one_text("Maya wants you in Sunday sunrise soccer at the Husky Soccer Field with the whole crew, bring "
+                    "cleats and water, we're playing two halves of forty minutes. Your spot is held for 30 min: " + link)
+    assert len(long) <= SMS_LIMIT and long.endswith("... " + link) and long.isascii()
