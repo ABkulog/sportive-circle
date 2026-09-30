@@ -7,12 +7,14 @@
   const empty = document.getElementById("chat-empty");
   let lastId = parseInt(box.dataset.lastId, 10) || 0;
 
-  // Phones: the chat fills the screen below the header, and shrinks when the keyboard opens.
+  // Phones: the chat fills the screen below the header, and shrinks when the keyboard opens. The page stays at
+  // the top, so "← Messages" and the name never slide off the screen (iPhones scroll the page when typing).
   const fit = () => {
     if (window.innerWidth > 700) { box.style.height = ""; return; }
     const visible = window.visualViewport ? window.visualViewport.height : window.innerHeight;
     const top = box.getBoundingClientRect().top + window.scrollY;
-    box.style.height = Math.max(320, visible - top + window.scrollY - 8) + "px";
+    box.style.height = Math.max(240, visible - top - 8) + "px";
+    window.scrollTo(0, 0);
   };
   fit();
   window.addEventListener("resize", fit);
@@ -141,9 +143,12 @@
     });
     textarea.addEventListener("input", grow);
     // Tapping the messages (not a photo, link or ⋯ menu) puts the keyboard away; tapping the box brings it back.
-    list.addEventListener("click", (event) => {
+    // (A touch, not a click: iPhones don't send clicks for taps on plain text.)
+    const putKeyboardAway = (event) => {
       if (document.activeElement === textarea && !event.target.closest("a, button, summary, details")) textarea.blur();
-    });
+    };
+    list.addEventListener("pointerdown", putKeyboardAway);
+    if (empty) empty.addEventListener("pointerdown", putKeyboardAway);
     // Sending happens in the background: the page doesn't reload, the box empties and keeps the keyboard up,
     // and the message shows right away. (Without JavaScript the form still posts the normal way.)
     const form = textarea.form;
