@@ -33,6 +33,8 @@ def invitable_friends(event_id, me):
            JOIN users u ON u.id = CASE WHEN f.requester_id = :me THEN f.addressee_id ELSE f.requester_id END
            WHERE (f.requester_id = :me OR f.addressee_id = :me) AND f.status = 'accepted'
              AND u.suspended = 0
+             AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :me AND b.blocked_id = u.id)
+                                                      OR (b.blocker_id = u.id AND b.blocked_id = :me))
              AND u.id NOT IN (SELECT user_id FROM rsvps WHERE event_id = :event)
              AND u.id NOT IN (SELECT guest_id FROM invites WHERE event_id = :event AND status IN ('pending', 'requested'))
            ORDER BY u.full_name""", {"me": me, "event": event_id}).fetchall()
@@ -327,7 +329,8 @@ def open_invite_link(token):
     event = _open_game(link[0]) if link[0] else None
     if g.get("user") is not None and inviter["id"] == g.user["id"]:
         return redirect(url_for("events.detail", event_id=event["id"]) if event else url_for("social.friends"))
-    return render_template("events/invite_link.html", inviter=inviter, event=event, token=token)
+    full = bool(event) and spots_left(event) == 0 and not event["i_am_going"]
+    return render_template("events/invite_link.html", inviter=inviter, event=event, token=token, full=full)
 
 
 def accept_invite_link(user, token):

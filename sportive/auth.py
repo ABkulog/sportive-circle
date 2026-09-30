@@ -290,8 +290,12 @@ def signup():
             error = TOO_MANY_CODES
         if error is None:
             db = get_db()
-            # An unverified account never proved it owns the email, so it can be replaced.
-            db.execute("DELETE FROM users WHERE email = ? AND verified = 0", (email,))
+            # An unverified account never proved it owns the email, so it can be replaced (also one started with
+            # the other UW address for the same inbox: one account per person).
+            local = email.split("@")[0]
+            same_inbox = [f"{local}@{domain}" for domain in current_app.config["ALLOWED_EMAIL_DOMAINS"]]
+            db.execute(f"DELETE FROM users WHERE verified = 0 AND email IN ({', '.join('?' for _ in same_inbox)})",
+                       same_inbox)
             try:
                 cur = db.execute(
                     "INSERT INTO users (email, password_hash, full_name, grad_year, birth_date)"
@@ -406,6 +410,14 @@ def verify():
             return redirect(url_for("auth.signup"))
 
         error = None
+        local = email.split("@")[0]
+        same_inbox = [f"{local}@{domain}" for domain in current_app.config["ALLOWED_EMAIL_DOMAINS"]]
+        other = db.execute(f"SELECT email FROM users WHERE verified = 1 AND id != ? AND email IN "
+                           f"({', '.join('?' for _ in same_inbox)})", (user["id"], *same_inbox)).fetchone()
+        if other:  # the same inbox got verified under its other UW address meanwhile
+            session.pop("pending_email", None)
+            flash(f"You already have an account as {other['email']}. Log in with that email.", "error")
+            return redirect(url_for("auth.login"))
         if user["verify_attempts"] >= MAX_CODE_ATTEMPTS:
             error = "Too many wrong tries. Send yourself a new code."
         elif not user["verify_code"] or now_local() > from_db(user["verify_expires"]):

@@ -4886,3 +4886,39 @@ def test_place_check_hides_private_game_headcounts(accounts, client, app):
                                                             "ends_at": e["ends_at"][:16].replace(" ", "T")}).get_json()
     private = [x for x in found["games"] if x["title"] == "A private game"]
     assert private and private[0]["going"] is None and private[0]["max"] is None and private[0]["url"] is None
+
+
+def test_one_account_per_inbox_even_with_both_uw_addresses(accounts, client, app):
+    """netid@uw.edu and netid@u.washington.edu are one inbox: signing up with both at once can't make two accounts."""
+    other = app.test_client()
+    accounts.signup(email="dup@uw.edu", verify=False)
+    first_code = accounts.code_for("dup@uw.edu")
+    other.post("/signup", data={"full_name": "Dup Two", "email": "dup@u.washington.edu", "password": "purple-and-gold",
+                                "password2": "purple-and-gold", "birth_date": "2005-01-15"})
+    with app.app_context():                                        # the newer sign-up replaced the older one
+        assert get_db().execute("SELECT COUNT(*) FROM users WHERE email LIKE 'dup@%'").fetchone()[0] == 1
+    client.post("/verify", data={"code": first_code})
+    other.post("/verify", data={"code": accounts.code_for("dup@u.washington.edu")})
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM users WHERE email LIKE 'dup@%' AND verified = 1").fetchone()[0] == 1
+
+
+def test_invite_link_to_a_full_game_says_so(accounts, client, app):
+    accounts.signup(email="maya@uw.edu", name="Maya Chen")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Full hoops", players="2")))
+    link = _invite_path(client.get(f"/events/{game}").data.decode())
+    accounts.logout()
+    accounts.signup(email="sam@uw.edu", name="Sam Park")
+    client.post(f"/events/{game}/join")
+    accounts.logout()
+    landing = client.get(link).data.decode()
+    assert "This game is full right now" in landing and "Sign up and join" not in landing
+    client.post(link)
+    client.post("/signup", data={"full_name": "New Friend", "email": "new@uw.edu", "password": "purple-and-gold",
+                                 "password2": "purple-and-gold", "birth_date": "2005-01-15"})
+    client.post("/verify", data={"code": accounts.code_for("new@uw.edu")})
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (game,)).fetchone()[0] == 2   # not overbooked
+        assert db.execute("SELECT status FROM friendships WHERE requester_id = (SELECT id FROM users WHERE"
+                          " email = 'maya@uw.edu')").fetchall()                                          # still friends

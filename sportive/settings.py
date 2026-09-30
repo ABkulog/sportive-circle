@@ -80,9 +80,12 @@ def texts():
         elif action == "toggle":
             on = 1 if request.form.get("sms_updates") else 0
             db = get_db()
-            db.execute("UPDATE users SET sms_updates = ?, sms_consent_at = CASE WHEN ? THEN ? ELSE sms_consent_at END"
-                       " WHERE id = ? AND phone_verified = 1", (on, on, to_db(now_local()), me))
+            changed = db.execute("UPDATE users SET sms_updates = ?, sms_consent_at = CASE WHEN ? THEN ? ELSE"
+                                 " sms_consent_at END WHERE id = ? AND phone_verified = 1",
+                                 (on, on, to_db(now_local()), me)).rowcount
             db.commit()
+            if not changed:
+                flash("Confirm your number first.", "error")
         elif action == "remove":
             remove_phone(me)
             flash("Your number is removed. No more texts.", "success")

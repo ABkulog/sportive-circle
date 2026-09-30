@@ -7,7 +7,9 @@
     <h1>{{ inviter.full_name.split()[0] }} wants you in their game</h1>
     <p class="invite-game"><span aria-hidden="true">{{ SPORT_EMOJI[event.sport] }}</span> <strong>{{ event_title(event) }}</strong><br>
       <span class="muted">{{ event.starts_at|when }} · {{ event.location }}</span></p>
-    {% if not g.user %}<p class="muted">Sign up with your UW email and you're in.</p>{% endif %}
+    {% if full %}<p class="muted">This game is full right now.{% if not g.user %} Sign up anyway and you'll be
+      friends with {{ inviter.full_name.split()[0] }}.{% endif %}</p>
+    {% elif not g.user %}<p class="muted">Sign up with your UW email and you're in.</p>{% endif %}
   {% else %}
     <h1>{{ inviter.full_name.split()[0] }} wants you on Sportive Circle</h1>
     {% if not g.user %}<p class="muted">Pickup games and UW clubs, for Huskies. Sign up with your UW email and you'll be friends.</p>{% endif %}
@@ -15,13 +17,13 @@
   {% if g.user %}
     <form method="post" action="{{ url_for('parties.open_invite_link', token=token) }}">
       {{ csrf_field() }}
-      <button class="btn btn-large btn-block">{{ 'Join the game' if event else 'Connect with ' ~ inviter.full_name.split()[0] }}</button>
+      <button class="btn btn-large btn-block">{{ 'Join the game' if event and not full else 'Connect with ' ~ inviter.full_name.split()[0] }}</button>
     </form>
     <a class="btn btn-ghost btn-block" href="{{ url_for('index') }}">Not now</a>
   {% else %}
     <form method="post" action="{{ url_for('parties.open_invite_link', token=token) }}">
       {{ csrf_field() }}
-      <button class="btn btn-large btn-block">Sign up{% if event %} and join{% endif %}</button>
+      <button class="btn btn-large btn-block">Sign up{% if event and not full %} and join{% endif %}</button>
       <button class="btn btn-ghost btn-block" name="go" value="login">I have an account</button>
     </form>
   {% endif %}
