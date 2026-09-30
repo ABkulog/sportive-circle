@@ -1122,6 +1122,12 @@ button.link-button { min-height: 36px; }
   .chat .chat-messages { flex: 1; height: auto; min-height: 0; }
   .chat.is-empty .chat-empty { flex: 1; align-content: center; }
 }
+/* Phones (chat.js adds chat-pinned): the chat page sits in the visible part of the screen and never scrolls */
+html.chat-pinned, html.chat-pinned body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+html.chat-pinned #main { position: fixed; left: 0; right: 0; top: var(--chat-top, 0); height: var(--chat-height, 100%);
+  display: flex; flex-direction: column; padding-bottom: 0; }
+html.chat-pinned #main > * { flex: none; }
+html.chat-pinned #main > .chat { flex: 1; min-height: 0; margin-bottom: 0; }
 @media (min-width: 701px) { .chat-messages { height: min(70vh, 720px); } }
 body:has(.chat[data-poll-url]) .site-footer { display: none; }  /* chats fill the screen: no footer underneath */
 body.hide-tabs.has-help main.page { padding-bottom: 16px; }  /* the Help? bubble is hidden here, so no room for it */

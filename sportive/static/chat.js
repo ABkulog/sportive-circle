@@ -7,21 +7,34 @@
   const empty = document.getElementById("chat-empty");
   let lastId = parseInt(box.dataset.lastId, 10) || 0;
 
-  // Phones: the chat fills the screen below the header, and shrinks when the keyboard opens. The page stays at
-  // the top, so "← Messages" and the name never slide off the screen (iPhones scroll the page when typing).
+  // Phones: the page is pinned to the part of the screen you can actually see, so it never scrolls. When the
+  // keyboard opens, iPhones slide the page up; the chat follows the visible part instead, so the back link,
+  // the messages and the box all stay on screen (only the chat gets shorter).
+  const topbar = document.querySelector(".topbar");
   const fit = () => {
-    if (window.innerWidth > 700) { box.style.height = ""; return; }
-    const visible = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    const top = box.getBoundingClientRect().top + window.scrollY;
-    box.style.height = Math.max(240, visible - top - 8) + "px";
-    window.scrollTo(0, 0);
+    const root = document.documentElement;
+    if (window.innerWidth > 700) { root.classList.remove("chat-pinned"); return; }
+    root.classList.add("chat-pinned");
+    const view = window.visualViewport;
+    const viewTop = view ? view.offsetTop : 0;
+    const viewBottom = viewTop + (view ? view.height : window.innerHeight);
+    const barBottom = topbar && topbar.offsetParent ? topbar.getBoundingClientRect().bottom : 0;
+    const top = Math.max(barBottom, viewTop);
+    root.style.setProperty("--chat-top", top + "px");
+    root.style.setProperty("--chat-height", Math.max(200, viewBottom - top) + "px");
   };
   fit();
   window.addEventListener("resize", fit);
-  if (window.visualViewport) window.visualViewport.addEventListener("resize", () => { fit(); scrollDown(); });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", () => { fit(); scrollDown(); });
+    window.visualViewport.addEventListener("scroll", fit);
+  }
   const scrollDown = () => { list.scrollTop = list.scrollHeight; };
   const nearBottom = () => list.scrollHeight - list.scrollTop - list.clientHeight < 200;
   scrollDown();
+  // Fonts and the layout settle after this runs, which moves things a little: jump to the newest again then.
+  window.addEventListener("load", () => { fit(); scrollDown(); });
+  if (document.fonts) document.fonts.ready.then(scrollDown);
   // Photos load after the page: keep the newest message in view as they appear.
   list.querySelectorAll("img").forEach((image) => {
     if (!image.complete) image.addEventListener("load", () => { if (nearBottom()) scrollDown(); });
