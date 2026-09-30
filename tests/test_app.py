@@ -3693,6 +3693,7 @@ def test_a_game_without_a_name_gets_one(accounts, client, app):
         from sportive.events import default_title
         assert default_title("soccer", "Denny Field") == "Soccer at Denny Field"
         assert default_title("esports", "Online") == "Esports online"
+        assert default_title("esports", "The HUB (Husky Union Building)") == "Esports at the HUB"
         assert default_title("hiking", "Off campus (see note)") == "Hiking off campus"
 
 

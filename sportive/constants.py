@@ -60,6 +60,7 @@ LOCATIONS = [
     "Denny Field",
     "Fitness Center West (under Elm Hall)",
     "Green Lake Park pickleball courts",
+    "The HUB (Husky Union Building)",
     "Hec Edmundson Pavilion",
     "Husky Track",
     "IMA (Intramural Activities Building)",
@@ -94,6 +95,7 @@ TRAIL = "Burke-Gilman Trail"
 GREEN_LAKE_PICKLEBALL = "Green Lake Park pickleball courts"
 OFF_CAMPUS = "Off campus (see note)"
 ONLINE = "Online"
+HUB = "The HUB (Husky Union Building)"  # the student union: its games area is where esports meet up
 
 # Map pins (latitude, longitude), from OpenStreetMap (openstreetmap.org), checked Sept 2026
 # against UW Recreation's official field map (Recreation Field 1 is right north of the IMA,
@@ -116,6 +118,7 @@ LOCATION_COORDS = {
     "Hec Edmundson Pavilion": (47.652179, -122.302125),
     TRAIL: None,                              # a 20-mile trail: search instead of one pin
     GREEN_LAKE_PICKLEBALL: (47.681547, -122.328384),  # next to the Green Lake Community Center
+    HUB: (47.655500, -122.305100),            # the Husky Union Building, on Stevens Way
 }
 
 # Open grass/turf areas, good for field sports like soccer and frisbee.
@@ -139,7 +142,7 @@ SPORT_LOCATIONS = {
     "snow": [OFF_CAMPUS],
     "hiking": [OFF_CAMPUS],
     "biking": [TRAIL, OFF_CAMPUS],
-    "esports": [ONLINE, OFF_CAMPUS],
+    "esports": [HUB, ONLINE, OFF_CAMPUS],
     "other": LOCATIONS,
 }
 # Each sport's places in the same (alphabetical) order as the full list.

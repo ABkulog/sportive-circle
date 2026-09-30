@@ -484,6 +484,8 @@ def default_title(sport, location):
     """A name for games created without one: "Basketball at the IMA", "Soccer at Denny Field"."""
     place = location.split(" (")[0]
     place = {"IMA": "the IMA", "Online": "online"}.get(place, place)
+    if place.startswith("The "):  # "at the HUB", "at the Quad"
+        place = "the " + place[4:]
     if location == OFF_CAMPUS:
         return f"{SPORTS[sport]} off campus"
     return f"{SPORTS[sport]} {'' if place == 'online' else 'at '}{place}"
