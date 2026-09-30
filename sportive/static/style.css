@@ -162,6 +162,8 @@ section.band > .section-title:first-child { margin-top: 0; }
 .invite-landing { display: grid; gap: 10px; }
 .invite-landing h1, .invite-landing p { margin: 0; }
 .invite-landing .invite-game { margin: 4px 0; }
+.no-limit { margin-top: 6px; }
+.players-field input[disabled] { opacity: .5; }
 .player-math { margin: 0; padding: 10px 12px; border-radius: var(--radius); background: var(--gold-light);
   font-weight: 600; font-size: .92rem; color: var(--purple-strong); }
 .player-math.is-over { background: color-mix(in srgb, var(--danger) 14%, var(--bg)); color: var(--danger); }

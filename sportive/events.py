@@ -128,6 +128,8 @@ def event_title(event):
     if event["team_size"]:
         return f"{sport} {event['team_size']}v{event['team_size']}: challenge us"
     left = spots_left(event)
+    if left is None:
+        return f"{sport} pickup game"
     return f"{sport}: full" if left == 0 else f"Need {left} more for {sport}"
 
 
@@ -463,13 +465,16 @@ def default_title(sport, location):
     return f"{SPORTS[sport]} {'' if place == 'online' else 'at '}{place}"
 
 
-def read_players(form, sport, team_size, event=None):
+def read_players(form, sport, team_size, event=None, allow_no_limit=True):
     """How many can play, and how many friends not on the app are already coming.
-    Returns (max_players, extra_players, error). "Players" includes the host; in team vs team it's both teams."""
+    Returns (max_players, extra_players, error). "Players" includes the host; in team vs team it's both teams.
+    max_players None = no limit (New event's "No limit" box; Need players posts always count down)."""
     # Friends who aren't on the app get an invite link after posting (so they're counted once they join).
     extra = event["extra_players"] if event is not None else 0
     if team_size:
         return 2 * team_size, 0, None
+    if allow_no_limit and form.get("no_limit"):
+        return None, extra, None
     raw = form.get("players", "").strip()
     players = int(raw) if raw.isdigit() else (DEFAULT_PLAYERS.get(sport, 10) if not raw else 0)
     if not 2 <= players <= MAX_PLAYERS:
@@ -510,7 +515,8 @@ def create():
             if duplicate:
                 error = "This event has already been created."
         if error is None:
-            room = data["team_size"] - 1 if data["team_size"] else data["max_players"] - 1 - data["extra_players"]
+            room = (data["team_size"] - 1 if data["team_size"] else
+                    MAX_PARTY if data["max_players"] is None else data["max_players"] - 1 - data["extra_players"])
             reserve, error = read_reservations(form, room)
         if error is None:
             event_id = insert_event(data, reserve)
@@ -610,7 +616,7 @@ def edit(event_id):
             "title": event["title"], "sport": event["sport"], "location": event["location"],
             "skill_level": event["skill_level"], "starts_at": to_form(event["starts_at"]),
             "ends_at": to_form(event["ends_at"]), "note": event["note"],
-            "players": event["max_players"] or "",
+            "players": event["max_players"] or "", "no_limit": "" if event["max_players"] else "1",
             "is_private": "1" if event["is_private"] else ("members" if event["members_only"] else ""),
             "password": event["password"], "open_to": event["open_to"],
         })
@@ -756,7 +762,7 @@ def quick():
         if error is None:
             open_to, error = read_open_to(form, is_private)
         if error is None:
-            max_players, extra, error = read_players(form, sport, team_size)
+            max_players, extra, error = read_players(form, sport, team_size, allow_no_limit=False)
         if error is None:
             room = team_size - 1 if team_size else max_players - 1 - extra
             reserve, error = read_reservations(form, room)

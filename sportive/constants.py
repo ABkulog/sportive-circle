@@ -145,9 +145,9 @@ SPORT_LOCATIONS = {
 # Each sport's places in the same (alphabetical) order as the full list.
 SPORT_LOCATIONS = {sport: sorted(places, key=LOCATIONS.index) for sport, places in SPORT_LOCATIONS.items()}
 
-# Hosts pick how many players they need, whatever the sport (every game is different). This is only a
-# sanity limit against typos.
-MAX_PLAYERS = 100
+# Hosts pick how many players they need, whatever the sport (every game is different), or tick "No limit"
+# (hall runs, club socials). This is only a sanity limit against typos for games that do set a number.
+MAX_PLAYERS = 1000
 
 # Team vs team: the sizes that make sense for each sport (players per team). Sports that aren't played as two
 # teams (running, hiking, the gym...) aren't listed, so they don't offer team vs team at all.

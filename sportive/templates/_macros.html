@@ -65,7 +65,7 @@
     <small class="muted">Team vs team: your team plays a group that challenges you.</small></label>
 {% endmacro %}
 
-{% macro players_block(form, friends=None, event=None) %}
+{% macro players_block(form, friends=None, event=None, allow_no_limit=True) %}
   {# Participants = everyone who can take part, you included (not every sport has "players"). "Who's coming?" = the friends already in: picked from the
      app (their spots are held, or they're invited if it's private) or just counted if they aren't on the app.
      The host picks any number (every game is different); a new sport starts at its usual size.
@@ -73,9 +73,17 @@
   {% set sport = form.get('sport', '') %}
   {% set chosen = (form.get('players') or DEFAULT_PLAYERS.get(sport, 10))|string %}
   {% set team_game = event.team_size if event else form.get('team_size') %}
-  <label class="field" data-show="regular" {% if team_game %}hidden{% endif %}><span>Participants <em>(including you)</em></span>
-    <input name="players" type="number" inputmode="numeric" min="2" max="{{ MAX_PLAYERS }}" value="{{ chosen }}"
-           required data-players></label>
+  {% set no_limit = form.get('no_limit') == '1' %}
+  <div class="field players-field" data-show="regular" {% if team_game %}hidden{% endif %}>
+    <label for="players-input"><span>Participants <em>(including you)</em></span></label>
+    <input id="players-input" name="players" type="number" inputmode="numeric" min="2" max="{{ MAX_PLAYERS }}"
+           value="{{ chosen }}" required data-players {% if no_limit %}disabled{% endif %}>
+    {% if allow_no_limit %}
+      {# Big events (a hall run, a club social) don't need a number: anyone can join. #}
+      <label class="toggle no-limit"><input type="checkbox" name="no_limit" value="1" data-no-limit {% if no_limit %}checked{% endif %}>
+        <span>No limit: anyone can join</span></label>
+    {% endif %}
+  </div>
   {% if not event %}
     {% set private = form.get('is_private') == '1' %}
     <fieldset class="field who-coming">
