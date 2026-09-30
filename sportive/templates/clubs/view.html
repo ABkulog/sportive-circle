@@ -186,8 +186,11 @@
           {% if g.user %}<a class="btn btn-small" href="{{ url_for('events.detail', event_id=e.id) }}">View</a>{% endif %}
         </li>
       {% else %}
-        <li class="muted">No events coming up.</li>
+        {% if not members_only_hidden %}<li class="muted">No events coming up.</li>{% endif %}
       {% endfor %}
+      {% if members_only_hidden %}
+        <li class="muted">+ {{ members_only_hidden }} event{{ 's' if members_only_hidden != 1 }} for members</li>
+      {% endif %}
     </ul>
   </section>
 

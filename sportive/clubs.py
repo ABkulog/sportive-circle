@@ -304,7 +304,13 @@ def view(club_id):
             ORDER BY e.starts_at LIMIT 10""",
         {"club": club_id, "now": to_db(now_local()), "me": g.user["id"] if g.get("user") else 0,
          "hold_now": to_db(now_local())}).fetchall()
+    # Members-only events are the club's business: outsiders see how many there are, not when or where.
+    members_only_hidden = 0
+    if role not in MEMBER_ROLES and not is_admin():
+        members_only_hidden = sum(1 for e in events if e["members_only"])
+        events = [e for e in events if not e["members_only"]]
     return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
+                           members_only_hidden=members_only_hidden,
                            role=role, owner=is_owner(club), requests=requests, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
                            socials=social_links(club),
                            joining=JOINING,

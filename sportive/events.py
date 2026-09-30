@@ -584,8 +584,9 @@ def post_club_event(club, event_id, data, repeat):
                 f"for {repeat} weeks, starting {when} · {data['location']}")
     else:
         text = f"New event: {data['title']} · {when} · {data['location']}"
-    if data.get("members_only"):
-        text += " (members only)"
+    if data.get("members_only"):  # updates are public: members see when and where on the Events tab
+        text = (f"New members-only events: every {from_db(data['starts_at']).strftime('%A')} for {repeat} weeks."
+                if repeat > 1 else "New members-only event.") + " Members: see the Events tab."
     get_db().execute("INSERT INTO club_posts (club_id, author_id, body, created_at, event_id) VALUES (?, ?, ?, ?, ?)",
                      (club["id"], g.user["id"], text, to_db(now_local()), event_id))
     get_db().commit()

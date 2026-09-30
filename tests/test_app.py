@@ -5255,3 +5255,13 @@ def test_place_check_hides_members_only_games_from_outsiders(accounts, client, a
         "location": e["location"], "starts_at": e["starts_at"][:16].replace(" ", "T"),
         "ends_at": e["ends_at"][:16].replace(" ", "T")}).get_json()
     assert found["games"] and all("Secret practice" not in g["title"] and g["going"] is None for g in found["games"])
+
+
+def test_club_page_shows_outsiders_only_a_count_of_members_only_events(accounts, client, app):
+    club = _club_with_member(accounts, client, app)
+    client.post(f"/events/new?club={club}", data=event_form(title="Secret practice", sport="spikeball",
+                                                            location="The Quad", is_private="members", club=str(club)))
+    assert "Secret practice" in client.get(f"/clubs/{club}").data.decode()        # an officer sees it
+    accounts.logout()
+    page = client.get(f"/clubs/{club}").data.decode()                            # a visitor from a QR code
+    assert "Secret practice" not in page and "1 event for members" in page
