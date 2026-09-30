@@ -48,7 +48,7 @@
 {% endif %}
 
 <section class="band home-section" aria-labelledby="games-title">
-<h2 class="home-section-title" id="games-title">{{ {'interests': 'Games in your sports', 'all': 'All games', 'full': 'Full games'}[filters.scope] }}</h2>
+<h2 class="home-section-title" id="games-title">{{ 'Full games' if filters.scope == 'full' else 'Upcoming games' }}</h2>
 {% set active_filters = [filters.sport, filters.when, filters.location, filters.skill, filters.open]|select|list|length %}
 <form method="get" class="filter-bar" aria-label="Filter games">
   <div class="segmented small" role="radiogroup" aria-label="Which sports">
@@ -87,10 +87,10 @@
   </details>
 </form>
 {% if filters.scope == 'interests' and my_sports %}
-  {# Where "My sports" comes from, and how to change it. #}
-  <p class="scope-hint muted">Your sports:
+  {# "My sports" = the sports on your profile: say which ones are showing, and how to change them. #}
+  <p class="scope-hint muted">Showing
     {%- for sport in my_sports %} {{ SPORTS[sport] }}{{ ',' if not loop.last }}{% endfor %} ·
-    <a href="{{ url_for('profile.edit_sports') }}">Change</a></p>
+    <a href="{{ url_for('profile.edit_sports') }}">Change sports</a></p>
 {% endif %}
 
 {% if filters.scope == 'interests' and not my_sports %}
