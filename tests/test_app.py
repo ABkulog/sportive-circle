@@ -5015,3 +5015,16 @@ def test_texting_failures_are_handled(accounts, client, app, monkeypatch):
         assert db.execute("SELECT sms_updates FROM users WHERE id = ?", (me,)).fetchone()[0] == 0   # respected
         monkeypatch.setattr(sms, "send_sms", fail(500))
         assert sms.text_code(me, "123456", "password reset") is False  # never raises
+
+
+def test_being_removed_and_game_changes_are_separate_notices(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Sam")
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    _as(accounts, "Sam")
+    client.post(f"/events/{game}/join")
+    _as(accounts, "Maya")
+    client.post(f"/events/{game}/players/{ids['Sam']}/remove")
+    with app.app_context():
+        keys = [r[0] for r in get_db().execute("SELECT key FROM notices WHERE user_id = ?", (ids["Sam"],))]
+    assert f"removed:{game}" in keys and f"change:{game}" not in keys

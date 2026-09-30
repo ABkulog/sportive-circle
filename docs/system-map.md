@@ -60,7 +60,14 @@ small enough for one student to maintain. Each area of the app is its own module
 | `sportive/moderation.py` | Reports and the admin page (review, suspend). |
 | `sportive/feedback.py` | Suggestions and trending topics for admins. |
 | `sportive/pages.py` | How it works, FAQ, Privacy, Terms, the Create menu. |
-| `sportive/reminders.py`, `stats.py` | Commands run on a schedule. |
+| `sportive/sms.py`, `phones.py`, `announcements.py` | Texts (Twilio): codes, limits, updates; phone numbers with a country picker; the one-time "texts are here" announcement. |
+| `sportive/placecheck.py` | "What else is on at this place?": UW Rec reservations (and the admin page to add them) and other games. |
+| `sportive/settings.py` | Settings pages: notifications, look (theme), reminders, texts, password, blocked people. |
+| `sportive/photos.py` | Profile photos and club logos: cropped, resized, hidden info removed. |
+| `sportive/spirit.py` | The Home greeting and Top Dawgs. |
+| `sportive/mail.py`, `links.py` | Sending email; full links to the live site for emails, calendar files and share buttons. |
+| `sportive/timeutil.py`, `textutil.py` | Seattle time and "5 min ago" style times; cleaning up typed text. |
+| `sportive/reminders.py`, `stats.py` | Game reminders (a loop inside the app on Render, or `/tasks/send-reminders`) and usage stats. |
 | `sportive/templates/` | Pages. `base.html` has the navigation; `_macros.html` has shared pieces. |
 | `sportive/static/` | Stylesheet, icons, and the small scripts. |
 | `tests/` | Unit tests (`test_app.py`) and Gherkin scenarios (`features/*.feature`). |

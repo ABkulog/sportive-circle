@@ -1077,7 +1077,7 @@ def remove_player(event_id, user_id):
         db.execute("INSERT OR REPLACE INTO removed_players (event_id, user_id, removed_at) VALUES (?, ?, ?)",
                    (event_id, user_id, to_db(now_local())))
         notify(user_id, "game_updates", f"{g.user['full_name'].split()[0]} took you off {event_title(event)}.",
-               url_for("events.detail", event_id=event_id), key=f"change:{event_id}")
+               url_for("events.detail", event_id=event_id), key=f"removed:{event_id}")
     db.commit()
     flash("Removed from the game." if cur.rowcount else "They're not in this game.", "info")
     return redirect(url_for("events.detail", event_id=event_id))
