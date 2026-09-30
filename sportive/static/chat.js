@@ -22,6 +22,7 @@
     const top = Math.max(barBottom, viewTop);
     root.style.setProperty("--chat-top", top + "px");
     root.style.setProperty("--chat-height", Math.max(200, viewBottom - top) + "px");
+    root.classList.toggle("keyboard-open", !!view && view.height < window.innerHeight - 120);
   };
   fit();
   window.addEventListener("resize", fit);
@@ -121,6 +122,66 @@
     list.appendChild(item);
   }
 
+  // Albums, like WhatsApp: 4+ photos in a row from one person show as one 2x2 grid, "+N" on the 4th opens the
+  // rest. The grid sits in the last message of the run (with its words, time and Seen); the others are hidden.
+  // Rebuilt from scratch whenever messages arrive, so a run that grows just becomes a bigger album.
+  const ALBUM_FROM = 4;
+  const opened = new Set();  // albums someone tapped "+N" on (by their first message's id)
+  function makeAlbums() {
+    list.querySelectorAll(".chat-album").forEach((album) => album.remove());
+    list.querySelectorAll(".in-album").forEach((item) => item.classList.remove("in-album"));
+    list.querySelectorAll(".has-album").forEach((item) => {
+      item.classList.remove("has-album");
+      if (item.dataset.albumStart) { item.classList.remove("starts-group"); delete item.dataset.albumStart; }
+    });
+    let run = [];
+    const finish = () => {
+      if (run.length >= ALBUM_FROM) buildAlbum(run);
+      run = [];
+    };
+    list.querySelectorAll(":scope > li").forEach((item) => {
+      const photo = item.classList.contains("chat-msg") && item.querySelector(":scope .chat-bubble > .chat-photo");
+      const last = run[run.length - 1];
+      if (!photo || (last && (last.dataset.sender !== item.dataset.sender || last.dataset.day !== item.dataset.day))) finish();
+      if (!photo) return;
+      run.push(item);
+      if (item.querySelector(".chat-bubble > p")) finish();  // words end an album (they're its caption)
+    });
+    finish();
+  }
+  function buildAlbum(run) {
+    const host = run[run.length - 1], key = run[0].dataset.id;
+    const showAll = opened.has(key);
+    const album = el("div", "chat-album");
+    run.forEach((item, i) => {
+      if (!showAll && i >= ALBUM_FROM) return;
+      const source = item.querySelector(".chat-bubble > .chat-photo");
+      const tile = el("a");
+      tile.href = source.href;
+      tile.target = "_blank";
+      tile.rel = "noopener";
+      const image = el("img");
+      image.src = source.querySelector("img").src;
+      image.alt = source.querySelector("img").alt;
+      tile.appendChild(image);
+      if (!showAll && i === ALBUM_FROM - 1 && run.length > ALBUM_FROM) {
+        tile.appendChild(el("span", "chat-album-more", `+${run.length - ALBUM_FROM}`));
+        tile.setAttribute("aria-label", `Show all ${run.length} photos`);
+        tile.addEventListener("click", (event) => { event.preventDefault(); opened.add(key); makeAlbums(); });
+      }
+      album.appendChild(tile);
+    });
+    run.slice(0, -1).forEach((item) => item.classList.add("in-album"));
+    host.classList.add("has-album");
+    if (run[0].classList.contains("starts-group") && !host.classList.contains("starts-group")) {
+      host.classList.add("starts-group");
+      host.dataset.albumStart = "1";
+    }
+    const bubble = host.querySelector(".chat-bubble");
+    bubble.insertBefore(album, bubble.querySelector(".chat-photo"));
+  }
+  makeAlbums();
+
   // "Seen" / "Delivered" under my newest message (only when the newest message is mine).
   function showStatus(status) {
     list.querySelectorAll(".chat-seen").forEach((node) => node.remove());
@@ -160,6 +221,7 @@
       if (!messages.length) { showStatus(status); return; }
       const wasNearBottom = nearBottom();
       messages.forEach(render);
+      makeAlbums();
       lastId = messages[messages.length - 1].id;
       showStatus(status);
       if (empty) empty.hidden = true;
@@ -173,7 +235,9 @@
   const textarea = box.querySelector("textarea");
   const photoInput = box.querySelector("[data-chat-photo]");
   const attached = box.querySelector("[data-chat-attached]");
-  const hasPhoto = () => photoInput && photoInput.files && photoInput.files.length > 0;
+  const MAX_PHOTOS = 10;  // each goes as its own message, one after another (the rate limit is 20 a minute)
+  let picked = [];        // the photos picked, shown above the box until they're sent or removed
+  const hasPhoto = () => picked.length > 0;
   if (textarea) {
     const grow = () => {
       textarea.style.height = "auto";
@@ -210,21 +274,28 @@
       sending = true;
       sendButton.disabled = true;
       try {
-        const response = await fetch(form.action, { method: "POST", body: new FormData(form),
-                                                    headers: { "X-Chat-Send": "1", Accept: "application/json" } });
-        if (new URL(response.url).pathname.startsWith("/login")) { location.reload(); return; }  // logged out
-        if (response.status === 413) { showError("That photo is too big. Pick one under 8 MB."); return; }
-        const answer = await response.json();
-        if (answer.ok) {
-          textarea.value = "";
-          grow();
-          if (photoInput) photoInput.dispatchEvent(new Event("chat:clear"));
-          showError(null);
-          await poll(true);
-          scrollDown();
-        } else {
-          showError(answer.error);
+        // One request per photo (the words go with the last one), or one for words only.
+        const photos = picked.length ? [...picked] : [null];
+        for (let i = 0; i < photos.length; i++) {
+          const data = new FormData(form);
+          data.delete("photo");
+          if (photos[i]) data.append("photo", photos[i]);
+          if (i < photos.length - 1) data.set("body", "");
+          const response = await fetch(form.action, { method: "POST", body: data,
+                                                      headers: { "X-Chat-Send": "1", Accept: "application/json" } });
+          if (new URL(response.url).pathname.startsWith("/login")) { location.reload(); return; }  // logged out
+          if (response.status === 413) { showError("That photo is too big. Pick one under 8 MB."); break; }
+          const answer = await response.json();
+          if (!answer.ok) { showError(answer.error); break; }
+          if (photos[i]) photoInput.dispatchEvent(new CustomEvent("chat:sent", { detail: photos[i] }));
+          if (i === photos.length - 1) {
+            textarea.value = "";
+            grow();
+            showError(null);
+          }
         }
+        await poll(true);
+        scrollDown();
       } catch (error) {
         showError("Couldn't send. Check your connection and try again.");
       } finally {
@@ -242,24 +313,35 @@
       });
     });
   }
-  // A picked photo shows above the box until it's sent or removed.
+  // Picked photos (up to 10, picked in one go or a few at a time) show above the box until sent or removed.
   if (photoInput && attached) {
-    let previewUrl = null;
-    const clear = () => {
-      photoInput.value = "";
-      attached.hidden = true;
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      previewUrl = null;
+    const thumbs = attached.querySelector("[data-chat-thumbs]");
+    const show = () => {
+      thumbs.querySelectorAll("img").forEach((image) => URL.revokeObjectURL(image.src));
+      thumbs.replaceChildren(...picked.map((file) => {
+        const image = el("img");
+        image.alt = "";
+        image.src = URL.createObjectURL(file);
+        return image;
+      }));
+      attached.hidden = !picked.length;
     };
     photoInput.addEventListener("change", () => {
-      if (!hasPhoto()) { clear(); return; }
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      previewUrl = URL.createObjectURL(photoInput.files[0]);
-      attached.querySelector("[data-chat-preview]").src = previewUrl;
-      attached.hidden = false;
+      const chosen = [...photoInput.files].filter((file) => file.type.startsWith("image/"));
+      photoInput.value = "";  // the list lives in `picked`, so the same photo can be picked again later
+      picked = picked.concat(chosen).slice(0, MAX_PHOTOS);
+      const errorLine = box.querySelector("[data-chat-error]");
+      if (errorLine && picked.length === MAX_PHOTOS && chosen.length) {
+        errorLine.textContent = `Up to ${MAX_PHOTOS} photos at a time.`;
+        errorLine.hidden = false;
+      }
+      show();
       if (textarea) textarea.focus();
     });
-    attached.querySelector("[data-chat-unattach]").addEventListener("click", clear);
-    photoInput.addEventListener("chat:clear", clear);  // sent
+    attached.querySelector("[data-chat-unattach]").addEventListener("click", () => { picked = []; show(); });
+    photoInput.addEventListener("chat:sent", (event) => {  // one photo went: take it off the list
+      picked = picked.filter((file) => file !== event.detail);
+      show();
+    });
   }
 })();

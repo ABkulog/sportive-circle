@@ -55,15 +55,15 @@
       <p class="chat-error" data-chat-error role="alert" hidden></p>
       <form method="post" action="{{ action }}" class="chat-composer" id="composer" enctype="multipart/form-data">
         {{ csrf_field() }}
-        <label class="chat-attach" title="Send a photo">
+        <label class="chat-attach" title="Send photos">
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-          <span class="visually-hidden">Send a photo</span>
-          <input type="file" name="photo" accept="image/*" data-chat-photo>
+          <span class="visually-hidden">Send photos</span>
+          <input type="file" name="photo" accept="image/*" multiple data-chat-photo>
         </label>
         <div class="chat-input">
           <div class="chat-attached" data-chat-attached hidden>
-            <img alt="The photo you picked" data-chat-preview>
-            <button type="button" class="chat-attached-remove" data-chat-unattach aria-label="Remove the photo">&times;</button>
+            <div class="chat-thumbs" data-chat-thumbs aria-label="The photos you picked"></div>
+            <button type="button" class="chat-attached-remove" data-chat-unattach aria-label="Remove the photos">&times;</button>
           </div>
           <textarea name="body" rows="1" maxlength="1000" placeholder="{{ placeholder }}"
                     aria-label="Message"{% if draft %} autofocus{% endif %}>{{ draft }}</textarea>

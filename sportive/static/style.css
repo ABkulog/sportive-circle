@@ -1104,8 +1104,9 @@ button.link-button { min-height: 36px; }
 .chat-attach input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
 .chat-attach:focus-within { outline: 2px solid var(--purple); outline-offset: 2px; }
 .chat-input { flex: 1; min-width: 0; display: grid; gap: 6px; }
-.chat-attached { position: relative; width: 72px; }
-.chat-attached img { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; display: block; }
+.chat-attached { position: relative; width: fit-content; max-width: 100%; }
+.chat-thumbs { display: flex; gap: 6px; overflow-x: auto; padding: 8px 8px 0 0; }
+.chat-thumbs img { flex: none; width: 64px; height: 64px; object-fit: cover; border-radius: 10px; display: block; }
 .chat-attached-remove { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%;
   background: var(--text); color: var(--bg); border: 0; font-size: 1rem; line-height: 1; cursor: pointer; }
 .chat-send { flex: none; width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--purple);
@@ -1142,3 +1143,16 @@ body.hide-tabs.has-help main.page { padding-bottom: 16px; }  /* the Help? bubble
 .chat-messages.show-times .chat-msg { transform: translateX(var(--swipe, 0)); transition: none; }
 .chat-seen { font-size: .72rem; opacity: .85; }
 .chat-seen::before { content: "· "; }
+/* iPhones: the photo and send buttons sit a little above the bottom edge (the home bar), easy to tap;
+   flush with the keyboard when it's up (chat.js adds keyboard-open) */
+.chat-composer { padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+html.keyboard-open .chat-composer { padding-bottom: 10px; }
+/* Albums (chat.js): 4+ photos in a row show as a 2x2 grid; "+N" on the 4th */
+.chat-msg.in-album { display: none; }
+.chat-msg.has-album .chat-bubble > .chat-photo { display: none; }
+.chat-album { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; width: min(240px, 62vw); border-radius: 14px;
+  overflow: hidden; }
+.chat-album a { position: relative; display: block; aspect-ratio: 1; }
+.chat-album img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.chat-album-more { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, .45);
+  color: #fff; font-size: 1.5rem; font-weight: 700; }
