@@ -472,6 +472,19 @@ def resend_code():
 
 # ------------------------------------------------------------ log in / out
 
+def account_email(email):
+    """netid@uw.edu and netid@u.washington.edu are one inbox: log in (or reset) with either, find the account."""
+    db = get_db()
+    if "@" not in email or db.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
+        return email
+    local = email.split("@")[0]
+    other = db.execute(
+        f"SELECT email FROM users WHERE verified = 1 AND email IN "
+        f"({', '.join('?' for _ in current_app.config['ALLOWED_EMAIL_DOMAINS'])})",
+        [f"{local}@{domain}" for domain in current_app.config["ALLOWED_EMAIL_DOMAINS"]]).fetchone()
+    return other["email"] if other else email
+
+
 @bp.route("/login", methods=("GET", "POST"))
 def login():
     next_url = request.values.get("next", "")
@@ -480,7 +493,7 @@ def login():
     if next_url:
         session["after_login"] = safe_next(next_url)
     if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
+        email = account_email(request.form.get("email", "").strip().lower())
         password = request.form.get("password", "")
         db = get_db()
         user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
@@ -534,8 +547,10 @@ def login_locked(ip, email):
 def forgot_password():
     """Step 1: email a 6-digit code. The answer is the same whether or not the account exists,
     so nobody can use this page to find out who has an account."""
+    if g.user is not None:  # a reset logs in as that account: logged in, change it in Settings instead
+        return redirect(url_for("settings.password"))
     if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
+        email = account_email(request.form.get("email", "").strip().lower())
         user = get_db().execute("SELECT verified, suspended FROM users WHERE email = ?", (email,)).fetchone()
         if user and user["verified"] and not user["suspended"] and not code_recently_sent(email) \
                 and codes_left_today(email):  # (same answer either way: the page never says which)

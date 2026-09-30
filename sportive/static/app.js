@@ -261,7 +261,10 @@
   // iPhone Safari gets the two steps (Apple only lets the person do it). Never once it runs from the home screen,
   // nor in browsers that can't (laptops, Instagram/Snapchat's). × hides the card; it comes back once after a week.
   const ua = navigator.userAgent;
-  const iosSafari = /iPhone|iPad|iPod/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|Instagram|FBAN|FBAV|Snapchat/.test(ua);
+  const iPadOS = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;  // iPads say "Mac" in Safari
+  const iosSafari = (/iPhone|iPad|iPod/.test(ua) || iPadOS) && /Safari/.test(ua)
+    && !/CriOS|FxiOS|EdgiOS|Instagram|FBAN|FBAV|Snapchat/.test(ua);
+  const androidChrome = /Android/.test(ua) && /Chrome\//.test(ua) && !/; wv\)|Instagram|FBAN|FBAV|Snapchat/.test(ua);
   const installed = navigator.standalone || window.matchMedia("(display-mode: standalone)").matches;
   let installPrompt = null;
   const installListeners = [];
@@ -326,6 +329,10 @@
       welcome.querySelector("[data-welcome-ios]").hidden = false;
     } else if (installPrompt) {
       offerAndroid();
+    } else if (androidChrome) {
+      // Chrome may take a while to offer its one-tap install: show its menu steps now, the button when it comes.
+      welcome.querySelector("[data-welcome-android]").hidden = false;
+      installListeners.push(() => { welcome.querySelector("[data-welcome-android]").hidden = true; offerAndroid(); });
     } else {
       installListeners.push(offerAndroid);
       setTimeout(() => { if (addButton.hidden) location.replace(next); }, 1500);  // nothing to offer here

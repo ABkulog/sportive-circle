@@ -116,6 +116,8 @@ def photo_remove():
 @login_required
 def photo_skip():
     """'Add later': the page already said "No problem" in a pop-up. Remembered, so they aren't asked again."""
+    if g.user["avatar_updated"] or g.user["photo_skipped"]:  # not the sign-up step any more (an old tab)
+        return redirect(url_for("profile.view", user_id=g.user["id"]))
     db = get_db()
     db.execute("UPDATE users SET photo_skipped = 1 WHERE id = ?", (g.user["id"],))
     # One reminder in the bell, instead of a banner on every page.

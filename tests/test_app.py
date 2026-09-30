@@ -5282,3 +5282,17 @@ def test_youre_in_screen_after_sign_up(accounts, client, app):
     assert 'data-next="/"' in client.get("/welcome?next=https://evil.example").data.decode()   # never off-site
     game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
     assert "Want your games one tap away?" in client.get(f"/events/{game}").data.decode()
+
+
+def test_log_in_or_reset_with_either_uw_address(accounts, client, app):
+    accounts.signup(email="dubs@uw.edu")
+    accounts.logout()
+    assert accounts.login(email="dubs@u.washington.edu").status_code == 302      # same inbox, same account
+    assert client.get("/forgot").headers["Location"] == "/settings/password"      # logged in: change it there
+    accounts.logout()
+    with app.app_context():
+        get_db().execute("UPDATE users SET verify_sent_at = NULL, verify_code = NULL")
+        get_db().commit()
+    client.post("/forgot", data={"email": "DUBS@u.washington.edu"})
+    with app.app_context():
+        assert get_db().execute("SELECT verify_code FROM users WHERE email = 'dubs@uw.edu'").fetchone()[0]
