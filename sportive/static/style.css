@@ -1045,3 +1045,5 @@ button.link-button { min-height: 36px; }
   background: var(--purple); color: var(--on-accent); font-weight: 700; }
 .share-icon { display: inline-flex; vertical-align: middle; color: #007aff; }
 .welcome .btn { width: 100%; }
+.rec-feed { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; }
+.rec-feed p { margin: 0; }

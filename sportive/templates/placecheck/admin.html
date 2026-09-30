@@ -3,8 +3,8 @@
 {% block content %}
 {% from "_macros.html" import admin_nav %}{{ admin_nav('uwrec') }}
 <h1 class="page-title">UW Rec reservations</h1>
-<p class="muted">Copy in UW Rec's reservations from <a href="{{ schedule }}" target="_blank" rel="noopener">its
-  schedule</a>. Hosts see them as “UW Rec: reserved”.</p>
+<p class="muted">UW Rec's bookings are copied from <a href="{{ schedule }}" target="_blank" rel="noopener">its
+  schedule</a> by themselves. Hosts see them as “UW Rec: reserved”. Add anything missing by hand.</p>
 
 {# Folded away once there's a list, so the page fits a phone; open when there's nothing yet or a form error. #}
 <details class="card form-card rec-add" {% if not upcoming or form %}open{% endif %}>
@@ -31,8 +31,15 @@
   </form>
 </details>
 
+<section class="card rec-feed">
+  <p><strong>{{ copied }} booking{{ 's' if copied != 1 }} copied from UW Rec's schedule</strong><br>
+    <small class="muted">{% if synced %}Updated {{ synced|ago }}. {% endif %}It updates by itself every day.</small></p>
+  <form method="post" action="{{ url_for('placecheck.admin_rec_sync') }}">
+    {{ csrf_field() }}<button class="btn btn-small btn-ghost">Update now</button></form>
+</section>
+
 <section class="band">
-  <h2>Coming up</h2>
+  <h2>Added by hand</h2>
   {% if upcoming %}
     <ul class="rec-list">
       {% for r in upcoming %}

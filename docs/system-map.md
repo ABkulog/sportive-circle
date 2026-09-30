@@ -61,6 +61,7 @@ small enough for one student to maintain. Each area of the app is its own module
 | `sportive/feedback.py` | Suggestions and trending topics for admins. |
 | `sportive/pages.py` | How it works, FAQ, Privacy, Terms, the Create menu. |
 | `sportive/sms.py`, `phones.py`, `announcements.py` | Texts (Twilio): codes, limits, updates; phone numbers with a country picker; the one-time "texts are here" announcement. |
+| `sportive/uwrec.py` | Copies UW Rec's own bookings (IM leagues, club practices, rentals) from its public Facility Schedule once a day; `flask --app wsgi sync-uw-rec` runs it now. |
 | `sportive/placecheck.py` | "What else is on at this place?": UW Rec reservations (and the admin page to add them) and other games. |
 | `sportive/settings.py` | Settings pages: notifications, look (theme), reminders, texts, password, blocked people. |
 | `sportive/photos.py` | Profile photos and club logos: cropped, resized, hidden info removed. |

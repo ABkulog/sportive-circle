@@ -9,6 +9,8 @@ Two different things, shown differently:
 """
 from datetime import timedelta
 
+import logging
+
 from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 
 from .auth import login_required
@@ -17,6 +19,8 @@ from .db import get_db
 from .moderation import admin_required
 from .textutil import one_line
 from .timeutil import fmt_clock, fmt_when, now_local, parse_form, same_day, to_db
+
+log = logging.getLogger(__name__)
 
 bp = Blueprint("placecheck", __name__)
 
@@ -136,11 +140,28 @@ def admin_rec():
             db.commit()
             flash(f"Added {weeks} reservation{'s' if weeks != 1 else ''}.", "success")
             return redirect(url_for("placecheck.admin_rec"))
-    upcoming = db.execute("SELECT * FROM rec_reservations WHERE ends_at >= ? ORDER BY starts_at LIMIT 300",
-                          (to_db(now_local()),)).fetchall()
+    now = to_db(now_local())
+    upcoming = db.execute("SELECT * FROM rec_reservations WHERE ends_at >= ? AND source = 'admin' ORDER BY starts_at"
+                          " LIMIT 300", (now,)).fetchall()
+    copied = db.execute("SELECT COUNT(*) FROM rec_reservations WHERE ends_at >= ? AND source = 'feed'",
+                        (now,)).fetchone()[0]
+    from .uwrec import last_synced
     return render_template("placecheck/admin.html", places=[p for p in LOCATIONS if p in UW_REC_PLACES],
                            upcoming=upcoming, form=form, schedule=UW_REC_SCHEDULE, max_weeks=MAX_REPEAT_WEEKS,
-                           max_label=MAX_LABEL, time_range=time_range)
+                           max_label=MAX_LABEL, time_range=time_range, copied=copied, synced=last_synced())
+
+
+@bp.route("/admin/uw-rec/sync", methods=("POST",))
+@admin_required
+def admin_rec_sync():
+    """"Update now": copy UW Rec's schedule right away (it also happens by itself once a day)."""
+    from .uwrec import sync
+    try:
+        flash(f"Updated: {sync()} bookings from UW Rec's schedule.", "success")
+    except Exception:
+        log.exception("Couldn't copy UW Rec's schedule")
+        flash("Couldn't reach UW Rec's schedule right now. The last copy is still used. Try again later.", "error")
+    return redirect(url_for("placecheck.admin_rec"))
 
 
 @bp.route("/admin/uw-rec/<int:reservation_id>/delete", methods=("POST",))

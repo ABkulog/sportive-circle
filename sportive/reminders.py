@@ -17,6 +17,7 @@ from flask import Blueprint, abort, current_app, jsonify, request
 from flask.cli import with_appcontext
 
 from .backups import backup_round
+from .uwrec import sync_round as uw_rec_round
 from .constants import SPORTS
 from .db import get_db
 from .mail import compose, send_email
@@ -125,6 +126,7 @@ def start_reminder_loop(app):
         while True:
             reminder_round(app)
             backup_round(app)  # once a day; a quick "already done today?" check otherwise
+            uw_rec_round(app)  # UW Rec's bookings, copied once a day (uwrec.py)
             time.sleep(CHECK_EVERY.total_seconds())
 
     threading.Thread(target=loop, name="reminders", daemon=True).start()

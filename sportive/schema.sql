@@ -391,3 +391,9 @@ CREATE TABLE IF NOT EXISTS ended_sessions (
 
 -- Feeds and profiles only look at games that haven't ended; without this they'd read every game ever made.
 CREATE INDEX IF NOT EXISTS idx_events_ends_at ON events(ends_at);
+
+-- Small bits the app remembers about itself (e.g. when UW Rec's schedule was last copied: uwrec.py).
+CREATE TABLE IF NOT EXISTS app_state (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);

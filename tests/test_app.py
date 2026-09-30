@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from datetime import timedelta
@@ -5323,3 +5324,45 @@ def test_one_admin_tab_with_everything(accounts, client, app):
     accounts.logout()
     accounts.signup(email="normal@uw.edu")
     assert client.get("/admin").status_code == 404                       # not for everyone
+
+
+def test_uw_rec_bookings_are_copied_by_themselves(accounts, client, app, monkeypatch):
+    """UW Rec's public schedule is read once a day (no typing): weekly repeats become dates, skipped days stay
+    out, bookings admins typed in are kept, and a failure keeps yesterday's copy. No real network in tests."""
+    from sportive import uwrec
+    page = ('<a href="/Facility/GetFacility?facilityId=11111111-1111-1111-1111-111111111111">Denny Field - Turf</a>'
+            '<a href="/Facility/GetFacility?facilityId=22222222-2222-2222-2222-222222222222">Gym B</a>')
+    now = now_local()
+    first = (now + timedelta(days=1)).replace(hour=18, minute=0, second=0, microsecond=0)
+    skip = first + timedelta(days=7)
+    rugby = {"Text": "Womxn's Rugby - Practice", "StartDate": first.strftime("%Y-%m-%dT%H:%M:%S.000"),
+             "EndDate": first.replace(hour=20).strftime("%Y-%m-%dT%H:%M:%S.000"),
+             "RecurrenceRule": f"FREQ=WEEKLY;UNTIL={(first + timedelta(days=22)).strftime('%Y%m%dT070000')}Z;"
+                               f"BYDAY={['MO','TU','WE','TH','FR','SA','SU'][first.weekday()]}",
+             "RecurrenceException": skip.strftime("%Y%m%dT%H%M%S")}
+    kendo = {"Text": "Kendo - Practice", "StartDate": first.strftime("%Y-%m-%dT%H:%M:%S.000"),
+             "EndDate": first.replace(hour=21).strftime("%Y-%m-%dT%H:%M:%S.000")}
+
+    def fake_get(path, params=None):
+        if path == "/Facility":
+            return page
+        return json.dumps([rugby] if params["selectedFacilityId"].startswith("1") else [kendo])
+    monkeypatch.setattr(uwrec, "_get", fake_get)
+    with app.app_context():
+        db = get_db()
+        db.execute("INSERT INTO rec_reservations (location, starts_at, ends_at, label, source, created_at)"
+                   " VALUES ('Denny Field', ?, ?, 'Typed in', 'admin', ?)",
+                   (to_db(first), to_db(first.replace(hour=19)), to_db(now)))
+        db.commit()
+        assert uwrec.sync() == 4                                          # 4 rugby weeks - 1 skipped + kendo
+        rows = db.execute("SELECT location, label, starts_at FROM rec_reservations WHERE source = 'feed'"
+                          " ORDER BY starts_at").fetchall()
+        assert [r["label"] for r in rows].count("Womxn's Rugby - Practice") == 3
+        assert to_db(skip) not in [r["starts_at"] for r in rows]
+        assert ("IMA (Intramural Activities Building)", "Gym B: Kendo - Practice") in [(r[0], r[1]) for r in rows]
+        monkeypatch.setattr(uwrec, "_get", lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
+        uwrec.sync_round(app)                                             # already done today: nothing happens
+        db.execute("DELETE FROM app_state"); db.commit()
+        uwrec.sync_round(app)                                             # UW Rec down: yesterday's copy stays
+        assert db.execute("SELECT COUNT(*) FROM rec_reservations WHERE source = 'feed'").fetchone()[0] == 4
+        assert db.execute("SELECT COUNT(*) FROM rec_reservations WHERE source = 'admin'").fetchone()[0] == 1

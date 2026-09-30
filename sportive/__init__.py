@@ -7,7 +7,7 @@ from datetime import timedelta
 from flask import Flask, render_template, request
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from . import (auth, backups, textutil, clubs, db, events, feedback, mail, moderation, notifications, pages, parties, placecheck, profile,
+from . import (auth, backups, textutil, uwrec, clubs, db, events, feedback, mail, moderation, notifications, pages, parties, placecheck, profile,
                phones, reminders, settings, sms, social, stats)
 from .constants import (SPORT_SPACE, DEFAULT_PLAYERS, LOCATIONS, OPEN_TO, OPEN_TO_BADGE, OPEN_TO_LABELS, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS,
                         MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
@@ -98,6 +98,7 @@ def create_app(test_config=None):
     app.add_url_rule("/", endpoint="index", view_func=events.feed)
     app.cli.add_command(reminders.send_reminders_command)
     app.cli.add_command(backups.backup_command)
+    app.cli.add_command(uwrec.sync_uw_rec_command)
     app.cli.add_command(stats.sport_stats_command)
     app.cli.add_command(mail.check_email_command)
 
