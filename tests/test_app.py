@@ -5165,3 +5165,24 @@ def test_suspended_people_get_no_game_or_club_emails(accounts, client, app, monk
     _as(accounts, "Host")
     client.post(f"/events/{game}/cancel")
     assert "player@uw.edu" not in sent
+
+
+def test_expired_records_are_cleaned_up_but_messages_stay(accounts, client, app):
+    from sportive import backups
+    ids = _people(accounts, app, "Maya", "Sam")
+    _friends(app, ids["Maya"], ids["Sam"])
+    _as(accounts, "Maya")
+    client.post(f"/messages/{ids['Sam']}", data={"body": "old but kept"})
+    with app.app_context():
+        db = get_db()
+        long_ago = "2025-01-01 10:00"
+        db.execute("INSERT INTO notices (user_id, kind, text, url, created_at) VALUES (?, 'account', 'old', '/', ?)",
+                   (ids["Maya"], long_ago))
+        db.execute("INSERT INTO sms_log (user_id, phone, kind, ok, created_at) VALUES (?, '+12065550142', 'code', 1, ?)",
+                   (ids["Maya"], long_ago))
+        db.execute("INSERT INTO email_codes (inbox, sent_at) VALUES ('maya', ?)", (long_ago,))
+        db.execute("UPDATE direct_messages SET created_at = ?", (long_ago,))
+        db.commit()
+        assert backups.clean_up_old_records() >= 3
+        assert not db.execute("SELECT 1 FROM notices WHERE text = 'old'").fetchone()
+        assert db.execute("SELECT 1 FROM direct_messages WHERE body = 'old but kept'").fetchone()

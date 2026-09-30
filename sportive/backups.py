@@ -12,12 +12,14 @@ import logging
 import os
 import sqlite3
 import time
+from datetime import timedelta
 
 import click
 from flask import current_app
 from flask.cli import with_appcontext
 
-from .timeutil import now_local
+from .db import get_db
+from .timeutil import now_local, to_db
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +32,10 @@ def backup_folder():
         os.path.dirname(os.path.abspath(current_app.config["DATABASE"])), "backups")
 
 
+def _today_target():
+    return os.path.join(backup_folder(), f"sportive-{now_local():%Y-%m-%d}.db")
+
+
 def make_backup(force=False):
     """Copy the database to today's backup file (unless it's there already). Returns its path, or None."""
     database = current_app.config["DATABASE"]
@@ -37,7 +43,7 @@ def make_backup(force=False):
         return None
     folder = backup_folder()
     os.makedirs(folder, exist_ok=True)
-    target = os.path.join(folder, f"sportive-{now_local():%Y-%m-%d}.db")
+    target = _today_target()
     if os.path.exists(target) and not force:
         return None
     lock = target + ".lock"
@@ -75,10 +81,35 @@ def remove_old_backups(folder):
         os.remove(os.path.join(folder, name))
 
 
+# Records only kept for a limit or a short window: (table, time column, days to keep). People's messages,
+# games, reports and suggestions are never removed here.
+EXPIRE = [("notices", "created_at", 90),         # the bell shows the last 30 days
+          ("sms_log", "created_at", 30),         # daily text limits look back 1 day
+          ("email_codes", "sent_at", 7),         # daily code limit looks back 1 day
+          ("club_join_emails", "sent_at", 7),    # one email a day per person per club
+          ("password_tries", "first_try", 7),    # 10 tries an hour
+          ("login_failures", "failed_at", 7)]    # 15-minute lockouts
+
+
+def clean_up_old_records():
+    """Delete what's past its window, so the database (and each backup) doesn't grow forever. Returns rows removed."""
+    db = get_db()
+    removed = 0
+    for table, column, days in EXPIRE:
+        removed += db.execute(f"DELETE FROM {table} WHERE {column} < ?",
+                              (to_db(now_local() - timedelta(days=days)),)).rowcount
+    db.commit()
+    return removed
+
+
 def backup_round(app):
-    """Called from the background loop. Never raises."""
+    """Called from the background loop: once a day, tidy up and back up. Never raises."""
     try:
         with app.app_context():
+            if not os.path.exists(_today_target()):  # the first round of the day
+                removed = clean_up_old_records()
+                if removed:
+                    log.info("Removed %d expired record(s).", removed)
             path = make_backup()
         if path:
             log.info("Backed up the database to %s", path)

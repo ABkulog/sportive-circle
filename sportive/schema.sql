@@ -299,6 +299,7 @@ CREATE TABLE IF NOT EXISTS notices (
     key        TEXT                   -- a newer notice with the same key replaces the older one
 );
 CREATE INDEX IF NOT EXISTS idx_notices_user ON notices(user_id, read_at);
+CREATE INDEX IF NOT EXISTS idx_notices_recent ON notices(user_id, created_at);  -- the bell: newest first
 
 -- ---------------------------------------------------------------- suggestions
 -- Ideas and problems people send from the footer link. Only admins can read them.
@@ -387,3 +388,6 @@ CREATE TABLE IF NOT EXISTS ended_sessions (
     sid      TEXT PRIMARY KEY,
     ended_at TEXT NOT NULL
 );
+
+-- Feeds and profiles only look at games that haven't ended; without this they'd read every game ever made.
+CREATE INDEX IF NOT EXISTS idx_events_ends_at ON events(ends_at);
