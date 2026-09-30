@@ -164,8 +164,8 @@ def _count(kind, me):
                AND sender_id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = ?)
                AND sender_id NOT IN (SELECT id FROM users WHERE suspended = 1)""", (me, me, me)).fetchone()[0]
     if kind == "friend_requests":
-        return db.execute("SELECT COUNT(*) FROM friendships WHERE addressee_id = ? AND status = 'pending'",
-                          (me,)).fetchone()[0]
+        return db.execute("SELECT COUNT(*) FROM friendships WHERE addressee_id = ? AND status = 'pending'"
+                          " AND requester_id IN (SELECT id FROM users WHERE suspended = 0)", (me,)).fetchone()[0]
     if kind == "game_chat":
         return sum(event_chat_unread().values())
     if kind == "need_players":

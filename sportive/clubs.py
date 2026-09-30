@@ -96,8 +96,8 @@ def my_role(club_id):
 
 
 def is_owner(club):
-    """The person who registered the club runs its officer list. If they're no longer an officer (left, or
-    deleted their account), any officer can, so a club is never stuck. Admins always can."""
+    """The person who registered the club runs its officer list. If they're no longer an officer (left,
+    deleted their account, or were suspended), any officer can, so a club is never stuck. Admins always can."""
     if g.get("user") is None:
         return False
     if is_admin():
@@ -107,8 +107,10 @@ def is_owner(club):
     owner = club["created_by"]
     if owner == g.user["id"]:
         return True
-    still_officer = get_db().execute("SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ? AND role = 'officer'",
-                                     (club["id"], owner)).fetchone() if owner else None
+    still_officer = get_db().execute(  # a suspended owner can't log in, so they don't count either
+        """SELECT 1 FROM club_members m JOIN users u ON u.id = m.user_id
+           WHERE m.club_id = ? AND m.user_id = ? AND m.role = 'officer' AND u.suspended = 0""",
+        (club["id"], owner)).fetchone() if owner else None
     return still_officer is None
 
 

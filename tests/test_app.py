@@ -5198,3 +5198,26 @@ def test_weekly_practices_skip_the_hour_clocks_jump_over(accounts, client, app):
             "SELECT starts_at FROM events WHERE club_id = ? AND title = 'Late practice' ORDER BY starts_at", (club,))]
     assert starts == ["2027-03-07 02:30", "2027-03-21 02:30"]            # Mar 14 2:30 AM doesn't exist
     assert "One week was skipped" in page
+
+
+def test_a_suspended_owner_doesnt_strand_their_club_or_friend_requests(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="vice@uw.edu", name="Vice Husky")
+    client.post(f"/clubs/{club}/join")
+    vice = _user_id(app, "vice@uw.edu")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    client.post(f"/clubs/{club}/members/{vice}/approve")
+    client.post(f"/clubs/{club}/officers", data={"user": vice, "action": "add"})
+    client.post(f"/friends/request/{vice}")                              # a request the suspension leaves behind
+    captain = _user_id(app, "captain@uw.edu")
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 1 WHERE id = ?", (captain,))
+        get_db().commit()
+    accounts.logout()
+    accounts.login(email="vice@uw.edu")
+    assert client.get(f"/clubs/{club}/officers").status_code == 200      # the other officer can run it
+    assert "Cap Tain" not in client.get("/friends").data.decode()
+    client.post(f"/friends/accept/{captain}")
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM friendships").fetchone()[0] == "pending"

@@ -212,14 +212,16 @@ def friends():
     db = get_db()
     incoming = db.execute(
         """SELECT u.id, u.full_name, u.avatar_updated FROM friendships f JOIN users u ON u.id = f.requester_id
-           WHERE f.addressee_id = ? AND f.status = 'pending' ORDER BY f.created_at DESC""", (me,)).fetchall()
+           WHERE f.addressee_id = ? AND f.status = 'pending' AND u.suspended = 0 ORDER BY f.created_at DESC""",
+        (me,)).fetchall()
     outgoing = db.execute(
         """SELECT u.id, u.full_name, u.avatar_updated FROM friendships f JOIN users u ON u.id = f.addressee_id
-           WHERE f.requester_id = ? AND f.status = 'pending' ORDER BY f.created_at DESC""", (me,)).fetchall()
+           WHERE f.requester_id = ? AND f.status = 'pending' AND u.suspended = 0 ORDER BY f.created_at DESC""",
+        (me,)).fetchall()
     friend_list = db.execute(
         """SELECT u.id, u.full_name, u.avatar_updated FROM friendships f
            JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
-           WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted'
+           WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted' AND u.suspended = 0
            ORDER BY fold(u.full_name)""", (me, me, me)).fetchall()
     q = request.args.get("q", "").strip()[:MAX_SEARCH_LENGTH]
     suggestions = friend_suggestions(me)
@@ -361,7 +363,8 @@ def send_request(user_id):
 def accept_request(user_id):
     db = get_db()
     cur = db.execute("UPDATE friendships SET status = 'accepted' WHERE requester_id = ? AND addressee_id = ?"
-                     " AND status = 'pending'", (user_id, g.user["id"]))
+                     " AND status = 'pending' AND requester_id IN (SELECT id FROM users WHERE suspended = 0)",
+                     (user_id, g.user["id"]))
     db.commit()
     if cur.rowcount:
         flash("You're friends now!", "celebrate")
