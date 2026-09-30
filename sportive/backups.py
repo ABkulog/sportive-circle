@@ -11,6 +11,7 @@ These copies live on the same disk, so also keep Render's disk snapshots on and 
 import logging
 import os
 import sqlite3
+import time
 
 import click
 from flask import current_app
@@ -21,6 +22,7 @@ from .timeutil import now_local
 log = logging.getLogger(__name__)
 
 KEEP = 7  # days of copies
+STALE_LOCK_SECONDS = 600  # a lock this old was left by a crash mid-copy
 
 
 def backup_folder():
@@ -39,9 +41,14 @@ def make_backup(force=False):
     if os.path.exists(target) and not force:
         return None
     lock = target + ".lock"
+    if os.path.exists(lock) and time.time() - os.path.getmtime(lock) > STALE_LOCK_SECONDS:
+        log.warning("Removing a backup lock left by a crash: %s", lock)  # a copy takes seconds, not minutes
+        os.remove(lock)
     try:  # the site runs as 2 copies: only one of them makes today's backup
         os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
     except FileExistsError:
+        if force:
+            log.warning("Another backup is running right now (%s); try again in a minute.", lock)
         return None
     try:
         partial = target + ".partial"

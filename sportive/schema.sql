@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS avatars (
 
 CREATE TABLE IF NOT EXISTS events (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    revision      INTEGER NOT NULL DEFAULT 0,  -- +1 on every edit or cancel (calendar files' SEQUENCE)
     host_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title         TEXT NOT NULL,
     sport         TEXT NOT NULL,

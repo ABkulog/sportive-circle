@@ -211,6 +211,22 @@ PASSWORD_WORDS = ("husky", "dawgs", "purple", "gold", "rally", "court", "field",
                   "canyon", "glacier", "thunder", "breeze", "nova", "pixel", "mango", "cobalt", "jade", "quartz")
 
 
+# Which form field an error message is about, so the step-by-step form opens on it and marks it (wizard.js).
+ERROR_FIELDS = [("name is too long", "title"), ("can't be played at", "location"), ("Off campus", "note"),
+                ("location", "location"), ("sport", "sport"), ("skill level", "skill_level"),
+                ("start time", "starts_at"), ("end time", "ends_at"), ("end after it starts", "ends_at"),
+                ("Event date", "starts_at"), ("when you're playing", "starts_in"), ("Note", "note"),
+                ("password", "password"), ("Team vs team", "is_private"), ("team", "team_size"),
+                ("open to", "open_to"), ("repeat", "repeat"), ("friends", "reserve"), ("participants", "players"),
+                ("players", "players"), ("spots", "players")]
+
+
+def form_error(message):
+    """flash() the problem and remember which field it's about (the form template reads g.error_field)."""
+    flash(message, "error")
+    g.error_field = next((field for words, field in ERROR_FIELDS if words.lower() in message.lower()), "")
+
+
 def suggested_password():
     """A private game's password, filled in for the host (they can change it): easy to say out loud, and too many
     options to guess (40 × 40 × 900, with 10 tries an hour)."""
@@ -539,7 +555,7 @@ def create():
             else:
                 flash(created_message(data["is_private"], reserve, "Your game is up!"), "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))
-        flash(error, "error")
+        form_error(error)
     else:
         starts, ends = default_times()
         form = MultiDict({"starts_at": starts, "ends_at": ends, "skill_level": "All levels",
@@ -599,7 +615,7 @@ def edit(event_id):
             db = get_db()
             # The size check is repeated inside the UPDATE: someone may have joined since the form was checked.
             saved = db.execute(
-                f"""UPDATE events SET title = :title, sport = :sport, location = :location,
+                f"""UPDATE events SET revision = revision + 1, title = :title, sport = :sport, location = :location,
                        starts_at = :starts_at, ends_at = :ends_at, skill_level = :skill_level,
                        max_players = :max_players, note = :note, is_private = :is_private, password = :password,
                        open_to = :open_to, members_only = :members_only
@@ -610,7 +626,7 @@ def edit(event_id):
             ).rowcount
             if not saved:
                 db.rollback()
-                flash("Someone just joined, so there are more people in than that. Pick more players.", "error")
+                form_error("Someone just joined, so there are more people in than that. Pick more players.")
                 return render_template("events/form.html", form=form, event=get_event(event_id), min_start="")
             if data["starts_at"] != event["starts_at"]:  # a reminder for the old time doesn't cover the new one
                 db.execute("UPDATE rsvps SET reminder_sent = 0 WHERE event_id = ?", (event_id,))
@@ -618,7 +634,7 @@ def edit(event_id):
             db.commit()
             flash("Saved. Everyone going got a heads-up." if told else "Saved.", "success")
             return redirect(url_for("events.detail", event_id=event_id))
-        flash(error, "error")
+        form_error(error)
     else:
         form = MultiDict({
             "title": event["title"], "sport": event["sport"], "location": event["location"],
@@ -638,7 +654,7 @@ def cancel(event_id):
     if event["cancelled"] or from_db(event["ends_at"]) < now_local():
         return redirect(url_for("events.detail", event_id=event_id))
     db = get_db()
-    db.execute("UPDATE events SET cancelled = 1 WHERE id = ?", (event_id,))
+    db.execute("UPDATE events SET cancelled = 1, revision = revision + 1 WHERE id = ?", (event_id,))
     db.commit()
     tell_players_it_was_cancelled(event)
     flash("Canceled. Everyone who joined was told.", "info")
@@ -792,7 +808,7 @@ def quick():
             }, reserve)
             flash(created_message(is_private, reserve, "Posted! It's at the top of everyone's feed."), "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))
-        flash(error, "error")
+        form_error(error)
     return render_template("events/quick.html", form=form, start_options=QUICK_START_OPTIONS,
                            durations=QUICK_DURATIONS, friends=friends_of(g.user["id"]))
 
@@ -1018,10 +1034,12 @@ def calendar_file(event_id):
     link = public_url("events.detail", event_id=event["id"])
     lines = [
         "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Sportive Circle UW//EN", "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
         *ICS_TIMEZONE,
         "BEGIN:VEVENT",
         f"UID:event-{event['id']}@sportivecircle",
         f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
+        f"SEQUENCE:{event['revision']}",  # calendar apps replace their copy when this goes up
         f"DTSTART;TZID=America/Los_Angeles:{ics_time(event['starts_at'])}",
         f"DTEND;TZID=America/Los_Angeles:{ics_time(event['ends_at'])}",
         f"SUMMARY:{ics_text(event_title(event))}",

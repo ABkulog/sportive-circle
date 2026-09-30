@@ -1,3 +1,4 @@
+import os
 import re
 from datetime import timedelta
 from io import BytesIO
@@ -5063,6 +5064,10 @@ def test_daily_database_backup(accounts, app, tmp_path, monkeypatch):
         assert len(kept) == backups.KEEP and kept[-1] == first.rsplit("/", 1)[1]
         (tmp_path / "backups" / f"sportive-{now_local():%Y-%m-%d}.db.lock").write_bytes(b"")
         assert backups.make_backup(force=True) is None                   # the other copy of the site is on it
+        lock = tmp_path / "backups" / f"sportive-{now_local():%Y-%m-%d}.db.lock"
+        old = lock.stat().st_mtime - backups.STALE_LOCK_SECONDS - 60
+        os.utime(lock, (old, old))                                       # left by a crash long ago
+        assert backups.make_backup(force=True) and not lock.exists()     # cleared, and the backup is made
 
 
 def test_update_texts_fit_in_one_plain_text():
@@ -5112,3 +5117,20 @@ def test_names_from_everywhere(accounts, client, app):
         get_db().commit()
         from sportive.social import friends_of
         assert [f["full_name"] for f in friends_of(ids["Searcher"])] == ["adam lowercase", "José Núñez"]
+
+
+def test_calendar_file_updates_and_form_errors_open_the_right_step(accounts, client, app):
+    accounts.signup()
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    assert "SEQUENCE:0" in client.get(f"/events/{game}/calendar.ics").data.decode()
+    client.post(f"/events/{game}/edit", data=event_form(title="Hoops at 7"))
+    assert "SEQUENCE:1" in client.get(f"/events/{game}/calendar.ics").data.decode()   # apps update their copy
+    client.post(f"/events/{game}/cancel")
+    ics = client.get(f"/events/{game}/calendar.ics").data.decode()
+    assert "SEQUENCE:2" in ics and "STATUS:CANCELLED" in ics
+    # A mistake on a later step: the form opens on that field instead of step 1.
+    page = client.post("/events/new", data=event_form(players="1")).data.decode()
+    assert 'data-error-field="players"' in page
+    page = client.post("/need-players", data={"sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
+                                              "starts_in": "15", "duration": "60", "players": "5000"}).data.decode()
+    assert 'data-error-field="players"' in page

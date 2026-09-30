@@ -197,7 +197,7 @@ def suspend(user_id, action):
         db.execute("UPDATE users SET suspended = 1 WHERE id = ?", (user_id,))
         hosted = query_events(["e.host_id = :host", "e.cancelled = 0", "e.ends_at >= :now"],
                               {"host": user_id, "now": now})
-        db.execute("UPDATE events SET cancelled = 1 WHERE host_id = ? AND cancelled = 0 AND ends_at >= ?",
+        db.execute("UPDATE events SET cancelled = 1, revision = revision + 1 WHERE host_id = ? AND cancelled = 0 AND ends_at >= ?",
                    (user_id, now))
         # Free the spots they held in other people's upcoming games.
         db.execute("""DELETE FROM rsvps WHERE user_id = ? AND event_id IN
