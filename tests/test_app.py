@@ -4634,7 +4634,7 @@ def test_events_can_have_no_limit_or_up_to_1000(accounts, client, app):
 
 
 def test_anyone_can_join_a_no_limit_event(accounts, client, app):
-    ids = _people(accounts, app, "Maya", "Sam", "Jordan")
+    _people(accounts, app, "Maya", "Sam", "Jordan")
     _as(accounts, "Maya")
     game = event_id_from(client.post("/events/new", data=event_form(title="Hall run", no_limit="1", players="")))
     for name in ("Sam", "Jordan"):
