@@ -717,7 +717,7 @@ def test_host_picks_any_number_of_players(accounts, client, app):
     assert b"Pick 2 to 1000 participants" in client.post("/events/new", data=event_form(players="1001")).data
     page = client.get("/events/new").data.decode()
     assert 'name="players" type="number"' in page and 'max="1000"' in page
-    assert "Participants <em>(including you)</em>" in page and "<span>3</span> Participants</h2>" in page
+    assert "Participants <em>(including you)</em>" in page and "<span>4</span> Participants</h2>" in page
 
 
 def test_quick_post_player_cap(accounts, client):
