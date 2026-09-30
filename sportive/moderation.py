@@ -147,7 +147,7 @@ def admin_reports():
     if status not in ("open", "reviewed", "dismissed", "suspended"):
         status = "open"
     db = get_db()
-    suspended = db.execute("SELECT id, full_name, email FROM users WHERE suspended = 1 ORDER BY full_name").fetchall()
+    suspended = db.execute("SELECT id, full_name, email FROM users WHERE suspended = 1 ORDER BY fold(full_name)").fetchall()
     reports = db.execute(
         """SELECT r.*, reporter.full_name AS reporter_name, reported.full_name AS reported_name,
                   reported.email AS reported_email, reported.suspended AS reported_suspended

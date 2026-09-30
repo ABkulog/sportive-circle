@@ -5090,3 +5090,25 @@ def test_home_screen_app_setup(accounts, client):
     assert "data-install-button" in home
     accounts.logout()
     assert "data-install-tip" in client.get("/").data.decode()          # the landing page (QR code) too
+
+
+def test_names_from_everywhere(accounts, client, app):
+    """Joined emoji stay one picture, "Jose" finds "José", and A-Z lists ignore capitals and accents."""
+    from sportive.textutil import initial, person_name
+    assert person_name("👩🏽\u200d🦱 Curly") == "👩🏽\u200d🦱 Curly" and person_name("Ma\u202eya") == "Maya"
+    assert initial("👩🏽\u200d🦱 Curly") == "👩🏽\u200d🦱" and initial(" zoë") == "Z"
+    ids = _people(accounts, app, "Searcher")
+    accounts.signup(email="jnunez@uw.edu", name="José Núñez")
+    accounts.logout()
+    accounts.signup(email="adam@uw.edu", name="adam lowercase")
+    accounts.logout()
+    _as(accounts, "Searcher")
+    assert "José Núñez" in client.get("/friends?q=jose nunez").data.decode()
+    with app.app_context():
+        for other in ("jnunez@uw.edu", "adam@uw.edu"):
+            get_db().execute("INSERT INTO friendships (requester_id, addressee_id, status, created_at) VALUES "
+                             "(?, (SELECT id FROM users WHERE email = ?), 'accepted', '2026-09-01 10:00')",
+                             (ids["Searcher"], other))
+        get_db().commit()
+        from sportive.social import friends_of
+        assert [f["full_name"] for f in friends_of(ids["Searcher"])] == ["adam lowercase", "José Núñez"]

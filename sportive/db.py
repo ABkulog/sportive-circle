@@ -2,6 +2,8 @@ import sqlite3
 
 from flask import current_app, g
 
+from .textutil import fold
+
 # How long a request waits for another one's write to finish before giving up ("database is locked").
 BUSY_TIMEOUT_SECONDS = 15
 
@@ -12,6 +14,7 @@ def get_db():
         g.db = sqlite3.connect(current_app.config["DATABASE"], timeout=BUSY_TIMEOUT_SECONDS)
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA foreign_keys = ON")
+        g.db.create_function("fold", 1, fold, deterministic=True)  # accent-free, for name search and A-Z
         # WAL: readers never block the writer (and the other way round), so the feed keeps loading while
         # someone joins a game or the reminder loop writes. The setting is saved in the database file.
         g.db.execute("PRAGMA journal_mode = WAL")

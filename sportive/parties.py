@@ -37,7 +37,7 @@ def invitable_friends(event_id, me):
                                                       OR (b.blocker_id = u.id AND b.blocked_id = :me))
              AND u.id NOT IN (SELECT user_id FROM rsvps WHERE event_id = :event)
              AND u.id NOT IN (SELECT guest_id FROM invites WHERE event_id = :event AND status IN ('pending', 'requested'))
-           ORDER BY u.full_name""", {"me": me, "event": event_id}).fetchall()
+           ORDER BY fold(u.full_name)""", {"me": me, "event": event_id}).fetchall()
 
 
 def party_plan(event):

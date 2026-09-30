@@ -7,7 +7,7 @@ from datetime import timedelta
 from flask import Flask, render_template, request
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from . import (auth, backups, clubs, db, events, feedback, mail, moderation, notifications, pages, parties, placecheck, profile,
+from . import (auth, backups, textutil, clubs, db, events, feedback, mail, moderation, notifications, pages, parties, placecheck, profile,
                phones, reminders, settings, sms, social, stats)
 from .constants import (SPORT_SPACE, DEFAULT_PLAYERS, LOCATIONS, OPEN_TO, OPEN_TO_BADGE, OPEN_TO_LABELS, PLACE_TIPS, SKILL_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS,
                         MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
@@ -163,7 +163,8 @@ def _add_template_helpers(app):
         pretty_phone=sms.pretty_phone, masked_phone=sms.masked_phone, SMS_CONSENT=sms.CONSENT,
         PHONE_COUNTRIES=phones.COUNTRIES, split_phone=phones.split_phone, phone_for_admins=phones.pretty_phone,
     )
-    app.jinja_env.filters.update(when=fmt_when, clock=fmt_clock, relative=fmt_relative, ago=fmt_ago, full=fmt_full)
+    app.jinja_env.filters.update(when=fmt_when, clock=fmt_clock, relative=fmt_relative, ago=fmt_ago, full=fmt_full,
+                                 initial=textutil.initial)
 
 
 def _version_static_files(app):

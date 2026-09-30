@@ -730,7 +730,7 @@ def officers(club_id):
         return redirect(url_for("clubs.officers", club_id=club_id))
     current = db.execute(
         """SELECT u.id, u.full_name, u.avatar_updated, u.email FROM club_members m JOIN users u ON u.id = m.user_id
-           WHERE m.club_id = ? AND m.role = 'officer' ORDER BY u.id = ? DESC, u.full_name""",
+           WHERE m.club_id = ? AND m.role = 'officer' ORDER BY u.id = ? DESC, fold(u.full_name)""",
         (club_id, club["created_by"] or 0)).fetchall()
     q = one_line(request.args.get("q", ""))[:60]
     officer_ids = {o["id"] for o in current}

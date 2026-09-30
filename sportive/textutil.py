@@ -12,11 +12,38 @@ def one_line(text):
     return " ".join((text or "").split())
 
 
+ZWJ = "\u200d"  # joins emoji into one picture (👩🏽‍🦱): kept, it can't disguise a name
+
+
 def person_name(text):
     """A name as it should be shown: one line, without invisible characters (zero-width spaces, and
     right-to-left overrides that can make "Maya" display as someone else's name)."""
-    visible = "".join(ch for ch in (text or "") if unicodedata.category(ch) not in ("Cf", "Cc"))
+    visible = "".join(ch for ch in (text or "") if ch == ZWJ or unicodedata.category(ch) not in ("Cf", "Cc"))
     return one_line(visible)
+
+
+def initial(name):
+    """The first letter for an avatar circle, uppercase. An emoji keeps its skin tone and joined parts
+    (a code point alone can be half a character)."""
+    name = (name or "").strip()
+    if not name:
+        return ""
+    end = 1
+    while end < len(name):
+        ch = name[end]
+        joined = name[end - 1] == ZWJ
+        if ch == ZWJ or joined or unicodedata.category(ch) in ("Mn", "Me") or "\U0001F3FB" <= ch <= "\U0001F3FF" \
+                or ch == "\ufe0f":
+            end += 1
+        else:
+            break
+    return name[:end].upper()
+
+
+def fold(text):
+    """For matching and sorting: lowercase without accents, so "Jose" finds "José" and "adam" sorts with "Adam"."""
+    decomposed = unicodedata.normalize("NFKD", text or "")
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).casefold()
 
 
 def has_a_letter(text):

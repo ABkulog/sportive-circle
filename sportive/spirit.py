@@ -20,6 +20,6 @@ def top_dawgs(limit=TOP_DAWGS, now=None):
         """SELECT u.id, u.full_name, u.avatar_updated, COUNT(*) AS games
            FROM rsvps r JOIN events e ON e.id = r.event_id JOIN users u ON u.id = r.user_id
            WHERE e.cancelled = 0 AND e.starts_at >= ? AND e.ends_at < ? AND u.verified = 1 AND u.suspended = 0
-           GROUP BY u.id ORDER BY games DESC, u.full_name LIMIT ?""",
+           GROUP BY u.id ORDER BY games DESC, fold(u.full_name) LIMIT ?""",
         (to_db(month_start), to_db(now), limit),
     ).fetchall()

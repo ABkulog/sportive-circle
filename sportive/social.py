@@ -16,7 +16,7 @@ from flask import (Blueprint, abort, current_app, flash, g, jsonify, redirect, r
 from .auth import login_required, safe_next
 from .constants import SPORT_EMOJI
 from .db import get_db
-from .textutil import multi_line, one_line
+from .textutil import fold, initial, multi_line, one_line
 from .timeutil import fmt_clock, fmt_when, now_local, to_db
 
 bp = Blueprint("social", __name__)
@@ -66,7 +66,7 @@ def friends_of(user_id):
         """SELECT u.id, u.full_name, u.avatar_updated FROM friendships f
            JOIN users u ON u.id = CASE WHEN f.requester_id = :me THEN f.addressee_id ELSE f.requester_id END
            WHERE (f.requester_id = :me OR f.addressee_id = :me) AND f.status = 'accepted' AND u.suspended = 0
-           ORDER BY u.full_name""", {"me": user_id}).fetchall()
+           ORDER BY fold(u.full_name)""", {"me": user_id}).fetchall()
 
 
 def shared_an_event(a, b):
@@ -185,7 +185,7 @@ def message_json(row, me, kind):
         "name": row["full_name"],
         "avatar": (url_for("profile.photo", user_id=row["sender_id"], v=row["avatar_updated"])
                    if row["avatar_updated"] else None),
-        "initial": row["full_name"][:1].upper(),
+        "initial": initial(row["full_name"]),
         "body": row["body"],
         "time": fmt_clock(row["created_at"]),
         "profile": url_for("profile.view", user_id=row["sender_id"]),
@@ -220,7 +220,7 @@ def friends():
         """SELECT u.id, u.full_name, u.avatar_updated FROM friendships f
            JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
            WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted'
-           ORDER BY u.full_name""", (me, me, me)).fetchall()
+           ORDER BY fold(u.full_name)""", (me, me, me)).fetchall()
     q = request.args.get("q", "").strip()[:MAX_SEARCH_LENGTH]
     suggestions = friend_suggestions(me)
     return render_template("social/friends.html", incoming=incoming, outgoing=outgoing,
@@ -264,7 +264,7 @@ def friend_suggestions(me):
                  AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = :me)
                GROUP BY u.id) s
            LEFT JOIN users v ON v.id = s.via_id
-           ORDER BY s.mutual + s.games DESC, s.mutual DESC, s.full_name
+           ORDER BY s.mutual + s.games DESC, s.mutual DESC, fold(s.full_name)
            LIMIT :limit""",
         {"me": me, "now": to_db(now_local()), "limit": MAX_SUGGESTIONS}).fetchall()
 
@@ -295,11 +295,11 @@ def search_people(me, q):
     """
     if len(q) < MIN_SEARCH_LENGTH:
         return []
-    words = q.lower().split()[:3]
+    words = fold(q).split()[:3]
     params = {"me": me, "starts": words[0] + "%", "limit": MAX_SEARCH_RESULTS}
     for n, word in enumerate(words):
         params[f"w{n}"] = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-    name_match = " AND ".join(f"LOWER(u.full_name) LIKE :w{n} ESCAPE '\\'" for n in range(len(words)))
+    name_match = " AND ".join(f"fold(u.full_name) LIKE :w{n} ESCAPE '\\'" for n in range(len(words)))
     netid_match = "0"
     if len(words) == 1:
         netid = words[0].split("@")[0]
@@ -321,7 +321,7 @@ def search_people(me, q):
             WHERE u.verified = 1 AND u.suspended = 0 AND u.id != :me AND (({name_match}) OR {netid_match})
               AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = :me)
               AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = :me)
-            ORDER BY by_netid DESC, played DESC, mutual DESC, LOWER(u.full_name) LIKE :starts DESC, u.full_name
+            ORDER BY by_netid DESC, played DESC, mutual DESC, fold(u.full_name) LIKE :starts DESC, fold(u.full_name)
             LIMIT :limit""", params).fetchall()
     return [{**dict(row), "status": friendship_status(me, row["id"])} for row in rows]
 
