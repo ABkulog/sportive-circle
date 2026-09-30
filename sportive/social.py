@@ -102,6 +102,8 @@ def they_messaged_me(me, other):
 def can_message(me, other):
     if me == other or is_blocked_between(me, other):
         return False
+    if get_db().execute("SELECT suspended FROM users WHERE id = ?", (other,)).fetchone()["suspended"]:
+        return False  # suspended accounts are hidden everywhere; an old chat link doesn't reach them either
     return (friendship_status(me, other) == "friends" or shared_an_event(me, other)
             or is_club_officer(other) or officer_of_their_club(me, other) or they_messaged_me(me, other))
 
@@ -428,6 +430,8 @@ def inbox():
                           WHERE sender_id = :me OR recipient_id = :me
                           GROUP BY CASE WHEN sender_id = :me THEN recipient_id ELSE sender_id END)
              AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = :me)
+             AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = :me)
+             AND u.suspended = 0
            ORDER BY m.id DESC""", {"me": me}).fetchall()
     # Friends I haven't messaged yet show too ("Start a chat"), so every friend is one tap away.
     talked = {c["id"] for c in conversations}

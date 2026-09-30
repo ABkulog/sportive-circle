@@ -160,7 +160,9 @@ def _count(kind, me):
     if kind == "messages":
         return db.execute(
             """SELECT COUNT(*) FROM direct_messages WHERE recipient_id = ? AND read_at IS NULL
-               AND sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)""", (me, me)).fetchone()[0]
+               AND sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
+               AND sender_id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = ?)
+               AND sender_id NOT IN (SELECT id FROM users WHERE suspended = 1)""", (me, me, me)).fetchone()[0]
     if kind == "friend_requests":
         return db.execute("SELECT COUNT(*) FROM friendships WHERE addressee_id = ? AND status = 'pending'",
                           (me,)).fetchone()[0]

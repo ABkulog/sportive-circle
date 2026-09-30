@@ -4922,3 +4922,25 @@ def test_invite_link_to_a_full_game_says_so(accounts, client, app):
         assert db.execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (game,)).fetchone()[0] == 2   # not overbooked
         assert db.execute("SELECT status FROM friendships WHERE requester_id = (SELECT id FROM users WHERE"
                           " email = 'maya@uw.edu')").fetchall()                                          # still friends
+
+
+def test_being_blocked_or_suspended_clears_their_messages_from_my_inbox(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan", "Sam")
+    _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])
+    _as(accounts, "Jordan")
+    client.post(f"/messages/{ids['Maya']}", data={"body": "hey"})
+    client.post(f"/block/{ids['Maya']}")                              # Jordan blocks Maya after writing
+    _as(accounts, "Sam")
+    client.post(f"/messages/{ids['Maya']}", data={"body": "yo"})
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 1 WHERE id = ?", (ids["Sam"],))
+        get_db().commit()
+    _as(accounts, "Maya")
+    inbox = client.get("/messages").data.decode()
+    assert "Jordan Husky" not in inbox and "Sam Husky" not in inbox
+    from sportive.notifications import _count
+    with app.app_context():
+        assert _count("messages", ids["Maya"]) == 0
+    client.post(f"/messages/{ids['Sam']}", data={"body": "still there?"})
+    with app.app_context():
+        assert not get_db().execute("SELECT 1 FROM direct_messages WHERE recipient_id = ?", (ids["Sam"],)).fetchone()
