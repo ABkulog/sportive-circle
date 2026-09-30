@@ -1022,3 +1022,15 @@ button.link-button { min-height: 36px; }
   .edit-photo { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; margin: 0 0 6px; }
   .edit-photo .avatar-img { --size: 52px !important; }
 }
+/* Phones: sport chips a little tighter so the sports screen fits (still easy to tap) */
+@media (max-width: 480px) {
+  .chip-grid { gap: 6px; }
+  .chip-check span { padding: 6px 11px; }
+}
+.socials-fold summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 4px; font-weight: 600; }
+.socials-fold summary em { font-weight: 400; color: var(--muted); font-style: normal; font-size: .9rem; }
+.socials-fold[open] summary { margin-bottom: 8px; }
+.socials-fold summary { list-style: none; color: var(--purple); }
+.socials-fold summary::-webkit-details-marker { display: none; }
+.socials-fold summary::before { content: "+"; font-weight: 700; margin-right: 2px; }
+.socials-fold[open] summary::before { content: "−"; }

@@ -9,8 +9,10 @@
   <p class="muted">Sports: pick any. Your feed shows these first.</p>
   <form method="post" class="form">
     {{ csrf_field() }}
-    <fieldset class="field">
-      <legend>Your socials <em>(optional, shown under your bio)</em></legend>
+    {# Folded unless some are filled in, so the whole screen fits a phone. #}
+    {% set filled = namespace(any=false) %}{% for key in socials %}{% if form.get(key) %}{% set filled.any = true %}{% endif %}{% endfor %}
+    <details class="socials-fold" {% if filled.any %}open{% endif %}>
+      <summary>Your socials <em>(optional, shown under your bio)</em></summary>
       <div class="row row-pair">
         {% for key, label in socials.items() %}
           <input name="{{ key }}" maxlength="{{ 150 if key == 'linkedin' else 40 }}" value="{{ form.get(key) or '' }}"
@@ -18,9 +20,11 @@
                  aria-label="{{ label }} username" autocapitalize="off" spellcheck="false">
         {% endfor %}
       </div>
-    </fieldset>
+    </details>
     {{ sport_checkboxes(form, legend=False) }}
     <button class="btn btn-block">Save</button>
   </form>
 </div>
 {% endblock %}
+
+{% block body_class %}hide-tabs{% endblock %}{# a form: its own Back link, and the whole step fits the phone #}
