@@ -7,6 +7,16 @@
   const empty = document.getElementById("chat-empty");
   let lastId = parseInt(box.dataset.lastId, 10) || 0;
 
+  // Phones: the chat fills the screen below the header, and shrinks when the keyboard opens.
+  const fit = () => {
+    if (window.innerWidth > 700) { box.style.height = ""; return; }
+    const visible = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const top = box.getBoundingClientRect().top + window.scrollY;
+    box.style.height = Math.max(320, visible - top + window.scrollY - 8) + "px";
+  };
+  fit();
+  window.addEventListener("resize", fit);
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", () => { fit(); scrollDown(); });
   const scrollDown = () => { list.scrollTop = list.scrollHeight; };
   const nearBottom = () => list.scrollHeight - list.scrollTop - list.clientHeight < 200;
   scrollDown();

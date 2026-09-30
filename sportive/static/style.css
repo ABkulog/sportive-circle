@@ -1116,3 +1116,12 @@ button.link-button { min-height: 36px; }
 @media (min-width: 900px) { .chat-messages { height: min(62vh, 620px); } }
 .chat-msg.is-grouped .chat-bubble .chat-meta time { display: none; }  /* the time shows once, on the group's last */
 .scope-hint { margin: -4px 0 10px; font-size: .85rem; }
+/* Phones: the chat goes edge to edge and down to the bottom of the screen (chat.js sets its height) */
+@media (max-width: 700px) {
+  .chat { margin: 0 -16px; border-radius: 0; border-left: 0; border-right: 0; display: flex; flex-direction: column; }
+  .chat .chat-messages { flex: 1; height: auto; min-height: 0; }
+  .chat.is-empty .chat-empty { flex: 1; align-content: center; }
+}
+@media (min-width: 701px) { .chat-messages { height: min(70vh, 720px); } }
+body:has(.chat[data-poll-url]) .site-footer { display: none; }  /* chats fill the screen: no footer underneath */
+body.hide-tabs.has-help main.page { padding-bottom: 16px; }  /* the Help? bubble is hidden here, so no room for it */
