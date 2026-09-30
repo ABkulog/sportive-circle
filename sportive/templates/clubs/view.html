@@ -108,7 +108,7 @@
         <li><small>Practices / events</small><strong>{{ club.meets or 'Ask the club' }}</strong></li>
         <li><small>Where</small><strong>{{ club.location or 'Ask the club' }}</strong></li>
         <li><small>Who can join</small><strong>{{ who[club.who_can_join] }}</strong></li>
-        {% if club.gear %}<li><small>Gear</small><strong>{{ club.gear }}</strong></li>{% endif %}
+        {% if club.gear %}<li><small>What to bring</small><strong>{{ club.gear }}</strong></li>{% endif %}
         <li><small>Competes</small><strong>{{ 'Vs. other schools' if club.competes else 'No' }}</strong></li>
       </ul>
     {% endif %}

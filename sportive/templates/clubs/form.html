@@ -44,8 +44,8 @@
     <section class="wizard-step" data-step="3">
     <h2 class="form-step"><span>3</span> Practices / events & costs</h2>
     <div class="row row-pair">
-      <label class="field"><span>When you practice / have events</span>
-        <input name="meets" maxlength="120" value="{{ form.get('meets', '') }}" placeholder="Tue & Thu 7-9 PM, or monthly events" required></label>
+      <label class="field"><span>Practices / events</span>
+        <input name="meets" maxlength="120" value="{{ form.get('meets', '') }}" placeholder="Tue & Thu 7 PM" required></label>
       <label class="field"><span>Where</span>
         <input name="location" maxlength="120" value="{{ form.get('location', '') }}" list="places" placeholder="Denny Field" required></label>
       <datalist id="places">{% for place in locations %}<option value="{{ place }}">{% endfor %}</datalist>
@@ -53,15 +53,15 @@
     <div class="row row-pair">
       <label class="field"><span>Dues <em>(type Free if none)</em></span>
         <input name="dues" maxlength="60" value="{{ form.get('dues', '') }}" placeholder="$40/quarter or Free" required></label>
-      <label class="field"><span>Gear</span>
-        <input name="gear" maxlength="120" value="{{ form.get('gear', '') }}" placeholder="Cleats; discs provided (or None needed)" required></label>
+      <label class="field"><span>What to bring</span>
+        <input name="gear" maxlength="120" value="{{ form.get('gear', '') }}" placeholder="Cleats, water" required></label>
     </div>
     <label class="field"><span>How to join: first steps for new members</span>
       <textarea name="how_to_join" rows="2" maxlength="500" required
                 placeholder="Sign the club waiver, then come to any Tuesday practice!">{{ form.get('how_to_join', '') }}</textarea></label>
     <label class="field"><span>A question for people who want to join</span>
       <input name="join_question" maxlength="150" value="{{ form.get('join_question', '') }}"
-             placeholder="What position do you play, and how long have you played?" required>
+             placeholder="How long have you played?" required>
       <small class="muted">You'll see their answers in your requests.</small></label>
     <label class="toggle"><input type="checkbox" name="competes" value="1" {% if form.get('competes') %}checked{% endif %}>
       <span>We compete against other schools</span></label>

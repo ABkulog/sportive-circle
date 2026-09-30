@@ -185,7 +185,7 @@ def read_club_form(form, club_id=None, phone_on_file=""):
     required = {
         "join_question": "a question for people who want to join",
         "meets": "when you practice or have events", "location": "where you meet",
-        "dues": "your dues (type Free if there are none)", "gear": "what gear people need (or None needed)",
+        "dues": "your dues (type Free if there are none)", "gear": "what to bring (or Nothing)",
         "how_to_join": "how new members get started",
         "club_email": "a club email (so students and our team can reach you)",
     }
@@ -195,7 +195,7 @@ def read_club_form(form, club_id=None, phone_on_file=""):
     if len(data["join_question"]) > 150:
         return problem("join_question", "Keep your question for new members under 150 characters.")
     for key, limit, label in (("meets", 120, "When you practice / have events"), ("location", 120, "Where"), ("dues", 60, "Dues"),
-                              ("gear", 120, "Gear"), ("how_to_join", 500, "How to join")):
+                              ("gear", 120, "What to bring"), ("how_to_join", 500, "How to join")):
         if len(data[key]) > limit:
             return problem(key, f"Keep '{label}' under {limit} characters.")
     if not re.fullmatch(r"[^@\s]{1,64}@[^@\s]{1,120}\.[a-z]{2,}", data["club_email"], re.I):
