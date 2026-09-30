@@ -13,6 +13,7 @@
     <button type="button" class="btn" data-share-title="{{ club.name }}" data-share-url="{{ link }}"
             data-share-text="Join {{ club.name }} on Sportive Circle"><span data-share-label>Share link</span></button>
     <button type="button" class="btn btn-ghost" data-print>Print</button>
+    <a class="btn btn-ghost" href="{{ url_for('flyer', club=club.id) }}">Flyer</a>
   </div>
   <p class="muted fine-print no-print">Put it on your flyer, or show it on a laptop at the involvement fair.</p>
 </div>

@@ -1,5 +1,7 @@
 """Simple pages: How it works, FAQ, Privacy, Terms, the Create menu, and icons browsers ask for."""
-from flask import Response, current_app, g, redirect, render_template, url_for
+import io
+
+from flask import Response, current_app, g, redirect, render_template, request, url_for
 
 from .auth import login_required
 from .clubs import officer_clubs
@@ -61,7 +63,39 @@ def sitemap():
                     mimetype="application/xml")
 
 
+VERBS = {"running": "Run", "hiking": "Hike", "biking": "Ride", "climbing": "Climb", "rowing": "Row"}
+
+
+def _flyer_target():
+    """(club or None, the link the QR opens): ?club=<id> for a verified club's flyer, else the site."""
+    from .links import public_url
+    club_id = request.args.get("club", type=int)
+    club = get_db().execute("SELECT id, name, sport FROM clubs WHERE id = ? AND status = 'approved'",
+                            (club_id,)).fetchone() if club_id else None
+    return club, public_url("clubs.view", club_id=club["id"]) if club else public_url("index")
+
+
+def flyer():
+    """A one-page printable flyer: headline, three steps and a big QR code (for a club, or the whole app)."""
+    club, link = _flyer_target()
+    headline = f"{VERBS.get(club['sport'], 'Play')} with {club['name']}" if club else "Find people to play with"
+    return render_template("pages/flyer.html", club=club, link=link, headline=headline,
+                           qr=url_for("flyer_qr", club=club["id"] if club else None))
+
+
+def flyer_qr():
+    import segno  # only needed here
+    code = segno.make(_flyer_target()[1], error="m")
+    output = io.BytesIO()
+    code.save(output, kind="svg", scale=10, dark="#4b2e83", light="#ffffff", border=2, xmldecl=False)
+    response = Response(output.getvalue(), mimetype="image/svg+xml")
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return response
+
+
 def register(app):
+    app.add_url_rule("/flyer", "flyer", flyer)
+    app.add_url_rule("/flyer/qr.svg", "flyer_qr", flyer_qr)
     app.add_url_rule("/how-it-works", "how_it_works", how_it_works)
     app.add_url_rule("/faq", "faq", faq)
     app.add_url_rule("/privacy", "privacy", privacy)

@@ -36,6 +36,14 @@
     </label>
     <noscript><button class="btn btn-small">Save</button></noscript>
   </form>
+  <form method="post" action="{{ url_for('settings.weekly') }}">
+    {{ csrf_field() }}
+    <label class="toggle">
+      <input type="checkbox" name="weekly_digest" value="1" {% if g.user.weekly_digest %}checked{% endif %} data-autosubmit>
+      <span>Monday email: games this week</span>
+    </label>
+    <noscript><button class="btn btn-small">Save</button></noscript>
+  </form>
 </section>
 
 <section class="settings-group">

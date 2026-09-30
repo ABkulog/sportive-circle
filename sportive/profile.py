@@ -52,7 +52,7 @@ def clean_social(key, value):
 
 # Pages you can still open before adding a profile picture.
 ALLOWED_WITHOUT_PHOTO = {"auth.signup_number", "profile.photo_upload", "profile.photo_skip", "profile.photo", "profile.delete_account",
-                         "auth.logout", "how_it_works", "faq", "robots", "sitemap", "parties.open_invite_link", "privacy", "terms", "static", "favicon", "touch_icon",
+                         "auth.logout", "how_it_works", "faq", "robots", "sitemap", "parties.open_invite_link", "privacy", "terms", "flyer", "flyer_qr", "static", "favicon", "touch_icon",
                          "touch_icon_precomposed"}
 
 

@@ -51,6 +51,18 @@ def reminders():
     return redirect(url_for("settings.home"))
 
 
+@bp.route("/settings/weekly", methods=("POST",))
+@login_required
+def weekly():
+    """The Monday "Games this week" email (on unless you switch it off)."""
+    on = 1 if request.form.get("weekly_digest") else 0
+    db = get_db()
+    db.execute("UPDATE users SET weekly_digest = ? WHERE id = ?", (on, g.user["id"]))
+    db.commit()
+    flash("The Monday email is on." if on else "The Monday email is off.", "success")
+    return redirect(url_for("settings.home"))
+
+
 @bp.route("/settings/texts", methods=("GET", "POST"))
 @login_required
 def texts():

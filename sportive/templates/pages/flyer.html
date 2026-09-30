@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Flyer{% endblock %}
+{% block content %}
+<p class="no-print muted flyer-tip">Print it (Letter, portrait) or show it on a laptop. <button type="button" class="btn btn-small" data-print>Print</button></p>
+<article class="flyer">
+  <img src="{{ url_for('static', filename='icon-512.png') }}" alt="" width="96" height="96" class="flyer-icon">
+  <h1>{{ headline }}</h1>
+  <p class="flyer-sub">{% if club %}Our {{ SPORTS[club.sport]|lower }} on Sportive Circle, for UW students.{% else %}Pickup games, runs and UW clubs. For Huskies, by Huskies.{% endif %}</p>
+  <img src="{{ qr }}" alt="QR code to {{ link }}" class="flyer-qr" width="300" height="300">
+  <ol class="flyer-steps">
+    <li><span>1</span>Scan the code</li>
+    <li><span>2</span>Sign up with your UW email</li>
+    <li><span>3</span>{{ 'Tap Going on the next run' if club and club.sport == 'running' else ('Join the next one' if club else 'Join a game, or post your own') }}</li>
+  </ol>
+  <p class="flyer-link">{{ link.replace('https://', '') }}</p>
+</article>
+{% endblock %}

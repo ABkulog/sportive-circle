@@ -5418,3 +5418,43 @@ def test_uw_rec_copy_refuses_what_it_cant_read_and_sudden_drops(app, monkeypatch
         feed["items"] = [booking("Only one")]
         assert uwrec.sync() == 0 and uwrec.last_report()["status"] == "kept"   # 1 vs 31: probably a broken page
         assert get_db().execute("SELECT COUNT(*) FROM rec_reservations WHERE source = 'feed'").fetchone()[0] == 31
+
+
+def test_monday_email_games_this_week(accounts, client, app, monkeypatch):
+    """Everyone gets a Monday email of open games in their sports (and what they're going to), unless it's off.
+    Nothing to show: no email. It goes out once a week, even with two copies of the site."""
+    from datetime import datetime
+    from sportive import digest
+    sent = []
+    monkeypatch.setattr(digest, "send_email", lambda to, subject, body, html=None: sent.append((to, body)))
+    ids = _people(accounts, app, "Host", "Hooper", "Runner", "Quiet")
+    with app.app_context():
+        db = get_db()
+        db.execute("DELETE FROM user_sports")
+        db.executemany("INSERT INTO user_sports (user_id, sport) VALUES (?, ?)",
+                       [(ids["Hooper"], "basketball"), (ids["Runner"], "running")])
+        db.execute("UPDATE users SET weekly_digest = 0 WHERE id = ?", (ids["Quiet"],))
+        db.commit()
+    _as(accounts, "Host")
+    client.post("/events/new", data=event_form(title="Tuesday hoops"))
+    with app.test_request_context():
+        assert digest.send_weekly() == 2                                 # Hooper (a game) + Host (going)
+    by = dict(sent)
+    assert "Tuesday hoops" in by["hooper@uw.edu"] and "Open games you could join" in by["hooper@uw.edu"]
+    assert "You're going to" in by["host@uw.edu"]
+    assert "runner@uw.edu" not in by and "quiet@uw.edu" not in by       # nothing in running; switched off
+    # Once a week: the claim stops a second send, and it only starts Monday from 9 AM.
+    starts = []
+    monkeypatch.setattr(digest.threading, "Thread", lambda target, args, name, daemon: type(
+        "T", (), {"start": lambda self: starts.append(name)})())
+    monday = datetime(2026, 10, 5, 9, 30)
+    monkeypatch.setattr(digest, "now_local", lambda: monday)
+    digest.weekly_round(app); digest.weekly_round(app)
+    assert starts == ["weekly-email"]
+    monkeypatch.setattr(digest, "now_local", lambda: datetime(2026, 10, 6, 9, 30))   # Tuesday
+    digest.weekly_round(app)
+    assert starts == ["weekly-email"]
+    _as(accounts, "Hooper")
+    client.post("/settings/weekly", data={})                            # switch it off
+    with app.app_context():
+        assert get_db().execute("SELECT weekly_digest FROM users WHERE id = ?", (ids["Hooper"],)).fetchone()[0] == 0
