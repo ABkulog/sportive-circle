@@ -6084,3 +6084,39 @@ def test_seed_refuses_the_live_database(tmp_path):
            "SECRET_KEY": "k" * 48}
     result = subprocess.run([sys.executable, "seed.py"], env=env, capture_output=True, text=True)
     assert result.returncode != 0 and "won't add demo accounts" in result.stderr
+
+
+# ---- UW club sports ----
+
+def test_uw_club_sports_can_be_picked(accounts, client, app):
+    """The user: no club wants to be "Other" (e.g. the boxing club)."""
+    from sportive.constants import SPORTS
+    for key in ("boxing", "bjj", "judo", "wrestling", "fencing", "rugby", "lacrosse", "water_polo", "badminton",
+                "squash", "ice_hockey", "sailing", "table_tennis"):
+        assert key in SPORTS
+    club = _approved_club(accounts, client, app, name="UW Boxing Club", sport="boxing")
+    with app.app_context():
+        assert get_db().execute("SELECT sport FROM clubs WHERE id = ?", (club,)).fetchone()[0] == "boxing"
+    accounts.signup(email="fighter@uw.edu", name="Fi Ghter", sports=("boxing",))
+    assert "Boxing" in client.get("/clubs?sport=boxing").data.decode()
+    game = event_id_from(client.post("/events/new", data=event_form(title="Sparring", sport="boxing",
+                                                                     location="IMA (Intramural Activities Building)",
+                                                                     players="8")))
+    assert "Sparring" in client.get(f"/events/{game}").data.decode()
+
+
+def test_other_clubs_move_to_their_sport_by_name(app):
+    from sportive.db import init_db
+    with app.app_context():
+        db = get_db()
+        owner = db.execute("INSERT INTO users (email, full_name, password_hash, created_at, verified) "
+                           "VALUES ('o@uw.edu', 'O W', 'x', '2026-01-01 00:00', 1)").lastrowid
+        for name, sport in (("UW Boxing Club", "other"), ("Husky Disc Golf", "other"), ("Kickboxing Crew", "other"),
+                            ("Chess Club", "other"), ("Spike Boxing", "spikeball")):
+            db.execute("INSERT INTO clubs (name, sport, description, status, created_by, created_at) "
+                       "VALUES (?, ?, 'x', 'approved', ?, '2026-01-01 00:00')", (name, sport, owner))
+        db.commit()
+        init_db()
+        sports = dict(db.execute("SELECT name, sport FROM clubs").fetchall())
+    assert sports == {"UW Boxing Club": "boxing", "Husky Disc Golf": "disc_golf", "Kickboxing Crew": "muay_thai",
+                      "Chess Club": "other", "Spike Boxing": "spikeball"}

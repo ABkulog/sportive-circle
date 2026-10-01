@@ -114,7 +114,34 @@ def init_db():
         existing = {row["name"] for row in db.execute(f"PRAGMA table_info({table})")}
         if column not in existing:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+    sort_other_clubs(db)
     db.commit()
+
+
+# Words in a club's name that mean one of the newer sports. Clubs registered as "Other" before that sport existed
+# move to it (e.g. "UW Boxing Club" -> Boxing). Only "Other" clubs are touched, so an officer's own pick wins.
+CLUB_NAME_SPORTS = [
+    ("kickboxing", "muay_thai"), ("boxing", "boxing"), ("jiu-jitsu", "bjj"), ("jiu jitsu", "bjj"), ("bjj", "bjj"),
+    ("judo", "judo"),
+    ("karate", "karate"), ("kendo", "kendo"), ("muay thai", "muay_thai"),
+    ("taekwondo", "taekwondo"), ("wrestling", "wrestling"), ("fencing", "fencing"), ("archery", "archery"),
+    ("badminton", "badminton"), ("baseball", "baseball"), ("softball", "softball"), ("bowling", "bowling"),
+    ("cricket", "cricket"), ("disc golf", "disc_golf"), ("dodgeball", "dodgeball"), ("equestrian", "equestrian"),
+    ("field hockey", "field_hockey"), ("figure skating", "figure_skating"), ("ice hockey", "ice_hockey"),
+    ("gymnastics", "gymnastics"), ("handball", "handball"), ("lacrosse", "lacrosse"),
+    ("racquetball", "racquetball"), ("rugby", "rugby"), ("sailing", "sailing"), ("skateboard", "skateboarding"),
+    ("squash", "squash"), ("swim", "swimming"), ("table tennis", "table_tennis"), ("ping pong", "table_tennis"),
+    ("triathlon", "triathlon"), ("water polo", "water_polo"), ("powerlifting", "weightlifting"),
+    ("weightlifting", "weightlifting"), ("barbell", "weightlifting"), ("golf", "golf"),
+]
+
+
+def sort_other_clubs(db):
+    """Clubs filed under "Other" whose name says the sport (see CLUB_NAME_SPORTS) move to that sport."""
+    if db.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'clubs'").fetchone() is None:
+        return
+    for word, sport in CLUB_NAME_SPORTS:  # "disc golf" before "golf", "kickboxing" maps like Muay Thai
+        db.execute("UPDATE clubs SET sport = ? WHERE sport = 'other' AND LOWER(name) LIKE ?", (sport, f"%{word}%"))
 
 
 def user_sports(user_id):

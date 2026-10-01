@@ -257,6 +257,12 @@ section.band > .section-title:first-child { margin-top: 0; }
 @media (max-width: 520px) { .topbar .nav .wide-only { display: none; } }  /* must beat ".topbar .nav a" above */
 .nav-cta { background: #b7a57a; color: #32006e !important; padding: 0 14px; border-radius: 6px; }
 .nav-cta:hover { background: #e8e3d3; text-decoration: none; }  /* header stays purple in dark mode */
+/* Logged out on a phone (logo + Log in + Sign up): a little tighter, so Sign up isn't cut off at 375px. */
+@media (max-width: 420px) {
+  .topbar .nav { gap: 10px; }
+  .nav-cta { padding: 0 10px; }
+  .topbar .brand { font-size: 1.15rem; gap: 6px; }
+}
 
 /* ============================== App navigation ==============================
    Phones & tablets: bottom tab bar.  Laptops (>= 1000px): left sidebar. Same sections, same order. */
