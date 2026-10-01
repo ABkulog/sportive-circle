@@ -5986,3 +5986,101 @@ def test_chat_messages_can_be_reached_with_the_keyboard(accounts, client, app):
     _as(accounts, "Ann")
     client.post(f"/messages/{ids['Ben']}", data={"body": "yo"})
     assert 'class="chat-bubble" tabindex="0"' in client.get(f"/messages/{ids['Ben']}").data.decode()
+
+
+# ---- Loop round 3: emails & texts, feed & search, deployment ----
+
+def test_weekly_email_command_runs_outside_a_page(app):
+    result = app.test_cli_runner().invoke(args=["send-weekly"])
+    assert result.exit_code == 0 and "Sent the weekly email" in result.output
+
+
+def test_every_email_links_to_settings(app):
+    from sportive.mail import compose
+    with app.test_request_context():
+        text, html = compose("Hi", "Hi", ["Line"], reason="Because.")
+    assert "/settings" in text and "/settings" in html
+
+
+def test_reset_code_isnt_texted_when_texts_are_off(accounts, client, app):
+    from sportive import sms
+    sent = []
+    sms.send_sms, original = (lambda to, body: sent.append(body)), sms.send_sms
+    try:
+        accounts.signup(email="bob@uw.edu", name="Bob Husky")
+        with app.app_context():
+            get_db().execute("UPDATE users SET phone = '+12065550142', phone_verified = 1, sms_updates = 0")
+            get_db().commit()
+            uid = get_db().execute("SELECT id FROM users").fetchone()[0]
+        with app.test_request_context():
+            assert sms.text_code(uid, "123456", "password reset") is False
+        assert sent == []
+    finally:
+        sms.send_sms = original
+
+
+def test_admin_cancellations_dont_blame_the_host(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    ids = _people(accounts, app, "Hana", "Pat", "Boss")
+    _as(accounts, "Hana")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    _as(accounts, "Pat")
+    client.post(f"/events/{game}/join")
+    _as(accounts, "Boss")
+    client.post(f"/admin/users/{ids['Hana']}/suspend")
+    _as(accounts, "Pat")
+    bell = client.get("/notifications").data.decode()
+    assert "Sportive Circle canceled" in bell and "Hana canceled" not in bell
+
+
+def test_top_dawgs_skips_blocked_people_and_solo_games(accounts, client, app):
+    ids = _people(accounts, app, "Mia", "Bob", "Cal")
+    from sportive.timeutil import now_local, to_db
+    start = now_local().replace(day=1, hour=0, minute=1)
+    with app.app_context():
+        db = get_db()
+        def game(host, *players):
+            cur = db.execute("""INSERT INTO events (host_id, title, sport, location, skill_level, starts_at, ends_at,
+                                created_at) VALUES (?, 'g', 'basketball', 'IMA (Intramural Activities Building)',
+                                'Casual', ?, ?, ?)""", (host, to_db(start), to_db(start + timedelta(minutes=30)), to_db(start)))
+            for p in (host, *players):
+                db.execute("INSERT INTO rsvps (event_id, user_id, created_at) VALUES (?, ?, ?)", (cur.lastrowid, p, to_db(start)))
+        game(ids["Bob"]); game(ids["Bob"]); game(ids["Bob"])         # solo: don't count
+        game(ids["Cal"], ids["Bob"])                                  # real game: counts for both
+        db.commit()
+    if now_local() <= start + timedelta(minutes=30):
+        return  # first half hour of the month: nothing has ended yet
+    _as(accounts, "Mia")
+    from sportive.spirit import top_dawgs
+    with app.test_request_context():
+        board = {r["full_name"].split()[0]: r["games"] for r in top_dawgs(viewer=ids["Mia"])}
+    assert board.get("Bob") == 1 and board.get("Cal") == 1
+    client.post(f"/block/{ids['Bob']}")
+    with app.test_request_context():
+        assert "Bob" not in {r["full_name"].split()[0] for r in top_dawgs(viewer=ids["Mia"])}
+
+
+def test_my_clubs_only_lists_clubs_you_can_open(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="mo@uw.edu", name="Mo Husky")
+    client.post(f"/clubs/{club}/join", data={"message": "hi"})
+    with app.app_context():
+        get_db().execute("UPDATE clubs SET status = 'pending' WHERE id = ?", (club,))
+        get_db().commit()
+    assert f'href="/clubs/{club}"' not in client.get("/clubs?mine=1").data.decode()
+
+
+def test_empty_my_sports_feed_points_to_all_sports(accounts, client, app):
+    accounts.signup(email="mia@uw.edu", name="Mia Husky", sports=("tennis",))
+    page = client.get("/").data.decode()
+    assert "No games for your sports yet" in page and "scope=all" in page
+
+
+def test_seed_refuses_the_live_database(tmp_path):
+    import os
+    import subprocess
+    import sys
+    env = {**os.environ, "RENDER_EXTERNAL_URL": "https://x.onrender.com", "DATABASE": str(tmp_path / "live.db"),
+           "SECRET_KEY": "k" * 48}
+    result = subprocess.run([sys.executable, "seed.py"], env=env, capture_output=True, text=True)
+    assert result.returncode != 0 and "won't add demo accounts" in result.stderr

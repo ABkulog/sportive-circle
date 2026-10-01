@@ -107,6 +107,11 @@
         <p><a href="{{ url_for('events.feed', scope=filters.scope) }}">Clear filters</a> or start one yourself.</p>
       {% elif filters.scope == 'full' %}
         <p><strong>No full games right now.</strong></p>
+      {% elif need_players or up_next %}
+        <p><strong>Nothing else coming up.</strong> The games above are happening soon, or start your own.</p>
+      {% elif filters.scope == 'interests' %}
+        <p><strong>No games for your sports yet.</strong></p>
+        <p><a href="{{ url_for('events.feed', scope='all') }}">See all sports</a> or start one yourself.</p>
       {% else %}
         <p><strong>No games yet.</strong> Start one!</p>
       {% endif %}

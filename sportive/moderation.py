@@ -219,7 +219,7 @@ def suspend(user_id, action):
                       AND event_id IN (SELECT id FROM events WHERE ends_at >= ?)""", (user_id, user_id, now))
         db.commit()
         for event in hosted:
-            tell_players_it_was_cancelled(event)
+            tell_players_it_was_cancelled(event, by_host=False)
         flash(f"{user['full_name']} is suspended. Their upcoming games were canceled and players were told.", "info")
     else:
         db.execute("UPDATE users SET suspended = 0 WHERE id = ?", (user_id,))

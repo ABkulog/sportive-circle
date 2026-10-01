@@ -244,13 +244,14 @@ def text_user(user_id, body, kind="update"):
 def text_code(user_id, code, purpose):
     """A password-reset code by text too (for people who confirmed their number). Never raises."""
     db = get_db()
-    user = db.execute("SELECT phone, phone_verified FROM users WHERE id = ?", (user_id,)).fetchone()
-    if not sms_available() or not user or not user["phone_verified"]:
-        return False
+    user = db.execute("SELECT phone, phone_verified, sms_updates, suspended FROM users WHERE id = ?",
+                      (user_id,)).fetchone()
+    if not sms_available() or not user or not user["phone_verified"] or not user["sms_updates"] or user["suspended"]:
+        return False  # texts turned off (or suspended): the email has the code
     if _sent_today(user_id, codes=True) >= MAX_CODES_PER_DAY:
         return False
     try:
-        send_sms(user["phone"], f"Sportive Circle {purpose} code: {code}. It expires soon. Don't share it.")
+        send_sms(user["phone"], f"Sportive Circle {purpose} code: {code}. It expires soon. Don't share it. Reply STOP to stop texts.")
         ok = True
     except Exception:
         ok = False

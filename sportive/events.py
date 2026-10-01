@@ -369,7 +369,7 @@ def feed():
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
                            month_name=now.strftime("%B"), more_page=more_page,
-                           hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now),
+                           hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now, viewer=g.user["id"]),
                            club_picks=suggested_clubs(g.user["id"], my_sports), texts_card=show_texts_card())
 
 
@@ -723,12 +723,13 @@ def tell_players_it_changed(event, data):
     players = players_except_host(event)
     if not changes or not players:
         return False
-    title, host = data["title"] if not event["is_quick"] else event_title(event), event["host_name"].split()[0]
+    title = data["title"] if not event["is_quick"] else event_title({**dict(event), **data})
+    host = event["host_name"].split()[0]
     link = url_for("events.detail", event_id=event["id"])
     for player in players:
         notify(player["id"], "game_updates", f"{host} changed {title}: {', '.join(changes)}", link,
                key=f"change:{event['id']}")
-    if any(change.startswith(("new time", "new place")) for change in changes):
+    if any(change.startswith(("new time", "new place", "now ends", "now ")) for change in changes):
         for player in players:
             text_user(player["id"], f"{host} changed {title}: now {fmt_when(data['starts_at'])} at {data['location']}. "
                                     f"{public_url('events.detail', event_id=event['id'])}")
@@ -738,6 +739,7 @@ def tell_players_it_changed(event, data):
                 body, html = compose(
                     subject, f"{title} changed",
                     [f"Hey {player['full_name'].split()[0]}, {host} changed this game.",
+                     *([f"🏅 Now {SPORTS[data['sport']]}"] if data["sport"] != event["sport"] else []),
                      f"🕐 {fmt_when(data['starts_at'])}", f"📍 {data['location']}"],
                     button=("See the game", public_url("events.detail", event_id=event["id"])),
                     reason="You're getting this because you joined this game.",
@@ -748,14 +750,17 @@ def tell_players_it_changed(event, data):
     return True
 
 
-def tell_players_it_was_cancelled(event, page_stays=True):
+def tell_players_it_was_cancelled(event, page_stays=True, by_host=True):
     """Tell everyone who joined (except the host), so nobody shows up to an empty field.
-    page_stays=False when the game is about to be deleted (the host's account is going), so links go to the feed."""
+    page_stays=False when the game is about to be deleted (the host's account is going), so links go to the feed.
+    by_host=False when Sportive Circle canceled it (a suspended host, a denied club): it doesn't name the host."""
     players = players_except_host(event)
     title, when = event_title(event), fmt_when(event["starts_at"])
+    who = event["host_name"].split()[0] if by_host else "Sportive Circle"
+    who_full = event["host_name"] if by_host else "Sportive Circle"
     link = url_for("events.detail", event_id=event["id"]) if page_stays else url_for("events.feed")
     for player in players:
-        notify(player["id"], "game_updates", f"{event['host_name'].split()[0]} canceled {title} ({when})",
+        notify(player["id"], "game_updates", f"{who} canceled {title} ({when})",
                link, key=f"change:{event['id']}")
     # Friends with an open invite ("You down?") hear about it too, and the invite closes.
     db = get_db()
@@ -764,21 +769,21 @@ def tell_players_it_was_cancelled(event, page_stays=True):
     db.execute("UPDATE invites SET status = 'canceled' WHERE event_id = ? AND status IN ('pending', 'requested')",
                (event["id"],))
     for row in invited:
-        notify(row["guest_id"], "invites", f"{event['host_name'].split()[0]} canceled {title} ({when}), "
+        notify(row["guest_id"], "invites", f"{who} canceled {title} ({when}), "
                "so that invite is off.", url_for("events.feed"), key=f"invite:{event['id']}")
     db.commit()
     for player in players:
-        text_user(player["id"], f"{event['host_name'].split()[0]} canceled {title} ({when}).")
+        text_user(player["id"], f"{who} canceled {title} ({when}).")
     for player in players:
         try:
             subject = f"Canceled: {title} ({when})"
             body, html = compose(
                 subject, f"{title} was canceled",
-                [f"Hey {player['full_name'].split()[0]}, heads up: {event['host_name']} canceled this game.",
+                [f"Hey {player['full_name'].split()[0]}, heads up: {who_full} canceled this game.",
                  f"🕐 {when}", f"📍 {event['location']}", "No worries, there are more games waiting for you."],
                 button=("Find another game", public_url("events.feed")),
                 reason="You're getting this because you joined this game.",
-                preheader=f"{event['host_name']} canceled {title}.")
+                preheader=f"{who_full} canceled {title}.")
             send_email(player["email"], subject, body, html=html)
         except Exception:  # one bad address shouldn't stop the others
             log.exception("Couldn't email %s about a canceled event", player["email"])
@@ -1160,5 +1165,5 @@ def my_events():
     past = query_events(
         ["e.ends_at < :now", "e.cancelled = 0",
          "EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"],
-        now, order="e.starts_at DESC", limit=10)
+        now, order="e.starts_at DESC", limit=10, on_hold=True)
     return render_template("events/mine.html", hosting=hosting, going=going, past=past)

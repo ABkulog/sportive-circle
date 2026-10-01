@@ -4,6 +4,7 @@
 
 Every demo account uses the password below. Running it again adds nothing new.
 """
+import os
 from datetime import timedelta
 from io import BytesIO
 
@@ -148,6 +149,13 @@ def add_friends_and_games(db, ids, now):
 
 def main():
     app = create_app({"DEBUG": True})
+    # Demo accounts have a public password (in this file), so they must never reach the live site: refuse the
+    # live database (Render's disk is /data) unless it's a throwaway test copy (tools/check.py, the audit server).
+    live = app.config["DATABASE"].startswith("/data/") or (os.environ.get("RENDER_EXTERNAL_URL")
+                                                           and not app.testing)
+    if live:
+        raise SystemExit("seed.py only fills a local or test database. It won't add demo accounts with a public "
+                         "password to the live site.")
     with app.app_context():
         db = get_db()
         if db.execute("SELECT 1 FROM users WHERE email = ?", (USERS[0][0],)).fetchone():

@@ -245,8 +245,9 @@ def directory():
     mine = request.args.get("mine") == "1" and g.get("user") is not None
     easy = request.args.getlist("easy")  # quick filters: beginner / free / no_tryouts
     where, params = [], {"me": g.user["id"] if g.get("user") else 0}
-    if mine:  # my clubs, including ones still being reviewed
-        where.append("EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me)")
+    if mine:  # my clubs, including ones still being reviewed (those only for their officers: others can't open them)
+        where.append("EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me"
+                     " AND (c.status = 'approved' OR m.role = 'officer'))")
     else:
         where.append("c.status = 'approved'")
     for n, word in enumerate(fold(q).split()[:5]):  # every word, any order, accents and capitals ignored
@@ -943,7 +944,7 @@ def review(club_id, decision):
                        "AND ends_at >= ?", (club_id, to_db(now_local())))
             db.commit()
             for event in upcoming:
-                tell_players_it_was_cancelled(event)
+                tell_players_it_was_cancelled(event, by_host=False)
             flash(f"Denied {club['name']}. It's hidden and can't be resent"
                   + (f"; {len(upcoming)} upcoming event{'s were' if len(upcoming) != 1 else ' was'} canceled." if upcoming else "."),
                   "info")

@@ -56,6 +56,7 @@ def compose(subject, heading, lines, code=None, after=(), button=None, reason=No
     text += ["Go Dawgs! 💜💛", "The Sportive Circle team", "", "--"]
     if reason:
         text.append(reason)
+    text.append(f"Change what we email you: {site}/settings")
     text.append("Sportive Circle is a student project for UW Huskies, not an official University of Washington service.")
     text.append(site)
     html = render_template("emails/message.html", subject=subject, heading=heading, lines=lines, code=code,
