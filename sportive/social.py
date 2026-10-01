@@ -286,9 +286,11 @@ def friend_suggestions(me):
                SELECT CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END AS id
                FROM friendships WHERE status = 'accepted' AND (requester_id = :me OR addressee_id = :me)),
            friends_of_friends AS (
-               SELECT CASE WHEN f.requester_id = m.id THEN f.addressee_id ELSE f.requester_id END AS id, m.id AS via
-               FROM friendships f JOIN my_friends m ON m.id IN (f.requester_id, f.addressee_id)
-               WHERE f.status = 'accepted'),
+               SELECT f.addressee_id AS id, m.id AS via
+               FROM my_friends m JOIN friendships f ON f.requester_id = m.id WHERE f.status = 'accepted'
+               UNION ALL
+               SELECT f.requester_id, m.id
+               FROM my_friends m JOIN friendships f ON f.addressee_id = m.id WHERE f.status = 'accepted'),
            played AS (
                SELECT r2.user_id AS id, COUNT(DISTINCT r2.event_id) AS games
                FROM rsvps r1 JOIN rsvps r2 ON r2.event_id = r1.event_id AND r2.user_id != r1.user_id
@@ -352,16 +354,18 @@ def search_people(me, q):
         params.update({f"e{n}": f"{netid}@{domain}" for n, domain in enumerate(domains)})
         netid_match = f"LOWER(u.email) IN ({', '.join(f':e{n}' for n in range(len(domains)))})"
     rows = get_db().execute(
-        f"""SELECT u.id, u.full_name, u.avatar_updated, u.grad_year, {netid_match} AS by_netid,
-                   (SELECT COUNT(*) FROM friendships a JOIN friendships b
-                      ON (CASE WHEN a.requester_id = :me THEN a.addressee_id ELSE a.requester_id END)
-                       = (CASE WHEN b.requester_id = u.id THEN b.addressee_id ELSE b.requester_id END)
-                    WHERE a.status = 'accepted' AND b.status = 'accepted'
-                      AND (a.requester_id = :me OR a.addressee_id = :me)
-                      AND (b.requester_id = u.id OR b.addressee_id = u.id)) AS mutual,
-                   EXISTS (SELECT 1 FROM rsvps mine JOIN rsvps theirs ON mine.event_id = theirs.event_id
-                           JOIN events e ON e.id = mine.event_id
-                           WHERE mine.user_id = :me AND theirs.user_id = u.id AND e.cancelled = 0) AS played
+        f"""WITH my_friends AS (
+               SELECT CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END AS id
+               FROM friendships WHERE status = 'accepted' AND (requester_id = :me OR addressee_id = :me)),
+            co_players AS (
+               SELECT DISTINCT theirs.user_id FROM rsvps mine JOIN rsvps theirs ON mine.event_id = theirs.event_id
+               JOIN events e ON e.id = mine.event_id WHERE mine.user_id = :me AND e.cancelled = 0)
+            SELECT u.id, u.full_name, u.avatar_updated, u.grad_year, {netid_match} AS by_netid,
+                   (SELECT COUNT(*) FROM friendships b WHERE b.status = 'accepted' AND b.requester_id = u.id
+                      AND b.addressee_id IN my_friends)
+                   + (SELECT COUNT(*) FROM friendships b WHERE b.status = 'accepted' AND b.addressee_id = u.id
+                      AND b.requester_id IN my_friends) AS mutual,
+                   u.id IN co_players AS played
             FROM users u
             WHERE u.verified = 1 AND u.suspended = 0 AND u.id != :me AND (({name_match}) OR {netid_match})
               AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = :me)
