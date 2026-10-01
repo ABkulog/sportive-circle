@@ -41,17 +41,24 @@ UP_NEXT_WINDOW = timedelta(hours=2)    # your own events starting this soon get 
 
 # ---------------------------------------------------------------- queries
 
-def query_events(where, params=None, order="e.starts_at", limit=100):
+# A club event is on hold while its club isn't approved (an admin took it off the list, or it's back in review):
+# hidden from every list and calendar, no joining, no reminders. Nothing is deleted: it comes back with the club.
+ON_HOLD_SQL = "(e.club_id IS NOT NULL AND COALESCE(cl.status, 'approved') != 'approved')"
+
+
+def query_events(where, params=None, order="e.starts_at", limit=100, on_hold=False):
     """Events + host name + how many are going + whether *I* am going.
 
     `where` is a list of SQL conditions written in this file (never user input);
-    user values always go through `params`.
+    user values always go through `params`. On-hold club events are left out unless on_hold=True.
     """
+    if not on_hold:
+        where = [*where, f"NOT {ON_HOLD_SQL}"]
     me = g.user["id"] if g.get("user") is not None else 0  # 0 = a visitor (e.g. opening an invite link)
     params = {"me": me, "hold_now": now_param(), **(params or {})}
     sql = f"""
         SELECT e.*, u.full_name AS host_name, u.avatar_updated AS host_avatar, cl.name AS club_name,
-               u.verified AS host_verified,
+               u.verified AS host_verified, {ON_HOLD_SQL} AS on_hold,
                (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id) AS going_count,
                EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me) AS i_am_going,
                {HELD} AS held_count,
@@ -67,7 +74,7 @@ def query_events(where, params=None, order="e.starts_at", limit=100):
 
 
 def get_event(event_id, host_only=False):
-    rows = query_events(["e.id = :id"], {"id": event_id}, limit=1)
+    rows = query_events(["e.id = :id"], {"id": event_id}, limit=1, on_hold=True)  # the page says it's on hold
     if not rows:
         abort(404)
     event = rows[0]
@@ -928,6 +935,8 @@ def join_problem(event, password=None):
     invite = my_invite(event["id"], me)
     if event["cancelled"]:
         return "This game was canceled."
+    if event["on_hold"]:
+        return "This club event is on hold while the club is reviewed."
     if from_db(event["ends_at"]) < now_local():
         return "This game already ended."
     if event["i_am_going"]:

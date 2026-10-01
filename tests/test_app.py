@@ -1648,6 +1648,37 @@ def test_club_events_pick_their_levels(accounts, client, app):
     assert client.get(f"/events/new?club={club}").status_code == 403       # only officers
 
 
+def test_a_removed_clubs_events_go_on_hold(accounts, client, app):
+    """The user: "when a club gets removed the activities they held have to at least go on hold". While the club
+    isn't approved its events are hidden (feed, profiles, My games), can't be joined and send no reminders;
+    nothing is deleted, and they're back when the club is approved again."""
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    club = _club_id(app)
+    _approve(app, club)
+    event_id = event_id_from(client.post("/events/new", data={
+        **event_form(title="Club night", sport="spikeball", location="The Quad"), "club": club}))
+    captain = _user_id(app, "captain@uw.edu")
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE clubs SET status = 'pending' WHERE id = ?", (club,))   # an admin removed it
+        db.commit()
+    assert "Club night" not in client.get(f"/u/{captain}").data.decode()          # off the host's profile
+    page = client.get(f"/events/{event_id}").data.decode()
+    assert "On hold" in page and "can't be joined" in page
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    assert "Club night" not in client.get("/?scope=all").data.decode()
+    client.post(f"/events/{event_id}/join")
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (event_id,)).fetchone()[0] == 1
+    _approve(app, club)                                                            # approved again: back
+    assert "Club night" in client.get("/?scope=all").data.decode()
+    client.post(f"/events/{event_id}/join")
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (event_id,)).fetchone()[0] == 2
+
+
 # -------------------------------------------------------------- navigation
 
 def test_same_sections_everywhere(accounts, client):

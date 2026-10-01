@@ -75,7 +75,8 @@ def send_due_reminders():
            JOIN users u ON u.id = r.user_id
            WHERE r.reminder_sent = 0 AND r.remind_minutes > 0 AND e.cancelled = 0 AND u.verified = 1 AND u.suspended = 0
              AND (u.email_reminders = 1 OR (u.sms_updates = 1 AND u.phone_verified = 1))
-             AND e.starts_at > :now AND e.starts_at <= :soon""",
+             AND e.starts_at > :now AND e.starts_at <= :soon
+             AND NOT EXISTS (SELECT 1 FROM clubs c WHERE c.id = e.club_id AND c.status != 'approved')  -- on hold""",
         {"now": to_db(now), "soon": to_db(now + REMIND_BEFORE)},
     ).fetchall()
 

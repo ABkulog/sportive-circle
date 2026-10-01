@@ -32,7 +32,7 @@
         {% if event.members_only %}<span class="badge badge-gold">Members only</span>{% endif %}
         {% if event.open_to != 'everyone' %}<span class="badge badge-gold">{{ OPEN_TO_BADGE[event.open_to] }}</span>{% endif %}
         {% if event.club_id %}<a class="badge badge-club" href="{{ url_for('clubs.view', club_id=event.club_id) }}">🏛️ {{ event.club_name }}</a>{% endif %}
-        {% if event.cancelled %}<span class="badge badge-danger">Canceled</span>{% elif ended %}<span class="badge badge-muted">Ended</span>{% endif %}
+        {% if event.cancelled %}<span class="badge badge-danger">Canceled</span>{% elif event.on_hold %}<span class="badge badge-muted">On hold</span>{% elif ended %}<span class="badge badge-muted">Ended</span>{% endif %}
       </div>
     </div>
   </div>
@@ -117,7 +117,11 @@
           {% endif %}
         {% endif %}
       {% endif %}
-      {% if is_host or event.i_am_going %}
+      {% if event.on_hold %}
+        {# The club is off the list for now (back in review): its events wait, nothing is lost. #}
+        <p class="card muted">On hold: {{ event.club_name }} is being reviewed again. This event is hidden and
+          can't be joined until the club is back.</p>
+      {% elif is_host or event.i_am_going %}
       {% elif blocked %}
         <p class="muted">You can't join this game.</p>
       {% elif invite %}
