@@ -17,13 +17,15 @@
       (only to check you're old enough and to say happy birthday), and graduation year if you add it.</li>
     <li><strong>Club officers' phone numbers:</strong> asked when registering a club, seen only by our admins and the club's owner, to
       reach you about the request.</li>
-    <li><strong>Your phone number, only if you add it for texts:</strong> used only to text you codes and the game
-      updates you asked for, never shown to anyone and never sold. Turn texts off or remove it anytime in
+    <li><strong>Your phone number, only if you add it for texts:</strong> used only to text you codes, the game
+      updates you asked for and, if you run a club, club alerts, never shown to anyone and never sold. Turn texts off or remove it anytime in
       Settings → Texts, or reply STOP.</li>
     <li><strong>Your profile:</strong> photo, bio, the sports you like, and, only if you add them, pronouns,
       gender and social media usernames.</li>
     <li><strong>What you do in the app:</strong> games you host or join, badges, friends,
-      clubs you follow or join, messages, and reports you send.</li>
+      clubs you follow or join (and your answer to a club's join question), messages and photos you send in chats,
+      reactions, whether you've seen a message (shown as Seen unless you turn off Read receipts), notifications,
+      and reports you send.</li>
     <li><strong>Security records:</strong> when a password is typed wrong, the device's internet address (IP) and
       the email typed, for about 15 minutes, to stop password guessing. And when we send codes, to limit them.</li>
   </ul>
@@ -61,12 +63,14 @@
   <ul>
     <li>Edit your profile, photo and sports any time in <strong>Profile → Edit profile</strong>. Email reminders
       and notifications are in <strong>Settings</strong>.</li>
-    <li><strong>Delete your account</strong> in Settings. Your profile, photo, games you host, messages and badges are
-      deleted right away. Reports about other people stay for safety, without your name.</li>
+    <li><strong>Delete your account</strong> in Settings. Your profile, photo, upcoming games you host,
+      messages and badges are deleted right away. Past games you hosted that others played stay in their history
+      under "Former member". Club updates and suggestions you posted stay without your name. Reports about other
+      people stay for safety, without your name.</li>
   </ul>
 
   <h2>Questions</h2>
-  <p>{% if contact %}Email <a href="mailto:{{ contact }}">{{ contact }}</a>.{% else %}Message an admin through the app.{% endif %}
+  <p>{% if contact %}Email <a href="mailto:{{ contact }}">{{ contact }}</a>.{% else %}Send it in <a href="{{ url_for('feedback.suggest') }}">Suggestions</a>.{% endif %}
     If we ever change how we use your data, we'll update this page and tell you in the app.</p>
 </article>
 {% endblock %}

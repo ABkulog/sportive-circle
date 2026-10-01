@@ -23,8 +23,8 @@ It is a student project, not an official University of Washington service.
 - **Group chat** for everyone going to a game, and **email reminders** an hour before.
 
 **Clubs**
-- **Verified UW clubs only.** Officers register with their club's HuskyLink or UW Recreation page;
-  an admin approves it before it's public.
+- **Verified UW clubs only.** Officers register with their club's social media or website;
+  an admin checks it before it's public.
 - Each club page shows everything a new member needs: how to join, tryouts, dues, experience,
   practices, contact info and officers.
 - **Follow** instantly; **membership is confirmed by officers** (request, application or tryouts).

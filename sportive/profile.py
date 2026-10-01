@@ -355,11 +355,12 @@ SOLE_OFFICER = """SELECT c.id, c.name FROM clubs c JOIN club_members m ON m.club
            WHERE m.user_id = ? AND m.role = 'officer'
              AND (SELECT COUNT(*) FROM club_members o WHERE o.club_id = c.id AND o.role = 'officer') = 1
              AND {} (c.status = 'approved' AND EXISTS (SELECT 1 FROM club_members o WHERE o.club_id = c.id
-                                                        AND o.role = 'member'))"""
+                                                        AND o.role != 'officer'))"""
 
 
 def clubs_only_i_lead(user_id):
-    """Live clubs with members where this person is the only officer (they'd be left without a leader)."""
+    """Live clubs with anyone else in them (members, followers, people asking to join) where this person is the
+    only officer: the club would be left without a leader, so they hand it over first."""
     return get_db().execute(SOLE_OFFICER.format(""), (user_id,)).fetchall()
 
 
@@ -413,6 +414,15 @@ def delete_account():
     for club in clubs_that_go_with_me(g.user["id"]):
         db.execute("DELETE FROM clubs WHERE id = ?", (club["id"],))
     keep_games_other_people_played(g.user["id"])
+    # Games still hosted by this account are deleted with it: older notices linking to them would 404.
+    for row in db.execute("SELECT id FROM events WHERE host_id = ?", (g.user["id"],)).fetchall():
+        db.execute("DELETE FROM notices WHERE url = ? OR url LIKE ?",
+                   (url_for("events.detail", event_id=row["id"]), url_for("events.detail", event_id=row["id"]) + "#%"))
+    # Reactions on their messages (the messages themselves go by cascade).
+    db.execute("""DELETE FROM message_reactions WHERE (kind = 'dm' AND message_id IN
+                      (SELECT id FROM direct_messages WHERE sender_id = :me OR recipient_id = :me))
+                  OR (kind = 'game' AND message_id IN (SELECT id FROM event_messages WHERE sender_id = :me))""",
+               {"me": g.user["id"]})
     # ON DELETE CASCADE (schema.sql) also removes your sports, RSVPs and the rest of your hosted events.
     # These two are kept by email address, not account, so they go by hand.
     db.execute("DELETE FROM login_failures WHERE email = ?", (g.user["email"],))

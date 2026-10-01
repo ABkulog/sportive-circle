@@ -6,8 +6,8 @@
 <div class="card form-card">
   <h1>Texts</h1>
   {% if user.phone and user.phone_verified %}
-    <p class="muted">We text <strong>{{ pretty_phone(user.phone) }}</strong>: game reminders, changes, cancellations
-      and invites. Email still gets everything.</p>
+    <p class="muted">We text <strong>{{ pretty_phone(user.phone) }}</strong>: game reminders, changes, cancellations,
+      invites, password codes and, if you run a club, club alerts. Email still gets everything.</p>
     <form method="post" data-autosave>
       {{ csrf_field() }}<input type="hidden" name="action" value="toggle">
       <label class="switch-row"><span class="switch-text">Text me updates</span>

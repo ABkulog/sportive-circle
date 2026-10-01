@@ -6115,8 +6115,88 @@ def test_other_clubs_move_to_their_sport_by_name(app):
                             ("Chess Club", "other"), ("Spike Boxing", "spikeball")):
             db.execute("INSERT INTO clubs (name, sport, description, status, created_by, created_at) "
                        "VALUES (?, ?, 'x', 'approved', ?, '2026-01-01 00:00')", (name, sport, owner))
+        db.execute("PRAGMA user_version = 0")      # an older database that hasn't been sorted yet
         db.commit()
         init_db()
         sports = dict(db.execute("SELECT name, sport FROM clubs").fetchall())
+        db.execute("UPDATE clubs SET sport = 'other' WHERE name = 'UW Boxing Club'")   # an officer's own pick later
+        db.commit()
+        init_db()                                  # a restart doesn't sort again
+        assert db.execute("SELECT sport FROM clubs WHERE name = 'UW Boxing Club'").fetchone()[0] == "other"
     assert sports == {"UW Boxing Club": "boxing", "Husky Disc Golf": "disc_golf", "Kickboxing Crew": "muay_thai",
                       "Chess Club": "other", "Spike Boxing": "spikeball"}
+
+
+# ---- Loop round 4: speed, data integrity, wording ----
+
+def test_friend_search_and_suggestions_still_find_the_right_people(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Alex")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _friends(app, ids["Jordan"], ids["Sam"])
+    _as(accounts, "Maya")
+    from sportive.social import friend_suggestions, search_people
+    with app.test_request_context():
+        found = {p["full_name"].split()[0]: p for p in search_people(ids["Maya"], "Husky")}
+        assert found["Sam"]["mutual"] == 1 and found["Alex"]["mutual"] == 0
+        assert "Sam" in {p["full_name"].split()[0] for p in friend_suggestions(ids["Maya"])}
+
+
+def test_club_events_have_an_index(app):
+    with app.app_context():
+        names = {r[1] for r in get_db().execute("PRAGMA index_list(events)")}
+    assert "idx_events_club" in names
+
+
+def test_only_officer_with_followers_hands_the_club_over_before_deleting(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu", name="Fan Husky")
+    client.post(f"/clubs/{club}/follow")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    said = client.post("/profile/delete", data={"confirm": "DELETE", "password": "purple-and-gold"},
+                       follow_redirects=True).data.decode()
+    assert "only officer" in said
+    with app.app_context():
+        assert get_db().execute("SELECT 1 FROM clubs WHERE id = ?", (club,)).fetchone() is not None
+
+
+def test_deleting_an_account_clears_notices_and_reactions_for_its_games(accounts, client, app):
+    ids = _people(accounts, app, "Xa", "Yo")
+    _as(accounts, "Xa")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    _as(accounts, "Yo")
+    client.post(f"/events/{game}/join")
+    client.post(f"/events/{game}/chat", data={"body": "hey"})
+    _as(accounts, "Xa")
+    client.post(f"/events/{game}/players/{ids['Yo']}/remove")              # notice to Yo links to the game
+    _friends(app, ids["Xa"], ids["Yo"])
+    client.post(f"/messages/{ids['Yo']}", data={"body": "sorry"})
+    with app.app_context():
+        dm = get_db().execute("SELECT id FROM direct_messages").fetchone()[0]
+    _as(accounts, "Yo")
+    client.post("/chat/react", data={"kind": "dm", "id": dm, "emoji": "❤️"})
+    _as(accounts, "Xa")
+    client.post("/profile/delete", data={"confirm": "DELETE", "password": "purple-and-gold"})
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT COUNT(*) FROM notices WHERE url LIKE ?", (f"/events/{game}%",)).fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM message_reactions").fetchone()[0] == 0
+
+
+def test_daily_cleanup_removes_reactions_on_missing_messages(accounts, app):
+    from sportive.backups import clean_up_old_records
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    with app.app_context():
+        get_db().execute("INSERT INTO message_reactions (kind, message_id, user_id, emoji, created_at) "
+                         "VALUES ('game', 999, ?, '❤️', '2026-01-01 00:00')", (me,))
+        get_db().commit()
+        clean_up_old_records()
+        assert get_db().execute("SELECT COUNT(*) FROM message_reactions").fetchone()[0] == 0
+
+
+def test_help_pages_match_the_app(client):
+    privacy = client.get("/privacy").data.decode()
+    assert "Former member" in privacy and "Read receipts" in privacy and "Message an admin" not in privacy
+    faq = client.get("/faq").data.decode()
+    assert "Who can I message?" in faq and "Send to friends" in faq and "Manage officers" in faq

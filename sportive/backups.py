@@ -98,6 +98,10 @@ def clean_up_old_records():
     for table, column, days in EXPIRE:
         removed += db.execute(f"DELETE FROM {table} WHERE {column} < ?",
                               (to_db(now_local() - timedelta(days=days)),)).rowcount
+    # Reactions whose message is gone (a deleted account or game took it): never shown, so tidy them away.
+    removed += db.execute("""DELETE FROM message_reactions
+                             WHERE (kind = 'dm' AND message_id NOT IN (SELECT id FROM direct_messages))
+                                OR (kind = 'game' AND message_id NOT IN (SELECT id FROM event_messages))""").rowcount
     db.commit()
     return removed
 

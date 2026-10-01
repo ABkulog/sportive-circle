@@ -114,12 +114,15 @@ def init_db():
         existing = {row["name"] for row in db.execute(f"PRAGMA table_info({table})")}
         if column not in existing:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
-    sort_other_clubs(db)
+    if db.execute("PRAGMA user_version").fetchone()[0] < 1:  # once per database (version 1 = clubs sorted)
+        sort_other_clubs(db)
+        db.execute("PRAGMA user_version = 1")
     db.commit()
 
 
 # Words in a club's name that mean one of the newer sports. Clubs registered as "Other" before that sport existed
-# move to it (e.g. "UW Boxing Club" -> Boxing). Only "Other" clubs are touched, so an officer's own pick wins.
+# move to it (e.g. "UW Boxing Club" -> Boxing), once per database. Only "Other" clubs are touched, and only that
+# once, so an officer who picks "Other" later keeps it.
 CLUB_NAME_SPORTS = [
     ("kickboxing", "muay_thai"), ("boxing", "boxing"), ("jiu-jitsu", "bjj"), ("jiu jitsu", "bjj"), ("bjj", "bjj"),
     ("judo", "judo"),

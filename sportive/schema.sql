@@ -357,6 +357,8 @@ CREATE TABLE IF NOT EXISTS rec_reservations (
     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL
 );
+-- Club pages and the clubs list count each club's upcoming events.
+CREATE INDEX IF NOT EXISTS idx_events_club ON events(club_id, ends_at);
 CREATE INDEX IF NOT EXISTS idx_rec_reservations ON rec_reservations(location, starts_at);
 
 -- Every email code we send (sign-up and password reset), for the per-day limit: a few codes a day means
