@@ -140,7 +140,7 @@
         {% if e.team_size %}<span class="badge">{{ e.team_size }}v{{ e.team_size }} teams</span>{% endif %}
         {% if e.members_only %}<span class="badge">Members only</span>{% endif %}
         {% if e.open_to != 'everyone' %}<span class="badge">{{ OPEN_TO_BADGE[e.open_to] }}</span>{% endif %}
-        {% if e.skill_level in ('Intermediate', 'Competitive') %}<span class="badge badge-level">{{ e.skill_level }}</span>{% endif %}
+        {% if e.skill_level not in ('All levels', 'Casual') %}<span class="badge badge-level">{{ e.skill_level }}</span>{% endif %}
         {% if e.cancelled %}<span class="badge badge-danger">Canceled</span>
         {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Hosting</span>
         {% elif e.i_am_going %}<span class="badge badge-success">You're going</span>

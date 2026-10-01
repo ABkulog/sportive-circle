@@ -5,7 +5,7 @@
 <a class="back-link" href="{{ url_for('events.detail', event_id=event.id) if event else (url_for('clubs.view', club_id=club.id) if club else url_for('events.feed')) }}" data-back>← Back</a>
 <div class="card form-card">
   <h1>{{ 'Edit event' if event else 'Create event' }}</h1>
-  {% if club %}<p class="club-banner">For <strong>{{ club.name }}</strong>. Open to all levels.</p>{% endif %}
+  {% if club %}<p class="club-banner">For <strong>{{ club.name }}</strong>.</p>{% endif %}
   {# Four short steps (no scrolling on a phone); without JavaScript it's one form. #}
   <form method="post" class="form" data-sport-form data-wizard data-error-field="{{ g.get('error_field', '') }}" {% if event %}data-event-id="{{ event.id }}"{% endif %} {% if event and event.team_size %}data-team-game{% endif %}>
     {{ csrf_field() }}
@@ -24,6 +24,18 @@
       </label>
       {% endif %}
     </div>
+    {% if club or (event and event.club_id) %}
+      {# Clubs pick who the event is for: any mix of levels (none or all = everyone). #}
+      <fieldset class="field">
+        <legend>Levels <em>(pick all that fit, or none for everyone)</em></legend>
+        <div class="chip-grid">
+          {% for level in CLUB_LEVELS %}
+            <label class="chip-check"><input type="checkbox" name="levels" value="{{ level }}"
+              {% if level in form.getlist('levels') %}checked{% endif %}><span>{{ level }}</span></label>
+          {% endfor %}
+        </div>
+      </fieldset>
+    {% endif %}
     <label class="field"><span>Note <em>(optional)</em></span>
       <textarea name="note" maxlength="500" rows="2" placeholder="Court 3, bring a light and a dark shirt">{{ form.get('note', '') }}</textarea></label>
     </section>

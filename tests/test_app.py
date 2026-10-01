@@ -1618,21 +1618,30 @@ def test_join_leave_and_officers(accounts, client, app):
     assert b"Nets are at the Quad by 5!" in client.get(f"/clubs/{club}").data
 
 
-def test_club_events_are_all_levels(accounts, client, app):
+def test_club_events_pick_their_levels(accounts, client, app):
+    """Clubs pick any mix of levels for an event (none or all = everyone); the Skill level filter finds it under
+    each level it's for, and editing shows the picks again."""
     accounts.signup(email="captain@uw.edu")
     client.post("/clubs/new", data=CLUB)
     club = _club_id(app)
     _approve(app, club)
     form_page = client.get(f"/events/new?club={club}").data.decode()
-    assert "Open to all levels" in form_page and 'name="skill_level"' not in form_page
-    response = client.post("/events/new", data={**event_form(title="Club night", sport="spikeball",
-                                                             location="The Quad", skill_level="Competitive"),
-                                                "club": club})
-    event_id = event_id_from(response)
+    assert 'name="levels"' in form_page and 'name="skill_level"' not in form_page
+    post = lambda title, levels: event_id_from(client.post("/events/new", data={
+        **event_form(title=title, sport="spikeball", location="The Quad"), "club": club, "levels": levels}))
+    mixed, everyone, every_box = (post("Club night", ["Casual", "Intermediate"]), post("Open night", []),
+                                  post("Big night", ["Casual", "Intermediate", "Competitive"]))
     with app.app_context():
-        row = get_db().execute("SELECT skill_level, club_id FROM events WHERE id = ?", (event_id,)).fetchone()
-        assert (row["skill_level"], row["club_id"]) == ("All levels", club)
-    assert "🏛️ UW Spikeball Club".encode() in client.get(f"/events/{event_id}").data
+        level = lambda e: get_db().execute("SELECT skill_level, club_id FROM events WHERE id = ?", (e,)).fetchone()
+        assert tuple(level(mixed)) == ("Casual, Intermediate", club)
+        assert level(everyone)["skill_level"] == level(every_box)["skill_level"] == "All levels"
+    assert "Casual, Intermediate" in client.get(f"/events/{mixed}").data.decode()
+    feed = lambda skill: client.get(f"/?scope=all&skill={skill}").data.decode()
+    assert "Club night" in feed("Intermediate") and "Club night" not in feed("Competitive")
+    assert "Open night" in feed("Competitive")
+    edit = client.get(f"/events/{mixed}/edit").data.decode()
+    assert 'value="Casual"\n              checked' in edit or 'value="Casual" checked' in edit.replace("\n              ", " ")
+    assert "🏛️ UW Spikeball Club".encode() in client.get(f"/events/{mixed}").data
     assert b"Club night" in client.get(f"/clubs/{club}").data
     accounts.logout()
     accounts.signup(email="random@uw.edu")

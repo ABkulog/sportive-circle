@@ -12,7 +12,7 @@ from .badges import sync_badges
 from .clubs import featured_clubs, suggested_clubs
 from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, OFF_CAMPUS, OPEN_TO_GENDERS, OPEN_TO_LABELS, OPEN_TO_PHRASE,
                         STATED_GENDERS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
-                        SKILL_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
+                        SKILL_LEVELS, CLUB_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .db import get_db, user_sports
 from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots,
                       holds_for_others, my_invite, now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
@@ -306,7 +306,8 @@ def feed():
         params["location"] = filters["location"]
     if filters["skill"] in SKILL_LEVELS:
         # "All levels" games welcome every level, so they match any level someone picks.
-        where.append("e.skill_level IN (:skill, 'All levels')")
+        # Club events can be for several levels ("Casual, Intermediate"): any of them matches.
+        where.append("(e.skill_level IN (:skill, 'All levels') OR ', ' || e.skill_level || ', ' LIKE '%, ' || :skill || ', %')")
         params["skill"] = filters["skill"]
     if filters["open"] in OPEN_SPOT_CHOICES:
         # "We're a group of 5": games with at least that many spots anyone can take right now
@@ -512,6 +513,17 @@ def read_players(form, sport, team_size, event=None, allow_no_limit=True):
     return players, extra, None
 
 
+def club_levels(form):
+    """The levels a club picked for its event (any mix): "All levels" for none or all of them."""
+    picked = [level for level in CLUB_LEVELS if level in form.getlist("levels")]
+    return "All levels" if len(picked) in (0, len(CLUB_LEVELS)) else ", ".join(picked)
+
+
+def level_list(skill_level):
+    """Back from "Casual, Intermediate" to the boxes to tick (none for "All levels")."""
+    return [level for level in skill_level.split(", ") if level in CLUB_LEVELS]
+
+
 def default_times():
     start = (now_local() + timedelta(hours=1)).replace(minute=0)
     return start.strftime("%Y-%m-%dT%H:%M"), (start + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
@@ -526,8 +538,8 @@ def create():
         data, error = read_event_form(form)
         repeat = _int(form.get("repeat")) or 1
         if error is None and club is not None:
-            # Club events are open to all levels; they can be for members only, and repeat weekly (practices).
-            data.update(club_id=club["id"], skill_level="All levels",
+            # Club events: any mix of levels; they can be for members only, and repeat weekly (practices).
+            data.update(club_id=club["id"], skill_level=club_levels(form),
                         members_only=1 if form.get("is_private") == "members" else 0)
             if not 1 <= repeat <= MAX_REPEAT_WEEKS:
                 error = f"A club event can repeat for up to {MAX_REPEAT_WEEKS} weeks."
@@ -618,7 +630,7 @@ def edit(event_id):
         form = request.form
         data, error = read_event_form(form, event)
         if error is None and event["club_id"]:
-            data.update(skill_level="All levels", members_only=1 if form.get("is_private") == "members" else 0)
+            data.update(skill_level=club_levels(form), members_only=1 if form.get("is_private") == "members" else 0)
         elif error is None:
             data.update(members_only=0)
         if error is None:
@@ -654,6 +666,7 @@ def edit(event_id):
             "is_private": "1" if event["is_private"] else ("members" if event["members_only"] else ""),
             "password": event["password"], "open_to": event["open_to"],
         })
+        form.setlist("levels", level_list(event["skill_level"]))
     return render_template("events/form.html", form=form, event=event, min_start="")
 
 

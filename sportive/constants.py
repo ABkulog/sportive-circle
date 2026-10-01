@@ -175,6 +175,8 @@ DEFAULT_PLAYERS = {
 }
 
 SKILL_LEVELS = ["All levels", "Casual", "Intermediate", "Competitive"]
+# Club events can be for any mix of these (saved as "Casual, Intermediate"); none or all of them is "All levels".
+CLUB_LEVELS = SKILL_LEVELS[1:]
 
 # "Open to": a game can be for everyone (the default) or, like UW Recreation's women-only hours, for a group.
 # Same choices as clubs. Someone whose profile says a gender outside the group can't join; people who left
