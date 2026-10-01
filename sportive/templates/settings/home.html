@@ -44,6 +44,14 @@
     </label>
     <noscript><button class="btn btn-small">Save</button></noscript>
   </form>
+  <form method="post" action="{{ url_for('settings.friend_games') }}">
+    {{ csrf_field() }}
+    <label class="toggle">
+      <input type="checkbox" name="email_friend_games" value="1" {% if g.user.email_friend_games %}checked{% endif %} data-autosubmit>
+      <span>Email me when friends or my clubs post a game</span>
+    </label>
+    <noscript><button class="btn btn-small">Save</button></noscript>
+  </form>
 </section>
 
 <section class="settings-group">

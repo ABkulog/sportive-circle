@@ -3992,7 +3992,7 @@ def test_each_notification_shows_in_one_place(accounts, client, app):
     assert places["invites"] == "bell" and places["club_updates"] == "clubs"
     accounts.signup()
     settings = client.get("/settings/notifications").data.decode()
-    assert settings.count('class="switch"') == 9          # club requests (officers) and trends (admins) hidden
+    assert settings.count('class="switch"') == 10         # club requests (officers) and trends (admins) hidden
     assert settings.count("In the bell") == 1 and "On the messages icon" in settings   # one heading per place
 
 
@@ -6200,3 +6200,75 @@ def test_help_pages_match_the_app(client):
     assert "Former member" in privacy and "Read receipts" in privacy and "Message an admin" not in privacy
     faq = client.get("/faq").data.decode()
     assert "Who can I message?" in faq and "Send to friends" in faq and "Manage officers" in faq
+
+
+# ---- "Maya posted a game": friends and club followers hear about new games ----
+
+def _outbox(app):
+    return app.extensions.setdefault("outbox", [])
+
+
+def test_friends_get_an_email_and_a_notice_when_you_post_a_game(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan", "Stranger")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _outbox(app).clear()
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Sunset hoops")))
+    mails = [m for m in _outbox(app) if "posted a game" in m["subject"]]
+    assert [m["to"] for m in mails] == ["jordan@uw.edu"]                  # friends only, not strangers or the host
+    assert "Maya posted a game: Sunset hoops" == mails[0]["subject"]
+    assert f"/events/{game}" in mails[0]["body"] and "See the game and join" in mails[0]["body"]
+    _as(accounts, "Jordan")
+    bell = client.get("/notifications").data.decode()
+    assert "Maya posted Sunset hoops" in bell and f'href="/events/{game}"' in bell
+
+
+def test_no_game_emails_for_private_games_blocked_people_or_people_who_opted_out(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Vic")
+    _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"], ids["Vic"])
+    _as(accounts, "Sam")
+    client.post("/settings/friend-games", data={})                          # Sam turns the email off
+    _as(accounts, "Vic")
+    client.post(f"/block/{ids['Maya']}")                                    # Vic blocks Maya
+    _outbox(app).clear()
+    _as(accounts, "Maya")
+    client.post("/events/new", data=event_form(title="Secret run", is_private="1", password="dawgs26"))
+    assert not [m for m in _outbox(app) if "posted a game" in m["subject"]]
+    client.post("/events/new", data=event_form(title="Open run"))
+    assert [m["to"] for m in _outbox(app) if "posted a game" in m["subject"]] == ["jordan@uw.edu"]
+    _as(accounts, "Sam")
+    assert "Maya posted Open run" in client.get("/notifications").data.decode()   # still in Sam's bell
+
+
+def test_game_emails_are_capped_per_day(accounts, client, app):
+    from sportive.friendgames import EMAILS_PER_DAY
+    ids = _people(accounts, app, "Maya", "Jordan")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _outbox(app).clear()
+    _as(accounts, "Maya")
+    for n in range(EMAILS_PER_DAY + 2):
+        client.post("/events/new", data=event_form(title=f"Game {n}", starts_at=form_time(timedelta(days=1, hours=n)),
+                                                   ends_at=form_time(timedelta(days=1, hours=n + 1))))
+    assert len([m for m in _outbox(app) if "posted a game" in m["subject"]]) == EMAILS_PER_DAY
+
+
+def test_club_followers_hear_about_club_events(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu", name="Fan Husky")
+    client.post(f"/clubs/{club}/follow")
+    accounts.logout()
+    _outbox(app).clear()
+    accounts.login(email="captain@uw.edu")
+    client.post("/events/new", data=event_form(title="Club night", club=str(club), repeat="3"))
+    mails = [m for m in _outbox(app) if "posted a game" in m["subject"]]
+    assert [m["to"] for m in mails] == ["fan@uw.edu"]                       # once, not once per week
+    assert "for UW Spikeball Club" in mails[0]["body"]
+    _outbox(app).clear()
+    client.post("/events/new", data=event_form(title="Members night", club=str(club), is_private="members"))
+    assert not [m for m in _outbox(app) if "posted a game" in m["subject"]]  # followers aren't members
+
+
+def test_settings_has_the_new_game_email_switch(accounts, client):
+    accounts.signup()
+    page = client.get("/settings").data.decode()
+    assert 'name="email_friend_games"' in page and "friends or my clubs post a game" in page

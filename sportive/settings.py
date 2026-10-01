@@ -51,6 +51,19 @@ def reminders():
     return redirect(url_for("settings.home"))
 
 
+@bp.route("/settings/friend-games", methods=("POST",))
+@login_required
+def friend_games():
+    """'Maya posted a game' emails (on unless you switch them off; the bell notice is in Notifications)."""
+    on = 1 if request.form.get("email_friend_games") else 0
+    db = get_db()
+    db.execute("UPDATE users SET email_friend_games = ? WHERE id = ?", (on, g.user["id"]))
+    db.commit()
+    flash("You'll get an email when friends or your clubs post a game." if on else
+          "No more emails when friends or your clubs post a game.", "success")
+    return redirect(url_for("settings.home"))
+
+
 @bp.route("/settings/weekly", methods=("POST",))
 @login_required
 def weekly():

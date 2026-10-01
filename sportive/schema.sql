@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS users (
     failed_logins   INTEGER NOT NULL DEFAULT 0,    -- wrong passwords in a row
     locked_until    TEXT,                          -- set after too many wrong passwords
     email_reminders INTEGER NOT NULL DEFAULT 1,    -- 0 = don't email me before events
+    email_friend_games INTEGER NOT NULL DEFAULT 1, -- 0 = don't email me when friends/my clubs post a game
     avatar_updated  TEXT,                          -- when the profile picture changed (NULL = none yet)
     showcase        TEXT,                          -- up to 3 badge keys shown on the profile, comma-separated
     photo_skipped   INTEGER NOT NULL DEFAULT 0,    -- 1 = chose "Add later" (don't ask again)
@@ -419,3 +420,12 @@ CREATE TABLE IF NOT EXISTS message_reactions (
     created_at TEXT NOT NULL,
     PRIMARY KEY (kind, message_id, user_id)
 );
+
+-- "Maya posted a game" emails sent (friendgames.py): one per person per game, and a daily cap per person.
+CREATE TABLE IF NOT EXISTS game_alerts (
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    sent_at  TEXT NOT NULL,
+    PRIMARY KEY (user_id, event_id)
+);
+CREATE INDEX IF NOT EXISTS idx_game_alerts_user ON game_alerts(user_id, sent_at);

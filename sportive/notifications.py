@@ -30,6 +30,7 @@ Kind = namedtuple("Kind", "key emoji label place audience")
 KINDS = [
     Kind("invites", "🙌", "Invites to games", "bell", "everyone"),
     Kind("game_updates", "📅", "Changes to games you joined", "bell", "everyone"),
+    Kind("friend_games", "🆕", "New games from friends and your clubs", "bell", "everyone"),
     Kind("game_chat", "💬", "Your games' group chats", "bell", "everyone"),
     Kind("need_players", "⚡", "Need players posts for your sports", "bell", "everyone"),
     Kind("badges", "🏅", "Badges you earn", "bell", "everyone"),
@@ -43,7 +44,7 @@ KINDS = [
 ]
 PLACE_NAMES = {"bell": "In the bell", "messages": "On the messages icon", "friends": "On the friends icon",
                "clubs": "On the Clubs tab", "admin": "On the admin icon"}
-NOTICE_KINDS = ("invites", "game_updates", "account", "club_review")  # saved as notices (the rest are counted)
+NOTICE_KINDS = ("invites", "game_updates", "friend_games", "account", "club_review")  # saved as notices (the rest are counted)
 NOTICE_DAYS = 30  # the bell shows notices from the last month
 KIND_BY_KEY = {kind.key: kind for kind in KINDS}
 TABS = ("home", "clubs", "profile", "messages", "friends", "admin")

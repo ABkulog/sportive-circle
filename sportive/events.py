@@ -16,6 +16,7 @@ from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, OFF
 from .db import get_db, user_sports
 from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots,
                       holds_for_others, my_invite, now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
+from .friendgames import announce_new_game
 from .links import public_url
 from .sms import text_user
 from .reminders import REMIND_CHOICES
@@ -576,6 +577,7 @@ def create():
                     continue
                 insert_event(dict(data, starts_at=to_db(starts), ends_at=to_db(ends)))
                 posted += 1
+            announce_new_game(get_event(event_id))  # friends and the club's people (the first week only)
             if club is not None:
                 post_club_event(club, event_id, data, posted)
                 flash(f"Posted {posted} weekly events. Your followers see it in Club updates." if posted > 1 else
@@ -846,6 +848,7 @@ def quick():
                 "max_players": max_players, "extra_players": extra, "note": note, "is_quick": 1,
                 "is_private": is_private, "password": password, "team_size": team_size, "open_to": open_to,
             }, reserve)
+            announce_new_game(get_event(event_id))
             flash(created_message(is_private, reserve, "Posted! It's at the top of everyone's feed."), "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))
         form_error(error)
