@@ -700,8 +700,10 @@ def players_except_host(event):
 def what_changed(event, data):
     """Plain words for what the host changed that players need to know ("new time: Sat, Oct 3 · 3:00 PM")."""
     changes = []
-    if (data["starts_at"], data["ends_at"]) != (event["starts_at"], event["ends_at"]):
+    if data["starts_at"] != event["starts_at"]:
         changes.append(f"new time: {fmt_when(data['starts_at'])}")
+    elif data["ends_at"] != event["ends_at"]:
+        changes.append(f"now ends at {fmt_clock(data['ends_at'])}")
     if data["location"] != event["location"]:
         changes.append(f"new place: {data['location']}")
     if data["sport"] != event["sport"]:
@@ -1147,10 +1149,11 @@ def remove_player(event_id, user_id):
 @login_required
 def my_events():
     now = {"now": to_db(now_local())}
-    hosting = query_events(["e.host_id = :me", "e.cancelled = 0", "e.ends_at >= :now"], now)
+    # On-hold club events stay here (marked On hold), so players can still find a game they're in.
+    hosting = query_events(["e.host_id = :me", "e.cancelled = 0", "e.ends_at >= :now"], now, on_hold=True)
     going = query_events(
         ["e.host_id != :me", "e.ends_at >= :now",
-         "EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"], now)
+         "EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"], now, on_hold=True)
     past = query_events(
         ["e.ends_at < :now", "e.cancelled = 0",
          "EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"],

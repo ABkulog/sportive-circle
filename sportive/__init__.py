@@ -158,7 +158,7 @@ def _add_template_helpers(app):
         OPEN_TO=OPEN_TO, OPEN_TO_LABELS=OPEN_TO_LABELS, OPEN_TO_BADGE=OPEN_TO_BADGE,
         OPEN_SPOT_CHOICES=events.OPEN_SPOT_CHOICES, now_db=lambda: to_db(now_local()),
         # menu counters
-        tab_badges=notifications.tab_badges, badge_text=notifications.badge_text, bell_count=notifications.bell_count,
+        tab_badges=notifications.tab_badges, notice_counts=notifications.counts, badge_text=notifications.badge_text, bell_count=notifications.bell_count,
         chat_unread=social.event_chat_unread, is_admin=moderation.is_admin,
         open_report_count=moderation.open_report_count, pending_club_count=clubs.pending_club_count,
         is_team=moderation.is_team, current_theme=settings.current_theme, sms_available=lambda: sms.sms_available(),

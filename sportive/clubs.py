@@ -346,7 +346,9 @@ def roster_csv(club_id):
     for person in roster(club_id):
         writer.writerow([spreadsheet_safe(person["full_name"]), person["email"], person["grad_year"] or "",
                          person["role"].title(), person["joined_at"][:10]])
-    filename = re.sub(r"[^A-Za-z0-9]+", "-", club["name"]).strip("-").lower() or "club"
+    import unicodedata  # only needed here
+    plain = unicodedata.normalize("NFKD", club["name"]).encode("ascii", "ignore").decode()
+    filename = re.sub(r"[^A-Za-z0-9]+", "-", plain).strip("-").lower() or "club"
     return Response(output.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename={filename}-roster.csv"})
 
@@ -496,6 +498,9 @@ def edit(club_id):
             db.execute(f"UPDATE clubs SET {', '.join(f + ' = :' + f for f in FIELDS)}, status = :status WHERE id = :id",
                        {**data, "status": status, "id": club_id})
             db.commit()
+            if status == "pending" and club["status"] == "approved":
+                _tell_players_on_hold(club)
+                db.commit()
             if status == "pending" and club["status"] != "pending":
                 flash("Saved. The club's name or type changed, so we'll quickly check it again.", "info")
             else:
@@ -838,6 +843,18 @@ def public_url_for(path):
     return current_app.config["PUBLIC_URL"].rstrip("/") + path if path.startswith("/") else path
 
 
+def _tell_players_on_hold(club):
+    """A club went back to review, so its upcoming events are on hold: tell everyone going (in their bell)."""
+    from .notifications import notify  # imported here: notifications.py is loaded after this module
+    rows = get_db().execute(
+        """SELECT DISTINCT r.user_id, e.id, e.title FROM rsvps r JOIN events e ON e.id = r.event_id
+           WHERE e.club_id = ? AND e.cancelled = 0 AND e.ends_at >= ?""", (club["id"], to_db(now_local()))).fetchall()
+    for row in rows:
+        notify(row["user_id"], "game_updates",
+               f"{row['title']} is on hold while {club['name']} is checked again. You're still in it.",
+               url_for("events.detail", event_id=row["id"]), key=f"on_hold:{row['id']}")
+
+
 def _notify_officers(club, subject, heading, lines, button, notice):
     """Email every officer, and put `notice` (text, link) in their bell too: not everyone checks email."""
     from .notifications import notify  # imported here: notifications.py is loaded after this module
@@ -916,6 +933,8 @@ def review(club_id, decision):
         elif decision == "restore":
             flash(f"{club['name']} is back on the waiting list.", "success")
         else:
+            _tell_players_on_hold(club)
+            db.commit()
             _notify_officers(club, f"About your Sportive Circle club: {club['name']}", "Your club is back in review",
                              [f"{club['name']} was moved back to our waiting list, so it's hidden for now."]
                              + ([f"Why: {note}"] if note else [])

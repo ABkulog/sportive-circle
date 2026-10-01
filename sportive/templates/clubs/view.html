@@ -167,7 +167,7 @@
       {% for p in posts %}
         <li>
           <p>{{ p.body }}{% if p.event_id and g.user %} <a href="{{ url_for('events.detail', event_id=p.event_id) }}">See it →</a>{% endif %}</p>
-          <small class="muted">{{ p.full_name or 'An officer' }} · {{ p.created_at|when }}</small>
+          <small class="muted">{{ (p.full_name if g.user else None) or 'An officer' }} · {{ p.created_at|when }}</small>
           {% if role == 'officer' %}
             <form method="post" action="{{ url_for('clubs.delete_post', club_id=club.id, post_id=p.id) }}" class="inline-form">
               {{ csrf_field() }}<button class="link-button danger-link">Delete</button>

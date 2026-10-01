@@ -2,7 +2,9 @@
 {% macro clubs_tabs(active) %}
   <nav class="home-tabs" aria-label="Clubs">
     <a href="{{ url_for('clubs.directory') }}" {% if active == 'find' %}class="is-on" aria-current="page"{% endif %}>Find clubs</a>
-    {% if g.user %}<a href="{{ url_for('clubs.updates') }}" {% if active == 'updates' %}class="is-on" aria-current="page"{% endif %}>Updates</a>{% endif %}
+    {% if g.user %}{% set new_updates = notice_counts().get('club_updates', 0) if active != 'updates' else 0 %}
+      {# The Clubs tab's number is mostly new updates: show it here too, so it's clear where to tap. #}
+      <a href="{{ url_for('clubs.updates') }}" {% if active == 'updates' %}class="is-on" aria-current="page"{% endif %}>Updates{% if new_updates %} <span class="count-dot">{{ new_updates }}</span>{% endif %}</a>{% endif %}
   </nav>
 {% endmacro %}
 {% macro home_tabs(active) %}
@@ -142,6 +144,7 @@
         {% if e.open_to != 'everyone' %}<span class="badge">{{ OPEN_TO_BADGE[e.open_to] }}</span>{% endif %}
         {% if e.skill_level not in ('All levels', 'Casual') %}<span class="badge badge-level">{{ e.skill_level }}</span>{% endif %}
         {% if e.cancelled %}<span class="badge badge-danger">Canceled</span>
+        {% elif e.on_hold %}<span class="badge badge-muted">On hold</span>
         {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Hosting</span>
         {% elif e.i_am_going %}<span class="badge badge-success">You're going</span>
         {% elif e.i_am_invited %}<span class="badge badge-gold">Invited</span>

@@ -580,6 +580,8 @@ def reset_password():
         error = None
         # Every answer here must look the same whether or not the email has an account (see forgot_password):
         # no account = a code that is always wrong, with the same limit on tries.
+        if user is not None and user["suspended"]:
+            user = None  # same answer as no account: a suspended account can't reset its way back in
         if user is None or not user["verify_code"]:
             session["reset_tries"] = session.get("reset_tries", 0) + 1
             error = ("Too many wrong tries. Ask for a new code." if session["reset_tries"] > MAX_CODE_ATTEMPTS
