@@ -512,6 +512,88 @@ def _mark_read(me, other):
     db.commit()
 
 
+REACTIONS = ["❤️", "😂", "👍", "🔥", "😮", "😢"]  # hold a message to pick one; a double tap is ❤️
+
+
+def _reaction_rows(kind, me, other_or_event, start):
+    """Reactions on a chat's messages from id `start` on: (message_id, emoji, user_id) rows."""
+    if kind == "dm":
+        return get_db().execute(
+            """SELECT r.message_id, r.emoji, r.user_id FROM message_reactions r
+               JOIN direct_messages m ON m.id = r.message_id
+               WHERE r.kind = 'dm' AND m.id >= ? AND ((m.sender_id = ? AND m.recipient_id = ?)
+                                                   OR (m.sender_id = ? AND m.recipient_id = ?))""",
+            (start, me, other_or_event, other_or_event, me)).fetchall()
+    return get_db().execute(
+        """SELECT r.message_id, r.emoji, r.user_id FROM message_reactions r
+           JOIN event_messages m ON m.id = r.message_id
+           WHERE r.kind = 'game' AND m.event_id = ? AND m.id >= ?
+             AND r.user_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)""",
+        (other_or_event, start, me)).fetchall()
+
+
+def reactions_by_message(rows, me):
+    """{message id: [{"emoji", "count", "mine"}, ...]} in the picker's order."""
+    found = {}
+    for row in rows:
+        counts = found.setdefault(row["message_id"], {})
+        entry = counts.setdefault(row["emoji"], {"emoji": row["emoji"], "count": 0, "mine": False})
+        entry["count"] += 1
+        entry["mine"] = entry["mine"] or row["user_id"] == me
+    order = {emoji: i for i, emoji in enumerate(REACTIONS)}
+    return {mid: sorted(counts.values(), key=lambda e: order.get(e["emoji"], 99)) for mid, counts in found.items()}
+
+
+def with_reactions(messages, kind, me, other_or_event, start=None):
+    """Adds each message's reactions (for the page and the poll)."""
+    if start is None:
+        start = messages[0]["id"] if messages else 0
+    found = reactions_by_message(_reaction_rows(kind, me, other_or_event, start), me)
+    for message in messages:
+        message["reactions"] = found.get(message["id"], [])
+    return messages, {str(mid): found[mid] for mid in found}
+
+
+@bp.route("/chat/react", methods=("POST",))
+@login_required
+def react():
+    """Toggle a reaction on a chat message: the same one again takes it off; another one replaces it."""
+    me = g.user["id"]
+    kind, emoji = request.form.get("kind"), request.form.get("emoji")
+    message_id = request.form.get("id", type=int)
+    if kind not in ("dm", "game") or emoji not in REACTIONS or not message_id:
+        abort(400)
+    db = get_db()
+    if kind == "dm":
+        message = db.execute("SELECT sender_id, recipient_id FROM direct_messages WHERE id = ?", (message_id,)).fetchone()
+        if message is None or me not in (message["sender_id"], message["recipient_id"]):
+            abort(404)
+        other = message["recipient_id"] if message["sender_id"] == me else message["sender_id"]
+        if is_blocked_between(me, other):
+            abort(403)
+        place = other
+    else:
+        message = db.execute("SELECT event_id FROM event_messages WHERE id = ?", (message_id,)).fetchone()
+        if message is None:
+            abort(404)
+        if db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (message["event_id"], me)).fetchone() is None:
+            abort(403)  # only people going can see (and react in) a game's chat
+        place = message["event_id"]
+    current = db.execute("SELECT emoji FROM message_reactions WHERE kind = ? AND message_id = ? AND user_id = ?",
+                         (kind, message_id, me)).fetchone()
+    if current is not None and current["emoji"] == emoji:
+        db.execute("DELETE FROM message_reactions WHERE kind = ? AND message_id = ? AND user_id = ?",
+                   (kind, message_id, me))
+    else:
+        db.execute("""INSERT INTO message_reactions (kind, message_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?, ?)
+                      ON CONFLICT(kind, message_id, user_id) DO UPDATE SET emoji = excluded.emoji,
+                                                                          created_at = excluded.created_at""",
+                   (kind, message_id, me, emoji, to_db(now_local())))
+    db.commit()
+    found = reactions_by_message(_reaction_rows(kind, me, place, message_id), me)
+    return jsonify(id=message_id, reactions=found.get(message_id, []))
+
+
 def dm_status(me, other):
     """What shows under my newest DM, if the newest message is mine: "Seen" once they've opened it, else
     "Delivered". Like WhatsApp, "Seen" only shows when both people have read receipts on."""
@@ -564,7 +646,8 @@ def thread(user_id):
         return chat_sent(error, url_for("social.thread", user_id=user_id) + "#composer")
     _mark_read(me, user_id)
     rows = _thread_rows(me, user_id) if not is_blocked_between(me, user_id) else []
-    return render_template("social/thread.html", other=other, messages=[message_json(r, me, 'dm') for r in rows],
+    messages, _ = with_reactions([message_json(r, me, 'dm') for r in rows], "dm", me, user_id)
+    return render_template("social/thread.html", other=other, messages=messages,
                            allowed=allowed, poll_url=url_for("social.thread_poll", user_id=user_id), draft=take_draft(),
                            blocked=i_blocked(me, user_id), status=dm_status(me, user_id))
 
@@ -578,7 +661,9 @@ def thread_poll(user_id):
         return jsonify(messages=[])
     rows = _thread_rows(me, user_id, request.args.get("after", 0, type=int))
     _mark_read(me, user_id)
-    return jsonify(messages=[message_json(r, me, 'dm') for r in rows], status=dm_status(me, user_id))
+    messages, reactions = with_reactions([message_json(r, me, 'dm') for r in rows], "dm", me, user_id,
+                                         start=request.args.get("from", 0, type=int))
+    return jsonify(messages=messages, status=dm_status(me, user_id), reactions=reactions)
 
 
 # -------------------------------------------------------------- event chat
@@ -633,8 +718,9 @@ def event_chat(event_id):
     rows = _chat_rows(event_id)
     _mark_chat_seen(event_id, rows)
     people = get_db().execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (event_id,)).fetchone()[0]
-    return render_template("social/event_chat.html", event=event, people=people,
-                           messages=[message_json(r, g.user["id"], 'event_message') for r in rows],
+    messages, _ = with_reactions([message_json(r, g.user["id"], 'event_message') for r in rows], "game",
+                                 g.user["id"], event_id)
+    return render_template("social/event_chat.html", event=event, people=people, messages=messages,
                            poll_url=url_for("social.event_chat_poll", event_id=event_id),
                            when=fmt_when(event["starts_at"]), draft=take_draft(),
                            status=group_status(event_id, g.user["id"]))
@@ -648,8 +734,9 @@ def event_chat_poll(event_id):
         abort(403)
     rows = _chat_rows(event_id, request.args.get("after", 0, type=int))
     _mark_chat_seen(event_id, rows)
-    return jsonify(messages=[message_json(r, g.user["id"], 'event_message') for r in rows],
-                   status=group_status(event_id, g.user["id"]))
+    messages, reactions = with_reactions([message_json(r, g.user["id"], 'event_message') for r in rows], "game",
+                                         g.user["id"], event_id, start=request.args.get("from", 0, type=int))
+    return jsonify(messages=messages, status=group_status(event_id, g.user["id"]), reactions=reactions)
 
 
 @bp.route("/chat-photos/<int:photo_id>")

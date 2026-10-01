@@ -61,7 +61,7 @@
                 placeholder="Sign the club waiver, then come to any Tuesday practice!">{{ form.get('how_to_join', '') }}</textarea></label>
     <label class="field"><span>A question for people who want to join</span>
       <input name="join_question" maxlength="150" value="{{ form.get('join_question', '') }}"
-             placeholder="How long have you played?" required>
+             placeholder="What's your experience level?" required>
       <small class="muted">You'll see their answers in your requests.</small></label>
     <label class="toggle"><input type="checkbox" name="competes" value="1" {% if form.get('competes') %}checked{% endif %}>
       <span>We compete against other schools</span></label>

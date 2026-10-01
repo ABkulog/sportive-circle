@@ -407,3 +407,13 @@ CREATE TABLE IF NOT EXISTS chat_photos (
     image      BLOB NOT NULL,
     created_at TEXT NOT NULL
 );
+
+-- Reactions on chat messages (like WhatsApp): one per person per message. kind: 'dm' or 'game'.
+CREATE TABLE IF NOT EXISTS message_reactions (
+    kind       TEXT NOT NULL,
+    message_id INTEGER NOT NULL,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    emoji      TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (kind, message_id, user_id)
+);

@@ -120,6 +120,7 @@
     bubble.appendChild(meta);
     item.appendChild(bubble);
     list.appendChild(item);
+    showReactions(item, message.reactions || []);
   }
 
   // Albums, like WhatsApp: 4+ photos in a row from one person show as one 2x2 grid, "+N" on the 4th opens the
@@ -258,12 +259,167 @@
     const image = link.querySelector("img");
     return { src: link.href, alt: image ? image.alt : "Photo" };
   });
-  list.addEventListener("click", (event) => {
-    const link = event.target.closest(".chat-photo, .chat-album a");
-    if (!link || event.defaultPrevented) return;  // "+N" opens the album instead
-    event.preventDefault();
+  const openPhoto = (link) => {
     const photos = chatPhotos();
     openViewer(photos, Math.max(0, photos.findIndex((photo) => photo.src === link.href)));
+  };
+
+  // Reactions, like WhatsApp: hold a message (right-click on a laptop) for the reaction bar, Copy and Report;
+  // a double tap (double click) is ❤️; tapping a reaction under a message adds or takes off yours.
+  const REACTIONS = ["❤️", "😂", "👍", "🔥", "😮", "😢"];  // the same list as social.REACTIONS
+  const csrf = () => (document.querySelector('input[name="csrf_token"]') || {}).value || "";
+  function showReactions(item, reactions) {
+    const json = JSON.stringify(reactions || []);
+    if (item.dataset.reactions === json && (reactions || []).length === item.querySelectorAll(".chat-reaction").length) return;
+    item.dataset.reactions = json;
+    const bubble = item.querySelector(".chat-bubble");
+    const old = bubble.querySelector(".chat-reactions");
+    if (old) old.remove();
+    if (!reactions || !reactions.length) return;
+    const row = el("div", "chat-reactions");
+    reactions.forEach((reaction) => {
+      const chip = el("button", "chat-reaction" + (reaction.mine ? " is-mine" : ""),
+                      reaction.count > 1 ? `${reaction.emoji} ${reaction.count}` : reaction.emoji);
+      chip.type = "button";
+      chip.dataset.emoji = reaction.emoji;
+      chip.setAttribute("aria-label", `${reaction.emoji} ${reaction.count}${reaction.mine ? ", yours" : ""}`);
+      row.appendChild(chip);
+    });
+    bubble.appendChild(row);
+  }
+  list.querySelectorAll(".chat-msg").forEach((item) => {
+    let reactions = [];
+    try { reactions = JSON.parse(item.dataset.reactions || "[]"); } catch (error) { /* leave it empty */ }
+    item.dataset.reactions = "";
+    showReactions(item, reactions);
+  });
+  async function react(item, emoji) {
+    if (!item || !item.dataset.id) return;
+    const data = new FormData();
+    data.append("csrf_token", csrf());
+    data.append("kind", box.dataset.kind === "dm" ? "dm" : "game");
+    data.append("id", item.dataset.id);
+    data.append("emoji", emoji);
+    try {
+      const response = await fetch(box.dataset.reactUrl, { method: "POST", body: data,
+                                                           headers: { Accept: "application/json" } });
+      if (!response.ok) return;
+      const answer = await response.json();
+      showReactions(item, answer.reactions);
+    } catch (error) { /* offline: nothing changes */ }
+  }
+  function heart(item) {
+    const pop = el("span", "chat-heart-pop", "❤️");
+    pop.setAttribute("aria-hidden", "true");
+    item.querySelector(".chat-bubble").appendChild(pop);
+    setTimeout(() => pop.remove(), 700);
+    const mine = JSON.parse(item.dataset.reactions || "[]").find((reaction) => reaction.mine);
+    if (!mine || mine.emoji !== "❤️") react(item, "❤️");  // a double tap only adds a heart (like Instagram)
+  }
+
+  // The menu that opens when you hold a message.
+  const menu = el("div", "chat-menu");
+  menu.hidden = true;
+  menu.setAttribute("role", "menu");
+  document.body.appendChild(menu);
+  let menuFor = null;
+  const closeMenu = () => {
+    menu.hidden = true;
+    if (menuFor) menuFor.classList.remove("is-held");
+    menuFor = null;
+  };
+  function openMenu(item) {
+    closeMenu();
+    menuFor = item;
+    item.classList.add("is-held");
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();  // keyboard away
+    const mine = (JSON.parse(item.dataset.reactions || "[]").find((reaction) => reaction.mine) || {}).emoji;
+    const emojis = el("div", "chat-menu-emojis");
+    REACTIONS.forEach((emoji) => {
+      const button = el("button", emoji === mine ? "is-mine" : "", emoji);
+      button.type = "button";
+      button.setAttribute("aria-label", `React ${emoji}`);
+      button.addEventListener("click", () => { react(item, emoji); closeMenu(); });
+      emojis.appendChild(button);
+    });
+    const actions = el("div", "chat-menu-actions");
+    const text = item.querySelector(".chat-bubble > p");
+    if (text && navigator.clipboard) {
+      const copy = el("button", "", "Copy");
+      copy.type = "button";
+      copy.addEventListener("click", () => { navigator.clipboard.writeText(text.textContent).catch(() => {}); closeMenu(); });
+      actions.appendChild(copy);
+    }
+    const report = item.querySelector(".chat-more a");
+    if (report) {
+      const link = el("a", "is-danger", "Report");
+      link.href = report.href;
+      actions.appendChild(link);
+    }
+    menu.replaceChildren(emojis);
+    if (actions.children.length) menu.appendChild(actions);
+    menu.hidden = false;
+    const spot = item.querySelector(".chat-bubble").getBoundingClientRect();
+    const width = menu.offsetWidth, height = menu.offsetHeight;
+    let top = spot.top - height - 8;
+    if (top < 70) top = Math.min(spot.bottom + 8, window.innerHeight - height - 8);
+    const left = item.classList.contains("is-mine") ? spot.right - width : spot.left;
+    menu.style.top = Math.max(8, top) + "px";
+    menu.style.left = Math.min(Math.max(8, left), window.innerWidth - width - 8) + "px";
+    const first = menu.querySelector("button");
+    if (first) first.focus({ preventScroll: true });
+  }
+  document.addEventListener("pointerdown", (event) => {
+    if (!menu.hidden && !menu.contains(event.target)) closeMenu();
+  });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !menu.hidden) closeMenu(); });
+  list.addEventListener("scroll", closeMenu, { passive: true });
+
+  // Hold (about half a second, without moving) opens the menu.
+  let hold = null, held = false;
+  list.addEventListener("pointerdown", (event) => {
+    const item = event.target.closest(".chat-msg");
+    if (!item || !event.target.closest(".chat-bubble") || event.target.closest(".chat-reaction")) return;
+    held = false;
+    hold = { x: event.clientX, y: event.clientY, timer: setTimeout(() => { held = true; hold = null; openMenu(item); }, 450) };
+  });
+  const cancelHold = () => { if (hold) { clearTimeout(hold.timer); hold = null; } };
+  list.addEventListener("pointermove", (event) => {
+    if (hold && Math.hypot(event.clientX - hold.x, event.clientY - hold.y) > 8) cancelHold();
+  });
+  list.addEventListener("pointerup", cancelHold);
+  list.addEventListener("pointercancel", cancelHold);
+  list.addEventListener("contextmenu", (event) => {  // right-click on a laptop (and long-press on Android)
+    const item = event.target.closest(".chat-msg");
+    if (!item || !event.target.closest(".chat-bubble")) return;
+    event.preventDefault();
+    cancelHold();
+    if (menuFor !== item) openMenu(item);
+  });
+
+  // Taps: a reaction under a message toggles yours; two quick taps on a message is ❤️; one tap on a photo
+  // opens it (a moment later, in case a second tap is coming).
+  let lastTap = null;
+  list.addEventListener("click", (event) => {
+    if (held) { held = false; event.preventDefault(); return; }  // the end of a hold, not a tap
+    if (event.defaultPrevented) return;                         // "+N" opens the album instead
+    const item = event.target.closest(".chat-msg");
+    const chip = event.target.closest(".chat-reaction");
+    if (chip) { react(item, chip.dataset.emoji); return; }
+    if (!item || event.target.closest(".chat-avatar, .chat-more, .chat-game")) return;
+    const bubble = event.target.closest(".chat-bubble");
+    if (!bubble) return;
+    const photo = event.target.closest(".chat-photo, .chat-album a");
+    if (photo) event.preventDefault();
+    const now = Date.now();
+    if (lastTap && lastTap.item === item && now - lastTap.at < 320) {
+      clearTimeout(lastTap.timer);
+      lastTap = null;
+      heart(item);
+      return;
+    }
+    if (lastTap) clearTimeout(lastTap.timer);
+    lastTap = { item, at: now, timer: photo ? setTimeout(() => { lastTap = null; openPhoto(photo); }, 300) : null };
   });
 
   // Profile pictures: one tap opens their profile, a double tap shows the picture big.
@@ -318,10 +474,15 @@
   async function poll(now) {
     if (document.hidden && !now) return;
     try {
-      const response = await fetch(`${box.dataset.pollUrl}?after=${lastId}`, { headers: { Accept: "application/json" } });
+      const first = list.querySelector(".chat-msg");
+      const response = await fetch(`${box.dataset.pollUrl}?after=${lastId}&from=${first ? first.dataset.id : 0}`,
+                                   { headers: { Accept: "application/json" } });
       if (new URL(response.url).pathname.startsWith("/login")) { location.reload(); return; }  // logged out
       if (!response.ok) return;
-      const { messages, status } = await response.json();
+      const { messages, status, reactions } = await response.json();
+      if (reactions) {  // reactions change on old messages too: bring every message up to date
+        list.querySelectorAll(".chat-msg").forEach((item) => showReactions(item, reactions[item.dataset.id] || []));
+      }
       if (!messages.length) { showStatus(status); return; }
       const wasNearBottom = nearBottom();
       messages.forEach(render);
@@ -407,14 +568,6 @@
         sendButton.disabled = false;
         textarea.focus();
       }
-    });
-    // Quick replies fill the box (you can still change them before sending).
-    box.querySelectorAll("[data-quick]").forEach((chip) => {
-      chip.addEventListener("click", () => {
-        textarea.value = textarea.value.trim() ? `${textarea.value.trim()} ${chip.dataset.quick}` : chip.dataset.quick;
-        grow();
-        textarea.focus();
-      });
     });
   }
   // Picked photos (up to 10, picked in one go or a few at a time) show above the box until sent or removed.

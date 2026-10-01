@@ -1453,6 +1453,41 @@ def test_seen_and_delivered_like_whatsapp(accounts, client, app):
     assert chat_status()["text"] == "Seen"
 
 
+def test_reactions_on_messages(accounts, client, app):
+    """Like WhatsApp: one reaction per person per message; the same again takes it off, another replaces it.
+    Only the two people in a DM (or people going to the game) can react; the poll keeps everyone up to date."""
+    accounts.signup(email="a@uw.edu")
+    accounts.logout()
+    accounts.signup(email="b@uw.edu")
+    a, b = _user_id(app, "a@uw.edu"), _user_id(app, "b@uw.edu")
+    _played_games(app, "soccer", [a, b])
+    client.post(f"/messages/{a}", data={"body": "low key wana run 5s"})
+    with app.app_context():
+        dm = get_db().execute("SELECT id FROM direct_messages").fetchone()[0]
+    react = lambda kind, mid, emoji: client.post("/chat/react", data={"kind": kind, "id": mid, "emoji": emoji})
+    accounts.logout()
+    accounts.login(email="a@uw.edu")
+    assert react("dm", dm, "❤️").get_json()["reactions"] == [{"emoji": "❤️", "count": 1, "mine": True}]
+    assert react("dm", dm, "😂").get_json()["reactions"] == [{"emoji": "😂", "count": 1, "mine": True}]  # replaced
+    assert client.get(f"/messages/{b}/poll?from=0").get_json()["reactions"][str(dm)][0]["emoji"] == "😂"
+    assert react("dm", dm, "😂").get_json()["reactions"] == []                                         # off again
+    assert react("dm", dm, "💩").status_code == 400
+    react("dm", dm, "🔥")
+    assert '"emoji": "\\ud83d\\udd25"' in client.get(f"/messages/{b}").data.decode()  # on the page too (for chat.js)
+    assert "Down to play?" not in client.get(f"/messages/{b}").data.decode()         # no suggestion chips
+    accounts.logout()
+    accounts.signup(email="c@uw.edu")
+    assert react("dm", dm, "❤️").status_code == 404                                  # not their chat
+    event_id = event_id_from(client.post("/events/new", data=event_form()))
+    client.post(f"/events/{event_id}/chat", data={"body": "on my way"})
+    with app.app_context():
+        game = get_db().execute("SELECT id FROM event_messages").fetchone()[0]
+    assert react("game", game, "👍").status_code == 200
+    accounts.logout()
+    accounts.login(email="a@uw.edu")
+    assert react("game", game, "👍").status_code == 403                               # not going
+
+
 def test_blocking_takes_them_off_your_upcoming_games(accounts, client, app):
     accounts.signup(email="host@uw.edu")
     event_id = event_id_from(client.post("/events/new", data=event_form()))
@@ -5534,10 +5569,10 @@ def test_photos_in_chats_and_friendlier_chats(accounts, client, app):
     assert saved.status_code == 200 and max(Image.open(BytesIO(saved.data)).size) == 1280   # made smaller
     page = client.get(f"/events/{game}/chat").data.decode()
     assert f"/chat-photos/{chat_photo}" in page and "Warm-up pic" in page and "Today" in page
-    assert "On my way" in page and 'name="photo"' in page and 'accept="image/*"' in page
+    assert "On my way" not in page and 'name="photo"' in page and 'accept="image/*"' in page   # no suggestion chips
     _as(accounts, "Sam")
     thread = client.get(f"/messages/{ids['Maya']}").data.decode()
-    assert f"/chat-photos/{dm_photo}" in thread and "Down to play?" in thread and "🚩 Report" not in thread
+    assert f"/chat-photos/{dm_photo}" in thread and "Down to play?" not in thread and "🚩 Report" not in thread
     assert ">Report</a>" in thread                                    # tucked in the ⋯ menu
     assert client.get(f"/chat-photos/{chat_photo}").status_code == 404   # not in that game
     _as(accounts, "Stranger")

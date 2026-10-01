@@ -1181,3 +1181,31 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .chat-avatar-photo { display: block; width: 100%; height: 100%; }
 .lightbox-avatar { width: min(86vw, 420px); aspect-ratio: 1; border-radius: 50%; }
 .lightbox-avatar[hidden], .lightbox img[hidden] { display: none; }
+/* Reactions (chat.js): hold a message for the reaction bar, double-tap for a heart; chips under the bubble.
+   Bubbles aren't text-selectable (Copy is in the hold menu), so a hold never starts a text selection. */
+.chat-bubble { position: relative; cursor: pointer; -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; transition: transform .15s ease; }
+.chat-msg.is-held .chat-bubble { transform: scale(.96); }
+.chat-reactions { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 0; }
+.chat-reaction { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 999px;
+  padding: 1px 8px; font: inherit; font-size: .8rem; line-height: 1.5; cursor: pointer; }
+.chat-reaction.is-mine { border-color: var(--purple); background: var(--accent-soft); }
+.chat-heart-pop { position: absolute; left: 50%; top: 50%; font-size: 2.6rem; line-height: 1; pointer-events: none;
+  transform: translate(-50%, -50%) scale(0); animation: heart-pop .7s ease-out forwards; }
+@keyframes heart-pop {
+  30% { transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
+  70% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -70%) scale(1); opacity: 0; }
+}
+.chat-menu { position: fixed; z-index: 80; padding: 6px; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 18px; box-shadow: 0 10px 30px rgb(0 0 0 / .22); }
+.chat-menu[hidden] { display: none; }
+.chat-menu-emojis { display: flex; gap: 2px; }
+.chat-menu-emojis button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: none; font-size: 1.5rem;
+  line-height: 1; cursor: pointer; }
+.chat-menu-emojis button:hover, .chat-menu-emojis button:focus-visible { background: var(--surface); }
+.chat-menu-emojis button.is-mine { background: var(--accent-soft); }
+.chat-menu-actions { display: flex; margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--line); }
+.chat-menu-actions > * { flex: 1; padding: 8px; border: 0; background: none; color: var(--text); font: inherit;
+  font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; }
+.chat-menu-actions .is-danger { color: var(--danger); }
