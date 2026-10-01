@@ -63,7 +63,8 @@ def resolve_target(target_type, target_id):
     db = get_db()
     me = g.user["id"]
     if target_type == "user":
-        user = db.execute("SELECT id, full_name FROM users WHERE id = ? AND verified = 1", (target_id,)).fetchone()
+        user = db.execute("SELECT id, full_name FROM users WHERE id = ? AND verified = 1 AND suspended = 0",
+                          (target_id,)).fetchone()
         if user is None or user["id"] == me:
             abort(404)
         return {"user_id": user["id"], "name": user["full_name"], "snapshot": "",
@@ -213,11 +214,12 @@ def suspend(user_id, action):
         # Free the spots they held in other people's upcoming games.
         db.execute("""DELETE FROM rsvps WHERE user_id = ? AND event_id IN
                       (SELECT id FROM events WHERE host_id != ? AND ends_at >= ?)""", (user_id, user_id, now))
-        db.execute("""UPDATE invites SET status = 'canceled' WHERE guest_id = ? AND status IN ('pending', 'requested')
-                      AND event_id IN (SELECT id FROM events WHERE ends_at >= ?)""", (user_id, now))
+        db.execute("""UPDATE invites SET status = 'canceled' WHERE (guest_id = ? OR inviter_id = ?)
+                      AND status IN ('pending', 'requested')
+                      AND event_id IN (SELECT id FROM events WHERE ends_at >= ?)""", (user_id, user_id, now))
         db.commit()
         for event in hosted:
-            tell_players_it_was_cancelled(event)
+            tell_players_it_was_cancelled(event, by_host=False)
         flash(f"{user['full_name']} is suspended. Their upcoming games were canceled and players were told.", "info")
     else:
         db.execute("UPDATE users SET suspended = 0 WHERE id = ?", (user_id,))

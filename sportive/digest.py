@@ -113,4 +113,6 @@ def _send_now(app):
 @click.command("send-weekly")
 @with_appcontext
 def send_weekly_command():
-    click.echo(f"Sent the weekly email to {send_weekly()} people.")
+    from flask import current_app
+    with current_app.test_request_context():  # links in the email are built with url_for
+        click.echo(f"Sent the weekly email to {send_weekly()} people.")

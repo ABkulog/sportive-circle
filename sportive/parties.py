@@ -36,6 +36,8 @@ def invitable_friends(event_id, me):
              AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :me AND b.blocked_id = u.id)
                                                       OR (b.blocker_id = u.id AND b.blocked_id = :me))
              AND u.id NOT IN (SELECT user_id FROM rsvps WHERE event_id = :event)
+             AND (u.id NOT IN (SELECT user_id FROM removed_players WHERE event_id = :event)
+                  OR :me = (SELECT host_id FROM events WHERE id = :event))
              AND u.id NOT IN (SELECT guest_id FROM invites WHERE event_id = :event AND status IN ('pending', 'requested'))
            ORDER BY fold(u.full_name)""", {"me": me, "event": event_id}).fetchall()
 
@@ -60,6 +62,8 @@ def _party_plan(event):
     me = g.user["id"]
     if event["cancelled"] or from_db(event["ends_at"]) < now_local():
         return None, False, "This game is over."
+    if event["on_hold"]:
+        return None, False, "This club event is on hold until the club is approved again."
     if is_blocked_between(me, event["host_id"]):
         return None, False, "You can't join this game."
     mine = get_db().execute("SELECT team FROM rsvps WHERE event_id = ? AND user_id = ?",
@@ -240,6 +244,8 @@ def answer_request(event_id, guest_id, action):
         db.commit()
         flash("Declined.", "info")
         return redirect(link + "#requests")
+    # The host said yes to this person by name, so a past "took you off this game" no longer applies.
+    db.execute("DELETE FROM removed_players WHERE event_id = ? AND user_id = ?", (event_id, guest_id))
     db.commit()
     db.execute("BEGIN IMMEDIATE")
     try:
@@ -433,7 +439,7 @@ def send_to_friends(event_id):
             flash("You can only send games to your friends.", "error")
         elif len(chosen) > MAX_PARTY:
             flash(f"You can send it to up to {MAX_PARTY} friends at once.", "error")
-        elif too_many_messages(me):
+        elif too_many_messages(me, len(chosen)):
             flash("Whoa, slow down! Wait a minute before sending more messages.", "error")
         else:
             body = note or f"Want to play? {event_title(event)}, {fmt_when(event['starts_at'])}."

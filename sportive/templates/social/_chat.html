@@ -24,7 +24,7 @@
               {%- else %}<span>{{ m.initial }}</span>{% endif -%}
             </a>
           {% endif %}
-          <div class="chat-bubble{% if m.photo and not m.body %} is-photo{% endif %}">
+          <div class="chat-bubble{% if m.photo and not m.body %} is-photo{% endif %}" tabindex="0">
             {% if not m.mine and kind == 'game' %}<span class="chat-name">{{ m.name }}</span>{% endif %}
             {% if m.photo %}<a class="chat-photo" href="{{ m.photo }}" target="_blank" rel="noopener">
               <img src="{{ m.photo }}" alt="Photo from {{ m.name }}"></a>{% endif %}

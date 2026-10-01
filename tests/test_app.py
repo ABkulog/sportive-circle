@@ -1614,6 +1614,8 @@ def test_join_leave_and_officers(accounts, client, app):
     client.post(f"/clubs/{club}/members/{fan}/approve")
     client.post(f"/clubs/{club}/posts", data={"body": "Nets are at the Quad by 5!"})
     client.post(f"/clubs/{club}/officers/{fan}")
+    assert b"You&#39;re the owner" in client.post(f"/clubs/{club}/leave", follow_redirects=True).data
+    client.post(f"/clubs/{club}/officers", data={"user": fan, "action": "owner"})   # hand over, then leave
     assert b"You left the club" in client.post(f"/clubs/{club}/leave", follow_redirects=True).data
     assert b"Nets are at the Quad by 5!" in client.get(f"/clubs/{club}").data
 
@@ -4447,7 +4449,7 @@ def test_password_reset_code_is_texted_to_confirmed_numbers(accounts, client, ap
     accounts.signup()
     accounts.logout()
     with app.app_context():
-        get_db().execute("UPDATE users SET phone = '+12065550142', phone_verified = 1, verify_sent_at = NULL")
+        get_db().execute("UPDATE users SET phone = '+12065550142', phone_verified = 1, sms_updates = 1, verify_sent_at = NULL")
         get_db().commit()
     client.post("/forgot", data={"email": "dubs@uw.edu"})
     assert sent and sent[-1][0] == "+12065550142" and "password reset code" in sent[-1][1]
@@ -5632,3 +5634,453 @@ def test_chats_send_without_reloading_the_page(accounts, client, app):
     assert client.post(f"/events/{game}/chat", data={"body": "On my way"},
                        headers={"X-Chat-Send": "1"}).get_json()["ok"] is True
     assert client.post(f"/messages/{ids['Sam']}", data={"body": "No script"}).status_code == 302   # still works
+
+
+
+
+# ---- Fixes from the bot test run (AI testers' findings) ----
+
+def test_full_for_now_doesnt_name_players_of_a_private_game(accounts, client, app):
+    ids = _people(accounts, app, "Hana", "Anna", "Gus", "Otto")
+    _friends(app, ids["Anna"], ids["Gus"])
+    _as(accounts, "Hana")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Secret", players="3", is_private="1",
+                                                                     password="dawgs26")))
+    _as(accounts, "Anna")
+    client.post(f"/events/{game}/join", data={"password": "dawgs26"})
+    with app.app_context():                     # Anna's friend Gus has a held spot (as after the host says yes)
+        from sportive.invites import HOLD_TIME
+        from sportive.timeutil import now_local, to_db
+        get_db().execute("""INSERT INTO invites (event_id, inviter_id, guest_id, status, created_at, expires_at)
+                            VALUES (?, ?, ?, 'pending', ?, ?)""",
+                         (game, ids["Anna"], ids["Gus"], to_db(now_local()), to_db(now_local() + HOLD_TIME)))
+        get_db().commit()
+    _as(accounts, "Otto")
+    page = client.get(f"/events/{game}").data.decode()
+    assert "Anna" not in page and "held for invited friends" in page
+
+
+def test_owner_cant_add_someone_who_blocked_them(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Vic")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Vic")
+    client.post(f"/block/{ids['Maya']}")
+    _as(accounts, "Maya")
+    said = client.post(f"/clubs/{club}/officers", data={"user": ids["Vic"], "action": "add"},
+                       follow_redirects=True).data.decode()
+    assert "can&#39;t add this person" in said
+    with app.app_context():
+        assert get_db().execute("SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ?",
+                                (club, ids["Vic"])).fetchone() is None
+
+
+def test_odd_digits_in_players_dont_crash(accounts, client):
+    accounts.signup()
+    response = client.post("/events/new", data=event_form(players="²"))
+    assert response.status_code == 200 and b"Pick 2 to 1000 participants" in response.data
+
+
+def test_send_to_friends_counts_the_whole_batch_toward_the_limit(accounts, client, app):
+    names = ["Maya"] + [f"Pal{n}" for n in range(10)]
+    ids = _people(accounts, app, *names)
+    _friends(app, ids["Maya"], *[ids[n] for n in names[1:]])
+    _as(accounts, "Maya")
+    for n in range(15):
+        client.post(f"/messages/{ids['Pal0']}", data={"body": f"hi {n}"})
+    game = event_id_from(client.post("/events/new", data=event_form(title="Pickup", players="20")))
+    said = client.post(f"/events/{game}/send", data={"friend": [ids[n] for n in names[1:]]},
+                       follow_redirects=True).data.decode()
+    assert "slow down" in said
+
+
+def test_leaving_a_game_you_werent_in_says_so(accounts, client, app):
+    _people(accounts, app, "Maya", "Sam")
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    _as(accounts, "Sam")
+    assert b"You weren&#39;t going to this game." in client.post(f"/events/{game}/leave", follow_redirects=True).data
+
+
+def test_skipping_texts_at_sign_up_hides_the_home_texts_card(client, app):
+    client.post("/signup", data={"full_name": "New Kid", "email": "newkid@uw.edu", "password": "purple-and-gold",
+                                 "password2": "purple-and-gold", "birth_date": "2006-01-01", "grad_year": "2029"})
+    client.post("/signup/sports", data={"sports": ["running"]})
+    client.post("/signup/texts", data={"phone": ""})
+    with app.app_context():
+        code = get_db().execute("SELECT verify_code FROM users WHERE email = 'newkid@uw.edu'").fetchone()[0]
+    client.post("/verify", data={"code": code})
+    assert "New: game updates by text" not in client.get("/").data.decode()
+
+
+def test_clubs_never_end_up_without_officers(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Bea")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Maya")
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Bea"], "action": "add"})
+    said = client.post(f"/clubs/{club}/leave", follow_redirects=True).data.decode()
+    assert "You&#39;re the owner" in said                                  # hand over before leaving
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Bea"], "action": "owner"})
+    client.post(f"/clubs/{club}/leave")                                     # now Maya can leave
+    _as(accounts, "Bea")
+    said = client.post(f"/clubs/{club}/officers", data={"user": ids["Bea"], "action": "remove"},
+                       follow_redirects=True).data.decode()
+    assert "stays an officer" in said or "at least one officer" in said
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'officer'",
+                                (club,)).fetchone()[0] == 1
+
+
+def test_admins_can_reach_manage_officers(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    _people(accounts, app, "Maya", "Boss")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Boss")
+    assert "Manage officers (admin)" in client.get(f"/clubs/{club}").data.decode()
+    assert client.get(f"/clubs/{club}/officers").status_code == 200
+
+
+def test_remove_all_weeks_keeps_other_weekdays(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "maya@uw.edu"
+    _people(accounts, app, "Maya")
+    _as(accounts, "Maya")
+    first, _ = _day_after_tomorrow(18)
+    from datetime import date as _date
+    second = (_date.fromisoformat(first) + timedelta(days=1)).isoformat()
+    for day in (first, second):
+        client.post("/admin/uw-rec", data={"location": "Denny Field", "label": "IM flag", "date": day,
+                                           "start": "18:00", "end": "22:00", "weeks": "3"})
+    with app.app_context():
+        one = get_db().execute("SELECT id FROM rec_reservations ORDER BY starts_at").fetchone()[0]
+    client.post(f"/admin/uw-rec/{one}/delete", data={"all": "1"})
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rec_reservations").fetchone()[0] == 3
+
+
+# ---- Loop round 1: accounts, hosting, chats (whole-app testers) ----
+
+def test_blocked_people_dont_see_your_upcoming_games_on_your_profile(accounts, client, app):
+    ids = _people(accounts, app, "Alice", "Bob")
+    _as(accounts, "Alice")
+    client.post("/events/new", data=event_form(title="Alice hoops"))
+    client.post(f"/block/{ids['Bob']}")
+    _as(accounts, "Bob")
+    assert "Alice hoops" not in client.get(f"/u/{ids['Alice']}").data.decode()
+
+
+def test_suspended_accounts_cant_reset_their_password(accounts, client, app):
+    accounts.signup(email="bob@uw.edu", name="Bob Husky")
+    accounts.logout()
+    client.post("/forgot", data={"email": "bob@uw.edu"})
+    with app.app_context():
+        code = get_db().execute("SELECT verify_code FROM users WHERE email = 'bob@uw.edu'").fetchone()[0]
+        get_db().execute("UPDATE users SET suspended = 1 WHERE email = 'bob@uw.edu'")
+        get_db().commit()
+    page = client.post("/reset", data={"email": "bob@uw.edu", "code": code, "password": "new-pass-word-1",
+                                       "password2": "new-pass-word-1"}, follow_redirects=True).data.decode()
+    assert "Password changed" not in page
+
+
+def test_suspended_people_cant_get_friend_requests(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Sus")
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 1 WHERE id = ?", (ids["Sus"],))
+        get_db().commit()
+    _as(accounts, "Maya")
+    assert client.post(f"/friends/request/{ids['Sus']}").status_code == 404
+
+
+def test_blocked_chat_isnt_marked_seen(accounts, client, app):
+    ids = _people(accounts, app, "Ann", "Ben")
+    _friends(app, ids["Ann"], ids["Ben"])
+    _as(accounts, "Ann")
+    client.post(f"/messages/{ids['Ben']}", data={"body": "last one"})
+    client.post(f"/block/{ids['Ben']}")
+    _as(accounts, "Ben")
+    client.get(f"/messages/{ids['Ann']}")
+    with app.app_context():
+        assert get_db().execute("SELECT read_at FROM direct_messages").fetchone()[0] is None
+
+
+def test_no_reactions_in_canceled_games_or_on_blocked_peoples_messages(accounts, client, app):
+    ids = _people(accounts, app, "Host", "Pat", "Rae")
+    _as(accounts, "Host")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Chatty")))
+    for name in ("Pat", "Rae"):
+        _as(accounts, name)
+        client.post(f"/events/{game}/join")
+    client.post(f"/events/{game}/chat", data={"body": "hi all"})          # Rae's message
+    with app.app_context():
+        msg = get_db().execute("SELECT id FROM event_messages").fetchone()[0]
+    _as(accounts, "Pat")
+    client.post(f"/block/{ids['Rae']}")
+    assert client.post("/chat/react", data={"kind": "game", "id": msg, "emoji": "❤️"}).status_code == 404
+    client.post(f"/unblock/{ids['Rae']}")
+    _as(accounts, "Host")
+    client.post(f"/events/{game}/cancel")
+    _as(accounts, "Pat")
+    assert client.post("/chat/react", data={"kind": "game", "id": msg, "emoji": "❤️"}).status_code in (403, 404)
+
+
+def test_visitors_dont_see_officer_names_on_club_updates(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.login(email="captain@uw.edu")
+    client.post(f"/clubs/{club}/posts", data={"body": "Nets at 5"})
+    accounts.logout()
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Nets at 5" in page and "Cap Tain" not in page
+
+
+def test_roster_file_name_keeps_accented_letters(accounts, client, app):
+    club = _approved_club(accounts, client, app, name="Ünïcode Clüb")
+    accounts.login(email="captain@uw.edu")
+    response = client.get(f"/clubs/{club}/roster.csv")
+    assert "unicode-club-roster.csv" in response.headers["Content-Disposition"]
+
+
+def test_changing_only_the_end_time_says_so(accounts, client, app):
+    _people(accounts, app, "Host", "Pat")
+    _as(accounts, "Host")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    with app.app_context():
+        row = get_db().execute("SELECT starts_at, ends_at FROM events WHERE id = ?", (game,)).fetchone()
+    _as(accounts, "Pat")
+    client.post(f"/events/{game}/join")
+    _as(accounts, "Host")
+    from sportive.timeutil import from_db
+    later = (from_db(row["ends_at"]) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
+    client.post(f"/events/{game}/edit", data=event_form(title="Hoops", starts_at=row["starts_at"].replace(" ", "T"),
+                                                         ends_at=later))
+    _as(accounts, "Pat")
+    bell = client.get("/notifications").data.decode()
+    assert "now ends at" in bell and "new time" not in bell
+
+
+def test_on_hold_club_games_stay_in_my_events_and_players_are_told(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.login(email="captain@uw.edu")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Club night", club=str(club))))
+    accounts.logout()
+    accounts.signup(email="pat@uw.edu", name="Pat Husky")
+    client.post(f"/events/{game}/join")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    client.post(f"/clubs/{club}/edit", data={**CLUB, "name": "UW Spikeball Club 2"})
+    accounts.logout()
+    accounts.login(email="pat@uw.edu")
+    assert "Club night" in client.get("/me/events").data.decode()
+    assert "on hold" in client.get("/notifications").data.decode()
+    said = client.get(f"/events/{game}/party", follow_redirects=True).data.decode()
+    assert "on hold" in said
+
+
+# ---- Loop round 2: races, admin tools, phone layout ----
+
+def test_cant_join_a_game_after_its_canceled(accounts, client, app):
+    _people(accounts, app, "Host", "Pat")
+    _as(accounts, "Host")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Rainout")))
+    _as(accounts, "Pat")
+    from sportive.events import get_event, try_join
+    with app.test_request_context():
+        from flask import g
+        g.user = get_db().execute("SELECT * FROM users WHERE email = 'pat@uw.edu'").fetchone()
+        event = get_event(game)                                   # loaded before the cancel, like a racing request
+        get_db().execute("UPDATE events SET cancelled = 1 WHERE id = ?", (game,))
+        get_db().commit()
+        joined, _ = try_join(event)
+    assert not joined
+
+
+def test_parallel_wrong_codes_cant_get_past_the_limit(accounts, client, app):
+    accounts.signup(email="bob@uw.edu", name="Bob Husky")
+    accounts.logout()
+    client.post("/forgot", data={"email": "bob@uw.edu"})
+    with app.app_context():
+        from sportive.auth import MAX_CODE_ATTEMPTS
+        get_db().execute("UPDATE users SET verify_attempts = ? WHERE email = 'bob@uw.edu'", (MAX_CODE_ATTEMPTS - 1,))
+        get_db().commit()
+    with app.test_request_context():
+        from sportive.auth import claim_code_try
+        uid = get_db().execute("SELECT id FROM users WHERE email = 'bob@uw.edu'").fetchone()[0]
+        assert claim_code_try(uid) and not claim_code_try(uid)    # one try left, then none
+
+
+def test_crossing_friend_requests_make_one_friendship(accounts, client, app):
+    ids = _people(accounts, app, "Ann", "Ben")
+    _as(accounts, "Ann")
+    client.post(f"/friends/request/{ids['Ben']}")
+    _as(accounts, "Ben")
+    client.post(f"/friends/request/{ids['Ann']}")                 # = accept
+    with app.app_context():
+        rows = get_db().execute("SELECT status FROM friendships").fetchall()
+    assert [r[0] for r in rows] == ["accepted"]
+
+
+def test_suspending_someone_cancels_invites_they_sent(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    ids = _people(accounts, app, "Host", "Xan", "Fay", "Boss")
+    _friends(app, ids["Xan"], ids["Fay"])
+    _as(accounts, "Host")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Pickup", players="10")))
+    _as(accounts, "Xan")
+    client.post(f"/events/{game}/join")
+    client.post(f"/events/{game}/party", data={"friend": [ids["Fay"]]})
+    _as(accounts, "Boss")
+    client.post(f"/admin/users/{ids['Xan']}/suspend")
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM invites WHERE inviter_id = ?", (ids["Xan"],)).fetchone()[0] == "canceled"
+
+
+def test_denying_a_club_cancels_its_on_hold_events(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.login(email="captain@uw.edu")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Club night", club=str(club))))
+    accounts.logout()
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    accounts.signup(email="boss@uw.edu", name="Bo Ss")
+    client.post(f"/admin/clubs/{club}/remove", data={"note": "Instagram link is dead"})
+    client.post(f"/admin/clubs/{club}/deny")
+    with app.app_context():
+        assert get_db().execute("SELECT cancelled FROM events WHERE id = ?", (game,)).fetchone()[0] == 1
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    client.post(f"/admin/clubs/{club}/restore")                  # not an admin: nothing happens
+
+
+def test_officers_see_why_their_club_was_removed(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    accounts.signup(email="boss@uw.edu", name="Bo Ss")
+    client.post(f"/admin/clubs/{club}/remove", data={"note": "Instagram link is dead"})
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Why it's back in review" in page and "Instagram link is dead" in page
+
+
+def test_filtered_suggestions_dont_hide_new_ones(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    accounts.signup(email="kid@uw.edu", name="Kid Husky")
+    client.post("/suggestions", data={"kind": "bug", "body": "The map button does nothing on my phone"})
+    accounts.logout()
+    accounts.signup(email="boss@uw.edu", name="Bo Ss")
+    client.get("/admin/suggestions?kind=idea")
+    with app.test_request_context():
+        pass
+    page = client.get("/admin/suggestions").data.decode()
+    assert "map button" in page and "New" in page.split("map button")[0][-600:]
+
+
+def test_no_reports_about_suspended_accounts(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Xan")
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 1 WHERE id = ?", (ids["Xan"],))
+        get_db().commit()
+    _as(accounts, "Maya")
+    assert client.get(f"/report/user/{ids['Xan']}").status_code == 404
+
+
+def test_chat_messages_can_be_reached_with_the_keyboard(accounts, client, app):
+    ids = _people(accounts, app, "Ann", "Ben")
+    _friends(app, ids["Ann"], ids["Ben"])
+    _as(accounts, "Ann")
+    client.post(f"/messages/{ids['Ben']}", data={"body": "yo"})
+    assert 'class="chat-bubble" tabindex="0"' in client.get(f"/messages/{ids['Ben']}").data.decode()
+
+
+# ---- Loop round 3: emails & texts, feed & search, deployment ----
+
+def test_weekly_email_command_runs_outside_a_page(app):
+    result = app.test_cli_runner().invoke(args=["send-weekly"])
+    assert result.exit_code == 0 and "Sent the weekly email" in result.output
+
+
+def test_every_email_links_to_settings(app):
+    from sportive.mail import compose
+    with app.test_request_context():
+        text, html = compose("Hi", "Hi", ["Line"], reason="Because.")
+    assert "/settings" in text and "/settings" in html
+
+
+def test_reset_code_isnt_texted_when_texts_are_off(accounts, client, app):
+    from sportive import sms
+    sent = []
+    sms.send_sms, original = (lambda to, body: sent.append(body)), sms.send_sms
+    try:
+        accounts.signup(email="bob@uw.edu", name="Bob Husky")
+        with app.app_context():
+            get_db().execute("UPDATE users SET phone = '+12065550142', phone_verified = 1, sms_updates = 0")
+            get_db().commit()
+            uid = get_db().execute("SELECT id FROM users").fetchone()[0]
+        with app.test_request_context():
+            assert sms.text_code(uid, "123456", "password reset") is False
+        assert sent == []
+    finally:
+        sms.send_sms = original
+
+
+def test_admin_cancellations_dont_blame_the_host(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    ids = _people(accounts, app, "Hana", "Pat", "Boss")
+    _as(accounts, "Hana")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    _as(accounts, "Pat")
+    client.post(f"/events/{game}/join")
+    _as(accounts, "Boss")
+    client.post(f"/admin/users/{ids['Hana']}/suspend")
+    _as(accounts, "Pat")
+    bell = client.get("/notifications").data.decode()
+    assert "Sportive Circle canceled" in bell and "Hana canceled" not in bell
+
+
+def test_top_dawgs_skips_blocked_people_and_solo_games(accounts, client, app):
+    ids = _people(accounts, app, "Mia", "Bob", "Cal")
+    from sportive.timeutil import now_local, to_db
+    start = now_local().replace(day=1, hour=0, minute=1)
+    with app.app_context():
+        db = get_db()
+        def game(host, *players):
+            cur = db.execute("""INSERT INTO events (host_id, title, sport, location, skill_level, starts_at, ends_at,
+                                created_at) VALUES (?, 'g', 'basketball', 'IMA (Intramural Activities Building)',
+                                'Casual', ?, ?, ?)""", (host, to_db(start), to_db(start + timedelta(minutes=30)), to_db(start)))
+            for p in (host, *players):
+                db.execute("INSERT INTO rsvps (event_id, user_id, created_at) VALUES (?, ?, ?)", (cur.lastrowid, p, to_db(start)))
+        game(ids["Bob"]); game(ids["Bob"]); game(ids["Bob"])         # solo: don't count
+        game(ids["Cal"], ids["Bob"])                                  # real game: counts for both
+        db.commit()
+    if now_local() <= start + timedelta(minutes=30):
+        return  # first half hour of the month: nothing has ended yet
+    _as(accounts, "Mia")
+    from sportive.spirit import top_dawgs
+    with app.test_request_context():
+        board = {r["full_name"].split()[0]: r["games"] for r in top_dawgs(viewer=ids["Mia"])}
+    assert board.get("Bob") == 1 and board.get("Cal") == 1
+    client.post(f"/block/{ids['Bob']}")
+    with app.test_request_context():
+        assert "Bob" not in {r["full_name"].split()[0] for r in top_dawgs(viewer=ids["Mia"])}
+
+
+def test_my_clubs_only_lists_clubs_you_can_open(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="mo@uw.edu", name="Mo Husky")
+    client.post(f"/clubs/{club}/join", data={"message": "hi"})
+    with app.app_context():
+        get_db().execute("UPDATE clubs SET status = 'pending' WHERE id = ?", (club,))
+        get_db().commit()
+    assert f'href="/clubs/{club}"' not in client.get("/clubs?mine=1").data.decode()
+
+
+def test_empty_my_sports_feed_points_to_all_sports(accounts, client, app):
+    accounts.signup(email="mia@uw.edu", name="Mia Husky", sports=("tennis",))
+    page = client.get("/").data.decode()
+    assert "No games for your sports yet" in page and "scope=all" in page
+
+
+def test_seed_refuses_the_live_database(tmp_path):
+    import os
+    import subprocess
+    import sys
+    env = {**os.environ, "RENDER_EXTERNAL_URL": "https://x.onrender.com", "DATABASE": str(tmp_path / "live.db"),
+           "SECRET_KEY": "k" * 48}
+    result = subprocess.run([sys.executable, "seed.py"], env=env, capture_output=True, text=True)
+    assert result.returncode != 0 and "won't add demo accounts" in result.stderr

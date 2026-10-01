@@ -30,8 +30,8 @@ MAX_DRAFT_COOKIE_BYTES = 2500
 # ---------------------------------------------------------------- helpers
 
 def get_user(user_id):
-    user = get_db().execute("SELECT id, full_name, avatar_updated FROM users WHERE id = ? AND verified = 1",
-                            (user_id,)).fetchone()
+    user = get_db().execute("SELECT id, full_name, avatar_updated FROM users WHERE id = ? AND verified = 1"
+                            " AND suspended = 0", (user_id,)).fetchone()
     if user is None:
         abort(404)
     return user
@@ -124,14 +124,15 @@ def block_user(me, other):
                   AND event_id IN (SELECT id FROM events WHERE host_id = ?)""", (other, me))
 
 
-def too_many_messages(me):
+def too_many_messages(me, sending=1):
+    """True if sending `sending` more messages now would go over the per-minute limit."""
     since = to_db(now_local() - timedelta(minutes=1))
     db = get_db()
     recent = db.execute("SELECT COUNT(*) FROM direct_messages WHERE sender_id = ? AND created_at >= ?",
                         (me, since)).fetchone()[0]
     recent += db.execute("SELECT COUNT(*) FROM event_messages WHERE sender_id = ? AND created_at >= ?",
                          (me, since)).fetchone()[0]
-    return recent >= MAX_MESSAGES_PER_MINUTE
+    return recent + sending > MAX_MESSAGES_PER_MINUTE
 
 
 def clean_body(text, photo=False):
@@ -381,8 +382,10 @@ def _back(default):
 def send_request(user_id):
     me = g.user["id"]
     get_user(user_id)
-    status = friendship_status(me, user_id)
     db = get_db()
+    db.commit()
+    db.execute("BEGIN IMMEDIATE")  # read and write together: two crossing requests can't both insert
+    status = friendship_status(me, user_id)
     if user_id == me:
         flash("That's you!", "info")
     elif is_blocked_between(me, user_id):
@@ -397,6 +400,7 @@ def send_request(user_id):
                    (me, user_id, to_db(now_local())))
         db.commit()
         flash("Friend request sent!", "success")
+    db.commit()
     return _back(url_for("profile.view", user_id=user_id))
 
 
@@ -573,9 +577,12 @@ def react():
             abort(403)
         place = other
     else:
-        message = db.execute("SELECT event_id FROM event_messages WHERE id = ?", (message_id,)).fetchone()
-        if message is None:
-            abort(404)
+        message = db.execute("""SELECT m.event_id, m.sender_id, e.cancelled FROM event_messages m
+                                JOIN events e ON e.id = m.event_id WHERE m.id = ?""", (message_id,)).fetchone()
+        if message is None or is_blocked_between(me, message["sender_id"]):
+            abort(404)  # a blocked person's messages are hidden from you, so they can't be reacted to either
+        if message["cancelled"]:
+            abort(403)  # the chat of a canceled game is closed
         if db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (message["event_id"], me)).fetchone() is None:
             abort(403)  # only people going can see (and react in) a game's chat
         place = message["event_id"]
@@ -644,8 +651,10 @@ def thread(user_id):
                            " VALUES (?, ?, ?, ?, ?)", (me, user_id, body, to_db(now_local()), photo_id))
                 db.commit()
         return chat_sent(error, url_for("social.thread", user_id=user_id) + "#composer")
-    _mark_read(me, user_id)
-    rows = _thread_rows(me, user_id) if not is_blocked_between(me, user_id) else []
+    blocked_now = is_blocked_between(me, user_id)
+    if not blocked_now:
+        _mark_read(me, user_id)
+    rows = _thread_rows(me, user_id) if not blocked_now else []
     messages, _ = with_reactions([message_json(r, me, 'dm') for r in rows], "dm", me, user_id)
     return render_template("social/thread.html", other=other, messages=messages,
                            allowed=allowed, poll_url=url_for("social.thread_poll", user_id=user_id), draft=take_draft(),

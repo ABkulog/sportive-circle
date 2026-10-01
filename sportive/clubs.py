@@ -245,8 +245,9 @@ def directory():
     mine = request.args.get("mine") == "1" and g.get("user") is not None
     easy = request.args.getlist("easy")  # quick filters: beginner / free / no_tryouts
     where, params = [], {"me": g.user["id"] if g.get("user") else 0}
-    if mine:  # my clubs, including ones still being reviewed
-        where.append("EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me)")
+    if mine:  # my clubs, including ones still being reviewed (those only for their officers: others can't open them)
+        where.append("EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me"
+                     " AND (c.status = 'approved' OR m.role = 'officer'))")
     else:
         where.append("c.status = 'approved'")
     for n, word in enumerate(fold(q).split()[:5]):  # every word, any order, accents and capitals ignored
@@ -346,7 +347,9 @@ def roster_csv(club_id):
     for person in roster(club_id):
         writer.writerow([spreadsheet_safe(person["full_name"]), person["email"], person["grad_year"] or "",
                          person["role"].title(), person["joined_at"][:10]])
-    filename = re.sub(r"[^A-Za-z0-9]+", "-", club["name"]).strip("-").lower() or "club"
+    import unicodedata  # only needed here
+    plain = unicodedata.normalize("NFKD", club["name"]).encode("ascii", "ignore").decode()
+    filename = re.sub(r"[^A-Za-z0-9]+", "-", plain).strip("-").lower() or "club"
     return Response(output.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename={filename}-roster.csv"})
 
@@ -493,9 +496,13 @@ def edit(club_id):
             identity_changed = any(data[key] != club[key] for key in ("name", "club_kind"))
             status = "pending" if identity_changed or club["status"] == "rejected" else club["status"]
             db = get_db()
-            db.execute(f"UPDATE clubs SET {', '.join(f + ' = :' + f for f in FIELDS)}, status = :status WHERE id = :id",
-                       {**data, "status": status, "id": club_id})
+            db.execute(f"UPDATE clubs SET {', '.join(f + ' = :' + f for f in FIELDS)}, status = :status,"
+                       " review_note = CASE WHEN :was = 'rejected' THEN '' ELSE review_note END WHERE id = :id",
+                       {**data, "status": status, "id": club_id, "was": club["status"]})
             db.commit()
+            if status == "pending" and club["status"] == "approved":
+                _tell_players_on_hold(club)
+                db.commit()
             if status == "pending" and club["status"] != "pending":
                 flash("Saved. The club's name or type changed, so we'll quickly check it again.", "info")
             else:
@@ -647,16 +654,22 @@ def decide(club_id, user_id, decision):
 def leave(club_id):
     """Leave the club, cancel a request, or unfollow."""
     db = get_db()
+    db.commit()
+    db.execute("BEGIN IMMEDIATE")  # read who's officer/owner and leave in one go (no handover to someone leaving)
     role = my_role(club_id)
     officers = db.execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'officer'",
                           (club_id,)).fetchone()[0]
+    club = get_club(club_id)
     if role == "officer" and officers == 1:
         flash("You're the only officer. Make someone else an officer before you leave.", "error")
+    elif role == "officer" and club["created_by"] == g.user["id"]:
+        flash("You're the owner. On Manage officers, make another officer the owner, then you can leave.", "error")
     elif role is not None:
         db.execute("DELETE FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, g.user["id"]))
         db.commit()
         flash({"follower": "Unfollowed.", "requested": "Request canceled.", "tryout": "Tryout sign-up canceled."}
               .get(role, "You left the club."), "info")
+    db.commit()
     return redirect(url_for("clubs.view", club_id=club_id))
 
 
@@ -698,7 +711,10 @@ def officers(club_id):
         if person is None:
             abort(404)
         first = person["full_name"].split()[0]
-        if action == "add":
+        from .social import is_blocked_between  # social.py is loaded after this module
+        if action == "add" and is_blocked_between(g.user["id"], user_id):
+            flash("You can't add this person.", "error")
+        elif action == "add":
             db.execute("""INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, 'officer', ?)
                           ON CONFLICT(club_id, user_id) DO UPDATE SET role = 'officer'""",
                        (club_id, user_id, to_db(now_local())))
@@ -713,9 +729,12 @@ def officers(club_id):
             if not is_officer:
                 flash("Make them an officer first, then you can make them the owner.", "error")
             elif user_id != club["created_by"]:
-                if not db.execute("UPDATE clubs SET created_by = ? WHERE id = ? AND created_by = ?",
-                                  (user_id, club_id, club["created_by"])).rowcount:  # handed over meanwhile
-                    flash("The club was already handed to someone else.", "error")
+                if not db.execute("""UPDATE clubs SET created_by = ? WHERE id = ? AND created_by = ?
+                                     AND EXISTS (SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ?
+                                                 AND role = 'officer')""",
+                                  (user_id, club_id, club["created_by"], club_id, user_id)).rowcount:
+                    # handed to someone else meanwhile, or they just left / stopped being an officer
+                    flash("That didn't go through: the club changed hands or they're no longer an officer.", "error")
                     return redirect(url_for("clubs.view", club_id=club_id))
                 _dm(g.user["id"], user_id, f"👑 You're now the owner of {club['name']}. You can add or remove officers "
                                            f"and hand the club to someone else later. {_club_link(club_id)}")
@@ -728,12 +747,18 @@ def officers(club_id):
             if user_id == club["created_by"]:
                 flash("The owner stays an officer. To step down, make another officer the owner first.", "error")
             else:
-                changed = db.execute("UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ?"
-                                     " AND role = 'officer'", (club_id, user_id)).rowcount
-                if changed:
-                    flash(f"{first} is a member now, not an officer.", "success")
-                else:
+                count = db.execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'officer'",
+                                   (club_id,)).fetchone()[0]
+                is_officer = db.execute("SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ? "
+                                        "AND role = 'officer'", (club_id, user_id)).fetchone()
+                if not is_officer:
                     flash(f"{first} isn't an officer.", "error")
+                elif count <= 1:
+                    flash("A club needs at least one officer. Add another officer first.", "error")
+                else:
+                    db.execute("UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ? "
+                               "AND role = 'officer'", (club_id, user_id))
+                    flash(f"{first} is a member now, not an officer.", "success")
         db.commit()
         return redirect(url_for("clubs.officers", club_id=club_id))
     current = db.execute(
@@ -826,6 +851,18 @@ def public_url_for(path):
     return current_app.config["PUBLIC_URL"].rstrip("/") + path if path.startswith("/") else path
 
 
+def _tell_players_on_hold(club):
+    """A club went back to review, so its upcoming events are on hold: tell everyone going (in their bell)."""
+    from .notifications import notify  # imported here: notifications.py is loaded after this module
+    rows = get_db().execute(
+        """SELECT DISTINCT r.user_id, e.id, e.title FROM rsvps r JOIN events e ON e.id = r.event_id
+           WHERE e.club_id = ? AND e.cancelled = 0 AND e.ends_at >= ?""", (club["id"], to_db(now_local()))).fetchall()
+    for row in rows:
+        notify(row["user_id"], "game_updates",
+               f"{row['title']} is on hold while {club['name']} is checked again. You're still in it.",
+               url_for("events.detail", event_id=row["id"]), key=f"on_hold:{row['id']}")
+
+
 def _notify_officers(club, subject, heading, lines, button, notice):
     """Email every officer, and put `notice` (text, link) in their bell too: not everyone checks email."""
     from .notifications import notify  # imported here: notifications.py is loaded after this module
@@ -900,10 +937,22 @@ def review(club_id, decision):
             return back
         db.commit()
         if decision == "deny":
-            flash(f"Denied {club['name']}. It's hidden and can't be resent.", "info")
+            from .events import query_events, tell_players_it_was_cancelled  # events.py imports this module
+            upcoming = query_events(["e.club_id = :club", "e.cancelled = 0", "e.ends_at >= :now"],
+                                    {"club": club_id, "now": to_db(now_local())}, on_hold=True)
+            db.execute("UPDATE events SET cancelled = 1, revision = revision + 1 WHERE club_id = ? AND cancelled = 0 "
+                       "AND ends_at >= ?", (club_id, to_db(now_local())))
+            db.commit()
+            for event in upcoming:
+                tell_players_it_was_cancelled(event, by_host=False)
+            flash(f"Denied {club['name']}. It's hidden and can't be resent"
+                  + (f"; {len(upcoming)} upcoming event{'s were' if len(upcoming) != 1 else ' was'} canceled." if upcoming else "."),
+                  "info")
         elif decision == "restore":
             flash(f"{club['name']} is back on the waiting list.", "success")
         else:
+            _tell_players_on_hold(club)
+            db.commit()
             _notify_officers(club, f"About your Sportive Circle club: {club['name']}", "Your club is back in review",
                              [f"{club['name']} was moved back to our waiting list, so it's hidden for now."]
                              + ([f"Why: {note}"] if note else [])

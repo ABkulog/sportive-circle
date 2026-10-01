@@ -4,7 +4,8 @@
 {% block content %}
 <a class="back-link" href="{{ url_for('clubs.directory') }}">← Clubs</a>
 {% if club.status == 'pending' %}
-  <div class="flash flash-info club-status">⏳ <strong>Waiting for verification</strong> (usually within 2 days). Only officers can see this page.</div>
+  <div class="flash flash-info club-status">⏳ <strong>Waiting for verification</strong> (usually within 2 days). Only officers can see this page.
+    {% if club.review_note %}<br><strong>Why it's back in review:</strong> {{ club.review_note }}{% endif %}</div>
 {% elif club.status == 'denied' %}
   <div class="flash flash-error club-status">This club request was denied. It isn't listed and can't be resent.</div>
 {% elif club.status == 'rejected' %}
@@ -82,6 +83,9 @@
           </form>
         {% endif %}
       </div>
+    {% endif %}
+    {% if owner and role != 'officer' %}{# an admin who isn't an officer here: a way to fix a stuck club #}
+      <a class="btn btn-ghost btn-block manage-officers" href="{{ url_for('clubs.officers', club_id=club.id) }}">Manage officers (admin)</a>
     {% endif %}
   </div>
 </article>
@@ -164,7 +168,7 @@
       {% for p in posts %}
         <li>
           <p>{{ p.body }}{% if p.event_id and g.user %} <a href="{{ url_for('events.detail', event_id=p.event_id) }}">See it →</a>{% endif %}</p>
-          <small class="muted">{{ p.full_name or 'An officer' }} · {{ p.created_at|when }}</small>
+          <small class="muted">{{ (p.full_name if g.user else None) or 'An officer' }} · {{ p.created_at|when }}</small>
           {% if role == 'officer' %}
             <form method="post" action="{{ url_for('clubs.delete_post', club_id=club.id, post_id=p.id) }}" class="inline-form">
               {{ csrf_field() }}<button class="link-button danger-link">Delete</button>

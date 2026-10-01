@@ -369,7 +369,7 @@ def feed():
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
                            month_name=now.strftime("%B"), more_page=more_page,
-                           hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now),
+                           hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now, viewer=g.user["id"]),
                            club_picks=suggested_clubs(g.user["id"], my_sports), texts_card=show_texts_card())
 
 
@@ -510,7 +510,7 @@ def read_players(form, sport, team_size, event=None, allow_no_limit=True):
     if allow_no_limit and form.get("no_limit"):
         return None, extra, None
     raw = form.get("players", "").strip()
-    players = int(raw) if raw.isdigit() else (DEFAULT_PLAYERS.get(sport, 10) if not raw else 0)
+    players = int(raw) if raw.isascii() and raw.isdigit() else (DEFAULT_PLAYERS.get(sport, 10) if not raw else 0)
     if not 2 <= players <= MAX_PLAYERS:
         return None, 0, f"Pick 2 to {MAX_PLAYERS} participants (you included)."
     taken = (event["going_count"] + event["extra_players"] + event["held_count"]) if event is not None else 1 + extra
@@ -553,6 +553,8 @@ def create():
         elif error is None:
             repeat = 1
         if error is None:
+            get_db().commit()
+            get_db().execute("BEGIN IMMEDIATE")  # one post at a time, so a double tap can't make two copies
             duplicate = get_db().execute(
                 "SELECT 1 FROM events WHERE host_id = ? AND title = ? AND starts_at = ? AND cancelled = 0",
                 (g.user["id"], data["title"], data["starts_at"]),
@@ -583,6 +585,7 @@ def create():
             else:
                 flash(created_message(data["is_private"], reserve, "Your game is up!"), "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))
+        get_db().rollback()  # let go of the write lock taken for the duplicate check
         form_error(error)
     else:
         starts, ends = default_times()
@@ -700,8 +703,10 @@ def players_except_host(event):
 def what_changed(event, data):
     """Plain words for what the host changed that players need to know ("new time: Sat, Oct 3 · 3:00 PM")."""
     changes = []
-    if (data["starts_at"], data["ends_at"]) != (event["starts_at"], event["ends_at"]):
+    if data["starts_at"] != event["starts_at"]:
         changes.append(f"new time: {fmt_when(data['starts_at'])}")
+    elif data["ends_at"] != event["ends_at"]:
+        changes.append(f"now ends at {fmt_clock(data['ends_at'])}")
     if data["location"] != event["location"]:
         changes.append(f"new place: {data['location']}")
     if data["sport"] != event["sport"]:
@@ -718,12 +723,13 @@ def tell_players_it_changed(event, data):
     players = players_except_host(event)
     if not changes or not players:
         return False
-    title, host = data["title"] if not event["is_quick"] else event_title(event), event["host_name"].split()[0]
+    title = data["title"] if not event["is_quick"] else event_title({**dict(event), **data})
+    host = event["host_name"].split()[0]
     link = url_for("events.detail", event_id=event["id"])
     for player in players:
         notify(player["id"], "game_updates", f"{host} changed {title}: {', '.join(changes)}", link,
                key=f"change:{event['id']}")
-    if any(change.startswith(("new time", "new place")) for change in changes):
+    if any(change.startswith(("new time", "new place", "now ends", "now ")) for change in changes):
         for player in players:
             text_user(player["id"], f"{host} changed {title}: now {fmt_when(data['starts_at'])} at {data['location']}. "
                                     f"{public_url('events.detail', event_id=event['id'])}")
@@ -733,6 +739,7 @@ def tell_players_it_changed(event, data):
                 body, html = compose(
                     subject, f"{title} changed",
                     [f"Hey {player['full_name'].split()[0]}, {host} changed this game.",
+                     *([f"🏅 Now {SPORTS[data['sport']]}"] if data["sport"] != event["sport"] else []),
                      f"🕐 {fmt_when(data['starts_at'])}", f"📍 {data['location']}"],
                     button=("See the game", public_url("events.detail", event_id=event["id"])),
                     reason="You're getting this because you joined this game.",
@@ -743,14 +750,17 @@ def tell_players_it_changed(event, data):
     return True
 
 
-def tell_players_it_was_cancelled(event, page_stays=True):
+def tell_players_it_was_cancelled(event, page_stays=True, by_host=True):
     """Tell everyone who joined (except the host), so nobody shows up to an empty field.
-    page_stays=False when the game is about to be deleted (the host's account is going), so links go to the feed."""
+    page_stays=False when the game is about to be deleted (the host's account is going), so links go to the feed.
+    by_host=False when Sportive Circle canceled it (a suspended host, a denied club): it doesn't name the host."""
     players = players_except_host(event)
     title, when = event_title(event), fmt_when(event["starts_at"])
+    who = event["host_name"].split()[0] if by_host else "Sportive Circle"
+    who_full = event["host_name"] if by_host else "Sportive Circle"
     link = url_for("events.detail", event_id=event["id"]) if page_stays else url_for("events.feed")
     for player in players:
-        notify(player["id"], "game_updates", f"{event['host_name'].split()[0]} canceled {title} ({when})",
+        notify(player["id"], "game_updates", f"{who} canceled {title} ({when})",
                link, key=f"change:{event['id']}")
     # Friends with an open invite ("You down?") hear about it too, and the invite closes.
     db = get_db()
@@ -759,21 +769,21 @@ def tell_players_it_was_cancelled(event, page_stays=True):
     db.execute("UPDATE invites SET status = 'canceled' WHERE event_id = ? AND status IN ('pending', 'requested')",
                (event["id"],))
     for row in invited:
-        notify(row["guest_id"], "invites", f"{event['host_name'].split()[0]} canceled {title} ({when}), "
+        notify(row["guest_id"], "invites", f"{who} canceled {title} ({when}), "
                "so that invite is off.", url_for("events.feed"), key=f"invite:{event['id']}")
     db.commit()
     for player in players:
-        text_user(player["id"], f"{event['host_name'].split()[0]} canceled {title} ({when}).")
+        text_user(player["id"], f"{who} canceled {title} ({when}).")
     for player in players:
         try:
             subject = f"Canceled: {title} ({when})"
             body, html = compose(
                 subject, f"{title} was canceled",
-                [f"Hey {player['full_name'].split()[0]}, heads up: {event['host_name']} canceled this game.",
+                [f"Hey {player['full_name'].split()[0]}, heads up: {who_full} canceled this game.",
                  f"🕐 {when}", f"📍 {event['location']}", "No worries, there are more games waiting for you."],
                 button=("Find another game", public_url("events.feed")),
                 reason="You're getting this because you joined this game.",
-                preheader=f"{event['host_name']} canceled {title}.")
+                preheader=f"{who_full} canceled {title}.")
             send_email(player["email"], subject, body, html=html)
         except Exception:  # one bad address shouldn't stop the others
             log.exception("Couldn't email %s about a canceled event", player["email"])
@@ -888,12 +898,12 @@ def detail(event_id):
                            # my own held spot is still mine to take, even if the game looks full to others
                            spots_for_me=None if spots_left(event) is None
                            else spots_left(event) + (1 if hold_minutes_left(invite) else 0),
-                           held=None if invite or event["i_am_going"] else full_for_now(event))
+                           held=None if hold_minutes_left(invite) or event["i_am_going"] else full_for_now(event))
 
 
 def full_for_now(event):
     """Why a game with open spots still says Full: friends invited by players hold them for 30 minutes.
-    Returns {"spots", "who", "opens_at" (clock), "minutes", "seconds"} or None if it's really full (or not full)."""
+    Returns {"spots", "whose", "opens_at" (clock), "minutes", "seconds"} or None if it's really full (or not full)."""
     if event["max_players"] is None or event["team_size"]:
         return None
     me = g.user["id"]
@@ -906,14 +916,18 @@ def full_for_now(event):
         return None
     spots, names, soonest = holds
     seconds = max(0, int((from_db(soonest) - now_local()).total_seconds()))
-    who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
-    return {"spots": spots, "who": who, "opens_at": fmt_clock(soonest), "minutes": max(1, -(-seconds // 60)),
+    if not can_see_inside(event):
+        whose = "invited friends"  # private or members-only: who's playing is for the people inside
+    else:
+        who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+        whose = f"friends {who} invited"
+    return {"spots": spots, "whose": whose, "opens_at": fmt_clock(soonest), "minutes": max(1, -(-seconds // 60)),
             "seconds": seconds}
 
 
 def full_for_now_message(held):
     spots = f"{held['spots']} spot{'s are' if held['spots'] != 1 else ' is'}"
-    return (f"Sorry, this game is full for now: {spots} held for friends {held['who']} invited. "
+    return (f"Sorry, this game is full for now: {spots} held for {held['whose']}. "
             f"If nobody takes it, a spot opens at {held['opens_at']} (in {held['minutes']} min).")
 
 
@@ -976,7 +990,7 @@ def try_join(event, password=None, team=None):
     cur = db.execute(
         f"""INSERT OR IGNORE INTO rsvps (event_id, user_id, created_at, team)
             SELECT e.id, :me, :now, :team FROM events e
-            WHERE e.id = :id AND (e.max_players IS NULL OR
+            WHERE e.id = :id AND e.cancelled = 0 AND (e.max_players IS NULL OR
                   e.extra_players + (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id)
                   + ({HELD} - (SELECT COUNT(*) FROM invites o WHERE o.event_id = e.id AND o.guest_id = :me
                                 AND o.status = 'pending' AND o.expires_at > :hold_now)) < e.max_players)
@@ -1112,9 +1126,9 @@ def leave(event_id):
         flash("This game is over, so it stays in your history.", "info")
     else:
         db = get_db()
-        db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, g.user["id"]))
+        left = db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, g.user["id"])).rowcount
         db.commit()
-        flash("You left. Your spot is open again.", "info")
+        flash("You left. Your spot is open again." if left else "You weren't going to this game.", "info")
     return redirect(url_for("events.detail", event_id=event_id))
 
 
@@ -1143,12 +1157,13 @@ def remove_player(event_id, user_id):
 @login_required
 def my_events():
     now = {"now": to_db(now_local())}
-    hosting = query_events(["e.host_id = :me", "e.cancelled = 0", "e.ends_at >= :now"], now)
+    # On-hold club events stay here (marked On hold), so players can still find a game they're in.
+    hosting = query_events(["e.host_id = :me", "e.cancelled = 0", "e.ends_at >= :now"], now, on_hold=True)
     going = query_events(
         ["e.host_id != :me", "e.ends_at >= :now",
-         "EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"], now)
+         "EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"], now, on_hold=True)
     past = query_events(
         ["e.ends_at < :now", "e.cancelled = 0",
          "EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"],
-        now, order="e.starts_at DESC", limit=10)
+        now, order="e.starts_at DESC", limit=10, on_hold=True)
     return render_template("events/mine.html", hosting=hosting, going=going, past=past)

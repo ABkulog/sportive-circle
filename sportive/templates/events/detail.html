@@ -127,7 +127,7 @@
       {% elif invite %}
         <div class="invite-box">
           <strong>{{ invite.inviter_name.split()[0] }} invited you. You down?</strong>
-          <small class="muted">{% if hold_minutes %}Your spot is held for {{ hold_minutes }} more min.{% else %}Join if there's still room.{% endif %}</small>
+          <small class="muted">{% if hold_minutes %}Your spot is held for {{ hold_minutes }} more min.{% elif held %}Your held spot ran out and it's full for now: a spot opens at {{ held.opens_at }} (in {{ held.minutes }} min) if nobody takes it.{% else %}Join if there's still room.{% endif %}</small>
           <div class="action-pair">
             <form method="post" action="{{ url_for('parties.answer_invite', event_id=event.id) }}">
               {{ csrf_field() }}<input type="hidden" name="answer" value="yes"><button class="btn btn-large btn-block">I'm in</button>
@@ -152,7 +152,7 @@
         {# Open spots are held for friends someone invited, so say so (and when it opens) instead of a bare "Full". #}
         <button class="btn btn-large btn-block" disabled>Full for now</button>
         <p class="hint held-why" data-reload-in="{{ held.seconds }}">
-          {{ held.spots }} spot{{ 's are' if held.spots != 1 else ' is' }} held for friends {{ held.who }} invited.
+          {{ held.spots }} spot{{ 's are' if held.spots != 1 else ' is' }} held for {{ held.whose }}.
           If nobody takes it, a spot opens at <strong>{{ held.opens_at }}</strong> (in {{ held.minutes }} min).
           This page updates then.</p>
       {% elif spots_for_me == 0 %}

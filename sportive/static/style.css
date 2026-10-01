@@ -1085,7 +1085,8 @@ button.link-button { min-height: 36px; }
   border-radius: 999px; }
 .chat-meta { display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 2px; font-size: .66rem; }
 .chat-bubble .chat-meta time { display: inline; margin: 0; opacity: .7; }
-.chat-more summary { list-style: none; cursor: pointer; padding: 0 4px; opacity: .55; line-height: 1; }
+.chat-more summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 36px; min-height: 32px; margin: -8px -6px -8px 0; font-size: 1rem; opacity: .7; line-height: 1; }
 .chat-more summary::-webkit-details-marker { display: none; }
 .chat-more[open] summary { opacity: 1; }
 .chat-more a { font-size: .75rem; padding: 2px 4px; color: inherit; text-decoration: underline; }
@@ -1186,9 +1187,10 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .chat-bubble { position: relative; cursor: pointer; -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none; transition: transform .15s ease; }
 .chat-msg.is-held .chat-bubble { transform: scale(.96); }
+.chat-bubble:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
 .chat-reactions { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 0; }
 .chat-reaction { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 999px;
-  padding: 1px 8px; font: inherit; font-size: .8rem; line-height: 1.5; cursor: pointer; }
+  padding: 4px 10px; min-height: 32px; font: inherit; font-size: .85rem; line-height: 1.4; cursor: pointer; }
 .chat-reaction.is-mine { border-color: var(--purple); background: var(--accent-soft); }
 .chat-heart-pop { position: absolute; left: 50%; top: 50%; font-size: 2.6rem; line-height: 1; pointer-events: none;
   transform: translate(-50%, -50%) scale(0); animation: heart-pop .7s ease-out forwards; }

@@ -170,8 +170,10 @@ def view(user_id):
     ).fetchone()
     if user is None or (user["suspended"] and user_id != g.user["id"] and not is_admin()):
         abort(404)
-    hosting = query_events(["e.host_id = :uid", "e.cancelled = 0", "e.ends_at >= :now", INSIDE_VISIBLE, SHOWN_UNLESS_FULL],
-                           {"uid": user_id, "now": to_db(now_local())}, limit=10)
+    blocked = user_id != g.user["id"] and is_blocked_between(g.user["id"], user_id)
+    hosting = [] if blocked else query_events(
+        ["e.host_id = :uid", "e.cancelled = 0", "e.ends_at >= :now", INSIDE_VISIBLE, SHOWN_UNLESS_FULL],
+        {"uid": user_id, "now": to_db(now_local())}, limit=10)
     # Emails are private: only visible to yourself and people you actually played with (a game you were both
     # in has ended). Joining a stranger's game just to read their email doesn't work.
     show_email = user_id == g.user["id"] or get_db().execute(

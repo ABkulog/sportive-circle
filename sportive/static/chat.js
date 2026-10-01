@@ -81,6 +81,7 @@
       item.appendChild(avatar);
     }
     const bubble = el("div", "chat-bubble" + (message.photo && !message.body ? " is-photo" : ""));
+    bubble.tabIndex = 0;  // Enter opens the react / copy menu (see keydown below)
     if (!message.mine && isGame) bubble.appendChild(el("span", "chat-name", message.name));
     if (message.photo) {
       const link = el("a", "chat-photo");
@@ -389,6 +390,13 @@
   });
   list.addEventListener("pointerup", cancelHold);
   list.addEventListener("pointercancel", cancelHold);
+  // Keyboard: Enter or Space on a focused message opens the menu (react, copy, report).
+  list.addEventListener("keydown", (event) => {
+    if ((event.key === "Enter" || event.key === " ") && event.target.classList.contains("chat-bubble")) {
+      event.preventDefault();
+      openMenu(event.target.closest(".chat-msg"));
+    }
+  });
   list.addEventListener("contextmenu", (event) => {  // right-click on a laptop (and long-press on Android)
     const item = event.target.closest(".chat-msg");
     if (!item || !event.target.closest(".chat-bubble")) return;
