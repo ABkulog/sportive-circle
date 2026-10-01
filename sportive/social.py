@@ -124,14 +124,15 @@ def block_user(me, other):
                   AND event_id IN (SELECT id FROM events WHERE host_id = ?)""", (other, me))
 
 
-def too_many_messages(me):
+def too_many_messages(me, sending=1):
+    """True if sending `sending` more messages now would go over the per-minute limit."""
     since = to_db(now_local() - timedelta(minutes=1))
     db = get_db()
     recent = db.execute("SELECT COUNT(*) FROM direct_messages WHERE sender_id = ? AND created_at >= ?",
                         (me, since)).fetchone()[0]
     recent += db.execute("SELECT COUNT(*) FROM event_messages WHERE sender_id = ? AND created_at >= ?",
                          (me, since)).fetchone()[0]
-    return recent >= MAX_MESSAGES_PER_MINUTE
+    return recent + sending > MAX_MESSAGES_PER_MINUTE
 
 
 def clean_body(text, photo=False):

@@ -1614,6 +1614,8 @@ def test_join_leave_and_officers(accounts, client, app):
     client.post(f"/clubs/{club}/members/{fan}/approve")
     client.post(f"/clubs/{club}/posts", data={"body": "Nets are at the Quad by 5!"})
     client.post(f"/clubs/{club}/officers/{fan}")
+    assert b"You&#39;re the owner" in client.post(f"/clubs/{club}/leave", follow_redirects=True).data
+    client.post(f"/clubs/{club}/officers", data={"user": fan, "action": "owner"})   # hand over, then leave
     assert b"You left the club" in client.post(f"/clubs/{club}/leave", follow_redirects=True).data
     assert b"Nets are at the Quad by 5!" in client.get(f"/clubs/{club}").data
 
@@ -5632,3 +5634,123 @@ def test_chats_send_without_reloading_the_page(accounts, client, app):
     assert client.post(f"/events/{game}/chat", data={"body": "On my way"},
                        headers={"X-Chat-Send": "1"}).get_json()["ok"] is True
     assert client.post(f"/messages/{ids['Sam']}", data={"body": "No script"}).status_code == 302   # still works
+
+
+
+
+# ---- Fixes from the bot test run (AI testers' findings) ----
+
+def test_full_for_now_doesnt_name_players_of_a_private_game(accounts, client, app):
+    ids = _people(accounts, app, "Hana", "Anna", "Gus", "Otto")
+    _friends(app, ids["Anna"], ids["Gus"])
+    _as(accounts, "Hana")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Secret", players="3", is_private="1",
+                                                                     password="dawgs26")))
+    _as(accounts, "Anna")
+    client.post(f"/events/{game}/join", data={"password": "dawgs26"})
+    with app.app_context():                     # Anna's friend Gus has a held spot (as after the host says yes)
+        from sportive.invites import HOLD_TIME
+        from sportive.timeutil import now_local, to_db
+        get_db().execute("""INSERT INTO invites (event_id, inviter_id, guest_id, status, created_at, expires_at)
+                            VALUES (?, ?, ?, 'pending', ?, ?)""",
+                         (game, ids["Anna"], ids["Gus"], to_db(now_local()), to_db(now_local() + HOLD_TIME)))
+        get_db().commit()
+    _as(accounts, "Otto")
+    page = client.get(f"/events/{game}").data.decode()
+    assert "Anna" not in page and "held for invited friends" in page
+
+
+def test_owner_cant_add_someone_who_blocked_them(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Vic")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Vic")
+    client.post(f"/block/{ids['Maya']}")
+    _as(accounts, "Maya")
+    said = client.post(f"/clubs/{club}/officers", data={"user": ids["Vic"], "action": "add"},
+                       follow_redirects=True).data.decode()
+    assert "can&#39;t add this person" in said
+    with app.app_context():
+        assert get_db().execute("SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ?",
+                                (club, ids["Vic"])).fetchone() is None
+
+
+def test_odd_digits_in_players_dont_crash(accounts, client):
+    accounts.signup()
+    response = client.post("/events/new", data=event_form(players="²"))
+    assert response.status_code == 200 and b"Pick 2 to 1000 participants" in response.data
+
+
+def test_send_to_friends_counts_the_whole_batch_toward_the_limit(accounts, client, app):
+    names = ["Maya"] + [f"Pal{n}" for n in range(10)]
+    ids = _people(accounts, app, *names)
+    _friends(app, ids["Maya"], *[ids[n] for n in names[1:]])
+    _as(accounts, "Maya")
+    for n in range(15):
+        client.post(f"/messages/{ids['Pal0']}", data={"body": f"hi {n}"})
+    game = event_id_from(client.post("/events/new", data=event_form(title="Pickup", players="20")))
+    said = client.post(f"/events/{game}/send", data={"friend": [ids[n] for n in names[1:]]},
+                       follow_redirects=True).data.decode()
+    assert "slow down" in said
+
+
+def test_leaving_a_game_you_werent_in_says_so(accounts, client, app):
+    _people(accounts, app, "Maya", "Sam")
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    _as(accounts, "Sam")
+    assert b"You weren&#39;t going to this game." in client.post(f"/events/{game}/leave", follow_redirects=True).data
+
+
+def test_skipping_texts_at_sign_up_hides_the_home_texts_card(client, app):
+    client.post("/signup", data={"full_name": "New Kid", "email": "newkid@uw.edu", "password": "purple-and-gold",
+                                 "password2": "purple-and-gold", "birth_date": "2006-01-01", "grad_year": "2029"})
+    client.post("/signup/sports", data={"sports": ["running"]})
+    client.post("/signup/texts", data={"phone": ""})
+    with app.app_context():
+        code = get_db().execute("SELECT verify_code FROM users WHERE email = 'newkid@uw.edu'").fetchone()[0]
+    client.post("/verify", data={"code": code})
+    assert "New: game updates by text" not in client.get("/").data.decode()
+
+
+def test_clubs_never_end_up_without_officers(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Bea")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Maya")
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Bea"], "action": "add"})
+    said = client.post(f"/clubs/{club}/leave", follow_redirects=True).data.decode()
+    assert "You&#39;re the owner" in said                                  # hand over before leaving
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Bea"], "action": "owner"})
+    client.post(f"/clubs/{club}/leave")                                     # now Maya can leave
+    _as(accounts, "Bea")
+    said = client.post(f"/clubs/{club}/officers", data={"user": ids["Bea"], "action": "remove"},
+                       follow_redirects=True).data.decode()
+    assert "stays an officer" in said or "at least one officer" in said
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'officer'",
+                                (club,)).fetchone()[0] == 1
+
+
+def test_admins_can_reach_manage_officers(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    _people(accounts, app, "Maya", "Boss")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Boss")
+    assert "Manage officers (admin)" in client.get(f"/clubs/{club}").data.decode()
+    assert client.get(f"/clubs/{club}/officers").status_code == 200
+
+
+def test_remove_all_weeks_keeps_other_weekdays(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "maya@uw.edu"
+    _people(accounts, app, "Maya")
+    _as(accounts, "Maya")
+    first, _ = _day_after_tomorrow(18)
+    from datetime import date as _date
+    second = (_date.fromisoformat(first) + timedelta(days=1)).isoformat()
+    for day in (first, second):
+        client.post("/admin/uw-rec", data={"location": "Denny Field", "label": "IM flag", "date": day,
+                                           "start": "18:00", "end": "22:00", "weeks": "3"})
+    with app.app_context():
+        one = get_db().execute("SELECT id FROM rec_reservations ORDER BY starts_at").fetchone()[0]
+    client.post(f"/admin/uw-rec/{one}/delete", data={"all": "1"})
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rec_reservations").fetchone()[0] == 3

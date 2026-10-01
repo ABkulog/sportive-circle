@@ -83,6 +83,9 @@
         {% endif %}
       </div>
     {% endif %}
+    {% if owner and role != 'officer' %}{# an admin who isn't an officer here: a way to fix a stuck club #}
+      <a class="btn btn-ghost btn-block manage-officers" href="{{ url_for('clubs.officers', club_id=club.id) }}">Manage officers (admin)</a>
+    {% endif %}
   </div>
 </article>
 

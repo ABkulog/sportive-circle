@@ -510,7 +510,7 @@ def read_players(form, sport, team_size, event=None, allow_no_limit=True):
     if allow_no_limit and form.get("no_limit"):
         return None, extra, None
     raw = form.get("players", "").strip()
-    players = int(raw) if raw.isdigit() else (DEFAULT_PLAYERS.get(sport, 10) if not raw else 0)
+    players = int(raw) if raw.isascii() and raw.isdigit() else (DEFAULT_PLAYERS.get(sport, 10) if not raw else 0)
     if not 2 <= players <= MAX_PLAYERS:
         return None, 0, f"Pick 2 to {MAX_PLAYERS} participants (you included)."
     taken = (event["going_count"] + event["extra_players"] + event["held_count"]) if event is not None else 1 + extra
@@ -888,12 +888,12 @@ def detail(event_id):
                            # my own held spot is still mine to take, even if the game looks full to others
                            spots_for_me=None if spots_left(event) is None
                            else spots_left(event) + (1 if hold_minutes_left(invite) else 0),
-                           held=None if invite or event["i_am_going"] else full_for_now(event))
+                           held=None if hold_minutes_left(invite) or event["i_am_going"] else full_for_now(event))
 
 
 def full_for_now(event):
     """Why a game with open spots still says Full: friends invited by players hold them for 30 minutes.
-    Returns {"spots", "who", "opens_at" (clock), "minutes", "seconds"} or None if it's really full (or not full)."""
+    Returns {"spots", "whose", "opens_at" (clock), "minutes", "seconds"} or None if it's really full (or not full)."""
     if event["max_players"] is None or event["team_size"]:
         return None
     me = g.user["id"]
@@ -906,14 +906,18 @@ def full_for_now(event):
         return None
     spots, names, soonest = holds
     seconds = max(0, int((from_db(soonest) - now_local()).total_seconds()))
-    who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
-    return {"spots": spots, "who": who, "opens_at": fmt_clock(soonest), "minutes": max(1, -(-seconds // 60)),
+    if not can_see_inside(event):
+        whose = "invited friends"  # private or members-only: who's playing is for the people inside
+    else:
+        who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+        whose = f"friends {who} invited"
+    return {"spots": spots, "whose": whose, "opens_at": fmt_clock(soonest), "minutes": max(1, -(-seconds // 60)),
             "seconds": seconds}
 
 
 def full_for_now_message(held):
     spots = f"{held['spots']} spot{'s are' if held['spots'] != 1 else ' is'}"
-    return (f"Sorry, this game is full for now: {spots} held for friends {held['who']} invited. "
+    return (f"Sorry, this game is full for now: {spots} held for {held['whose']}. "
             f"If nobody takes it, a spot opens at {held['opens_at']} (in {held['minutes']} min).")
 
 
@@ -1112,9 +1116,9 @@ def leave(event_id):
         flash("This game is over, so it stays in your history.", "info")
     else:
         db = get_db()
-        db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, g.user["id"]))
+        left = db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, g.user["id"])).rowcount
         db.commit()
-        flash("You left. Your spot is open again.", "info")
+        flash("You left. Your spot is open again." if left else "You weren't going to this game.", "info")
     return redirect(url_for("events.detail", event_id=event_id))
 
 
