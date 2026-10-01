@@ -5871,3 +5871,118 @@ def test_on_hold_club_games_stay_in_my_events_and_players_are_told(accounts, cli
     assert "on hold" in client.get("/notifications").data.decode()
     said = client.get(f"/events/{game}/party", follow_redirects=True).data.decode()
     assert "on hold" in said
+
+
+# ---- Loop round 2: races, admin tools, phone layout ----
+
+def test_cant_join_a_game_after_its_canceled(accounts, client, app):
+    _people(accounts, app, "Host", "Pat")
+    _as(accounts, "Host")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Rainout")))
+    _as(accounts, "Pat")
+    from sportive.events import get_event, try_join
+    with app.test_request_context():
+        from flask import g
+        g.user = get_db().execute("SELECT * FROM users WHERE email = 'pat@uw.edu'").fetchone()
+        event = get_event(game)                                   # loaded before the cancel, like a racing request
+        get_db().execute("UPDATE events SET cancelled = 1 WHERE id = ?", (game,))
+        get_db().commit()
+        joined, _ = try_join(event)
+    assert not joined
+
+
+def test_parallel_wrong_codes_cant_get_past_the_limit(accounts, client, app):
+    accounts.signup(email="bob@uw.edu", name="Bob Husky")
+    accounts.logout()
+    client.post("/forgot", data={"email": "bob@uw.edu"})
+    with app.app_context():
+        from sportive.auth import MAX_CODE_ATTEMPTS
+        get_db().execute("UPDATE users SET verify_attempts = ? WHERE email = 'bob@uw.edu'", (MAX_CODE_ATTEMPTS - 1,))
+        get_db().commit()
+    with app.test_request_context():
+        from sportive.auth import claim_code_try
+        uid = get_db().execute("SELECT id FROM users WHERE email = 'bob@uw.edu'").fetchone()[0]
+        assert claim_code_try(uid) and not claim_code_try(uid)    # one try left, then none
+
+
+def test_crossing_friend_requests_make_one_friendship(accounts, client, app):
+    ids = _people(accounts, app, "Ann", "Ben")
+    _as(accounts, "Ann")
+    client.post(f"/friends/request/{ids['Ben']}")
+    _as(accounts, "Ben")
+    client.post(f"/friends/request/{ids['Ann']}")                 # = accept
+    with app.app_context():
+        rows = get_db().execute("SELECT status FROM friendships").fetchall()
+    assert [r[0] for r in rows] == ["accepted"]
+
+
+def test_suspending_someone_cancels_invites_they_sent(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    ids = _people(accounts, app, "Host", "Xan", "Fay", "Boss")
+    _friends(app, ids["Xan"], ids["Fay"])
+    _as(accounts, "Host")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Pickup", players="10")))
+    _as(accounts, "Xan")
+    client.post(f"/events/{game}/join")
+    client.post(f"/events/{game}/party", data={"friend": [ids["Fay"]]})
+    _as(accounts, "Boss")
+    client.post(f"/admin/users/{ids['Xan']}/suspend")
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM invites WHERE inviter_id = ?", (ids["Xan"],)).fetchone()[0] == "canceled"
+
+
+def test_denying_a_club_cancels_its_on_hold_events(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    accounts.login(email="captain@uw.edu")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Club night", club=str(club))))
+    accounts.logout()
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    accounts.signup(email="boss@uw.edu", name="Bo Ss")
+    client.post(f"/admin/clubs/{club}/remove", data={"note": "Instagram link is dead"})
+    client.post(f"/admin/clubs/{club}/deny")
+    with app.app_context():
+        assert get_db().execute("SELECT cancelled FROM events WHERE id = ?", (game,)).fetchone()[0] == 1
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    client.post(f"/admin/clubs/{club}/restore")                  # not an admin: nothing happens
+
+
+def test_officers_see_why_their_club_was_removed(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    accounts.signup(email="boss@uw.edu", name="Bo Ss")
+    client.post(f"/admin/clubs/{club}/remove", data={"note": "Instagram link is dead"})
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Why it's back in review" in page and "Instagram link is dead" in page
+
+
+def test_filtered_suggestions_dont_hide_new_ones(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    accounts.signup(email="kid@uw.edu", name="Kid Husky")
+    client.post("/suggestions", data={"kind": "bug", "body": "The map button does nothing on my phone"})
+    accounts.logout()
+    accounts.signup(email="boss@uw.edu", name="Bo Ss")
+    client.get("/admin/suggestions?kind=idea")
+    with app.test_request_context():
+        pass
+    page = client.get("/admin/suggestions").data.decode()
+    assert "map button" in page and "New" in page.split("map button")[0][-600:]
+
+
+def test_no_reports_about_suspended_accounts(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Xan")
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 1 WHERE id = ?", (ids["Xan"],))
+        get_db().commit()
+    _as(accounts, "Maya")
+    assert client.get(f"/report/user/{ids['Xan']}").status_code == 404
+
+
+def test_chat_messages_can_be_reached_with_the_keyboard(accounts, client, app):
+    ids = _people(accounts, app, "Ann", "Ben")
+    _friends(app, ids["Ann"], ids["Ben"])
+    _as(accounts, "Ann")
+    client.post(f"/messages/{ids['Ben']}", data={"body": "yo"})
+    assert 'class="chat-bubble" tabindex="0"' in client.get(f"/messages/{ids['Ben']}").data.decode()

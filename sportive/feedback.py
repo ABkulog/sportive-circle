@@ -138,6 +138,7 @@ def admin_suggestions():
     seen = set((seen_value("suggestion_trends") or "").split(",")) | {word for word, *_ in trends}
     mark_seen_value("suggestion_trends", ",".join(sorted(filter(None, seen))))
     last_seen = int(seen_value("suggestions") or 0)
-    mark_seen_value("suggestions", max([row["id"] for row in rows] + [last_seen]))
+    if not kind and not topic:
+        mark_seen_value("suggestions", max([row["id"] for row in rows] + [last_seen]))
     return render_template("feedback/admin.html", suggestions=rows[:300], kinds=KINDS, kind=kind, topic=topic,
                            trends=trends, fresh=fresh, last_seen=last_seen, trend_people=TREND_PEOPLE)

@@ -4,7 +4,8 @@
 {% block content %}
 <a class="back-link" href="{{ url_for('clubs.directory') }}">← Clubs</a>
 {% if club.status == 'pending' %}
-  <div class="flash flash-info club-status">⏳ <strong>Waiting for verification</strong> (usually within 2 days). Only officers can see this page.</div>
+  <div class="flash flash-info club-status">⏳ <strong>Waiting for verification</strong> (usually within 2 days). Only officers can see this page.
+    {% if club.review_note %}<br><strong>Why it's back in review:</strong> {{ club.review_note }}{% endif %}</div>
 {% elif club.status == 'denied' %}
   <div class="flash flash-error club-status">This club request was denied. It isn't listed and can't be resent.</div>
 {% elif club.status == 'rejected' %}

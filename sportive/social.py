@@ -382,8 +382,10 @@ def _back(default):
 def send_request(user_id):
     me = g.user["id"]
     get_user(user_id)
-    status = friendship_status(me, user_id)
     db = get_db()
+    db.commit()
+    db.execute("BEGIN IMMEDIATE")  # read and write together: two crossing requests can't both insert
+    status = friendship_status(me, user_id)
     if user_id == me:
         flash("That's you!", "info")
     elif is_blocked_between(me, user_id):
@@ -398,6 +400,7 @@ def send_request(user_id):
                    (me, user_id, to_db(now_local())))
         db.commit()
         flash("Friend request sent!", "success")
+    db.commit()
     return _back(url_for("profile.view", user_id=user_id))
 
 

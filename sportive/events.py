@@ -553,6 +553,8 @@ def create():
         elif error is None:
             repeat = 1
         if error is None:
+            get_db().commit()
+            get_db().execute("BEGIN IMMEDIATE")  # one post at a time, so a double tap can't make two copies
             duplicate = get_db().execute(
                 "SELECT 1 FROM events WHERE host_id = ? AND title = ? AND starts_at = ? AND cancelled = 0",
                 (g.user["id"], data["title"], data["starts_at"]),
@@ -583,6 +585,7 @@ def create():
             else:
                 flash(created_message(data["is_private"], reserve, "Your game is up!"), "celebrate")
             return redirect(url_for("events.detail", event_id=event_id))
+        get_db().rollback()  # let go of the write lock taken for the duplicate check
         form_error(error)
     else:
         starts, ends = default_times()
@@ -982,7 +985,7 @@ def try_join(event, password=None, team=None):
     cur = db.execute(
         f"""INSERT OR IGNORE INTO rsvps (event_id, user_id, created_at, team)
             SELECT e.id, :me, :now, :team FROM events e
-            WHERE e.id = :id AND (e.max_players IS NULL OR
+            WHERE e.id = :id AND e.cancelled = 0 AND (e.max_players IS NULL OR
                   e.extra_players + (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id)
                   + ({HELD} - (SELECT COUNT(*) FROM invites o WHERE o.event_id = e.id AND o.guest_id = :me
                                 AND o.status = 'pending' AND o.expires_at > :hold_now)) < e.max_players)

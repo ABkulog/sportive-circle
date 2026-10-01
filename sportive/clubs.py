@@ -495,8 +495,9 @@ def edit(club_id):
             identity_changed = any(data[key] != club[key] for key in ("name", "club_kind"))
             status = "pending" if identity_changed or club["status"] == "rejected" else club["status"]
             db = get_db()
-            db.execute(f"UPDATE clubs SET {', '.join(f + ' = :' + f for f in FIELDS)}, status = :status WHERE id = :id",
-                       {**data, "status": status, "id": club_id})
+            db.execute(f"UPDATE clubs SET {', '.join(f + ' = :' + f for f in FIELDS)}, status = :status,"
+                       " review_note = CASE WHEN :was = 'rejected' THEN '' ELSE review_note END WHERE id = :id",
+                       {**data, "status": status, "id": club_id, "was": club["status"]})
             db.commit()
             if status == "pending" and club["status"] == "approved":
                 _tell_players_on_hold(club)
@@ -652,6 +653,8 @@ def decide(club_id, user_id, decision):
 def leave(club_id):
     """Leave the club, cancel a request, or unfollow."""
     db = get_db()
+    db.commit()
+    db.execute("BEGIN IMMEDIATE")  # read who's officer/owner and leave in one go (no handover to someone leaving)
     role = my_role(club_id)
     officers = db.execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'officer'",
                           (club_id,)).fetchone()[0]
@@ -665,6 +668,7 @@ def leave(club_id):
         db.commit()
         flash({"follower": "Unfollowed.", "requested": "Request canceled.", "tryout": "Tryout sign-up canceled."}
               .get(role, "You left the club."), "info")
+    db.commit()
     return redirect(url_for("clubs.view", club_id=club_id))
 
 
@@ -724,9 +728,12 @@ def officers(club_id):
             if not is_officer:
                 flash("Make them an officer first, then you can make them the owner.", "error")
             elif user_id != club["created_by"]:
-                if not db.execute("UPDATE clubs SET created_by = ? WHERE id = ? AND created_by = ?",
-                                  (user_id, club_id, club["created_by"])).rowcount:  # handed over meanwhile
-                    flash("The club was already handed to someone else.", "error")
+                if not db.execute("""UPDATE clubs SET created_by = ? WHERE id = ? AND created_by = ?
+                                     AND EXISTS (SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ?
+                                                 AND role = 'officer')""",
+                                  (user_id, club_id, club["created_by"], club_id, user_id)).rowcount:
+                    # handed to someone else meanwhile, or they just left / stopped being an officer
+                    flash("That didn't go through: the club changed hands or they're no longer an officer.", "error")
                     return redirect(url_for("clubs.view", club_id=club_id))
                 _dm(g.user["id"], user_id, f"👑 You're now the owner of {club['name']}. You can add or remove officers "
                                            f"and hand the club to someone else later. {_club_link(club_id)}")
@@ -929,7 +936,17 @@ def review(club_id, decision):
             return back
         db.commit()
         if decision == "deny":
-            flash(f"Denied {club['name']}. It's hidden and can't be resent.", "info")
+            from .events import query_events, tell_players_it_was_cancelled  # events.py imports this module
+            upcoming = query_events(["e.club_id = :club", "e.cancelled = 0", "e.ends_at >= :now"],
+                                    {"club": club_id, "now": to_db(now_local())}, on_hold=True)
+            db.execute("UPDATE events SET cancelled = 1, revision = revision + 1 WHERE club_id = ? AND cancelled = 0 "
+                       "AND ends_at >= ?", (club_id, to_db(now_local())))
+            db.commit()
+            for event in upcoming:
+                tell_players_it_was_cancelled(event)
+            flash(f"Denied {club['name']}. It's hidden and can't be resent"
+                  + (f"; {len(upcoming)} upcoming event{'s were' if len(upcoming) != 1 else ' was'} canceled." if upcoming else "."),
+                  "info")
         elif decision == "restore":
             flash(f"{club['name']} is back on the waiting list.", "success")
         else:

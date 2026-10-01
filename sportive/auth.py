@@ -269,6 +269,16 @@ def validate_signup(full_name, email, password, password2, grad_year, birth_date
     return None
 
 
+def claim_code_try(user_id):
+    """Use up one of the 5 tries on an email code, in a single statement: guesses sent at the same moment from
+    many tabs can't all slip past the limit. True if there was a try left. (A right code resets the count.)"""
+    db = get_db()
+    claimed = db.execute("UPDATE users SET verify_attempts = verify_attempts + 1 WHERE id = ? AND verify_attempts < ?",
+                         (user_id, MAX_CODE_ATTEMPTS)).rowcount
+    db.commit()
+    return bool(claimed)
+
+
 @bp.route("/signup", methods=("GET", "POST"))
 def signup():
     if g.user is not None:  # already logged in: a second account from here would log this one out
@@ -420,13 +430,11 @@ def verify():
             session.pop("pending_email", None)
             flash(f"You already have an account as {other['email']}. Log in with that email.", "error")
             return redirect(url_for("auth.login"))
-        if user["verify_attempts"] >= MAX_CODE_ATTEMPTS:
+        if not claim_code_try(user["id"]):
             error = "Too many wrong tries. Send yourself a new code."
         elif not user["verify_code"] or now_local() > from_db(user["verify_expires"]):
             error = "That code expired. Send yourself a new one."
         elif not same_secret(code, user["verify_code"]):
-            db.execute("UPDATE users SET verify_attempts = verify_attempts + 1 WHERE id = ?", (user["id"],))
-            db.commit()
             error = "Wrong code, try again."
 
         if error is None:
@@ -586,11 +594,9 @@ def reset_password():
             session["reset_tries"] = session.get("reset_tries", 0) + 1
             error = ("Too many wrong tries. Ask for a new code." if session["reset_tries"] > MAX_CODE_ATTEMPTS
                      else "Wrong code, try again.")
-        elif user["verify_attempts"] >= MAX_CODE_ATTEMPTS:
+        elif not claim_code_try(user["id"]):
             error = "Too many wrong tries. Ask for a new code."
         elif not same_secret(code, user["verify_code"]):
-            db.execute("UPDATE users SET verify_attempts = verify_attempts + 1 WHERE id = ?", (user["id"],))
-            db.commit()
             error = "Wrong code, try again."
         elif now_local() > from_db(user["verify_expires"]):  # only said to someone who knows the code
             error = "That code expired. Ask for a new one."
