@@ -4449,7 +4449,7 @@ def test_password_reset_code_is_texted_to_confirmed_numbers(accounts, client, ap
     accounts.signup()
     accounts.logout()
     with app.app_context():
-        get_db().execute("UPDATE users SET phone = '+12065550142', phone_verified = 1, verify_sent_at = NULL")
+        get_db().execute("UPDATE users SET phone = '+12065550142', phone_verified = 1, sms_updates = 1, verify_sent_at = NULL")
         get_db().commit()
     client.post("/forgot", data={"email": "dubs@uw.edu"})
     assert sent and sent[-1][0] == "+12065550142" and "password reset code" in sent[-1][1]
