@@ -1008,6 +1008,8 @@ def try_join(event, password=None, team=None):
             return False, "You're already going."
         held = full_for_now(event)
         return False, full_for_now_message(held) if held else "Sorry, this game is full."
+    # "Maya posted a game" is old news once you're in it.
+    db.execute("DELETE FROM notices WHERE user_id = ? AND key = ?", (me, f"friend_game:{event['id']}"))
     if invite:
         db.execute("UPDATE invites SET status = 'accepted' WHERE id = ?", (invite["id"],))
         notify(invite["inviter_id"], "invites", f"{g.user['full_name'].split()[0]} is in for {event_title(event)}.",

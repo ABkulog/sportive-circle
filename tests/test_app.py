@@ -6272,3 +6272,13 @@ def test_settings_has_the_new_game_email_switch(accounts, client):
     accounts.signup()
     page = client.get("/settings").data.decode()
     assert 'name="email_friend_games"' in page and "friends or my clubs post a game" in page
+
+
+def test_joining_clears_the_posted_a_game_notice(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Sunset hoops")))
+    _as(accounts, "Jordan")
+    client.post(f"/events/{game}/join")
+    assert "Maya posted Sunset hoops" not in client.get("/notifications").data.decode()
