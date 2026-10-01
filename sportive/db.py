@@ -96,7 +96,8 @@ ADDED_COLUMNS = [
     ("users", "theme", "TEXT NOT NULL DEFAULT 'light'"),
     ("users", "session_version", "INTEGER NOT NULL DEFAULT 0"),
     ("events", "revision", "INTEGER NOT NULL DEFAULT 0"),  # +1 on every edit or cancel (calendar SEQUENCE)
-    ("users", "weekly_digest", "INTEGER NOT NULL DEFAULT 1"),  # the Monday "Games this week" email (digest.py)
+    ("users", "weekly_digest", "INTEGER NOT NULL DEFAULT 1"),
+    ("users", "email_friend_games", "INTEGER NOT NULL DEFAULT 1"),  # "Maya posted a game" emails (friendgames.py)  # the Monday "Games this week" email (digest.py)
     ("users", "read_receipts", "INTEGER NOT NULL DEFAULT 1"),  # "Seen" in DMs (off both ways, like WhatsApp)
     ("direct_messages", "photo_id", "INTEGER REFERENCES chat_photos(id) ON DELETE SET NULL"),  # a photo in a chat
     ("event_messages", "photo_id", "INTEGER REFERENCES chat_photos(id) ON DELETE SET NULL"),
