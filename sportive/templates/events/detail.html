@@ -196,7 +196,7 @@
       {% if inside %}
         <a class="icon-action" href="{{ url_for('events.calendar_file', event_id=event.id) }}"><span>{{ icon('calendar') }}</span>Calendar</a>
       {% endif %}
-      {% if is_host %}
+      {% if manage %}
         <a class="icon-action" href="{{ url_for('events.edit', event_id=event.id) }}"><span>{{ icon('edit') }}</span>Edit</a>
       {% elif event.i_am_going %}
         <form method="post" action="{{ url_for('events.leave', event_id=event.id) }}" class="icon-action-form">
@@ -223,7 +223,7 @@
       <p class="muted">Off campus: the address is in the note.</p>
     {% endif %}
 
-    {% if is_host %}
+    {% if manage %}
       <form method="post" action="{{ url_for('events.cancel', event_id=event.id) }}" class="cancel-event"
             data-confirm="Cancel this event for everyone? We'll email everyone who joined.">
         {{ csrf_field() }}<button class="link-button danger-link">Cancel event</button>
@@ -237,7 +237,7 @@
   {% if is_team(person.id) %}<span class="team-pill" title="Runs Sportive Circle">🐾 Team</span>{% endif %}
   {% if person.grad_year %}<span class="muted">’{{ (person.grad_year|string)[-2:] }}</span>{% endif %}
   {% if person.id == event.host_id %}<span class="badge badge-purple">Host</span>
-  {% elif is_host and not ended and not event.cancelled %}
+  {% elif manage and person.id != g.user.id and not ended and not event.cancelled %}
     <form method="post" action="{{ url_for('events.remove_player', event_id=event.id, user_id=person.id) }}" class="remove-player"
           data-confirm="Take {{ person.full_name.split()[0] }} off this game? They'll get a notice.">
       {{ csrf_field() }}<button class="link-button">Remove</button></form>

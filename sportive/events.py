@@ -25,7 +25,8 @@ from .mail import compose, send_email
 from .social import friends_of, is_blocked_between
 from .spirit import greeting, top_dawgs
 from .textutil import multi_line, one_line, same_secret
-from .timeutil import exists_in_seattle, fmt_clock, fmt_when, from_db, now_local, parse_form, to_db, to_form
+from .timeutil import (add_real, exists_in_seattle, fmt_clock, fmt_when, from_db, now_local, parse_form, real_gap,
+                       to_db, to_form)
 
 bp = Blueprint("events", __name__)
 log = logging.getLogger(__name__)
@@ -79,9 +80,18 @@ def get_event(event_id, host_only=False):
     if not rows:
         abort(404)
     event = rows[0]
-    if host_only and event["host_id"] != g.user["id"]:
+    if host_only and not can_manage(event):
         abort(403)
     return event
+
+
+def can_manage(event):
+    """Who can edit, cancel and take people off a game: its host. A club event belongs to the club: any of its
+    current officers, and not a host who has stopped being one (left, removed, or stepped down)."""
+    if not event["club_id"]:
+        return event["host_id"] == g.user["id"]
+    return get_db().execute("SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ? AND role = 'officer'",
+                            (event["club_id"], g.user["id"])).fetchone() is not None
 
 
 # SQL for "is this game full?": spots held for invited friends count as taken (for their 30 minutes).
@@ -421,7 +431,7 @@ def read_event_form(form, event=None):
             return None, (f"{fmt_clock(to_db(moment))} doesn't exist on {moment.strftime('%b')} {moment.day}: "
                           "clocks jump ahead an hour for daylight saving. Pick another time.")
     max_hours = SPORT_MAX_HOURS.get(sport, DEFAULT_MAX_HOURS)
-    if ends - starts > timedelta(hours=max_hours):
+    if real_gap(starts, ends) > timedelta(hours=max_hours):  # real hours, even the night the clocks change
         longest = f"{max_hours // 24} days" if max_hours % 24 == 0 else f"{max_hours} hours"
         return None, f"{SPORTS[sport]} events can be at most {longest} long."
     if ends <= now:
@@ -638,6 +648,9 @@ def edit(event_id):
     if event["cancelled"]:
         flash("This game was canceled, so it can't be edited.", "error")
         return redirect(url_for("events.detail", event_id=event_id))
+    if from_db(event["ends_at"]) < now_local():  # it happened: it stays in everyone's history as it was
+        flash("This game is over, so it can't be edited. Post a new one instead.", "error")
+        return redirect(url_for("events.detail", event_id=event_id))
     if request.method == "POST":
         form = request.form
         data, error = read_event_form(form, event)
@@ -839,8 +852,11 @@ def quick():
             error = "Everyone's already coming, so there's no one to find. Pick more participants."
 
         if error is None:
-            starts = round_up_5(now_local() + timedelta(minutes=_int(form.get("starts_in"))))
-            ends = starts + timedelta(minutes=_int(form.get("duration")))
+            # Real minutes from now, so a game never lands in the hour skipped when clocks jump ahead.
+            starts = round_up_5(add_real(now_local(), timedelta(minutes=_int(form.get("starts_in")))))
+            if not exists_in_seattle(starts):  # rounded up into the skipped hour (1:58 -> 2:00): it's 3:00
+                starts += timedelta(hours=1)
+            ends = add_real(starts, timedelta(minutes=_int(form.get("duration"))))
             event_id = insert_event({
                 "title": f"{team_size}v{team_size} {SPORTS[sport]}" if team_size else f"Need {needed} for {SPORTS[sport]}",
                 "sport": sport, "location": location,
@@ -890,6 +906,7 @@ def detail(event_id):
     first_game = get_db().execute("SELECT event_id FROM rsvps WHERE user_id = ? ORDER BY created_at, event_id LIMIT 1",
                                   (me,)).fetchone()
     return render_template("events/detail.html", event=event, attendees=attendees, inside=inside,
+                           manage=can_manage(event),
                            first_game=bool(first_game) and first_game["event_id"] == event_id,
                            my_reminder=my_rsvp["remind_minutes"] if my_rsvp else None, remind_choices=REMIND_CHOICES,
                            ended=from_db(event["ends_at"]) < now_local(),
@@ -1142,7 +1159,7 @@ def leave(event_id):
 def remove_player(event_id, user_id):
     """The host takes someone off their game (e.g. they don't fit who it's for). They get a notice."""
     event = get_event(event_id, host_only=True)
-    if user_id == g.user["id"] or from_db(event["ends_at"]) < now_local():
+    if user_id in (g.user["id"], event["host_id"]) or from_db(event["ends_at"]) < now_local():
         abort(400)
     db = get_db()
     cur = db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, user_id))

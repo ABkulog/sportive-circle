@@ -645,9 +645,22 @@ def decide(club_id, user_id, decision):
         flash("Declined. They still follow the club.", "info")
     elif decision == "remove" and row["role"] == "member":
         db.execute("DELETE FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, user_id))
+        _leave_members_only_games(club_id, user_id)
         flash("Removed from the club.", "info")
     db.commit()
     return redirect(url_for("clubs.view", club_id=club_id) + ("#requests" if decision != "remove" else "#members"))
+
+
+def _leave_members_only_games(club_id, user_id):
+    """Someone who's no longer a member isn't in the club's upcoming members-only games anymore either (and
+    so stops seeing the spot, the players and the chat). Games they host stay; the caller commits."""
+    db = get_db()
+    upcoming = """SELECT id FROM events WHERE club_id = ? AND members_only = 1 AND cancelled = 0 AND ends_at >= ?
+                  AND host_id != ?"""
+    args = (club_id, to_db(now_local()), user_id)
+    db.execute(f"DELETE FROM rsvps WHERE user_id = ? AND event_id IN ({upcoming})", (user_id, *args))
+    db.execute(f"""UPDATE invites SET status = 'canceled' WHERE guest_id = ? AND status IN ('pending', 'requested')
+                   AND event_id IN ({upcoming})""", (user_id, *args))
 
 
 @bp.route("/clubs/<int:club_id>/leave", methods=("POST",))
@@ -667,6 +680,7 @@ def leave(club_id):
         flash("You're the owner. On Manage officers, make another officer the owner, then you can leave.", "error")
     elif role is not None:
         db.execute("DELETE FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, g.user["id"]))
+        _leave_members_only_games(club_id, g.user["id"])
         db.commit()
         flash({"follower": "Unfollowed.", "requested": "Request canceled.", "tryout": "Tryout sign-up canceled."}
               .get(role, "You left the club."), "info")

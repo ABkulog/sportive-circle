@@ -47,6 +47,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-PROF-4 | A user's email is shown only to themselves and people they've played a game with. | Must | ✅ |
 | FR-PROF-5 | On the photo page, Save without picking a new photo goes back to the profile, and users can remove their photo (with an "Are you sure?"). | Should | ✅ |
 | FR-PROF-6 | Optional pronouns, gender (says it's only used for games open to women or men), and Instagram / Snapchat / TikTok / X usernames right under the bio in Edit profile, shown on the profile only if filled in. | Should | ✅ |
+| FR-PROF-7 | Emails shown to people you've played with are hidden once either of you blocks the other. Top Dawgs ties share a place and medal. | Must | ✅ |
 
 ### Games and events (EVT)
 
@@ -71,6 +72,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-EVT-17 | Game pages have a Back button that returns to where you came from (never into the game's own chat). | Should | ✅ |
 | FR-EVT-18 | Open games can be "Open to" anyone, women, men, nonbinary players or Other (like UW Recreation's women-only hours). People whose profile gender is outside the group can't join and don't see it in their feed; people who left gender blank confirm instead. Hosts can remove a player (who gets a notice). | Should | ✅ |
 | FR-EVT-19 | Creating a game (New event and Need players) shows a heads-up: check the courts / field / trail (the word follows the sport) is free at that time, since it could be booked, full or closed for an event. Sportive Circle doesn't reserve or check places; the host does. The Terms say the same. | Must | ✅ |
+| FR-EVT-20 | A game that's over can't be edited (it stays in everyone's history as it was). Time math uses real elapsed time on the nights clocks change: sport length limits, Need players start times (never in the skipped hour) and reminders (sent at the right moment, with the right minutes). | Must | ✅ |
 | FR-EVT-20 | While making a game, and on its page, people see what else is on at that place then: **UW Rec reservations** ("UW Rec: reserved 6–10 PM · IM flag football", you probably can't play there) and **other Sportive Circle games** (busy, not taken: you can still post, or join theirs). Private games show only as "a private game". UW Rec places link to UW Rec's schedule. UW Rec's bookings are copied automatically once a day from its public Facility Schedule; admins can add their own entries (Admin → UW Rec reservations, weekly repeats). | Should | ✅ |
 
 ### Parties, private games, team vs team (PARTY, PRIV, TEAM)
@@ -116,6 +118,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-CLUB-10 | A new club event is posted to the club's updates automatically, with a link, so followers and members hear about it. | Should | ✅ |
 | FR-CLUB-11 | Officers see members' UW emails, can copy them all and download the roster as a spreadsheet (CSV). Members don't see each other's emails. | Should | ✅ |
 | FR-CLUB-12 | The person who registered a club is its owner: only they add officers (searching anyone on the app by name or UW NetID, on Manage officers) or take officer rights away; they always stay an officer. Other officers edit the club, post, make club events and confirm members. The owner can hand the club to another officer (Make owner); they stay an officer. If the owner is no longer an officer, any officer can manage officers. | Must | ✅ |
+| FR-CLUB-13 | Club events belong to the club: any current officer can edit or cancel them and take players off, and an officer who leaves or steps down can't anymore. Someone who leaves the club or is removed is taken out of its upcoming members-only events (they stop seeing the note, players and chat). | Must | ✅ |
 
 ### Friends and messages (SOC)
 

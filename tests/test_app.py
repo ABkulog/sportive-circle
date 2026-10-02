@@ -3239,6 +3239,106 @@ def _as(accounts, name):
     accounts.login(email=f"{name.lower()}@uw.edu")
 
 
+def _move_to_past(app, event_id):
+    with app.app_context():
+        get_db().execute("UPDATE events SET starts_at = '2026-01-10 10:00', ends_at = '2026-01-10 12:00' WHERE id = ?",
+                         (event_id,))
+        get_db().commit()
+
+
+def test_club_events_belong_to_the_club_and_leaving_takes_you_out(accounts, client, app):
+    """Bot round 7: a removed member kept their spot (and the place) in members-only games, and an officer
+    who left still managed the club events they made while the other officers couldn't."""
+    ids = _people(accounts, app, "Maya", "Sam", "Mem")
+    club = _club_with_officer(accounts, client, app)                        # Maya owns it
+    _as(accounts, "Maya")
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Sam"], "action": "add"})
+    _as(accounts, "Mem")
+    client.post(f"/clubs/{club}/join", data={"message": "hi"})
+    _as(accounts, "Maya")
+    client.post(f"/clubs/{club}/members/{ids['Mem']}/approve")
+    _as(accounts, "Sam")
+    form = dict(title="Practice", sport="spikeball", location="The Quad", is_private="members", club=str(club),
+                note="Meet by the cherry trees")
+    game = event_id_from(client.post(f"/events/new?club={club}", data=event_form(**form)))
+    _as(accounts, "Mem")
+    client.post(f"/events/{game}/join")
+    _as(accounts, "Maya")                                                   # another officer manages it too
+    assert "Cancel event" in client.get(f"/events/{game}").data.decode()
+    assert client.post(f"/events/{game}/edit", data=event_form(**{**form, "title": "Practice!"})).status_code == 302
+    client.post(f"/clubs/{club}/members/{ids['Mem']}/remove")               # Mem is removed from the club...
+    with app.app_context():
+        assert not get_db().execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?",
+                                    (game, ids["Mem"])).fetchone()          # ...and from its members-only game
+    _as(accounts, "Mem")
+    assert "cherry trees" not in client.get(f"/events/{game}").data.decode()   # the inside details are gone too
+    _as(accounts, "Maya")
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Sam"], "action": "remove"})   # Sam steps down
+    _as(accounts, "Sam")
+    assert client.get(f"/events/{game}/edit").status_code == 403
+    assert client.post(f"/events/{game}/cancel").status_code == 403
+
+
+def test_a_finished_game_cant_be_moved_and_blocking_hides_emails(accounts, client, app):
+    ids = _people(accounts, app, "Ana", "Ben")
+    _as(accounts, "Ana")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Done game")))
+    _as(accounts, "Ben")
+    client.post(f"/events/{game}/join")
+    _move_to_past(app, game)
+    assert "ana@uw.edu" in client.get(f"/u/{ids['Ana']}").data.decode()    # played together: emails show
+    _as(accounts, "Ana")
+    moved = client.post(f"/events/{game}/edit", data=event_form(title="Done game"), follow_redirects=True)
+    assert "This game is over" in moved.data.decode()
+    with app.app_context():
+        assert get_db().execute("SELECT starts_at FROM events WHERE id = ?", (game,)).fetchone()[0] == "2026-01-10 10:00"
+    client.post(f"/block/{ids['Ben']}")
+    assert "ben@uw.edu" not in client.get(f"/u/{ids['Ben']}").data.decode()
+    _as(accounts, "Ben")
+    assert "ana@uw.edu" not in client.get(f"/u/{ids['Ana']}").data.decode()
+
+
+def test_clock_changes_use_real_time(accounts, client, app, monkeypatch):
+    """Bot round 7: on the nights clocks change, reminders went out an hour off, Need players could land in the
+    skipped hour, and a 7-hour game passed the 6-hour limit."""
+    from datetime import datetime
+    from sportive import events, reminders
+    accounts.signup(email="host@uw.edu", name="Host Husky")
+    monkeypatch.setattr(events, "now_local", lambda: datetime(2026, 10, 31, 12, 0))
+    too_long = client.post("/events/new", data=event_form(starts_at="2026-11-01T00:30", ends_at="2026-11-01T06:30"))
+    assert b"at most 6 hours" in too_long.data                               # 7 real hours that night
+    monkeypatch.setattr(events, "now_local", lambda: datetime(2027, 3, 14, 1, 40))
+    client.post("/need-players", data={"sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
+                                       "starts_in": "30", "duration": "60", "players": "3"})
+    with app.app_context():
+        quick = get_db().execute("SELECT starts_at FROM events WHERE is_quick = 1").fetchone()
+    assert quick is not None and quick[0] == "2027-03-14 03:10"                # 2:10 AM doesn't exist
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE events SET starts_at = '2027-03-14 03:30', ends_at = '2027-03-14 04:30'")
+        db.execute("UPDATE rsvps SET remind_minutes = 60, created_at = '2027-03-13 10:00'")
+        db.commit()
+        sent = []
+        monkeypatch.setattr(reminders, "send_email", lambda to, subject, body, **kw: sent.append(subject))
+        monkeypatch.setattr(reminders, "now_local", lambda: datetime(2027, 3, 14, 1, 30))   # 1 real hour before
+        assert reminders.send_due_reminders() == 1 and "starts in 60 min" in sent[0]
+        db.execute("UPDATE events SET starts_at = '2026-11-01 02:15', ends_at = '2026-11-01 03:00'")
+        db.execute("UPDATE rsvps SET reminder_sent = 0, created_at = '2026-10-31 10:00'")
+        db.commit()
+        monkeypatch.setattr(reminders, "now_local", lambda: datetime(2026, 11, 1, 1, 15))   # 2 real hours before
+        assert reminders.send_due_reminders() == 0
+        monkeypatch.setattr(reminders, "now_local", lambda: datetime(2026, 11, 1, 1, 15, fold=1))  # the 2nd 1:15
+        assert reminders.send_due_reminders() == 1
+
+
+def test_top_dawgs_ties_share_a_medal():
+    from jinja2 import Environment
+    tmpl = Environment().from_string("{% for dawg in top_dawgs %}"
+                                     "{% set rank = (top_dawgs|selectattr('games', 'gt', dawg.games)|list|length) + 1 %}"
+                                     "{{ rank }} {% endfor %}")
+    assert tmpl.render(top_dawgs=[{"games": 5}, {"games": 5}, {"games": 3}]) == "1 1 3 "
+
+
 def test_party_up_holds_spots_for_friends(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Stranger")
     _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])
