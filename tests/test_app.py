@@ -3774,6 +3774,28 @@ def test_home_says_when_there_are_more_games_than_it_lists(accounts, client, app
     assert "There are even more games" in client.get("/?page=20").data.decode()
 
 
+def test_changes_reach_invited_friends_and_say_what_changed(accounts, client, app):
+    """Round 15: a friend with a spot held wasn't told the time or place changed; the "Changed" email didn't say
+    what changed (an end-time edit looked like nothing changed); a canceled game still showed spots left."""
+    ids = _people(accounts, app, "Maya", "Jordan", "Priya")
+    _friends(app, ids["Maya"], ids["Jordan"], ids["Priya"])
+    _as(accounts, "Maya")
+    form = dict(title="Hoops", players="6")
+    game = event_id_from(client.post("/events/new", data=event_form(**form)))
+    client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"], ids["Priya"]]})
+    _as(accounts, "Jordan")
+    client.post(f"/events/{game}/invite/answer", data={"answer": "yes"})
+    _as(accounts, "Maya")
+    client.post(f"/events/{game}/edit", data=event_form(**form, ends_at=form_time(timedelta(days=1, hours=3))))
+    email = [m for m in app.extensions["outbox"] if m["to"] == "jordan@uw.edu" and m["subject"] == "Changed: Hoops"][-1]
+    assert "Maya changed this game: now ends at" in email["body"]
+    _as(accounts, "Priya")                                                   # only invited: told too
+    assert "which changed: now ends at" in client.get("/notifications").data.decode()
+    _as(accounts, "Maya")
+    client.post(f"/events/{game}/cancel")
+    assert "spots left" not in client.get(f"/events/{game}").data.decode()
+
+
 def test_party_up_holds_spots_for_friends(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Stranger")
     _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])
@@ -5257,7 +5279,7 @@ def test_hosts_are_told_to_check_the_place_is_free(accounts, client, app):
     accounts.signup()
     for page in ("/events/new", "/need-players"):
         html = client.get(page).data.decode()
-        assert "Heads up: check the" in html and "We don't reserve places" in html
+        assert "Heads up: check you can use the" in html and "We don't reserve places" in html
     html = client.get("/events/new").data.decode()
     assert '"space"' in html and '"courts"' in html and '"trail"' in html  # the word follows the sport (forms.js)
     assert "make sure the place is free" in client.get("/terms").data.decode()

@@ -42,7 +42,7 @@
       || (location.value.startsWith("Off campus") ? "Add where in the note, so people can find you." : "");
   }
 
-  // "Heads up: check the courts/field/trail is free": the word follows the sport.
+  // "Heads up: check you can use the courts/field/trail then": the word follows the sport.
   const space = form.querySelector("[data-place-space]");
   function updateSpace() {
     const rule = rules[sport.value];

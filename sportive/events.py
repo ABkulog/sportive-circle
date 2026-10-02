@@ -777,7 +777,12 @@ def tell_players_it_changed(event, data, by=None):
     Returns True if anyone was told. Caller commits."""
     changes = what_changed(event, data)
     players = players_except_host(event, by)
-    if not changes or not players:
+    # Friends with a spot held ("You down?") are deciding on the old time and place: their invite is updated too.
+    invited = get_db().execute(
+        """SELECT i.guest_id, v.full_name AS inviter_name FROM invites i JOIN users v ON v.id = i.inviter_id
+           JOIN users u ON u.id = i.guest_id WHERE i.event_id = ? AND i.status = 'pending' AND u.suspended = 0""",
+        (event["id"],)).fetchall()
+    if not changes or not (players or invited):
         return False
     title = data["title"] if not event["is_quick"] else event_title({**dict(event), **data})
     host = (by["full_name"] if by is not None else event["host_name"]).split()[0]
@@ -785,6 +790,9 @@ def tell_players_it_changed(event, data, by=None):
     for player in players:
         notify(player["id"], "game_updates", f"{host} changed {title}: {', '.join(changes)}", link,
                key=f"change:{event['id']}")
+    for row in invited:
+        notify(row["guest_id"], "invites", f"{row['inviter_name'].split()[0]} wants you in {title}, which changed: "
+               f"{', '.join(changes)}. You down?", link, key=f"invite:{event['id']}")
     if any(change.startswith(("new time", "new place", "now ends", "now ")) for change in changes):
         for player in players:
             text_user(player["id"], f"{host} changed {title}: now {fmt_when(data['starts_at'])} at {data['location']}. "
@@ -794,9 +802,9 @@ def tell_players_it_changed(event, data, by=None):
                 subject = f"Changed: {title}"
                 body, html = compose(
                     subject, f"{title} changed",
-                    [f"Hey {player['full_name'].split()[0]}, {host} changed this game.",
+                    [f"Hey {player['full_name'].split()[0]}, {host} changed this game: {', '.join(changes)}.",
                      *([f"🏅 Now {SPORTS[data['sport']]}"] if data["sport"] != event["sport"] else []),
-                     f"🕐 {fmt_when(data['starts_at'])}", f"📍 {data['location']}"],
+                     f"🕐 {fmt_when(data['starts_at'])} – {fmt_clock(data['ends_at'])}", f"📍 {data['location']}"],
                     button=("See the game", public_url("events.detail", event_id=event["id"])),
                     reason="You're getting this because you joined this game.",
                     preheader=f"{host} changed {title}.")
