@@ -51,11 +51,18 @@
     </a>
   {% else %}
     <div class="card empty">
+    {% if mine and not q and not sport %}
+      <p><strong>You haven't joined any clubs yet.</strong></p>
+      <p class="muted">Follow a club to see its events and news, or ask to join.</p>
+      <a class="btn" href="{{ url_for('clubs.directory') }}">Browse all clubs</a>
+    </div>
+    {% else %}
       <p><strong>{% if q or sport or mine %}No clubs match that.{% else %}No clubs yet.{% endif %}</strong></p>
       <p class="muted">Are you an officer of an active UW club? Register it so other Huskies can find you.</p>
       {% if g.user %}<a class="btn" href="{{ url_for('clubs.create') }}">Register your club</a>
       {% else %}<a class="btn" href="{{ url_for('auth.signup', next=url_for('clubs.create')) }}">Sign up to register your club</a>{% endif %}
     </div>
+    {% endif %}
   {% endfor %}
 </div>
 {% if clubs and g.user %}

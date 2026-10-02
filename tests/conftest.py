@@ -36,7 +36,9 @@ class Accounts:
             "full_name": name, "email": email, "password": password, "password2": password,
             "birth_date": birth_date, "grad_year": "2028",
         })
-        if response.status_code == 302:  # step 2: sports
+        if response.status_code == 302 and response.headers["Location"].split("?")[0] == "/signup":
+            response = self.client.get(response.headers["Location"])   # a problem: shown on the sign-up page
+        elif response.status_code == 302:  # step 2: sports
             self.client.post("/signup/sports", data={"sports": list(sports)})
         if verify:
             self.client.post("/verify", data={"code": self.code_for(email)})

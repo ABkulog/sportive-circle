@@ -324,7 +324,9 @@ def change_password():
         flash(f"{error} Your password was not changed.", "error")
     else:
         db = get_db()
-        db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(form["password"]), g.user["id"]))
+        # A reset code someone else asked for stops working too: the new password is what locks the account.
+        db.execute("UPDATE users SET password_hash = ?, verify_code = NULL, verify_expires = NULL, verify_attempts = 0"
+                   " WHERE id = ?", (hash_password(form["password"]), g.user["id"]))
         end_other_sessions(g.user["id"])
         db.commit()
         flash("Password changed. You're logged out on your other devices.", "success")

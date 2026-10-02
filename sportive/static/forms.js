@@ -223,7 +223,8 @@
     });
     if (info.uw_rec) {
       const line = el("p", "muted");
-      if (!info.reserved.length) line.append("No UW Rec reservations we know of then. ");
+      if (info.beyond_copy) line.append("We only copy UW Rec's schedule 4 weeks ahead, so we can't tell yet. ");
+      else if (!info.reserved.length) line.append("No UW Rec reservations we know of then. ");
       const link = el("a", "", "Check UW Rec's schedule");
       link.href = info.schedule; link.target = "_blank"; link.rel = "noopener";
       line.append(link);

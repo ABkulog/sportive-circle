@@ -42,13 +42,13 @@ def test_older_uw_addresses_work(accounts, client, app):
     accounts.signup(email="husky@u.washington.edu", verify=False)
     with app.app_context():
         assert get_db().execute("SELECT COUNT(*) FROM users WHERE email = 'husky@u.washington.edu'").fetchone()[0] == 1
-    assert b"Please use your UW email" in client.post("/signup", data={
+    assert b"Please use your UW email" in client.post("/signup", follow_redirects=True, data={
         "full_name": "X", "email": "x@washington.edu.evil.com", "password": "longenough1",
         "password2": "longenough1", "birth_date": "2005-01-01"}).data
 
 
 def test_signup_rejects_mismatched_passwords(client):
-    response = client.post("/signup", data={
+    response = client.post("/signup", follow_redirects=True, data={
         "full_name": "A", "email": "a@uw.edu", "password": "longenough1",
         "password2": "different11", "birth_date": "2005-01-01",
     })
@@ -2547,7 +2547,7 @@ def test_very_long_searches_dont_crash(accounts, client):
 
 
 def test_names_have_a_length_limit_and_one_line(accounts, client, app):
-    page = client.post("/signup", data={"full_name": "x" * 61, "email": "long@uw.edu", "password": "purple-and-gold",
+    page = client.post("/signup", follow_redirects=True, data={"full_name": "x" * 61, "email": "long@uw.edu", "password": "purple-and-gold",
                                         "password2": "purple-and-gold", "birth_date": "2005-01-15"}).data
     assert b"under 60 characters" in page
     accounts.signup(name="Dubs\r\n  Husky")
@@ -4259,7 +4259,7 @@ def test_sign_up_is_short_screens(client, app):
     """Screen 1 checks the details (and emails the code); screen 2 is sports; screen 3 (optional) is texts."""
     page = client.get("/signup").data.decode()
     assert "Step 1 of 4" in page and 'name="sports"' not in page and ">Next</button>" in page   # (3 without texts)
-    bad = client.post("/signup", data={"full_name": "Dubs Husky", "email": "dubs@gmail.com", "password": "purple-and-gold",
+    bad = client.post("/signup", follow_redirects=True, data={"full_name": "Dubs Husky", "email": "dubs@gmail.com", "password": "purple-and-gold",
                                        "password2": "purple-and-gold", "birth_date": "2005-01-15"})
     assert bad.status_code == 200 and b"Please use your UW email" in bad.data  # Next still checks everything
     assert client.get("/signup/sports").headers["Location"] == "/signup"      # can't skip screen 1
@@ -5754,6 +5754,105 @@ def test_uw_rec_copy_refuses_what_it_cant_read_and_sudden_drops(app, monkeypatch
         feed["items"] = [booking("Only one")]
         assert uwrec.sync() == 0 and uwrec.last_report()["status"] == "kept"   # 1 vs 31: probably a broken page
         assert get_db().execute("SELECT COUNT(*) FROM rec_reservations WHERE source = 'feed'").fetchone()[0] == 31
+
+
+def test_uw_rec_copy_keeps_a_place_that_didnt_answer_and_reads_odd_data(accounts, client, app, monkeypatch):
+    """Bot round 8: an empty answer for one space wiped that place's bookings; one odd booking stopped the whole
+    copy (blamed on the network); "Updated just now" showed after a failed run; dates past the copy said "none"."""
+    from sportive import uwrec
+    app.config["UW_REC_PAUSE"] = 0
+    page = ('<a href="/Facility/GetFacility?facilityId=11111111-1111-1111-1111-111111111111">Denny Field - Turf</a>'
+            '<a href="/Facility/GetFacility?facilityId=22222222-2222-2222-2222-222222222222">Gym B</a>')
+    start = (now_local() + timedelta(days=1)).replace(hour=18, minute=0, second=0, microsecond=0)
+    booking = lambda title, day=0: {"Text": title, "StartDate": (start + timedelta(days=day)).strftime("%Y-%m-%dT%H:%M:%S"),
+                                    "EndDate": (start + timedelta(days=day, hours=2)).strftime("%Y-%m-%dT%H:%M:%S")}
+    answers = {"1": json.dumps([booking(f"Field {i}", i) for i in range(15)]),
+               "2": json.dumps([booking(f"Gym {i}", i) for i in range(15)])}
+    monkeypatch.setattr(uwrec, "_get", lambda path, params=None: page if path == "/Facility"
+                        else answers[params["selectedFacilityId"][0]])
+    count = "SELECT COUNT(*) FROM rec_reservations WHERE source = 'feed' AND location = ?"
+    with app.app_context():
+        db = get_db()
+        assert uwrec.sync() == 30
+        answers["1"] = ""                                                        # Denny Field: no answer at all
+        answers["2"] = json.dumps([booking(f"Gym {i}", i) for i in range(14)]
+                                  + [{"Text": 123, "StartDate": None, "EndDate": None}, "oops",
+                                     {"Text": "UTC one", "StartDate": start.strftime("%Y-%m-%dT%H:%M:%S") + "Z",
+                                      "EndDate": (start + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S") + "Z"}])
+        uwrec.sync()
+        assert db.execute(count, ("Denny Field",)).fetchone()[0] == 15             # its last copy is kept
+        assert db.execute(count, ("IMA (Intramural Activities Building)",)).fetchone()[0] == 15   # 14 + the UTC one
+        report = uwrec.last_report()
+        assert report["status"] == "warnings" and any("Denny Field" in p for p in report["problems"])
+        copied = uwrec.last_copied()
+        monkeypatch.setattr(uwrec, "_get", lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
+        with pytest.raises(OSError):
+            uwrec.sync()
+        assert uwrec.last_copied() == copied                                    # a failed run isn't "updated"
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="admin@uw.edu")
+    far = now_local() + timedelta(days=40)
+    found = client.get("/events/place-check", query_string={
+        "location": "Denny Field", "starts_at": far.strftime("%Y-%m-%dT18:00"), "ends_at": far.strftime("%Y-%m-%dT19:00")}
+    ).get_json()
+    assert found["beyond_copy"] is True
+    soon = client.get("/events/place-check", query_string={
+        "location": "Denny Field", "starts_at": start.strftime("%Y-%m-%dT%H:%M"),
+        "ends_at": (start + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")}).get_json()
+    assert soon["beyond_copy"] is False
+
+
+def test_sign_up_back_button_and_wrong_email(accounts, client, app):
+    """Bot round 8: going back to fix sign-up was blocked for a minute; Back after an error hit "Confirm Form
+    Resubmission"; the code page had no way out of a mistyped email."""
+    data = {"full_name": "Fresh Husky", "email": "fersh@uw.edu", "password": "purple-and-gold",
+            "password2": "purple-and-gold", "birth_date": "2006-03-01", "grad_year": "2030"}
+    bad = client.post("/signup", data={**data, "password2": "nope-nope-nope"})
+    assert bad.status_code == 302 and bad.headers["Location"] == "/signup"    # a normal page, so Back works
+    again = client.get("/signup").data.decode()
+    assert "Passwords do not match" in again and 'value="fersh@uw.edu"' in again and "purple-and-gold" not in again
+    assert client.post("/signup", data=data).headers["Location"] == "/signup/sports"
+    code = accounts.code_for("fersh@uw.edu")
+    fixed = client.post("/signup", data={**data, "full_name": "Fresh Dawg"})  # Back, fixed the name, Next again
+    assert fixed.headers["Location"] == "/signup/sports" and accounts.code_for("fersh@uw.edu") == code
+    verify = client.get("/verify").data.decode()
+    assert "Wrong email? Fix it" in verify
+    form = client.get("/signup?fix=1").data.decode()
+    assert 'value="fersh@uw.edu"' in form and 'value="Fresh Dawg"' in form
+    assert client.post("/signup", data={**data, "email": "fresh@uw.edu"}).headers["Location"] == "/signup/sports"
+    client.post("/verify", data={"code": accounts.code_for("fresh@uw.edu")})
+    with app.app_context():
+        assert get_db().execute("SELECT verified FROM users WHERE email = 'fresh@uw.edu'").fetchone()[0] == 1
+    accounts.upload_photo()                                                 # (the photo step comes first)
+    assert "haven't joined any clubs yet" in client.get("/clubs?mine=1").data.decode()
+
+
+def test_changing_your_password_kills_a_pending_reset_code_and_phones_stay_one_account(accounts, client, app):
+    accounts.signup(email="alice@uw.edu", name="Alice Husky")
+    accounts.logout()
+    client.post("/forgot", data={"email": "alice@uw.edu"})                  # someone else asks for a reset code
+    code = accounts.code_for("alice@uw.edu")
+    accounts.login(email="alice@uw.edu")
+    client.post("/profile/password", data={"current_password": "purple-and-gold", "password": "new-password-22",
+                                           "password2": "new-password-22"})
+    accounts.logout()
+    client.post("/forgot", data={"email": "nobody@uw.edu"})                 # (just to be on the reset flow)
+    with client.session_transaction() as sess:
+        sess["reset_email"] = "alice@uw.edu"
+    client.post("/reset", data={"code": code, "password": "attacker-pass-9", "password2": "attacker-pass-9"})
+    assert b"Wrong email or password" in client.post("/login", data={"email": "alice@uw.edu",
+                                                                     "password": "attacker-pass-9"}).data
+    from sportive.sms import check_phone_code
+    with app.app_context():
+        db = get_db()
+        db.execute("INSERT INTO users (email, password_hash, full_name, verified, phone, sms_code, sms_code_expires)"
+                   " VALUES ('bob@uw.edu', 'x', 'Bob', 1, '+12065550142', '111111', '2099-01-01 00:00')")
+        db.execute("UPDATE users SET phone = '+12065550142', sms_code = '222222', sms_code_expires = '2099-01-01 00:00'"
+                   " WHERE email = 'alice@uw.edu'")
+        db.commit()
+        ids = dict(db.execute("SELECT email, id FROM users").fetchall())
+        assert check_phone_code(ids["bob@uw.edu"], "111111") is None            # Bob confirms first...
+        assert check_phone_code(ids["alice@uw.edu"], "222222") == "That number is already used by another account."
 
 
 def test_monday_email_games_this_week(accounts, client, app, monkeypatch):

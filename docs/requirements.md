@@ -36,6 +36,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-AUTH-6 | Logged-in users can change their password (current password required). | Must | ✅ |
 | FR-AUTH-7 | Users can delete their account after an "Are you sure?" page, typing DELETE, and their password. A club's only officer must hand over first. | Must | ✅ |
 | FR-AUTH-8 | Suspended accounts can't log in. | Must | ✅ |
+| FR-AUTH-9 | Sign-up forgives going back: a problem shows on a normal page (typed details kept, passwords not), so the phone's Back button works; going back to fix details with the same email keeps the code already sent; the code page has "Wrong email? Fix it". Changing your password cancels any pending reset code. | Must | ✅ |
 
 ### Profile (PROF)
 
@@ -72,8 +73,9 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-EVT-17 | Game pages have a Back button that returns to where you came from (never into the game's own chat). | Should | ✅ |
 | FR-EVT-18 | Open games can be "Open to" anyone, women, men, nonbinary players or Other (like UW Recreation's women-only hours). People whose profile gender is outside the group can't join and don't see it in their feed; people who left gender blank confirm instead. Hosts can remove a player (who gets a notice). | Should | ✅ |
 | FR-EVT-19 | Creating a game (New event and Need players) shows a heads-up: check the courts / field / trail (the word follows the sport) is free at that time, since it could be booked, full or closed for an event. Sportive Circle doesn't reserve or check places; the host does. The Terms say the same. | Must | ✅ |
-| FR-EVT-20 | A game that's over can't be edited (it stays in everyone's history as it was). Time math uses real elapsed time on the nights clocks change: sport length limits, Need players start times (never in the skipped hour) and reminders (sent at the right moment, with the right minutes). | Must | ✅ |
+| FR-EVT-21 | A game that's over can't be edited (it stays in everyone's history as it was). Time math uses real elapsed time on the nights clocks change: sport length limits, Need players start times (never in the skipped hour) and reminders (sent at the right moment, with the right minutes). | Must | ✅ |
 | FR-EVT-20 | While making a game, and on its page, people see what else is on at that place then: **UW Rec reservations** ("UW Rec: reserved 6–10 PM · IM flag football", you probably can't play there) and **other Sportive Circle games** (busy, not taken: you can still post, or join theirs). Private games show only as "a private game". UW Rec places link to UW Rec's schedule. UW Rec's bookings are copied automatically once a day from its public Facility Schedule; admins can add their own entries (Admin → UW Rec reservations, weekly repeats). | Should | ✅ |
+| FR-EVT-22 | The UW Rec copy holds up to bad data: a space that sends nothing or junk keeps its place's last copy (and so does a place that suddenly lost most bookings); an odd booking is left out and reported, not the whole copy; times with "Z" or an offset are read correctly; admins see when the last good copy was saved; past the 4 weeks copied, the form says it can't tell yet. | Must | ✅ |
 
 ### Parties, private games, team vs team (PARTY, PRIV, TEAM)
 
@@ -141,6 +143,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-SMS-1 | Texts are optional: people can add a phone number (at sign-up step 3 or in Settings → Texts), must tick a permission box, and confirm it with a texted code. Email stays required (the UW email is the proof of being a UW student). | Should | ✅ |
 | FR-SMS-2 | Confirmed, opted-in numbers get texts for game reminders (at the time each player picked), changed times/places, cancellations, invites and password-reset codes. Texts can be turned off or the number removed anytime; replying STOP is respected; texts are limited per day. | Should | ✅ |
 | FR-SMS-3 | People who joined before texts (or skipped them) see a "New: game updates by text" card on Home after logging in: add a number right there, or "Not now" hides it for good. `tools/announce_texts.py` emails everyone without a number once (dry run by default). Club officers also get their club alerts by text. | Should | ✅ |
+| FR-SMS-4 | A phone number belongs to one account: if two accounts ask for a code for the same number, only the first to confirm gets it. | Must | ✅ |
 | FR-SET-1 | A Settings page, separate from Edit profile: notifications, look (light / dark / match my phone, also chosen at sign-up), reminder emails, password, log out, delete account. Edit profile is only about you (photo, bio, socials, sports). | Must | ✅ |
 
 ### Safety and admin (SAFE)

@@ -33,7 +33,7 @@
 
 <section class="card rec-feed">
   <p><strong>{{ copied }} booking{{ 's' if copied != 1 }} copied from UW Rec's schedule</strong><br>
-    <small class="muted">{% if synced %}Updated {{ synced|ago }}. {% endif %}It updates by itself every day.</small>
+    <small class="muted">{% if synced %}Last good copy {{ synced|ago }}. {% endif %}It updates by itself every day.</small>
     {% if report %}<br><small class="rec-check rec-{{ report.status }}">{{ {
       'ok': "Checked: every booking read fine.",
       'warnings': "Checked: " ~ (report.problems|length + report.more) ~ " booking(s) couldn't be read and were left out.",

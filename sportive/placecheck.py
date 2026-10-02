@@ -19,6 +19,7 @@ from .db import get_db
 from .moderation import admin_required
 from .textutil import one_line
 from .timeutil import fmt_clock, fmt_when, now_local, parse_form, same_day, to_db
+from .uwrec import DAYS_AHEAD as COPIED_DAYS
 
 log = logging.getLogger(__name__)
 
@@ -84,6 +85,8 @@ def whats_on(location, starts, ends, exclude=None):
         "reserved": [{"label": r["label"], "when": time_range(r["starts_at"], r["ends_at"])}
                      for r in rec_reservations(location, starts, ends)],
         "games": games_at(location, starts, ends, exclude),
+        # We copy UW Rec's schedule only so far ahead: past that, "no reservations" would be a guess.
+        "beyond_copy": is_uw_rec(location) and starts > to_db(now_local() + timedelta(days=COPIED_DAYS)),
     }
 
 
@@ -147,10 +150,10 @@ def admin_rec():
                           " LIMIT 300", (now,)).fetchall()
     copied = db.execute("SELECT COUNT(*) FROM rec_reservations WHERE ends_at >= ? AND source = 'feed'",
                         (now,)).fetchone()[0]
-    from .uwrec import last_report, last_synced
+    from .uwrec import last_copied, last_report
     return render_template("placecheck/admin.html", places=[p for p in LOCATIONS if p in UW_REC_PLACES],
                            upcoming=upcoming, form=form, schedule=UW_REC_SCHEDULE, max_weeks=MAX_REPEAT_WEEKS,
-                           max_label=MAX_LABEL, time_range=time_range, copied=copied, synced=last_synced(),
+                           max_label=MAX_LABEL, time_range=time_range, copied=copied, synced=last_copied(),
                            report=last_report())
 
 

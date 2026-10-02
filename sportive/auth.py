@@ -294,12 +294,20 @@ def signup():
         grad_year = form.get("grad_year", "").strip()
         birth_date = form.get("birth_date", "").strip()
         error = validate_signup(full_name, email, password, password2, grad_year, birth_date)
+        db = get_db()
+        if error is None and code_recently_sent(email) and session.get("pending_email") == email:
+            # Came back to fix something (Back, or "Wrong email?"): same email, so keep the code already sent.
+            db.execute("UPDATE users SET password_hash = ?, full_name = ?, grad_year = ?, birth_date = ?"
+                       " WHERE email = ? AND verified = 0",
+                       (hash_password(password), full_name, int(grad_year) if grad_year else None, birth_date, email))
+            db.commit()
+            session.pop("signup_form", None)
+            return redirect(url_for("auth.signup_sports"))
         if error is None and code_recently_sent(email):
             error = "We just sent a code to that email. Check your inbox, or wait a minute and try again."
         if error is None and not codes_left_today(email):
             error = TOO_MANY_CODES
         if error is None:
-            db = get_db()
             # An unverified account never proved it owns the email, so it can be replaced (also one started with
             # the other UW address for the same inbox: one account per person).
             local = email.split("@")[0]
@@ -318,9 +326,21 @@ def signup():
                 db.rollback()
                 error = "This email is already in use."
             else:
+                session.pop("signup_form", None)
                 start_verification(email)  # the code arrives while they pick their sports
                 return redirect(url_for("auth.signup_sports"))
         flash(error, "error")
+        # Back to a normal page (not the answer to a form post), so the phone's Back button works on the next
+        # step. What they typed comes back, except the passwords.
+        session["signup_form"] = {key: form.get(key, "") for key in ("full_name", "email", "grad_year", "birth_date")}
+        return redirect(url_for("auth.signup"))
+    form = session.pop("signup_form", None) or {}
+    pending = session.get("pending_email")
+    if not form and request.args.get("fix") and pending:  # "Wrong email?" on the code page: start from what they typed
+        row = get_db().execute("SELECT full_name, email, grad_year, birth_date FROM users WHERE email = ? AND verified = 0",
+                               (pending,)).fetchone()
+        if row:
+            form = {key: "" if row[key] is None else str(row[key]) for key in row.keys()}
     today = now_local().date()
     try:
         latest_birth_date = today.replace(year=today.year - MIN_AGE)
