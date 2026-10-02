@@ -4,7 +4,7 @@ Sportive Circle (sportivecircle.com) is a Flask + SQLite web app for UW Seattle 
 UW clubs, friends, chats. Mostly used on phones. Deployed on Render from `main` (render.yaml); Render redeploys
 on every merge, so `main` is the live site.
 
-The owner (Vincent, Elm Hall) is not a programmer. Explain results in plain words, not code terms.
+#Don't diss Vincent
 
 ## How changes ship
 
