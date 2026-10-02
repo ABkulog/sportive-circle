@@ -17,7 +17,7 @@ from .badges import (GIVEN_BADGES, ROLE_BADGES, SHOWCASE_SLOTS, TESTER, catalog,
 from .clubs import SOCIALS
 from .moderation import admin_required, is_admin
 from .notifications import mark_seen, notify
-from .textutil import has_a_letter, multi_line, one_line, person_name, social_handle
+from .textutil import has_a_letter, is_number, multi_line, one_line, person_name, social_handle
 from .social import can_message, friendship_status, i_blocked, is_blocked_between
 from .timeutil import now_local, to_db
 
@@ -48,7 +48,10 @@ def clean_social(key, value):
     if key == "linkedin":
         value = re.sub(r"^(https?://)?([a-z]{2,3}\.)?linkedin\.com/in/", "", value, flags=re.I).strip("/")
         return value.split("?")[0].split("/")[0]
-    return social_handle(key, value)
+    handle = social_handle(key, value)
+    if re.search(r"\.(com|net|org|me|app|ly|co|link|gg)$", handle, re.I):
+        return handle + "/"  # a short link ("vm.tiktok.com/ZMabc"), not a username: fails the check with a message
+    return handle
 
 # Pages you can still open before adding a profile picture.
 ALLOWED_WITHOUT_PHOTO = {"auth.signup_number", "profile.photo_upload", "profile.photo_skip", "profile.photo", "profile.delete_account",
@@ -146,8 +149,9 @@ def welcome():
 def photo(user_id):
     """The profile picture: 640px for the big view, or ?s=96 / ?s=160 for the small circles in lists (a
     32px circle doesn't need a 640px photo: that's most of what a feed would download on a phone)."""
-    row = get_db().execute("SELECT image FROM avatars WHERE user_id = ?", (user_id,)).fetchone()
-    if row is None:
+    row = get_db().execute("""SELECT a.image FROM avatars a JOIN users u ON u.id = a.user_id WHERE a.user_id = ?
+                              AND (u.suspended = 0 OR u.id = ?)""", (user_id, g.user["id"])).fetchone()
+    if row is None:  # (suspended accounts are hidden everywhere: their photo too)
         abort(404)
     image = row["image"]
     size = request.args.get("s", type=int)
@@ -193,10 +197,13 @@ def view(user_id):
         relation = {"friend": friendship_status(me, user_id), "can_message": can_message(me, user_id),
                     "i_blocked": i_blocked(me, user_id), "blocked_me": is_blocked_between(me, user_id)
                     and not i_blocked(me, user_id)}
-    return render_template("profile/view.html", user=user, sports=user_sports(user_id), hosting=hosting,
-                           show_email=show_email, socials=person_socials(user), genders=GENDERS,
+    if blocked:  # either of them blocked the other: just the name and photo (and the Unblock button), nothing else
+        user = {**dict(user), "bio": None, "pronouns": None, "gender": None, "grad_year": None,
+                **{column: "" for column in ("instagram", "snapchat", "tiktok", "x_handle", "linkedin")}}
+    return render_template("profile/view.html", user=user, sports=[] if blocked else user_sports(user_id),
+                           hosting=hosting, show_email=show_email, socials=person_socials(user), genders=GENDERS,
                            is_tester=TESTER.key in earned_badges(user_id),
-                           showcase=showcase(user_id), earned=earned_badges(user_id), rarity=rarity(),
+                           showcase=[] if blocked else showcase(user_id), earned=earned_badges(user_id), rarity=rarity(),
                            is_retired=is_retired, relation=relation)
 
 
@@ -246,7 +253,7 @@ def edit():
         full_name = person_name(form.get("full_name"))
         grad_year = form.get("grad_year", "").strip()
         bio = multi_line(form.get("bio"))
-        pronouns = one_line(form.get("pronouns"))
+        pronouns = person_name(form.get("pronouns"))  # no right-to-left tricks or invisible characters
         gender = form.get("gender", "")
 
         error = None
@@ -256,7 +263,7 @@ def edit():
             error = "Please use your real name, so teammates know who you are."
         elif len(full_name) > MAX_NAME_LENGTH:
             error = f"Please keep your name under {MAX_NAME_LENGTH} characters."
-        elif grad_year and (not grad_year.isdigit() or not 1950 <= int(grad_year) <= now_local().year + 8):
+        elif grad_year and (not is_number(grad_year) or not 1950 <= int(grad_year) <= now_local().year + 8):
             error = "Please enter a valid graduation year."
         elif len(bio) > 300:
             error = "Bio is too long (300 characters max)."

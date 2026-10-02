@@ -24,7 +24,7 @@ from .notifications import mark_seen, notify
 from .mail import compose, send_email
 from .social import friends_of, is_blocked_between
 from .spirit import greeting, top_dawgs
-from .textutil import multi_line, one_line, same_secret
+from .textutil import is_number, multi_line, one_line, same_secret
 from .timeutil import (add_real, exists_in_seattle, fmt_clock, fmt_when, from_db, now_local, parse_form, real_gap,
                        to_db, to_form)
 
@@ -213,7 +213,7 @@ def read_game_options(form, sport, event=None):
     if event is None and team_raw:
         if not sizes:
             return 0, "", None, f"{SPORTS[sport]} isn't played team vs team. Pick Regular game."
-        if not team_raw.isdigit() or int(team_raw) not in sizes:
+        if not is_number(team_raw) or int(team_raw) not in sizes:
             return 0, "", None, f"{SPORTS[sport]} teams can be {', '.join(f'{n}v{n}' for n in sizes)}."
         team_size = int(team_raw)
     if event is not None and team_size and team_size not in sizes:
@@ -261,7 +261,7 @@ def created_message(is_private, reserve, public_text):
 
 def read_reservations(form, room):
     """Friends the host picked to reserve spots for. Returns (friend ids, error). `room` = spots they can use."""
-    chosen = list(dict.fromkeys(int(value) for value in form.getlist("reserve") if value.isdigit()))
+    chosen = list(dict.fromkeys(int(value) for value in form.getlist("reserve") if is_number(value)))
     friends = {friend["id"] for friend in friends_of(g.user["id"])}
     if any(friend_id not in friends for friend_id in chosen):
         return [], "You can only reserve spots for your friends."
@@ -345,9 +345,10 @@ def feed():
 
     # "Show more games" grows the list a page at a time (one extra row tells us if there's more).
     page = request.args.get("page", "1")
-    page = min(int(page), MAX_FEED_PAGES) if page.isdigit() and int(page) > 0 else 1
+    page = min(int(page), MAX_FEED_PAGES) if is_number(page) and int(page) > 0 else 1
     events = query_events(where, params, limit=page * FEED_PAGE_SIZE + 1)
     more_page = page + 1 if len(events) > page * FEED_PAGE_SIZE and page < MAX_FEED_PAGES else None
+    capped = len(events) > page * FEED_PAGE_SIZE and page >= MAX_FEED_PAGES  # even more games than we list
     events = events[:page * FEED_PAGE_SIZE]
 
     # "Need players" posts starting soon (any sport) go in their own strip at the top. While filtering,
@@ -379,7 +380,7 @@ def feed():
     mark_seen("need_players")
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
-                           month_name=now.strftime("%B"), more_page=more_page,
+                           month_name=now.strftime("%B"), more_page=more_page, capped=capped,
                            hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now, viewer=g.user["id"]),
                            club_picks=suggested_clubs(g.user["id"], my_sports), texts_card=show_texts_card())
 

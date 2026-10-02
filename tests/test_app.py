@@ -3719,6 +3719,61 @@ def test_two_workers_starting_at_once_dont_crash_adding_columns(tmp_path):
         assert errors == []
 
 
+def test_odd_digits_and_huge_pages_dont_crash(accounts, client, app):
+    """Round 14: "²" passes str.isdigit() but not int(): Home's ?page= and grad years crashed (500)."""
+    accounts.signup()
+    assert client.get("/?page=²").status_code == 200
+    assert client.post("/profile/edit", data={"full_name": "Dubs Husky", "grad_year": "²⁰²⁷"}).status_code in (200, 302)
+    assert client.post("/signup", data={"full_name": "A B", "email": "ab@uw.edu", "password": "purple-and-gold",
+                                        "password2": "purple-and-gold", "birth_date": "2005-01-01",
+                                        "grad_year": "²⁰²⁷"}).status_code == 302
+    app.config["ADMIN_EMAILS"] = "dubs@uw.edu"
+    assert client.get("/admin/reports?page=99999999999999999999999").status_code == 200
+    assert client.get("/admin/suggestions?page=99999999999999999999999").status_code == 200
+
+
+def test_blocked_profiles_show_only_name_and_photo(accounts, client, app):
+    """Round 14: someone you blocked still saw your bio, gender and socials; pronouns could fake text."""
+    ids = _people(accounts, app, "Alice", "Bob")
+    _as(accounts, "Alice")
+    client.post("/profile/edit", data={"full_name": "Alice Husky", "bio": "Hoops every night", "gender": "woman",
+                                       "pronouns": "\u202enamow", "grad_year": "2027"})
+    with app.app_context():
+        assert get_db().execute("SELECT pronouns FROM users WHERE id = ?", (ids["Alice"],)).fetchone()[0] == "namow"
+        get_db().execute("UPDATE users SET instagram = 'alice.ig' WHERE id = ?", (ids["Alice"],))
+        get_db().commit()
+    _as(accounts, "Bob")
+    assert "alice.ig" in client.get(f"/u/{ids['Alice']}").data.decode()
+    _as(accounts, "Alice")
+    client.post(f"/block/{ids['Bob']}")
+    _as(accounts, "Bob")
+    page = client.get(f"/u/{ids['Alice']}").data.decode()
+    assert "Alice Husky" in page and "alice.ig" not in page and "Hoops every night" not in page
+    from sportive.textutil import person_name
+    assert person_name("\u3164\u3164") == ""                                     # looks blank: not a name
+
+
+def test_social_links_and_short_links(accounts, client, app):
+    from sportive.profile import clean_social
+    assert clean_social("tiktok", "https://www.tiktok.com/@dubs.husky.official?_t=8kL") == "dubs.husky.official"
+    assert clean_social("tiktok", "vm.tiktok.com/ZMabc/").endswith("/")             # a short link, refused
+    assert 'maxlength="200"' in pathlib.Path(app.root_path, "templates/profile/edit_sports.html").read_text()
+
+
+def test_home_says_when_there_are_more_games_than_it_lists(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    with app.app_context():
+        db = get_db()
+        host = db.execute("SELECT id FROM users WHERE email = 'host@uw.edu'").fetchone()[0]
+        start = now_local() + timedelta(days=2)
+        db.executemany("INSERT INTO events (title, sport, location, skill_level, starts_at, ends_at, host_id, created_at)"
+                       " VALUES (?, 'basketball', 'IMA (Intramural Activities Building)', 'Casual', ?, ?, ?, ?)",
+                       [(f"Game {n}", to_db(start), to_db(start + timedelta(hours=1)), host, to_db(now_local()))
+                        for n in range(1010)])
+        db.commit()
+    assert "There are even more games" in client.get("/?page=20").data.decode()
+
+
 def test_party_up_holds_spots_for_friends(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Stranger")
     _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])

@@ -243,7 +243,8 @@ def _report(status, saved, previous, problems):
         for admin in db.execute(f"SELECT id FROM users WHERE email IN ({', '.join('?' for _ in emails)})",
                                 emails).fetchall() if emails else []:
             notify(admin["id"], "account", "UW Rec copy needs a look: "
-                   + {"failed": "UW Rec's site didn't answer.", "kept": "far fewer bookings came back.",
+                   + {"failed": "UW Rec's site didn't answer.",
+                      "kept": "far fewer bookings came back (or none could be read), so the last copy is kept.",
                       "warnings": f"{len(problems)} booking(s) couldn't be read."}[status],
                    "/admin/uw-rec", key="uw_rec_report")
     db.commit()

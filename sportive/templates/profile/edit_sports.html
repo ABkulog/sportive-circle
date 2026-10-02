@@ -15,7 +15,7 @@
       <summary>Your socials <em>(optional, shown under your bio)</em></summary>
       <div class="row row-pair">
         {% for key, label in socials.items() %}
-          <input name="{{ key }}" maxlength="{{ 150 if key == 'linkedin' else 40 }}" value="{{ form.get(key) or '' }}"
+          <input name="{{ key }}" maxlength="200" value="{{ form.get(key) or '' }}"
                  placeholder="{{ 'LinkedIn link' if key == 'linkedin' else label }}"
                  aria-label="{{ label }} username" autocapitalize="off" spellcheck="false">
         {% endfor %}

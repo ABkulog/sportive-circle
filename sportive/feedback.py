@@ -130,7 +130,7 @@ def admin_suggestions():
     where, params = "", ()
     if kind in KINDS:
         where, params = "WHERE s.kind = ?", (kind,)
-    page = max(1, request.args.get("page", 1, type=int) or 1)
+    page = min(max(1, request.args.get("page", 1, type=int) or 1), 10000)  # a huge number would overflow SQLite
     if topic:  # every suggestion in the trend's window, so a trend's link never comes up empty
         rows = get_db().execute(
             f"""SELECT s.*, u.full_name, u.email FROM suggestions s LEFT JOIN users u ON u.id = s.user_id

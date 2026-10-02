@@ -167,7 +167,7 @@ def admin_reports():
         status = "open"
     db = get_db()
     suspended = db.execute("SELECT id, full_name, email FROM users WHERE suspended = 1 ORDER BY fold(full_name)").fetchall()
-    page = max(1, request.args.get("page", 1, type=int) or 1)
+    page = min(max(1, request.args.get("page", 1, type=int) or 1), 10000)  # a huge number would overflow SQLite
     reports = db.execute(
         """SELECT r.*, reporter.full_name AS reporter_name, reported.full_name AS reported_name,
                   reported.email AS reported_email, reported.suspended AS reported_suspended
@@ -218,6 +218,9 @@ def suspend(user_id, action):
     elif action == "suspend":
         from .events import query_events, tell_players_it_was_cancelled
         now = to_db(now_local())
+        db.commit()
+        db.execute("BEGIN IMMEDIATE")  # read their games and cancel them in one go: an officer canceling one of
+        # them at the same moment can't make its players hear about it twice
         db.execute("UPDATE users SET suspended = 1 WHERE id = ?", (user_id,))
         hosted = query_events(["e.host_id = :host", "e.cancelled = 0", "e.ends_at >= :now"],
                               {"host": user_id, "now": now}, on_hold=True, limit=100000)  # club games on hold too

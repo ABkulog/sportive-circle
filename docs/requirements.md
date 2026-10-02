@@ -49,6 +49,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-PROF-5 | On the photo page, Save without picking a new photo goes back to the profile, and users can remove their photo (with an "Are you sure?"). | Should | ✅ |
 | FR-PROF-6 | Optional pronouns, gender (says it's only used for games open to women or men), and Instagram / Snapchat / TikTok / X usernames right under the bio in Edit profile, shown on the profile only if filled in. | Should | ✅ |
 | FR-PROF-7 | Emails shown to people you've played with are hidden once either of you blocks the other. Top Dawgs ties share a place and medal. | Must | ✅ |
+| FR-PROF-8 | Someone you blocked (or who blocked you) sees only your name and photo, not your bio, pronouns, gender, class year, sports, badges or socials; suspended people's photos aren't served. Pronouns and names can't hide behind invisible or right-to-left characters. Pasted social links keep the full username (long links aren't cut off), short links like vm.tiktok.com are refused, and long handles wrap on a phone. | Must | ✅ |
 
 ### Games and events (EVT)
 
