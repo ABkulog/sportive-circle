@@ -150,7 +150,8 @@ def photo(user_id):
     """The profile picture: 640px for the big view, or ?s=96 / ?s=160 for the small circles in lists (a
     32px circle doesn't need a 640px photo: that's most of what a feed would download on a phone)."""
     row = get_db().execute("""SELECT a.image FROM avatars a JOIN users u ON u.id = a.user_id WHERE a.user_id = ?
-                              AND (u.suspended = 0 OR u.id = ?)""", (user_id, g.user["id"])).fetchone()
+                              AND (u.suspended = 0 OR u.id = ? OR ?)""",
+                           (user_id, g.user["id"], 1 if is_admin() else 0)).fetchone()
     if row is None:  # (suspended accounts are hidden everywhere: their photo too)
         abort(404)
     image = row["image"]

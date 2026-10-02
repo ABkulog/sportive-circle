@@ -62,13 +62,13 @@
       {% if r.details %}<p class="report-details">“{{ r.details }}”</p>{% endif %}
       <div class="detail-actions">
         {% if status == 'open' %}
-          <form method="post" action="{{ url_for('moderation.resolve', report_id=r.id, action='reviewed', **{'from': status}) }}">
+          <form method="post" action="{{ url_for('moderation.resolve', report_id=r.id, action='reviewed', page=page, **{'from': status}) }}">
             {{ csrf_field() }}<button class="btn btn-small">Mark reviewed</button></form>
-          <form method="post" action="{{ url_for('moderation.resolve', report_id=r.id, action='dismissed', **{'from': status}) }}">
+          <form method="post" action="{{ url_for('moderation.resolve', report_id=r.id, action='dismissed', page=page, **{'from': status}) }}">
             {{ csrf_field() }}<button class="btn btn-small btn-ghost">Dismiss</button></form>
           {% if r.reported_user_id %}{{ suspend_button(r.reported_user_id, r.reported_name, r.reported_suspended) }}{% endif %}
         {% else %}
-          <form method="post" action="{{ url_for('moderation.resolve', report_id=r.id, action='open', **{'from': status}) }}">
+          <form method="post" action="{{ url_for('moderation.resolve', report_id=r.id, action='open', page=page, **{'from': status}) }}">
             {{ csrf_field() }}<button class="btn btn-small btn-ghost">Reopen</button></form>
         {% endif %}
       </div>

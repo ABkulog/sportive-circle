@@ -57,7 +57,8 @@
         <li class="rec-row">
           <span><strong>{{ r.location }}</strong> · {{ r.label }}<br><small class="muted">{{ time_range(r.starts_at, r.ends_at) }}</small></span>
           <span class="rec-actions">
-            <form method="post" action="{{ url_for('placecheck.admin_rec_delete', reservation_id=r.id) }}">
+            <form method="post" action="{{ url_for('placecheck.admin_rec_delete', reservation_id=r.id) }}"
+                  data-confirm="Remove this reservation ({{ r.label }}, {{ time_range(r.starts_at, r.ends_at) }})?">
               {{ csrf_field() }}<button class="link-button">Remove</button></form>
             <form method="post" action="{{ url_for('placecheck.admin_rec_delete', reservation_id=r.id) }}"
                   data-confirm="Remove every week of “{{ r.label }}” at this time, from today on?">

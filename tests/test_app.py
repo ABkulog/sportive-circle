@@ -2360,7 +2360,7 @@ def test_suspending_a_host_tells_players_even_when_their_club_is_in_review(accou
     page = client.post(f"/admin/users/{_user_id(app, 'captain@uw.edu')}/suspend", follow_redirects=True).data.decode()
     outbox = app.extensions.get("outbox", [])
     assert any(m["to"] == "member@uw.edu" and m["subject"].startswith("Canceled: Club night") for m in outbox)
-    assert "only officer of UW Spikeball Club" in page                    # someone has to take the club over
+    assert "only officer of" in page and "UW Spikeball Club</a>" in page   # someone has to take the club over
     waiting = _user_id(app, "waiting@uw.edu")
     assert client.post(f"/clubs/{club}/members/{waiting}/approve").status_code == 302   # an admin can let them in
     with app.app_context():
@@ -3794,6 +3794,62 @@ def test_changes_reach_invited_friends_and_say_what_changed(accounts, client, ap
     _as(accounts, "Maya")
     client.post(f"/events/{game}/cancel")
     assert "spots left" not in client.get(f"/events/{game}").data.decode()
+
+
+def test_game_chats_hide_blocked_people_both_ways_and_suspended_people(accounts, client, app):
+    """Round 16: in a game chat, blocking only hid the blocked person from the blocker; a suspended person's
+    old messages still showed and counted as unread."""
+    ids = _people(accounts, app, "Host", "Ann", "Ben", "Sus")
+    _as(accounts, "Host")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    for name in ("Ann", "Ben", "Sus"):
+        _as(accounts, name)
+        client.post(f"/events/{game}/join")
+    _as(accounts, "Sus")
+    client.post(f"/events/{game}/chat", data={"body": "buy my stuff"})
+    _as(accounts, "Ann")
+    client.post(f"/block/{ids['Ben']}")
+    client.post(f"/events/{game}/chat", data={"body": "ann private plan"})
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 1 WHERE id = ?", (ids["Sus"],))
+        get_db().commit()
+    _as(accounts, "Ben")
+    seen = json.dumps(client.get(f"/events/{game}/chat/poll?after=0").get_json())
+    assert "ann private plan" not in seen and "buy my stuff" not in seen
+    _as(accounts, "Host")
+    seen = json.dumps(client.get(f"/events/{game}/chat/poll?after=0").get_json())
+    assert "ann private plan" in seen and "buy my stuff" not in seen
+
+
+def test_admin_tools_on_a_suspended_profile_and_report_pages(accounts, client, app):
+    """Round 16: a suspended profile looked normal to admins (no label, no Restore, no photo); acting on page 2
+    of reports jumped back to page 1."""
+    ids = _people(accounts, app, "Sam")
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="admin@uw.edu")
+    client.post(f"/admin/users/{ids['Sam']}/suspend")
+    page = client.get(f"/u/{ids['Sam']}").data.decode()
+    assert "Suspended" in page and "Restore account" in page
+    assert client.get(f"/u/{ids['Sam']}/photo").status_code == 200
+    with app.app_context():
+        db = get_db()
+        admin = db.execute("SELECT id FROM users WHERE email = 'admin@uw.edu'").fetchone()[0]
+        for n in range(130):
+            db.execute("INSERT INTO reports (reporter_id, reported_user_id, target_type, target_id, reason, details,"
+                       " status, created_at) VALUES (?, ?, 'user', ?, 'spam', ?, 'open', '2026-10-01 12:00')",
+                       (admin, ids["Sam"], ids["Sam"], f"r{n}"))
+        db.commit()
+        last = db.execute("SELECT MAX(id) FROM reports").fetchone()[0]
+    page2 = client.get("/admin/reports?page=2").data.decode()
+    assert f"/admin/reports/{last}/reviewed?page=2" in page2 or "page=2&amp;from=open" in page2
+    done = client.post(f"/admin/reports/{last}/reviewed?page=2&from=open")
+    assert "page=2" in done.headers["Location"]
+
+
+def test_need_players_place_check_uses_seattle_time_on_any_phone(app):
+    """Round 16: on a phone set to Seoul, Need players asked the place check about Seoul's clock time."""
+    js = (pathlib.Path(app.root_path) / "static" / "forms.js").read_text()
+    assert 'timeZone: "America/Los_Angeles"' in js and "getHours()" not in js
 
 
 def test_party_up_holds_spots_for_friends(accounts, client, app):

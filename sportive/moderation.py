@@ -8,6 +8,7 @@ import functools
 from datetime import timedelta
 
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
+from markupsafe import Markup
 
 from .auth import login_required
 from .db import get_db
@@ -199,7 +200,8 @@ def resolve(report_id, action):
                       (action, to_db(now_local()) if action != "open" else None, report_id, seen)).rowcount:
         flash("Another admin already handled that report.", "info")
     db.commit()
-    return redirect(url_for("moderation.admin_reports", status=seen))
+    page = min(max(1, request.args.get("page", 1, type=int) or 1), 10000)
+    return redirect(url_for("moderation.admin_reports", status=seen, page=page if page > 1 else None))
 
 
 @bp.route("/admin/users/<int:user_id>/<action>", methods=("POST",))
@@ -251,8 +253,10 @@ def suspend(user_id, action):
             tell_players_it_was_cancelled(event, by_host=False)
         flash(f"{user['full_name']} is suspended. Their upcoming games were canceled and players were told.", "info")
         if stranded:
-            flash("They were the only officer of " + ", ".join(c["name"] for c in stranded)
-                  + ". Add a new officer on the club's Officers page so join requests get answered.", "error")
+            links = Markup(", ").join(Markup('<a href="{}">{}</a>').format(url_for("clubs.officers", club_id=c["id"]),
+                                                                          c["name"]) for c in stranded)
+            flash(Markup("They were the only officer of {}. Add a new officer there so join requests get answered.")
+                  .format(links), "error")
     else:
         db.execute("UPDATE users SET suspended = 0 WHERE id = ?", (user_id,))
         flash(f"{user['full_name']} can log in again.", "success")

@@ -196,8 +196,13 @@
   const endsAt = form.querySelector('input[name="ends_at"]');
   const startsIn = form.querySelector('select[name="starts_in"]');   // Need players: "in 30 min"...
   const duration = form.querySelector('select[name="duration"]');    // ...for "1 hour"
-  const pad = (n) => String(n).padStart(2, "0");
-  const local = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  // "In 30 min" as a Seattle clock time (the game's time), even on a phone set to New York or Seoul.
+  const seattleClock = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric",
+    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const local = (d) => {
+    const part = Object.fromEntries(seattleClock.formatToParts(d).map((p) => [p.type, p.value]));
+    return `${part.year}-${part.month}-${part.day}T${part.hour}:${part.minute}`;
+  };
 
   function times() {
     if (startsAt && endsAt) return [startsAt.value, endsAt.value];

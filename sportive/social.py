@@ -233,8 +233,9 @@ def event_chat_unread():
                        JOIN rsvps r ON r.event_id = m.event_id AND r.user_id = ?
                        LEFT JOIN event_chat_seen s ON s.event_id = m.event_id AND s.user_id = ?
                        WHERE m.sender_id != ? AND m.id > COALESCE(s.last_id, 0)
-                         AND m.sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
-                       GROUP BY m.event_id""", (recent, me, me, me, me)):
+                         AND m.sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ? UNION SELECT blocker_id FROM blocks WHERE blocked_id = ?
+                                       UNION SELECT id FROM users WHERE suspended = 1)  -- blocked either way, or suspended
+                       GROUP BY m.event_id""", (recent, me, me, me, me, me)):
                 g.chat_unread[row["event_id"]] = row["n"]
     return g.chat_unread
 
@@ -566,8 +567,9 @@ def _reaction_rows(kind, me, other_or_event, start):
         """SELECT r.message_id, r.emoji, r.user_id FROM message_reactions r
            JOIN event_messages m ON m.id = r.message_id
            WHERE r.kind = 'game' AND m.event_id = ? AND m.id >= ?
-             AND r.user_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)""",
-        (other_or_event, start, me)).fetchall()
+             AND r.user_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ? UNION SELECT blocker_id FROM blocks WHERE blocked_id = ?
+                                       UNION SELECT id FROM users WHERE suspended = 1)""",
+        (other_or_event, start, me, me)).fetchall()
 
 
 def reactions_by_message(rows, me):
@@ -653,8 +655,9 @@ def group_status(event_id, me):
     (Always on: the read receipts setting is for DMs.)"""
     db = get_db()
     last = db.execute("""SELECT id, sender_id FROM event_messages WHERE event_id = ?
-                           AND sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
-                         ORDER BY id DESC LIMIT 1""", (event_id, me)).fetchone()
+                           AND sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ? UNION SELECT blocker_id FROM blocks WHERE blocked_id = ?
+                                       UNION SELECT id FROM users WHERE suspended = 1)
+                         ORDER BY id DESC LIMIT 1""", (event_id, me, me)).fetchone()
     if last is None or last["sender_id"] != me:
         return None
     others, behind = db.execute(
@@ -724,9 +727,11 @@ def _chat_rows(event_id, after=0):
         f"""SELECT * FROM (
                SELECT m.*, u.full_name, u.avatar_updated FROM event_messages m JOIN users u ON u.id = m.sender_id
                WHERE m.event_id = ? AND m.id > ?
-                 AND m.sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
+                 AND m.sender_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?
+                                         UNION SELECT blocker_id FROM blocks WHERE blocked_id = ?
+                                         UNION SELECT id FROM users WHERE suspended = 1)  -- blocked either way
                ORDER BY m.id DESC LIMIT {MAX_SHOWN_MESSAGES}) ORDER BY id""",
-        (event_id, after, g.user["id"])).fetchall()
+        (event_id, after, g.user["id"], g.user["id"])).fetchall()
 
 
 def _mark_chat_seen(event_id, rows):
