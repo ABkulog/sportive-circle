@@ -135,6 +135,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-SOC-5 | Messages lists every friend, including ones with no messages yet ("Start a chat"), and has a search bar: typing filters chats and friends right away, and Search also finds anyone else you can message (people you've played with, club officers). Strangers point to Friends to add first. | Must | ✅ |
 | FR-SOC-6 | When someone posts a public game, their friends (and, for a club event, the club's followers and members; members-only events: members only) get a bell notice and an email ("Maya posted a game", with a button to see and join it). Never for private games, blocked or suspended people, people already in it, or a game open only to another gender. At most 3 of these emails a day per person; the email can be turned off in Settings. A weekly practice is announced once. | Should | ✅ |
 | FR-SOC-7 | Unfriending or blocking ends the spots held and invites either person sent the other, in any game (and their "You down?" notices). Suspended people don't count as mutual friends in search or suggestions. | Must | ✅ |
+| FR-SOC-8 | People search never fails on odd input (only accent marks, emoji, wildcards) and folds letters like ı and ß; friends come first, so Messages search finds a friend even among many people with the same name. Messages with only invisible characters aren't sent; photo-only chats preview as "📷 Photo"; an unsent draft (even all emoji) comes back. | Must | ✅ |
 
 ### Notifications (NOTIF)
 
@@ -159,6 +160,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-SAFE-3 | Admins review club registrations. | Must | ✅ |
 | FR-SAFE-4 | The people who run the app (admins) show a gold 🐾 Team label on their profile, in game lists and in messages, plus a 💜 Sportive Circle Team badge. It can't be earned or faked, and goes away if someone stops being an admin. | Should | ✅ |
 | FR-SAFE-5 | Admin tools hold up when busy: the report queue pages 100 at a time; two admins handling the same report don't overwrite each other ("Another admin already handled that report"); suspending a host tells every player of the canceled games, club games on hold included; it warns when they were a club's only officer, and admins can confirm that club's waiting members. | Must | ✅ |
+| FR-SAFE-6 | A reported message keeps a copy of its words and notes when it had a photo, so admins can tell what was reported. | Must | ✅ |
 
 ### Info pages (INFO)
 

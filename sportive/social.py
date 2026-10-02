@@ -16,7 +16,7 @@ from flask import (Blueprint, Response, abort, current_app, flash, g, jsonify, r
 from .auth import login_required, safe_next
 from .constants import SPORT_EMOJI
 from .db import get_db
-from .textutil import fold, initial, multi_line, one_line
+from .textutil import fold, initial, multi_line, one_line, person_name
 from .photos import make_chat_photo
 from .timeutil import fmt_clock, fmt_when, from_db, now_local, to_db
 
@@ -149,6 +149,8 @@ def too_many_messages(me, sending=1):
 def clean_body(text, photo=False):
     """Returns (body, error). With a photo, the words are optional."""
     body = multi_line(text)
+    if body and not person_name(body).strip():  # only invisible characters (zero-width spaces): an empty bubble
+        body = ""
     if not body and not photo:
         return None, "Type a message first."
     if len(body) > MAX_MESSAGE_LENGTH:
@@ -199,7 +201,10 @@ def chat_sent(error, back):
 def keep_draft(text):
     """A message that couldn't be sent goes back in the box after the redirect, instead of vanishing."""
     body = (text or "")[:MAX_MESSAGE_LENGTH]
-    if len(json.dumps(body)) <= MAX_DRAFT_COOKIE_BYTES:  # the session is a cookie (browsers cap them at 4 KB)
+    # The session is a cookie (browsers cap them at 4 KB) and an emoji takes 12 bytes in it: keep as much as fits.
+    while body and len(json.dumps(body)) > MAX_DRAFT_COOKIE_BYTES:
+        body = body[:len(body) * 3 // 4]
+    if body:
         session["chat_draft"] = {"path": request.path, "body": body}
 
 
@@ -356,6 +361,8 @@ def search_people(me, q):
     if len(q) < MIN_SEARCH_LENGTH:
         return []
     words = fold(q).split()[:3]
+    if not words:  # only accent marks or spaces: nothing left to look for
+        return []
     params = {"me": me, "starts": words[0] + "%", "limit": MAX_SEARCH_RESULTS}
     for n, word in enumerate(words):
         params[f"w{n}"] = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
@@ -385,8 +392,9 @@ def search_people(me, q):
             WHERE u.verified = 1 AND u.suspended = 0 AND u.id != :me AND (({name_match}) OR {netid_match})
               AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = :me)
               AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = :me)
-            ORDER BY by_netid DESC, played DESC, mutual DESC, fold(u.full_name) LIKE :starts DESC, fold(u.full_name)
-            LIMIT :limit""", params).fetchall()
+            ORDER BY by_netid DESC, u.id IN my_friends DESC, played DESC, mutual DESC,
+                     fold(u.full_name) LIKE :starts DESC, fold(u.full_name)
+            LIMIT :limit""", params).fetchall()  # friends first: Messages search keeps only people you can message
     return [{**dict(row), "status": friendship_status(me, row["id"])} for row in rows]
 
 

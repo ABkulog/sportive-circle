@@ -56,6 +56,13 @@ def is_team(user_id):
     return user_id in team_ids()
 
 
+
+def _snapshot(message):
+    """What admins see of a reported message: its words, and that it had a photo (a photo-only message
+    would otherwise leave nothing to review)."""
+    photo = "📷 [sent a photo]" if message["photo_id"] else ""
+    return "\n".join(part for part in (message["body"], photo) if part)
+
 def resolve_target(target_type, target_id):
     """Who's being reported, a copy of what they said, and where to go back to.
 
@@ -76,7 +83,7 @@ def resolve_target(target_type, target_id):
                WHERE m.id = ? AND m.recipient_id = ?""", (target_id, me)).fetchone()  # only messages sent TO you
         if message is None:
             abort(404)
-        return {"user_id": message["sender_id"], "name": message["full_name"], "snapshot": message["body"],
+        return {"user_id": message["sender_id"], "name": message["full_name"], "snapshot": _snapshot(message),
                 "what": f"a message from {message['full_name']}",
                 "back": url_for("social.thread", user_id=message["sender_id"])}
     if target_type == "event_message":
@@ -87,7 +94,7 @@ def resolve_target(target_type, target_id):
             (target_id, me, me)).fetchone()  # only chats you're in, and not your own messages
         if message is None:
             abort(404)
-        return {"user_id": message["sender_id"], "name": message["full_name"], "snapshot": message["body"],
+        return {"user_id": message["sender_id"], "name": message["full_name"], "snapshot": _snapshot(message),
                 "what": f"a group chat message from {message['full_name']}",
                 "back": url_for("social.event_chat", event_id=message["event_id"])}
     abort(404)

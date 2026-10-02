@@ -44,7 +44,8 @@ def initial(name):
 def fold(text):
     """For matching and sorting: lowercase without accents, so "Jose" finds "José" and "adam" sorts with "Adam"."""
     decomposed = unicodedata.normalize("NFKD", text or "")
-    return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).casefold()
+    # The Turkish dotless ı has no accent to strip: "yilmaz" should still find "Yılmaz".
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).casefold().replace("ı", "i")
 
 
 def has_a_letter(text):

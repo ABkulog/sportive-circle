@@ -3554,6 +3554,44 @@ def test_one_click_unsubscribe_without_logging_in(accounts, client, app, monkeyp
     assert client.get("/unsubscribe/forged-token").status_code == 404
 
 
+def test_search_with_only_accents_odd_letters_and_friends_first(accounts, client, app):
+    """Bot round 11: a search of only accent marks crashed (500); "yilmaz" didn't find "Yılmaz"; Messages search
+    could miss a friend behind 20 strangers with the same name."""
+    ids = _people(accounts, app, "Maya", "Zoe")
+    with app.app_context():
+        db = get_db()
+        db.executemany("INSERT INTO users (email, password_hash, full_name, verified) VALUES (?, 'x', ?, 1)",
+                       [(f"chen{n}@uw.edu", f"Alex Chen{n:02d}") for n in range(25)]
+                       + [("ibo@uw.edu", "İbrahim Yılmaz")])
+        db.execute("UPDATE users SET full_name = 'Zoe Chen' WHERE id = ?", (ids["Zoe"],))
+        db.commit()
+    _friends(app, ids["Maya"], ids["Zoe"])
+    _as(accounts, "Maya")
+    assert client.get("/friends?q=%CC%81%CC%81").status_code == 200
+    assert client.get("/messages?q=%CC%81%CC%81").status_code == 200
+    assert "Yılmaz" in client.get("/friends?q=yilmaz").data.decode()
+    assert "Zoe Chen" in client.get("/messages?q=chen").data.decode()
+
+
+def test_message_odd_contents(accounts, client, app):
+    """Bot round 11: zero-width-only messages made empty bubbles; photo-only chats had a blank preview; a reported
+    photo left admins nothing to look at."""
+    ids = _people(accounts, app, "Maya", "Jordan")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _as(accounts, "Maya")
+    client.post(f"/messages/{ids['Jordan']}", data={"body": "\u200b\u200b"})
+    client.post(f"/messages/{ids['Jordan']}", data={"body": "", "photo": (BytesIO(make_image()), "p.png")},
+                content_type="multipart/form-data")
+    with app.app_context():
+        rows = get_db().execute("SELECT id, body, photo_id FROM direct_messages").fetchall()
+    assert len(rows) == 1 and rows[0]["photo_id"]                               # only the photo went through
+    _as(accounts, "Jordan")
+    assert "📷 Photo" in client.get("/messages").data.decode()
+    client.post(f"/report/dm/{rows[0]['id']}", data={"reason": "spam", "details": ""})
+    with app.app_context():
+        assert "sent a photo" in get_db().execute("SELECT snapshot FROM reports").fetchone()[0]
+
+
 def test_party_up_holds_spots_for_friends(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Stranger")
     _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])
