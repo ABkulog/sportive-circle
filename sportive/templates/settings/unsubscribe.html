@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Unsubscribe{% endblock %}
+{% block head %}<meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+<div class="card form-card center">
+  {% if done %}
+    <h1>You're unsubscribed</h1>
+    <p class="muted">No more {{ label }}. You can turn them back on anytime in Settings.</p>
+    <a class="btn btn-ghost" href="{{ url_for('settings.home') }}">Settings</a>
+  {% else %}
+    <h1>Unsubscribe?</h1>
+    <p class="muted">Stop {{ label }}. Emails about your account, and about games you're in that change or get
+      canceled, still come.</p>
+    <form method="post" action="{{ url_for('unsubscribe.one_click', token=token) }}">
+      <button class="btn btn-block">Unsubscribe</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

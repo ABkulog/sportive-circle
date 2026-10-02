@@ -36,6 +36,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-AUTH-6 | Logged-in users can change their password (current password required). | Must | ✅ |
 | FR-AUTH-7 | Users can delete their account after an "Are you sure?" page, typing DELETE, and their password. A club's only officer must hand over first. | Must | ✅ |
 | FR-AUTH-8 | Suspended accounts can't log in. | Must | ✅ |
+| FR-AUTH-9 | Sign-up forgives going back: a problem shows on a normal page (typed details kept, passwords not), so the phone's Back button works; going back to fix details with the same email keeps the code already sent; the code page has "Wrong email? Fix it". Changing your password cancels any pending reset code. | Must | ✅ |
 
 ### Profile (PROF)
 
@@ -47,6 +48,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-PROF-4 | A user's email is shown only to themselves and people they've played a game with. | Must | ✅ |
 | FR-PROF-5 | On the photo page, Save without picking a new photo goes back to the profile, and users can remove their photo (with an "Are you sure?"). | Should | ✅ |
 | FR-PROF-6 | Optional pronouns, gender (says it's only used for games open to women or men), and Instagram / Snapchat / TikTok / X usernames right under the bio in Edit profile, shown on the profile only if filled in. | Should | ✅ |
+| FR-PROF-7 | Emails shown to people you've played with are hidden once either of you blocks the other. Top Dawgs ties share a place and medal. | Must | ✅ |
 
 ### Games and events (EVT)
 
@@ -71,7 +73,9 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-EVT-17 | Game pages have a Back button that returns to where you came from (never into the game's own chat). | Should | ✅ |
 | FR-EVT-18 | Open games can be "Open to" anyone, women, men, nonbinary players or Other (like UW Recreation's women-only hours). People whose profile gender is outside the group can't join and don't see it in their feed; people who left gender blank confirm instead. Hosts can remove a player (who gets a notice). | Should | ✅ |
 | FR-EVT-19 | Creating a game (New event and Need players) shows a heads-up: check the courts / field / trail (the word follows the sport) is free at that time, since it could be booked, full or closed for an event. Sportive Circle doesn't reserve or check places; the host does. The Terms say the same. | Must | ✅ |
+| FR-EVT-21 | A game that's over can't be edited (it stays in everyone's history as it was). Time math uses real elapsed time on the nights clocks change: sport length limits, Need players start times (never in the skipped hour) and reminders (sent at the right moment, with the right minutes). | Must | ✅ |
 | FR-EVT-20 | While making a game, and on its page, people see what else is on at that place then: **UW Rec reservations** ("UW Rec: reserved 6–10 PM · IM flag football", you probably can't play there) and **other Sportive Circle games** (busy, not taken: you can still post, or join theirs). Private games show only as "a private game". UW Rec places link to UW Rec's schedule. UW Rec's bookings are copied automatically once a day from its public Facility Schedule; admins can add their own entries (Admin → UW Rec reservations, weekly repeats). | Should | ✅ |
+| FR-EVT-22 | The UW Rec copy holds up to bad data: a space that sends nothing or junk keeps its place's last copy (and so does a place that suddenly lost most bookings); an odd booking is left out and reported, not the whole copy; times with "Z" or an offset are read correctly; a place we no longer read loses its old bookings; admins see when the last good copy was saved (a run where nothing could be read doesn't count); past the 4 weeks copied, the form says it can't tell yet. | Must | ✅ |
 
 ### Parties, private games, team vs team (PARTY, PRIV, TEAM)
 
@@ -80,13 +84,15 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-PARTY-1 | "Reserve spots for friends": the host can tick friends while creating a New event or Need players post, and anyone in a game can tap Reserve spots later; each friend gets a "You down?" notice. Someone not in yet can "Join + reserve spots for friends" in one step (all or nothing). | Must | ✅ |
 | FR-PARTY-2 | Each invite holds a spot for 30 minutes, so strangers can't take it. "I'm in" takes it; "Can't make it" frees it and tells the inviter. Holds end by themselves. | Must | ✅ |
 | FR-PARTY-3 | Not just the host: any player can invite friends. Only friends can be invited. | Must | ✅ |
-| FR-PARTY-4 | Everyone in a game has "Send invite link": "Jordan wants you in their Sportive Circle game: … Tap to sign up and you're in." Signing up (or logging in) through it puts the person in that game and makes them friends with the sender. The link is signed (can't be forged) and lets friends into a private game without the password. The Friends page has the same link for the app itself. | Must | ✅ |
+| FR-PARTY-4 | Everyone in a game has "Send invite link": "Jordan wants you in their Sportive Circle game: … Tap to sign up and you're in." Signing up through it puts the person in that game and makes them friends with the sender; someone already on the app gets the game and sends the sender a friend request instead (so an old link can't undo an unfriend or a declined request). It never gets back in someone the host took off the game. The link is signed (can't be forged) and lets friends into a private game without the password. The Friends page has the same link for the app itself. | Must | ✅ |
 | FR-PARTY-5 | A game that's full only because spots are held for invited friends says "Full for now", how many are held and by whose invite, and the time the soonest hold ends; the page updates by itself then. Trying to join says the same instead of a bare "full". | Must | ✅ |
 | FR-PARTY-6 | "Send to friends" on any open public game (going or not): pick friends and they get a direct message with a card that opens the game. Nothing is held for them. Not for private games (they use the invite link and password). | Should | ✅ |
+| FR-PARTY-7 | An invite link's page (and its preview in iMessage, Discord and the like) never shows a private or members-only game's place: it says "Place shown once you're in". Members-only invites say the game is for club members and don't promise a spot. Invite pages aren't listed by search engines. Public games and club links preview with what they are (sport, time, place; the club's description). | Must | ✅ |
 | FR-PRIV-1 | New events and Need players posts can be private: a lock in the list, and joining needs the host's password (shown to the host and players). Wrong passwords are limited to 10 an hour. | Must | ✅ |
 | FR-PRIV-2 | Friends the host invites to a private game don't need the password. | Must | ✅ |
 | FR-PRIV-3 | In a private game, friends other players want to bring are requests with a note; the host approves or declines. | Should | ✅ |
 | FR-PRIV-4 | Creating a game asks "Who can join? Anyone / Private". Private shows a ready-made password and "Invite friends", and hides what doesn't fit (we have / we need, skill level, team vs team, reserving). Its game page has a Share invite button (link + password) and Invite friends. Private Need players posts don't go to the top of everyone's feed. | Must | ✅ |
+| FR-PRIV-5 | Tapping Join on a private game without typing the password isn't counted as a wrong try. A host saying yes to bringing someone who already got in doesn't hold an extra spot. | Must | ✅ |
 | FR-TEAM-1 | Team vs team ("Format", on New event and Need players), only in sizes that fit the sport (e.g. basketball 2v2-5v5, none for running): the host's party is one team, another group challenges as the other team. Nobody walks in alone. | Should | ✅ |
 
 ### Badges (BADGE)
@@ -115,6 +121,8 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-CLUB-10 | A new club event is posted to the club's updates automatically, with a link, so followers and members hear about it. | Should | ✅ |
 | FR-CLUB-11 | Officers see members' UW emails, can copy them all and download the roster as a spreadsheet (CSV). Members don't see each other's emails. | Should | ✅ |
 | FR-CLUB-12 | The person who registered a club is its owner: only they add officers (searching anyone on the app by name or UW NetID, on Manage officers) or take officer rights away; they always stay an officer. Other officers edit the club, post, make club events and confirm members. The owner can hand the club to another officer (Make owner); they stay an officer. If the owner is no longer an officer, any officer can manage officers. | Must | ✅ |
+| FR-CLUB-13 | Club events belong to the club: any current officer can edit or cancel them and take players off, and an officer who leaves or steps down can't anymore. Someone who leaves the club or is removed is taken out of its upcoming members-only events (they stop seeing the note, players and chat). | Must | ✅ |
+| FR-CLUB-14 | Weekly practices: the last week must be within a year. Turning a club event members-only takes people who aren't members off it (they're told). When another officer edits or cancels a club event, players hear it from that officer and the host is told too. A club going back to review sends each person one on-hold notice, not one per week. | Must | ✅ |
 
 ### Friends and messages (SOC)
 
@@ -126,6 +134,8 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-SOC-4 | Blocking stops messages, friend requests and joining each other's games, both ways, and hides you from their search and feed. | Must | ✅ |
 | FR-SOC-5 | Messages lists every friend, including ones with no messages yet ("Start a chat"), and has a search bar: typing filters chats and friends right away, and Search also finds anyone else you can message (people you've played with, club officers). Strangers point to Friends to add first. | Must | ✅ |
 | FR-SOC-6 | When someone posts a public game, their friends (and, for a club event, the club's followers and members; members-only events: members only) get a bell notice and an email ("Maya posted a game", with a button to see and join it). Never for private games, blocked or suspended people, people already in it, or a game open only to another gender. At most 3 of these emails a day per person; the email can be turned off in Settings. A weekly practice is announced once. | Should | ✅ |
+| FR-SOC-7 | Unfriending or blocking ends the spots held and invites either person sent the other, in any game (and their "You down?" notices). Suspended people don't count as mutual friends in search or suggestions. | Must | ✅ |
+| FR-SOC-8 | People search never fails on odd input (only accent marks, emoji, wildcards) and folds letters like ı and ß; friends come first, so Messages search finds a friend even among many people with the same name. Messages with only invisible characters aren't sent; photo-only chats preview as "📷 Photo"; an unsent draft (even all emoji) comes back. | Must | ✅ |
 
 ### Notifications (NOTIF)
 
@@ -134,9 +144,11 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-NOTIF-1 | Everything new shows in exactly one place, never twice: messages on ✉️, friend requests on 👥, club news on the Clubs tab, and everything else (invites, game changes, game chats, Need players, badges) in the 🔔 bell, in plain sentences. A number clears when you open that place. | Must | ✅ |
 | FR-NOTIF-2 | Settings → Notifications: one on/off switch per kind, saying where it shows up. No pop-ups. | Must | ✅ |
 | FR-NOTIF-3 | No repeats: a newer notice about the same thing replaces the older one (a host editing a game three times = one notice). New accounts start with nothing to catch up on. | Should | ✅ |
+| FR-NOTIF-4 | Optional emails (Monday email, friends' and clubs' new games, reminders, announcements) have an Unsubscribe link that works without logging in, plus the List-Unsubscribe headers mail apps show a button for. The texts announcement skips people who turned off the Monday email. | Must | ✅ |
 | FR-SMS-1 | Texts are optional: people can add a phone number (at sign-up step 3 or in Settings → Texts), must tick a permission box, and confirm it with a texted code. Email stays required (the UW email is the proof of being a UW student). | Should | ✅ |
 | FR-SMS-2 | Confirmed, opted-in numbers get texts for game reminders (at the time each player picked), changed times/places, cancellations, invites and password-reset codes. Texts can be turned off or the number removed anytime; replying STOP is respected; texts are limited per day. | Should | ✅ |
 | FR-SMS-3 | People who joined before texts (or skipped them) see a "New: game updates by text" card on Home after logging in: add a number right there, or "Not now" hides it for good. `tools/announce_texts.py` emails everyone without a number once (dry run by default). Club officers also get their club alerts by text. | Should | ✅ |
+| FR-SMS-4 | A phone number belongs to one account: if two accounts ask for a code for the same number, only the first to confirm gets it. | Must | ✅ |
 | FR-SET-1 | A Settings page, separate from Edit profile: notifications, look (light / dark / match my phone, also chosen at sign-up), reminder emails, password, log out, delete account. Edit profile is only about you (photo, bio, socials, sports). | Must | ✅ |
 
 ### Safety and admin (SAFE)
@@ -147,6 +159,8 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-SAFE-2 | Admins (set by `ADMIN_EMAILS`) review reports, see people reported by 3+ others, and can suspend or restore accounts. Suspending cancels games they host and hides their profile from students. | Must | ✅ |
 | FR-SAFE-3 | Admins review club registrations. | Must | ✅ |
 | FR-SAFE-4 | The people who run the app (admins) show a gold 🐾 Team label on their profile, in game lists and in messages, plus a 💜 Sportive Circle Team badge. It can't be earned or faked, and goes away if someone stops being an admin. | Should | ✅ |
+| FR-SAFE-5 | Admin tools hold up when busy: the report queue pages 100 at a time; two admins handling the same report don't overwrite each other ("Another admin already handled that report"); suspending a host tells every player of the canceled games, club games on hold included; it warns when they were a club's only officer, and admins can confirm that club's waiting members (the club page shows them the join requests). | Must | ✅ |
+| FR-SAFE-6 | A reported message keeps a copy of its words and notes when it had a photo, so admins can tell what was reported. | Must | ✅ |
 
 ### Info pages (INFO)
 
@@ -155,6 +169,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-INFO-1 | How it works is 3 steps (Find a game, Start your own, Join a club); the FAQ has its own page behind the ? icon. | Must | ✅ |
 | FR-INFO-2 | Privacy and Terms pages, linked from every page and from sign-up. | Must | ✅ |
 | FR-INFO-4 | A Suggestions link in the footer: logged-in students send ideas or problems (optionally anonymous, max 5 an hour); only admins can read them. Suggestions are scanned for keywords, and admins are notified only when 3+ different people bring up the same topic within 30 days. | Should | ✅ |
+| FR-INFO-5 | Suggestions: only real people count toward a trending topic (not deleted accounts), admins can page through all of them, a trend's link shows every matching suggestion from its 30 days, and invisible characters alone aren't a suggestion. | Should | ✅ |
 
 ---
 
@@ -179,9 +194,11 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 |---|---|---|
 | NFR-PRIV-1 | Location from "Where am I?" never leaves the browser. | ✅ |
 | NFR-PRIV-2 | Photo metadata is removed. | ✅ |
+| NFR-PRIV-7 | Photos come out right from any phone: 16-bit grayscale and see-through PNGs too (on white). | ✅ |
 | NFR-PRIV-3 | Deleting an account deletes the person's data (reports keep a copy for safety, without the reporter's name). | ✅ |
 | NFR-PRIV-4 | No ads, no tracking cookies, no selling data. Only a login cookie. | ✅ |
 | NFR-PRIV-5 | The database file is never committed to Git (`.gitignore`). | ✅ |
+| NFR-PRIV-6 | Chats stay correct on a slow connection: one check for new messages at a time, and a message already shown is never added again. | ✅ |
 
 ### Usability and accessibility (NFR-UX)
 
@@ -191,6 +208,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | NFR-UX-2 | Plain, casual words: about 30 words a screen, decorative emojis only where they work as icons, no corporate tone. | ✅ |
 | NFR-UX-7 | Long pages are split into clear sections by soft full-width bands; items inside a section are split by thin lines. | ✅ |
 | NFR-UX-3 | Keyboard and screen-reader friendly: labels on every field, skip link, visible focus, `aria-current` on tabs, alt text rules, and text contrast of at least 4.5:1 (WCAG AA). | ✅ |
+| NFR-UX-9 | Works with bigger phone text (130–160%) and at 320px: no sideways scrolling, the tab bar and top icons stay on screen. Keyboard and screen-reader users: the chat message panel keeps Tab inside and gives focus back on Esc; Esc closes a message's ⋯; a form problem is read out with its field; a "Full for now" page doesn't reload under someone using a keyboard. | ✅ |
 | NFR-UX-4 | Light and dark mode; animations are skipped for "reduce motion". | ✅ |
 | NFR-UX-5 | Error messages say what went wrong and how to fix it. Friendly pages for 400/403/404/405/413/500. | ✅ |
 | NFR-UX-6 | Husky look and feel: UW purple and gold, paw logo, without using UW's trademarked logos or corny slogans. | ✅ |

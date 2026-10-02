@@ -237,6 +237,10 @@ section.band > .section-title:first-child { margin-top: 0; }
 .brand { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .topbar .brand { flex: none; }   /* the logo never gets squeezed under the links */
 .topbar .nav, .topbar .top-icons { min-width: 0; }
+/* Logged in, with bigger phone text: the wordmark gives way so the message and bell icons stay on screen. */
+body.has-app-nav .topbar .top-icons { flex: none; }
+body.has-app-nav .topbar .brand { flex: 0 1 auto; min-width: 0; }
+body.has-app-nav .topbar .brand > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .brand img { width: 28px; height: 28px; flex: none; }
 .brand-accent { color: var(--accent); }
 .brand:hover { text-decoration: none; }
@@ -277,7 +281,9 @@ section.band > .section-title:first-child { margin-top: 0; }
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   min-height: 52px; padding: 4px 2px; border: 0; border-radius: 10px; background: none; cursor: pointer;
   color: var(--muted); font: 500 .68rem/1.1 var(--font); text-decoration: none;
+  min-width: 0;  /* with bigger phone text the tabs shrink instead of pushing the page sideways */
 }
+.tab-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tab:hover { text-decoration: none; color: var(--text); }
 .tab-icon { position: relative; display: grid; place-items: center; }
 .tab-icon .count-dot { position: absolute; top: -4px; right: -10px; }
@@ -359,7 +365,7 @@ body.hide-tabs { padding-bottom: 0; }
 .done-pill { font-size: .85rem; }
 
 /* segmented control & tabs */
-.segmented { display: inline-flex; background: var(--control); border-radius: 10px; padding: 3px;
+.segmented { display: inline-flex; flex-wrap: wrap; max-width: 100%; background: var(--control); border-radius: 10px; padding: 3px;
   box-shadow: inset 0 0 0 1px var(--control-line); }
 .segmented label { flex: 0 0 auto; }
 
@@ -588,7 +594,7 @@ form[data-wizard] .form-step { display: none; }
 .edit-photo:hover { text-decoration: none; }
 .people-search { display: flex; gap: 8px; margin: 0 0 16px; }
 .people-search input { flex: 1; min-width: 0; }
-.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.section-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 12px; }
 .section-head a { font-size: .9rem; font-weight: 600; padding: 8px 0; }
 .showcase-row { list-style: none; padding: 0; margin: 4px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .showcase-badge { display: grid; justify-items: center; gap: 4px; padding: 12px 6px; border-radius: var(--radius);
@@ -1096,7 +1102,7 @@ button.link-button { min-height: 36px; }
   min-width: 36px; min-height: 32px; margin: -8px -6px -8px 0; font-size: 1rem; opacity: .7; line-height: 1; }
 .chat-more summary::-webkit-details-marker { display: none; }
 .chat-more[open] summary { opacity: 1; }
-.chat-more a { font-size: .75rem; padding: 2px 4px; color: inherit; text-decoration: underline; }
+.chat-more a { font-size: .75rem; padding: 6px 8px; display: inline-block; min-height: 24px; color: inherit; text-decoration: underline; }
 .chat-photo { display: block; margin: 2px 0 4px; }
 .chat-photo img { display: block; max-width: min(240px, 60vw); max-height: 320px; width: auto; height: auto; border-radius: 12px; }
 .chat-bubble.is-photo { padding: 4px 4px 6px; }
@@ -1218,3 +1224,6 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .chat-menu-actions > * { flex: 1; padding: 8px; border: 0; background: none; color: var(--text); font: inherit;
   font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; }
 .chat-menu-actions .is-danger { color: var(--danger); }
+
+/* Admin report queue: Previous / Next */
+.pager { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; justify-content: space-between; margin-top: 1rem; }

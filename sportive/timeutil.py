@@ -34,6 +34,24 @@ def exists_in_seattle(dt):
     return there_and_back.replace(tzinfo=None) == dt
 
 
+def _utc(dt):
+    """A Seattle wall-clock time as a real moment. For the hour that happens twice in November, now_local()
+    keeps which one it is (fold); a stored time means the first."""
+    return dt.replace(tzinfo=SEATTLE).astimezone(timezone.utc)
+
+
+def real_gap(start, end):
+    """How much time really passes from `start` to `end` (Seattle wall-clock times): 1:30 to 3:30 AM is
+    1 hour on the night clocks jump ahead and 3 hours on the night they fall back."""
+    return _utc(end) - _utc(start)
+
+
+def add_real(dt, delta):
+    """`delta` of real time after `dt`, as a Seattle wall-clock time (1:40 AM + 30 min is 3:10 AM on the
+    night clocks jump ahead, never the 2:10 AM that doesn't exist)."""
+    return (_utc(dt) + delta).astimezone(SEATTLE).replace(tzinfo=None)
+
+
 def from_sqlite_utc(value):
     """A column filled in by SQLite's datetime('now') (UTC, "YYYY-MM-DD HH:MM:SS") -> Seattle local time,
     so it can be compared with everything else in the app."""

@@ -321,14 +321,29 @@
   // The menu that opens when you hold a message.
   const menu = el("div", "chat-menu");
   menu.hidden = true;
-  menu.setAttribute("role", "menu");
+  menu.setAttribute("role", "dialog");  // a small panel of buttons (not an arrow-key menu)
+  menu.setAttribute("aria-label", "Message options");
   document.body.appendChild(menu);
   let menuFor = null;
-  const closeMenu = () => {
+  // refocus: put the keyboard (or screen reader) back on the message, so nobody loses their place in the chat.
+  const closeMenu = (refocus) => {
+    const item = menuFor;
+    const wasInside = menu.contains(document.activeElement);
     menu.hidden = true;
-    if (menuFor) menuFor.classList.remove("is-held");
+    if (item) item.classList.remove("is-held");
     menuFor = null;
+    if (item && refocus === true && wasInside) item.querySelector(".chat-bubble").focus({ preventScroll: true });
   };
+  // Tab stays inside the open panel (it sits at the end of the page) until it's closed.
+  menu.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab") return;
+    const stops = [...menu.querySelectorAll("button, a[href]")];
+    if (!stops.length) return;
+    const at = stops.indexOf(document.activeElement);
+    const next = event.shiftKey ? (at <= 0 ? stops.length - 1 : at - 1) : (at + 1) % stops.length;
+    event.preventDefault();
+    stops[next].focus();
+  });
   function openMenu(item) {
     closeMenu();
     menuFor = item;
@@ -340,7 +355,7 @@
       const button = el("button", emoji === mine ? "is-mine" : "", emoji);
       button.type = "button";
       button.setAttribute("aria-label", `React ${emoji}`);
-      button.addEventListener("click", () => { react(item, emoji); closeMenu(); });
+      button.addEventListener("click", () => { react(item, emoji); closeMenu(true); });
       emojis.appendChild(button);
     });
     const actions = el("div", "chat-menu-actions");
@@ -348,7 +363,7 @@
     if (text && navigator.clipboard) {
       const copy = el("button", "", "Copy");
       copy.type = "button";
-      copy.addEventListener("click", () => { navigator.clipboard.writeText(text.textContent).catch(() => {}); closeMenu(); });
+      copy.addEventListener("click", () => { navigator.clipboard.writeText(text.textContent).catch(() => {}); closeMenu(true); });
       actions.appendChild(copy);
     }
     const report = item.querySelector(".chat-more a");
@@ -373,7 +388,7 @@
   document.addEventListener("pointerdown", (event) => {
     if (!menu.hidden && !menu.contains(event.target)) closeMenu();
   });
-  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !menu.hidden) closeMenu(); });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !menu.hidden) closeMenu(true); });
   list.addEventListener("scroll", closeMenu, { passive: true });
 
   // Hold (about half a second, without moving) opens the menu.
@@ -479,15 +494,28 @@
   list.addEventListener("touchend", endSwipe);
   list.addEventListener("touchcancel", endSwipe);
 
+  // One check at a time: on a slow connection the 5-second timer would otherwise start new checks before the
+  // last one answered, and each answer would add the same new messages again.
+  let polling = null;
   async function poll(now) {
     if (document.hidden && !now) return;
+    if (polling) {
+      if (!now) return;          // the timer can skip a turn
+      await polling.catch(() => {});  // after sending: wait for the one in flight, then ask again
+    }
+    polling = check();
+    try { await polling; } finally { polling = null; }
+  }
+  async function check() {
     try {
       const first = list.querySelector(".chat-msg");
       const response = await fetch(`${box.dataset.pollUrl}?after=${lastId}&from=${first ? first.dataset.id : 0}`,
                                    { headers: { Accept: "application/json" } });
       if (new URL(response.url).pathname.startsWith("/login")) { location.reload(); return; }  // logged out
       if (!response.ok) return;
-      const { messages, status, reactions } = await response.json();
+      const answer = await response.json();
+      const { status, reactions } = answer;
+      const messages = answer.messages.filter((m) => m.id > lastId && !list.querySelector(`.chat-msg[data-id="${m.id}"]`));
       if (reactions) {  // reactions change on old messages too: bring every message up to date
         list.querySelectorAll(".chat-msg").forEach((item) => showReactions(item, reactions[item.dataset.id] || []));
       }

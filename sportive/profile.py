@@ -175,8 +175,8 @@ def view(user_id):
         ["e.host_id = :uid", "e.cancelled = 0", "e.ends_at >= :now", INSIDE_VISIBLE, SHOWN_UNLESS_FULL],
         {"uid": user_id, "now": to_db(now_local())}, limit=10)
     # Emails are private: only visible to yourself and people you actually played with (a game you were both
-    # in has ended). Joining a stranger's game just to read their email doesn't work.
-    show_email = user_id == g.user["id"] or get_db().execute(
+    # in has ended), and never once either of you blocked the other. Joining a stranger's game just to read their email doesn't work.
+    show_email = user_id == g.user["id"] or not blocked and get_db().execute(
         """SELECT 1 FROM rsvps mine JOIN rsvps theirs ON mine.event_id = theirs.event_id
            JOIN events e ON e.id = mine.event_id
            WHERE mine.user_id = ? AND theirs.user_id = ? AND e.cancelled = 0 AND e.ends_at < ?""",
@@ -324,7 +324,9 @@ def change_password():
         flash(f"{error} Your password was not changed.", "error")
     else:
         db = get_db()
-        db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(form["password"]), g.user["id"]))
+        # A reset code someone else asked for stops working too: the new password is what locks the account.
+        db.execute("UPDATE users SET password_hash = ?, verify_code = NULL, verify_expires = NULL, verify_attempts = 0"
+                   " WHERE id = ?", (hash_password(form["password"]), g.user["id"]))
         end_other_sessions(g.user["id"])
         db.commit()
         flash("Password changed. You're logged out on your other devices.", "success")

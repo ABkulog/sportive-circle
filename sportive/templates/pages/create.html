@@ -25,7 +25,7 @@
     <ul class="people">
       {% for c in officer_clubs %}
         <li class="post-game-row">
-          <span><strong>{{ SPORT_EMOJI[c.sport] }} {{ c.name }}</strong></span>
+          <span class="person"><strong>{{ SPORT_EMOJI[c.sport] }} {{ c.name }}</strong></span>
           <a class="btn btn-small" href="{{ url_for('events.create', club=c.id) }}">+ Club event</a>
         </li>
       {% endfor %}

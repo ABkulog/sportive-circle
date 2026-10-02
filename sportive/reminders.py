@@ -23,7 +23,8 @@ from .digest import weekly_round
 from .mail import compose, send_email
 from .sms import text_user
 from .textutil import same_secret
-from .timeutil import fmt_clock, from_db, now_local, to_db
+from .unsubscribe import unsubscribe_url
+from .timeutil import fmt_clock, from_db, now_local, real_gap, to_db
 from .uwrec import sync_round as uw_rec_round
 
 log = logging.getLogger(__name__)
@@ -57,7 +58,8 @@ def reminder_email(row, minutes):
         button=("See the game", link),
         reason="You're getting this because you joined this game. Pick 30 min or no reminder on the game page, "
                "or turn these off in Settings → Email.",
-        preheader=f"{fmt_clock(row['starts_at'])} at {row['location']}")
+        preheader=f"{fmt_clock(row['starts_at'])} at {row['location']}",
+        unsubscribe=unsubscribe_url(row["email"], "reminders"))
     return subject, body, html
 
 
@@ -77,12 +79,13 @@ def send_due_reminders():
              AND (u.email_reminders = 1 OR (u.sms_updates = 1 AND u.phone_verified = 1))
              AND e.starts_at > :now AND e.starts_at <= :soon
              AND NOT EXISTS (SELECT 1 FROM clubs c WHERE c.id = e.club_id AND c.status != 'approved')  -- on hold""",
-        {"now": to_db(now), "soon": to_db(now + REMIND_BEFORE)},
+        # An hour extra: the night clocks jump ahead, 3:30 AM is only an hour after 1:30 (checked below).
+        {"now": to_db(now), "soon": to_db(now + REMIND_BEFORE + timedelta(hours=1))},
     ).fetchall()
 
     sent = 0
     for row in rows:
-        if from_db(row["starts_at"]) - now > timedelta(minutes=row["remind_minutes"]):
+        if real_gap(now, from_db(row["starts_at"])) > timedelta(minutes=row["remind_minutes"]):
             continue  # picked "30 min before": not yet
         # Mark it before sending, and only send if this run was the one that marked it: the app runs more
         # than one copy of itself, and nobody should get the same reminder twice. (A failed send isn't retried.)
@@ -92,11 +95,11 @@ def send_due_reminders():
         starts = from_db(row["starts_at"])
         joined = from_db(row["joined_at"][:16])
         if claimed and starts - joined >= MIN_NOTICE:
-            minutes = int((starts - now).total_seconds() // 60)
+            minutes = int(real_gap(now, starts).total_seconds() // 60)
             if row["email_reminders"]:
                 subject, body, html = reminder_email(row, minutes=minutes)
                 try:
-                    send_email(row["email"], subject, body, html=html)
+                    send_email(row["email"], subject, body, html=html, unsubscribe=unsubscribe_url(row["email"], "reminders"))
                     sent += 1
                 except Exception:  # one bad address or email hiccup must not stop everyone else's reminders
                     log.exception("Couldn't send a reminder to %s", row["email"])

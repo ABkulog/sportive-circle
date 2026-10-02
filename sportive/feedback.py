@@ -16,13 +16,14 @@ from .auth import login_required
 from .db import get_db
 from .moderation import admin_required, is_admin
 from .notifications import mark_seen_value, seen_value
-from .textutil import multi_line
+from .textutil import multi_line, person_name
 from .timeutil import now_local, to_db
 
 bp = Blueprint("feedback", __name__)
 
 KINDS = {"idea": "Idea", "bug": "Something's broken", "other": "Other"}
 MIN_LENGTH, MAX_LENGTH = 5, 2000
+PER_PAGE = 300           # suggestions per admin page
 MAX_PER_HOUR = 5
 
 TREND_PEOPLE = 3                 # different people who must mention a keyword before admins hear about it
@@ -74,9 +75,10 @@ def trending(now=None):
     since = to_db((now or now_local()) - TREND_WINDOW)
     people, mentions = {}, {}
     for row in get_db().execute("SELECT id, user_id, body FROM suggestions WHERE created_at >= ?", (since,)):
-        who = row["user_id"] if row["user_id"] is not None else f"gone-{row['id']}"
         for word in keywords(row["body"]):
-            people.setdefault(word, set()).add(who)
+            people.setdefault(word, set())
+            if row["user_id"] is not None:  # a deleted account can't be told apart from another: not "people"
+                people[word].add(row["user_id"])
             mentions[word] = mentions.get(word, 0) + 1
     trends = [(word, len(who), mentions[word]) for word, who in people.items() if len(who) >= TREND_PEOPLE]
     return sorted(trends, key=lambda t: (-t[1], -t[2], t[0]))[:MAX_TRENDS]
@@ -97,12 +99,13 @@ def suggest():
     if request.method == "POST":
         kind = form.get("kind", "")
         body = multi_line(form.get("body"))
+        has_words = person_name(body).strip()  # zero-width characters alone aren't a suggestion
         db = get_db()
         recent = db.execute("SELECT COUNT(*) FROM suggestions WHERE user_id = ? AND created_at >= ?",
                             (g.user["id"], to_db(now_local() - timedelta(hours=1)))).fetchone()[0]
         if kind not in KINDS:
             error = "Please choose what your suggestion is about."
-        elif not MIN_LENGTH <= len(body) <= MAX_LENGTH:
+        elif not MIN_LENGTH <= len(body) <= MAX_LENGTH or len(has_words) < MIN_LENGTH:
             error = f"Please write {MIN_LENGTH} to {MAX_LENGTH} characters."
         elif recent >= MAX_PER_HOUR:
             error = "Thanks for all the ideas! You can send more in an hour."
@@ -127,18 +130,29 @@ def admin_suggestions():
     where, params = "", ()
     if kind in KINDS:
         where, params = "WHERE s.kind = ?", (kind,)
-    rows = get_db().execute(
-        f"""SELECT s.*, u.full_name, u.email FROM suggestions s LEFT JOIN users u ON u.id = s.user_id
-            {where} ORDER BY s.id DESC LIMIT 500""", params).fetchall()
-    if topic:
+    page = max(1, request.args.get("page", 1, type=int) or 1)
+    if topic:  # every suggestion in the trend's window, so a trend's link never comes up empty
+        rows = get_db().execute(
+            f"""SELECT s.*, u.full_name, u.email FROM suggestions s LEFT JOIN users u ON u.id = s.user_id
+                WHERE s.created_at >= ? {where.replace('WHERE', 'AND')} ORDER BY s.id DESC""",
+            (to_db(now_local() - TREND_WINDOW), *params)).fetchall()
         rows = [row for row in rows if topic in keywords(row["body"])]
+        more = False
+    else:
+        rows = get_db().execute(
+            f"""SELECT s.*, u.full_name, u.email FROM suggestions s LEFT JOIN users u ON u.id = s.user_id
+                {where} ORDER BY s.id DESC LIMIT ? OFFSET ?""",
+            (*params, PER_PAGE + 1, (page - 1) * PER_PAGE)).fetchall()
+        more = len(rows) > PER_PAGE
+        rows = rows[:PER_PAGE]
     trends = trending()
     fresh = {word for word, *_ in unseen_trends()}
     # Opening the page counts as seeing every current trend and every suggestion so far.
     seen = set((seen_value("suggestion_trends") or "").split(",")) | {word for word, *_ in trends}
     mark_seen_value("suggestion_trends", ",".join(sorted(filter(None, seen))))
     last_seen = int(seen_value("suggestions") or 0)
-    if not kind and not topic:
+    if not kind and not topic and page == 1:
         mark_seen_value("suggestions", max([row["id"] for row in rows] + [last_seen]))
-    return render_template("feedback/admin.html", suggestions=rows[:300], kinds=KINDS, kind=kind, topic=topic,
+    return render_template("feedback/admin.html", suggestions=rows, kinds=KINDS, kind=kind, topic=topic,
+                           page=page, more=more,
                            trends=trends, fresh=fresh, last_seen=last_seen, trend_people=TREND_PEOPLE)

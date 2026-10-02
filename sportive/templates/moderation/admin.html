@@ -77,5 +77,13 @@
     <div class="card empty"><p class="empty-emoji" aria-hidden="true">🛡️</p><p><strong>No {{ status }} reports.</strong></p></div>
   {% endfor %}
 </div>
+{% set total = report_counts.get(status, 0) %}
+{% if total > per_page %}
+  <nav class="pager" aria-label="More reports">
+    <span class="muted">Showing {{ (page - 1) * per_page + 1 }}–{{ [page * per_page, total]|min }} of {{ total }}</span>
+    {% if page > 1 %}<a class="btn btn-small btn-ghost" href="{{ url_for('moderation.admin_reports', status=status, page=page - 1) }}">← Previous</a>{% endif %}
+    {% if page * per_page < total %}<a class="btn btn-small btn-ghost" href="{{ url_for('moderation.admin_reports', status=status, page=page + 1) }}">Next →</a>{% endif %}
+  </nav>
+{% endif %}
 {% endif %}
 {% endblock %}

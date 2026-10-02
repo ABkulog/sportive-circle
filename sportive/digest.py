@@ -15,6 +15,7 @@ from flask.cli import with_appcontext
 
 from .db import get_db, user_sports
 from .links import public_url
+from .unsubscribe import unsubscribe_url
 from .mail import compose, send_email
 from .timeutil import fmt_when, now_local, to_db
 
@@ -60,13 +61,14 @@ def send_to(user):
     if open_games:
         lines += ["Open games you could join:"] + [f"• {game}" for game in open_games]
     subject = f"Games this week, {first}"
-    body, html = compose(subject, f"Your week, {first} 🏀", lines,
+    leave = unsubscribe_url(user["email"], "digest")
+    body, html = compose(subject, f"Your week, {first} 🏀", lines, unsubscribe=leave,
                          after=["Tap a game to join. Short a few players? Post a Need players and it goes to the "
                                 "top of everyone's feed."],
                          button=("See all games", public_url("index")),
                          reason="You're getting this Monday email because you have a Sportive Circle account. "
                                 "Turn it off in Settings -> Email.")
-    send_email(user["email"], subject, body, html=html)
+    send_email(user["email"], subject, body, html=html, unsubscribe=leave)
     return True
 
 

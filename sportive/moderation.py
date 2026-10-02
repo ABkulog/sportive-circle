@@ -27,6 +27,7 @@ REASONS = {
 }
 MAX_DETAILS = 1000
 MAX_REPORTS_PER_HOUR = 10  # stops people from spamming reports
+REPORTS_PER_PAGE = 100
 FLAG_THRESHOLD = 3         # reported by this many different people = flagged for admins
 
 
@@ -55,6 +56,13 @@ def is_team(user_id):
     return user_id in team_ids()
 
 
+
+def _snapshot(message):
+    """What admins see of a reported message: its words, and that it had a photo (a photo-only message
+    would otherwise leave nothing to review)."""
+    photo = "📷 [sent a photo]" if message["photo_id"] else ""
+    return "\n".join(part for part in (message["body"], photo) if part)
+
 def resolve_target(target_type, target_id):
     """Who's being reported, a copy of what they said, and where to go back to.
 
@@ -75,7 +83,7 @@ def resolve_target(target_type, target_id):
                WHERE m.id = ? AND m.recipient_id = ?""", (target_id, me)).fetchone()  # only messages sent TO you
         if message is None:
             abort(404)
-        return {"user_id": message["sender_id"], "name": message["full_name"], "snapshot": message["body"],
+        return {"user_id": message["sender_id"], "name": message["full_name"], "snapshot": _snapshot(message),
                 "what": f"a message from {message['full_name']}",
                 "back": url_for("social.thread", user_id=message["sender_id"])}
     if target_type == "event_message":
@@ -86,7 +94,7 @@ def resolve_target(target_type, target_id):
             (target_id, me, me)).fetchone()  # only chats you're in, and not your own messages
         if message is None:
             abort(404)
-        return {"user_id": message["sender_id"], "name": message["full_name"], "snapshot": message["body"],
+        return {"user_id": message["sender_id"], "name": message["full_name"], "snapshot": _snapshot(message),
                 "what": f"a group chat message from {message['full_name']}",
                 "back": url_for("social.event_chat", event_id=message["event_id"])}
     abort(404)
@@ -159,14 +167,15 @@ def admin_reports():
         status = "open"
     db = get_db()
     suspended = db.execute("SELECT id, full_name, email FROM users WHERE suspended = 1 ORDER BY fold(full_name)").fetchall()
+    page = max(1, request.args.get("page", 1, type=int) or 1)
     reports = db.execute(
         """SELECT r.*, reporter.full_name AS reporter_name, reported.full_name AS reported_name,
                   reported.email AS reported_email, reported.suspended AS reported_suspended
            FROM reports r
            LEFT JOIN users reporter ON reporter.id = r.reporter_id
            LEFT JOIN users reported ON reported.id = r.reported_user_id
-           WHERE r.status = ? ORDER BY CASE WHEN r.status = 'open' THEN r.id ELSE -r.id END LIMIT 200""",
-        (status,)).fetchall()  # open: oldest first, so none waits forever; done ones: newest first
+           WHERE r.status = ? ORDER BY CASE WHEN r.status = 'open' THEN r.id ELSE -r.id END LIMIT ? OFFSET ?""",
+        (status, REPORTS_PER_PAGE, (page - 1) * REPORTS_PER_PAGE)).fetchall()  # open: oldest first; done: newest first
     flagged = db.execute(
         """SELECT u.id, u.full_name, u.email, u.suspended, COUNT(DISTINCT r.reporter_id) AS reporters
            FROM reports r JOIN users u ON u.id = r.reported_user_id
@@ -175,7 +184,8 @@ def admin_reports():
     report_counts = {row["status"]: row["n"] for row in db.execute(
         "SELECT status, COUNT(*) AS n FROM reports GROUP BY status")}
     return render_template("moderation/admin.html", reports=reports, flagged=flagged, status=status,
-                           report_counts=report_counts, reasons=REASONS, suspended=suspended)
+                           report_counts=report_counts, reasons=REASONS, suspended=suspended,
+                           page=page, per_page=REPORTS_PER_PAGE)
 
 
 @bp.route("/admin/reports/<int:report_id>/<action>", methods=("POST",))
@@ -184,10 +194,12 @@ def resolve(report_id, action):
     if action not in ("reviewed", "dismissed", "open"):
         abort(404)
     db = get_db()
-    db.execute("UPDATE reports SET status = ?, reviewed_at = ? WHERE id = ?",
-               (action, to_db(now_local()) if action != "open" else None, report_id))
+    seen = request.args.get("from", "open")  # the tab the admin was looking at: only if nobody changed it since
+    if not db.execute("UPDATE reports SET status = ?, reviewed_at = ? WHERE id = ? AND status = ?",
+                      (action, to_db(now_local()) if action != "open" else None, report_id, seen)).rowcount:
+        flash("Another admin already handled that report.", "info")
     db.commit()
-    return redirect(url_for("moderation.admin_reports", status=request.args.get("from", "open")))
+    return redirect(url_for("moderation.admin_reports", status=seen))
 
 
 @bp.route("/admin/users/<int:user_id>/<action>", methods=("POST",))
@@ -208,7 +220,14 @@ def suspend(user_id, action):
         now = to_db(now_local())
         db.execute("UPDATE users SET suspended = 1 WHERE id = ?", (user_id,))
         hosted = query_events(["e.host_id = :host", "e.cancelled = 0", "e.ends_at >= :now"],
-                              {"host": user_id, "now": now})
+                              {"host": user_id, "now": now}, on_hold=True, limit=100000)  # club games on hold too
+        # Clubs where they're the only officer left: someone has to take over (an admin can add one).
+        stranded = db.execute(
+            """SELECT c.id, c.name FROM clubs c JOIN club_members m ON m.club_id = c.id
+               WHERE m.user_id = ? AND m.role = 'officer' AND NOT EXISTS (
+                 SELECT 1 FROM club_members o JOIN users u ON u.id = o.user_id
+                 WHERE o.club_id = c.id AND o.role = 'officer' AND o.user_id != ? AND u.suspended = 0)
+               ORDER BY c.name""", (user_id, user_id)).fetchall()
         db.execute("UPDATE events SET cancelled = 1, revision = revision + 1 WHERE host_id = ? AND cancelled = 0 AND ends_at >= ?",
                    (user_id, now))
         # Free the spots they held in other people's upcoming games.
@@ -221,6 +240,9 @@ def suspend(user_id, action):
         for event in hosted:
             tell_players_it_was_cancelled(event, by_host=False)
         flash(f"{user['full_name']} is suspended. Their upcoming games were canceled and players were told.", "info")
+        if stranded:
+            flash("They were the only officer of " + ", ".join(c["name"] for c in stranded)
+                  + ". Add a new officer on the club's Officers page so join requests get answered.", "error")
     else:
         db.execute("UPDATE users SET suspended = 0 WHERE id = ?", (user_id,))
         flash(f"{user['full_name']} can log in again.", "success")

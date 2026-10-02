@@ -25,7 +25,7 @@ from .phones import phone_from_form
 from .photos import make_avatar
 from .sms import text_user
 from .textutil import fold, multi_line, one_line, social_handle
-from .timeutil import from_db, now_local, to_db
+from .timeutil import fmt_when, from_db, now_local, to_db
 
 bp = Blueprint("clubs", __name__)
 log = logging.getLogger(__name__)
@@ -291,7 +291,8 @@ def view(club_id):
         flash(f"{club['name']} is verified! Every Husky can find it now.", "celebrate")  # confetti
     if g.get("user") is not None:
         members = roster(club_id)
-    if role == "officer":
+    can_decide = role == "officer" or is_admin()  # admins too: a club whose only officer was suspended
+    if can_decide:
         requests = db.execute(
             """SELECT u.id, u.full_name, u.avatar_updated, m.role, m.message, m.joined_at
                FROM club_members m JOIN users u ON u.id = m.user_id
@@ -312,7 +313,7 @@ def view(club_id):
         events = [e for e in events if not e["members_only"]]
     return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
                            members_only_hidden=members_only_hidden,
-                           role=role, owner=is_owner(club), requests=requests, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
+                           role=role, owner=is_owner(club), requests=requests, can_decide=can_decide, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
                            socials=social_links(club),
                            joining=JOINING,
                            experience=EXPERIENCE, who=WHO_CAN_JOIN_LABELS)
@@ -611,7 +612,8 @@ def join(club_id):
 def decide(club_id, user_id, decision):
     """Officers confirm or decline people waiting to join (and can remove members)."""
     club = get_club(club_id)
-    if my_role(club_id) != "officer" or decision not in ("approve", "decline", "remove"):
+    # Admins too: a club whose only officer was suspended still has people waiting to be let in.
+    if (my_role(club_id) != "officer" and not is_admin()) or decision not in ("approve", "decline", "remove"):
         abort(403)
     db = get_db()
     row = db.execute("SELECT role FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, user_id)).fetchone()
@@ -644,9 +646,22 @@ def decide(club_id, user_id, decision):
         flash("Declined. They still follow the club.", "info")
     elif decision == "remove" and row["role"] == "member":
         db.execute("DELETE FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, user_id))
+        _leave_members_only_games(club_id, user_id)
         flash("Removed from the club.", "info")
     db.commit()
     return redirect(url_for("clubs.view", club_id=club_id) + ("#requests" if decision != "remove" else "#members"))
+
+
+def _leave_members_only_games(club_id, user_id):
+    """Someone who's no longer a member isn't in the club's upcoming members-only games anymore either (and
+    so stops seeing the spot, the players and the chat). Games they host stay; the caller commits."""
+    db = get_db()
+    upcoming = """SELECT id FROM events WHERE club_id = ? AND members_only = 1 AND cancelled = 0 AND ends_at >= ?
+                  AND host_id != ?"""
+    args = (club_id, to_db(now_local()), user_id)
+    db.execute(f"DELETE FROM rsvps WHERE user_id = ? AND event_id IN ({upcoming})", (user_id, *args))
+    db.execute(f"""UPDATE invites SET status = 'canceled' WHERE guest_id = ? AND status IN ('pending', 'requested')
+                   AND event_id IN ({upcoming})""", (user_id, *args))
 
 
 @bp.route("/clubs/<int:club_id>/leave", methods=("POST",))
@@ -666,6 +681,7 @@ def leave(club_id):
         flash("You're the owner. On Manage officers, make another officer the owner, then you can leave.", "error")
     elif role is not None:
         db.execute("DELETE FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, g.user["id"]))
+        _leave_members_only_games(club_id, g.user["id"])
         db.commit()
         flash({"follower": "Unfollowed.", "requested": "Request canceled.", "tryout": "Tryout sign-up canceled."}
               .get(role, "You left the club."), "info")
@@ -854,13 +870,20 @@ def public_url_for(path):
 def _tell_players_on_hold(club):
     """A club went back to review, so its upcoming events are on hold: tell everyone going (in their bell)."""
     from .notifications import notify  # imported here: notifications.py is loaded after this module
+    # One notice per person (a weekly practice is 12 games: not 12 identical notices), about their next one.
     rows = get_db().execute(
-        """SELECT DISTINCT r.user_id, e.id, e.title FROM rsvps r JOIN events e ON e.id = r.event_id
-           WHERE e.club_id = ? AND e.cancelled = 0 AND e.ends_at >= ?""", (club["id"], to_db(now_local()))).fetchall()
+        """SELECT r.user_id, e.id, e.title, MIN(e.starts_at) AS starts_at, COUNT(*) AS games
+           FROM rsvps r JOIN events e ON e.id = r.event_id
+           WHERE e.club_id = ? AND e.cancelled = 0 AND e.ends_at >= ? GROUP BY r.user_id""",
+        (club["id"], to_db(now_local()))).fetchall()
     for row in rows:
+        what = (f"{row['title']} ({fmt_when(row['starts_at'])})" if row["games"] == 1
+                else f"Your {row['games']} {club['name']} events")
+        verb = "is" if row["games"] == 1 else "are"
         notify(row["user_id"], "game_updates",
-               f"{row['title']} is on hold while {club['name']} is checked again. You're still in it.",
-               url_for("events.detail", event_id=row["id"]), key=f"on_hold:{row['id']}")
+               f"{what} {verb} on hold while {club['name']} is checked again. You're still in "
+               f"{'it' if row['games'] == 1 else 'them'}.",
+               url_for("events.detail", event_id=row["id"]), key=f"on_hold:{club['id']}")
 
 
 def _notify_officers(club, subject, heading, lines, button, notice):

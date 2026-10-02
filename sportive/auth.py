@@ -62,7 +62,9 @@ def csrf_field():
 @bp.before_app_request
 def check_csrf():
     # The scheduler's reminder call proves itself with its own secret token instead (reminders.py).
-    if request.method == "POST" and current_app.config["CSRF_ENABLED"] and request.endpoint != "tasks.send_reminders_task":
+    # So does an unsubscribe link (the signed link is the proof; mail apps' one-click button sends no form token).
+    if (request.method == "POST" and current_app.config["CSRF_ENABLED"]
+            and request.endpoint not in ("tasks.send_reminders_task", "unsubscribe.one_click")):
         sent = request.form.get("csrf_token", "")
         expected = session.get("csrf_token", "")
         if not sent or not expected or not same_secret(sent, expected):
@@ -116,8 +118,9 @@ def safe_next(target):
     return url_for("index")
 
 
-def log_in(user, remember=True):
-    """remember=False ("Remember me" unticked): the login ends when the browser closes."""
+def log_in(user, remember=True, just_signed_up=False):
+    """remember=False ("Remember me" unticked): the login ends when the browser closes.
+    just_signed_up: they just confirmed a new account (a friend's invite link then makes them friends)."""
     after = session.get("after_login")  # e.g. a shared event link they opened before signing up
     invite = session.get("invite_link")  # a friend's "you're in my game" link
     session.clear()
@@ -135,7 +138,7 @@ def log_in(user, remember=True):
             flash(f"Happy birthday, {user['full_name'].split()[0]}! 🎂", "birthday")
     if invite:
         from .parties import accept_invite_link  # imported here: parties.py imports this module
-        destination = accept_invite_link(user, invite)
+        destination = accept_invite_link(user, invite, just_signed_up=just_signed_up)
         if destination:
             return destination
     return safe_next(after)
@@ -294,18 +297,28 @@ def signup():
         grad_year = form.get("grad_year", "").strip()
         birth_date = form.get("birth_date", "").strip()
         error = validate_signup(full_name, email, password, password2, grad_year, birth_date)
+        db = get_db()
+        if error is None and code_recently_sent(email) and session.get("pending_email") == email:
+            # Came back to fix something (Back, or "Wrong email?"): same email, so keep the code already sent.
+            db.execute("UPDATE users SET password_hash = ?, full_name = ?, grad_year = ?, birth_date = ?"
+                       " WHERE email = ? AND verified = 0",
+                       (hash_password(password), full_name, int(grad_year) if grad_year else None, birth_date, email))
+            db.commit()
+            session.pop("signup_form", None)
+            return redirect(url_for("auth.signup_sports"))
         if error is None and code_recently_sent(email):
             error = "We just sent a code to that email. Check your inbox, or wait a minute and try again."
         if error is None and not codes_left_today(email):
             error = TOO_MANY_CODES
         if error is None:
-            db = get_db()
             # An unverified account never proved it owns the email, so it can be replaced (also one started with
             # the other UW address for the same inbox: one account per person).
             local = email.split("@")[0]
             same_inbox = [f"{local}@{domain}" for domain in current_app.config["ALLOWED_EMAIL_DOMAINS"]]
             db.execute(f"DELETE FROM users WHERE verified = 0 AND email IN ({', '.join('?' for _ in same_inbox)})",
                        same_inbox)
+            if session.get("pending_email") and session["pending_email"] != email:  # "Wrong email? Fix it"
+                db.execute("DELETE FROM users WHERE verified = 0 AND email = ?", (session["pending_email"],))
             try:
                 cur = db.execute(
                     "INSERT INTO users (email, password_hash, full_name, grad_year, birth_date)"
@@ -318,9 +331,21 @@ def signup():
                 db.rollback()
                 error = "This email is already in use."
             else:
+                session.pop("signup_form", None)
                 start_verification(email)  # the code arrives while they pick their sports
                 return redirect(url_for("auth.signup_sports"))
         flash(error, "error")
+        # Back to a normal page (not the answer to a form post), so the phone's Back button works on the next
+        # step. What they typed comes back, except the passwords.
+        session["signup_form"] = {key: form.get(key, "") for key in ("full_name", "email", "grad_year", "birth_date")}
+        return redirect(url_for("auth.signup"))
+    form = session.pop("signup_form", None) or {}
+    pending = session.get("pending_email")
+    if not form and request.args.get("fix") and pending:  # "Wrong email?" on the code page: start from what they typed
+        row = get_db().execute("SELECT full_name, email, grad_year, birth_date FROM users WHERE email = ? AND verified = 0",
+                               (pending,)).fetchone()
+        if row:
+            form = {key: "" if row[key] is None else str(row[key]) for key in row.keys()}
     today = now_local().date()
     try:
         latest_birth_date = today.replace(year=today.year - MIN_AGE)
@@ -446,7 +471,7 @@ def verify():
             from .notifications import start_markers  # imported here: notifications.py imports this module
             start_markers(user["id"])
             db.commit()
-            destination = log_in(user)
+            destination = log_in(user, just_signed_up=True)
             flash(f"Welcome, {user['full_name'].split()[0]}!", "celebrate")
             if user["phone"] and not user["phone_verified"]:
                 # The email is real now, so the number from step 3 gets its code.

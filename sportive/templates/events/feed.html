@@ -145,7 +145,9 @@
     <ol>
       {% for dawg in top_dawgs %}
         <li>
-          <span class="rank" aria-hidden="true">{{ ['🥇', '🥈', '🥉'][loop.index0] if loop.index <= 3 else loop.index }}</span>
+          {# Ties share a place: 5, 5, 3 games is 🥇 🥇 🥉 #}
+          {% set rank = (top_dawgs|selectattr('games', 'gt', dawg.games)|list|length) + 1 %}
+          <span class="rank" aria-hidden="true">{{ ['🥇', '🥈', '🥉'][rank - 1] if rank <= 3 else rank }}</span>
           <a class="person" href="{{ url_for('profile.view', user_id=dawg.id) }}">{{ avatar(dawg.id, dawg.full_name, dawg.avatar_updated, 32) }}{{ dawg.full_name }}</a>
           <span class="muted">{{ dawg.games }} game{{ 's' if dawg.games != 1 }}</span>
         </li>

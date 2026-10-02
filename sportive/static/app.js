@@ -27,7 +27,18 @@
   // so a full-for-now game turns joinable without anyone having to keep tapping.
   document.querySelectorAll("[data-reload-in]").forEach((element) => {
     const seconds = Number(element.dataset.reloadIn);
-    if (seconds >= 0 && seconds < 3600) setTimeout(() => location.reload(), (seconds + 3) * 1000);
+    if (!(seconds >= 0 && seconds < 3600)) return;
+    element.setAttribute("role", "status");
+    setTimeout(() => {
+      // Someone moving through the page with a keyboard or screen reader would be thrown back to the top by a
+      // reload: tell them instead, with a link to check.
+      const busy = document.activeElement && document.activeElement !== document.body;
+      if (!busy) { location.reload(); return; }
+      const again = document.createElement("a");
+      again.href = location.href;
+      again.textContent = "A spot may be open now. Check again";
+      element.replaceChildren(again);
+    }, (seconds + 3) * 1000);
   });
   // <input data-filter-list="#id">: as you type, hide the [data-filter-name] items in #id whose name doesn't
   // match (any word of the name starting with what's typed), plus sections left empty.
@@ -343,10 +354,11 @@
     });
   }
 
-  // "⋯" menus (<details class="more-menu">): Esc closes the open one and puts focus back on its button.
+  // "⋯" menus (<details class="more-menu">, and a chat message's ⋯): Esc closes the open one and puts focus
+  // back on its button.
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    const open = document.querySelector("details.more-menu[open]");
+    const open = document.querySelector("details.more-menu[open], details.chat-more[open]");
     if (!open) return;
     open.open = false;
     open.querySelector("summary").focus();

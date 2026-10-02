@@ -16,7 +16,7 @@ from flask import (Blueprint, Response, abort, current_app, flash, g, jsonify, r
 from .auth import login_required, safe_next
 from .constants import SPORT_EMOJI
 from .db import get_db
-from .textutil import fold, initial, multi_line, one_line
+from .textutil import fold, initial, multi_line, one_line, person_name
 from .photos import make_chat_photo
 from .timeutil import fmt_clock, fmt_when, from_db, now_local, to_db
 
@@ -122,6 +122,17 @@ def block_user(me, other):
                   (SELECT id FROM events WHERE host_id = ? AND cancelled = 0 AND ends_at >= ?)""", (other, me, now))
     db.execute("""UPDATE invites SET status = 'canceled' WHERE guest_id = ? AND status IN ('pending', 'requested')
                   AND event_id IN (SELECT id FROM events WHERE host_id = ?)""", (other, me))
+    cancel_invites_between(me, other)
+
+
+def cancel_invites_between(a, b):
+    """Spots held and invites either of them sent the other, in any game, end (with their "You down?" notices):
+    after an unfriend or a block, nobody gets in on the other's invite."""
+    db = get_db()
+    pair = "((guest_id = :a AND inviter_id = :b) OR (guest_id = :b AND inviter_id = :a)) AND status IN ('pending', 'requested')"
+    for row in db.execute(f"SELECT event_id, guest_id FROM invites WHERE {pair}", {"a": a, "b": b}).fetchall():
+        db.execute("DELETE FROM notices WHERE user_id = ? AND key = ?", (row["guest_id"], f"invite:{row['event_id']}"))
+    db.execute(f"UPDATE invites SET status = 'canceled' WHERE {pair}", {"a": a, "b": b})
 
 
 def too_many_messages(me, sending=1):
@@ -138,6 +149,8 @@ def too_many_messages(me, sending=1):
 def clean_body(text, photo=False):
     """Returns (body, error). With a photo, the words are optional."""
     body = multi_line(text)
+    if body and not person_name(body).strip():  # only invisible characters (zero-width spaces): an empty bubble
+        body = ""
     if not body and not photo:
         return None, "Type a message first."
     if len(body) > MAX_MESSAGE_LENGTH:
@@ -188,7 +201,10 @@ def chat_sent(error, back):
 def keep_draft(text):
     """A message that couldn't be sent goes back in the box after the redirect, instead of vanishing."""
     body = (text or "")[:MAX_MESSAGE_LENGTH]
-    if len(json.dumps(body)) <= MAX_DRAFT_COOKIE_BYTES:  # the session is a cookie (browsers cap them at 4 KB)
+    # The session is a cookie (browsers cap them at 4 KB) and an emoji takes 12 bytes in it: keep as much as fits.
+    while body and len(json.dumps(body)) > MAX_DRAFT_COOKIE_BYTES:
+        body = body[:len(body) * 3 // 4]
+    if body:
         session["chat_draft"] = {"path": request.path, "body": body}
 
 
@@ -282,9 +298,11 @@ def friend_suggestions(me):
     suspended accounts. Each row has `mutual` (friends in common), `via` (one of them, for "Friends with Maya")
     and `games` (finished games played together)."""
     return get_db().execute(
-        """WITH my_friends AS (
+        """WITH my_friends AS (  -- not suspended ones: nobody can see them, so they can't be "Friends with ..."
                SELECT CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END AS id
-               FROM friendships WHERE status = 'accepted' AND (requester_id = :me OR addressee_id = :me)),
+               FROM friendships WHERE status = 'accepted' AND (requester_id = :me OR addressee_id = :me)
+               AND (CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END)
+                   NOT IN (SELECT id FROM users WHERE suspended = 1)),
            friends_of_friends AS (
                SELECT f.addressee_id AS id, m.id AS via
                FROM my_friends m JOIN friendships f ON f.requester_id = m.id WHERE f.status = 'accepted'
@@ -343,6 +361,8 @@ def search_people(me, q):
     if len(q) < MIN_SEARCH_LENGTH:
         return []
     words = fold(q).split()[:3]
+    if not words:  # only accent marks or spaces: nothing left to look for
+        return []
     params = {"me": me, "starts": words[0] + "%", "limit": MAX_SEARCH_RESULTS}
     for n, word in enumerate(words):
         params[f"w{n}"] = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
@@ -354,9 +374,11 @@ def search_people(me, q):
         params.update({f"e{n}": f"{netid}@{domain}" for n, domain in enumerate(domains)})
         netid_match = f"LOWER(u.email) IN ({', '.join(f':e{n}' for n in range(len(domains)))})"
     rows = get_db().execute(
-        f"""WITH my_friends AS (
+        f"""WITH my_friends AS (  -- suspended friends don't count as mutual friends (nobody can see them)
                SELECT CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END AS id
-               FROM friendships WHERE status = 'accepted' AND (requester_id = :me OR addressee_id = :me)),
+               FROM friendships WHERE status = 'accepted' AND (requester_id = :me OR addressee_id = :me)
+               AND (CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END)
+                   NOT IN (SELECT id FROM users WHERE suspended = 1)),
             co_players AS (
                SELECT DISTINCT theirs.user_id FROM rsvps mine JOIN rsvps theirs ON mine.event_id = theirs.event_id
                JOIN events e ON e.id = mine.event_id WHERE mine.user_id = :me AND e.cancelled = 0)
@@ -370,8 +392,9 @@ def search_people(me, q):
             WHERE u.verified = 1 AND u.suspended = 0 AND u.id != :me AND (({name_match}) OR {netid_match})
               AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = :me)
               AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = :me)
-            ORDER BY by_netid DESC, played DESC, mutual DESC, fold(u.full_name) LIKE :starts DESC, fold(u.full_name)
-            LIMIT :limit""", params).fetchall()
+            ORDER BY by_netid DESC, u.id IN my_friends DESC, played DESC, mutual DESC,
+                     fold(u.full_name) LIKE :starts DESC, fold(u.full_name)
+            LIMIT :limit""", params).fetchall()  # friends first: Messages search keeps only people you can message
     return [{**dict(row), "status": friendship_status(me, row["id"])} for row in rows]
 
 
@@ -429,6 +452,7 @@ def remove_friend(user_id):
     db = get_db()
     db.execute("""DELETE FROM friendships WHERE (requester_id = ? AND addressee_id = ?)
                   OR (requester_id = ? AND addressee_id = ?)""", (me, user_id, user_id, me))
+    cancel_invites_between(me, user_id)
     db.commit()
     return _back(url_for("social.friends"))
 

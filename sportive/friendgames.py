@@ -15,6 +15,7 @@ from .constants import OPEN_TO_GENDERS, SPORT_EMOJI, SPORTS, STATED_GENDERS
 from .db import get_db
 from .links import public_url
 from .mail import compose, send_email
+from .unsubscribe import unsubscribe_url
 from .timeutil import fmt_when, now_local, to_db
 
 log = logging.getLogger(__name__)
@@ -93,7 +94,7 @@ def _send(app, recipients, d):
                     button=("See the game and join", d["url"]),
                     reason="You're getting this because you're friends with the host or follow the club. "
                            "Turn these emails off in Settings.",
-                    preheader=f"{d['sport']} · {d['when']}")
-                send_email(email, subject, body, html=html)
+                    preheader=f"{d['sport']} · {d['when']}", unsubscribe=unsubscribe_url(email, "friend_games"))
+                send_email(email, subject, body, html=html, unsubscribe=unsubscribe_url(email, "friend_games"))
             except Exception:  # one bad address shouldn't stop the others
                 log.exception("Couldn't email %s about a new game", email)

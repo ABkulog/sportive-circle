@@ -67,12 +67,19 @@ def facility_ids():
 
 def _local(text):
     """"2026-10-01T18:00:00.000" (UW Rec's local time) or "20261218T040000Z" (UTC) -> Seattle time, no tzinfo."""
-    text = text.strip()
+    text = str(text).strip()
+    if "-" in text[:10]:  # ISO: "2026-10-01T18:00:00.000", maybe ending in "Z" or "+00:00" (then not Seattle time)
+        when = datetime.fromisoformat(text[:19])
+        offset = re.search(r"(Z|[+-]\d\d:?\d\d)$", text[19:])
+        if not offset:
+            return when
+        sign, digits = offset.group(1)[:1], offset.group(1).lstrip("+-").replace(":", "")
+        delta = timedelta(0) if sign == "Z" else timedelta(hours=int(digits[:2]), minutes=int(digits[2:]))
+        utc = when - delta if sign != "-" else when + delta
+        return utc.replace(tzinfo=timezone.utc).astimezone(SEATTLE).replace(tzinfo=None)
     if text.endswith("Z"):
         return datetime.strptime(text, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc).astimezone(SEATTLE) \
             .replace(tzinfo=None)
-    if "-" in text:
-        return datetime.fromisoformat(text[:19])
     return datetime.strptime(text[:15], "%Y%m%dT%H%M%S")
 
 
@@ -129,6 +136,8 @@ def fetch(start, end):
     A booking that fails a check is left out and described in problems."""
     ids = facility_ids()
     rows, seen, problems = [], set(), []
+    unread = set()  # our places where a space didn't answer properly: their last copy is kept (see sync)
+    asked = set()   # our places with at least one space on UW Rec's site
     spaces_read = 0
     for place, spaces in UW_REC_SPACES.items():
         for name, fid in ids.items():
@@ -137,16 +146,28 @@ def fetch(start, end):
             if spaces_read:
                 time.sleep(current_app.config.get("UW_REC_PAUSE", PAUSE_SECONDS))
             spaces_read += 1
-            items = json.loads(_get("/Facility/GetScheduleCustomAppointmentsForDevExtremeScheduler",
-                                    {"selectedFacilityId": fid, "start": start.strftime("%Y-%m-%dT%H:%M:%S"),
-                                     "end": end.strftime("%Y-%m-%dT%H:%M:%S")}) or "[]")
+            asked.add(place)
+            answer = _get("/Facility/GetScheduleCustomAppointmentsForDevExtremeScheduler",
+                          {"selectedFacilityId": fid, "start": start.strftime("%Y-%m-%dT%H:%M:%S"),
+                           "end": end.strftime("%Y-%m-%dT%H:%M:%S")})
+            try:  # an empty or odd answer isn't "no bookings": it's no answer
+                items = json.loads(answer) if answer and answer.strip() else None
+            except ValueError:
+                items = None
+            if not isinstance(items, list):
+                unread.add(place)
+                problems.append(f"{name}: UW Rec sent no schedule, so {place}'s last copy is kept")
+                continue
             for item in items:
-                title = (item.get("Text") or "Reserved").strip()
+                if not isinstance(item, dict):
+                    problems.append(f"{name}: left out something that isn't a booking ({str(item)[:40]})")
+                    continue
+                title = str(item.get("Text") or "Reserved").strip() or "Reserved"
                 one_space = len(spaces) == 1 and name == spaces[0]  # else say which gym/court/part
                 label = (title if one_space else f"{name}: {title}")[:MAX_LABEL]
                 try:
                     dates = occurrences(item, end)
-                except (UnreadableRule, ValueError, KeyError) as error:
+                except (UnreadableRule, ValueError, KeyError, TypeError, AttributeError) as error:
                     problems.append(f"{name} · {title}: couldn't read its dates ({error})")
                     continue
                 for starts, ends in dates:
@@ -159,7 +180,7 @@ def fetch(start, end):
                     rows.append((place, label, starts, ends))
     if not spaces_read:
         problems.append("None of our places were found on UW Rec's site (did its page change?)")
-    return rows, problems
+    return rows, problems, unread, asked
 
 
 def sync(days=DAYS_AHEAD):
@@ -168,24 +189,42 @@ def sync(days=DAYS_AHEAD):
     bookings the last one had (UW Rec's page probably changed). The result is saved for the admin page."""
     now = now_local()
     db = get_db()
-    previous = db.execute("SELECT COUNT(*) FROM rec_reservations WHERE source = 'feed' AND ends_at >= ?",
-                          (to_db(now),)).fetchone()[0]
+    by_place = dict(db.execute("SELECT location, COUNT(*) FROM rec_reservations WHERE source = 'feed' AND ends_at >= ?"
+                               " GROUP BY location", (to_db(now),)).fetchall())
+    previous = sum(by_place.values())
     try:
-        rows, problems = fetch(now - timedelta(hours=12), now + timedelta(days=days))
+        rows, problems, unread, asked = fetch(now - timedelta(hours=12), now + timedelta(days=days))
     except Exception as error:
-        _report("failed", 0, previous, [f"UW Rec's site didn't answer ({type(error).__name__})"])
+        _report("failed", 0, previous, [f"UW Rec's site didn't answer ({type(error).__name__}: {str(error)[:80]})"])
         raise
     if previous >= 20 and len(rows) < previous * DROP_LIMIT:
         _report("kept", len(rows), previous, problems + [
             f"Only {len(rows)} bookings came back (the last copy had {previous}), so the last copy is kept"])
         return 0
-    db.execute("DELETE FROM rec_reservations WHERE source = 'feed'")
+    # A place that suddenly lost most of its bookings probably didn't answer properly: keep its last copy too.
+    new_counts = {}
+    for place, _, _, _ in rows:
+        new_counts[place] = new_counts.get(place, 0) + 1
+    for place, before in by_place.items():
+        if place not in unread and before >= 10 and new_counts.get(place, 0) < before * DROP_LIMIT:
+            unread.add(place)
+            problems.append(f"{place}: only {new_counts.get(place, 0)} bookings came back (it had {before}), "
+                            "so its last copy is kept")
+    # Every place we read gets a fresh copy. Places that didn't answer properly, or that UW Rec's page didn't
+    # list this time, keep yesterday's; places we no longer read at all (not in UW_REC_SPACES) lose theirs.
+    kept = sorted(unread | (set(UW_REC_SPACES) - asked))
+    db.execute(f"DELETE FROM rec_reservations WHERE source = 'feed' AND location NOT IN ({', '.join('?' for _ in kept)})",
+               kept)
     db.executemany("""INSERT INTO rec_reservations (location, starts_at, ends_at, label, source, created_by, created_at)
                       VALUES (?, ?, ?, ?, 'feed', NULL, ?)""",
-                   [(place, to_db(starts), to_db(ends), label, to_db(now)) for place, label, starts, ends in rows])
+                   [(place, to_db(starts), to_db(ends), label, to_db(now)) for place, label, starts, ends in rows
+                    if place not in unread])
     db.commit()
-    _report("ok" if not problems else "warnings", len(rows), previous, problems)
-    return len(rows)
+    saved = sum(1 for row in rows if row[0] not in unread)
+    replaced_any = bool(asked - unread)
+    # Nothing replaced at all (every place sent junk) isn't a good copy, whatever else happened.
+    _report(("ok" if not problems else "warnings") if replaced_any else "kept", saved, previous, problems)
+    return saved
 
 
 def _report(status, saved, previous, problems):
@@ -197,6 +236,8 @@ def _report(status, saved, previous, problems):
     db = get_db()
     db.execute("INSERT OR REPLACE INTO app_state (key, value) VALUES ('uw_rec_report', ?)", (json.dumps(report),))
     db.execute("INSERT OR REPLACE INTO app_state (key, value) VALUES ('uw_rec_synced_at', ?)", (report["at"],))
+    if status in ("ok", "warnings"):  # a copy was really saved, not just tried (the admin page says how old it is)
+        db.execute("INSERT OR REPLACE INTO app_state (key, value) VALUES ('uw_rec_copied_at', ?)", (report["at"],))
     if status != "ok":
         emails = sorted(admin_emails())
         for admin in db.execute(f"SELECT id FROM users WHERE email IN ({', '.join('?' for _ in emails)})",
@@ -217,6 +258,16 @@ def last_synced():
     """When UW Rec's schedule was last copied (or tried), as a DB time string, or None."""
     row = get_db().execute("SELECT value FROM app_state WHERE key = 'uw_rec_synced_at'").fetchone()
     return row[0] if row else None
+
+
+def last_copied():
+    """When a copy of UW Rec's schedule was last really saved, or None. (A copy saved before this was tracked
+    counts too: the last try, if it worked.)"""
+    row = get_db().execute("SELECT value FROM app_state WHERE key = 'uw_rec_copied_at'").fetchone()
+    if row:
+        return row[0]
+    report = last_report() or {}
+    return last_synced() if report.get("status") in ("ok", "warnings") else None
 
 
 def sync_round(app):

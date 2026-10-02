@@ -9,6 +9,7 @@ from flask import current_app
 
 from .db import get_db
 from .links import public_url
+from .unsubscribe import unsubscribe_url
 from .mail import send_designed
 from .sms import sms_available
 from .timeutil import now_local, to_db
@@ -21,6 +22,7 @@ def texts_audience():
     return get_db().execute(
         """SELECT id, email, full_name FROM users
            WHERE verified = 1 AND suspended = 0 AND phone_verified = 0 AND texts_announced_at IS NULL
+             AND weekly_digest = 1  -- turned off our optional (Monday/news) email: no announcement either
            ORDER BY id""").fetchall()
 
 
@@ -51,7 +53,8 @@ def _announce_texts(send):
                            "It's optional and takes 30 seconds. Email still gets everything, and you can "
                            "turn texts off anytime or reply STOP."],
                           button=("Add my number", link),
-                          reason="You're getting this one-time update because you have a Sportive Circle account.")
+                          reason="You're getting this one-time update because you have a Sportive Circle account.",
+                          unsubscribe=unsubscribe_url(person["email"], "digest"))
         except Exception:
             failed += 1
             log.exception("Couldn't email %s about texts", person["email"])

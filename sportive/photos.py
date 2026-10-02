@@ -45,7 +45,11 @@ def _clean_photo(data, size, square, quality):
             elif image.width * image.height > MAX_FULL_DECODE_PIXELS:
                 raise ValueError(TOO_BIG)
             image = ImageOps.exif_transpose(image)  # phones store "rotate me" in metadata
-            if image.mode in ("RGBA", "LA", "P"):
+            if image.mode.startswith("I"):  # 16-bit (or 32-bit) grayscale: bring it down to 0-255, or it's all white
+                low, high = image.getextrema()
+                scale = 255 / (high - low) if high > low else 0
+                image = image.point(lambda v: (v - low) * scale).convert("L")
+            if image.mode in ("RGBA", "LA", "P", "PA") or "transparency" in image.info:  # see-through: on white
                 image = image.convert("RGBA")
                 background = Image.new("RGB", image.size, "white")
                 background.paste(image, mask=image.getchannel("A"))

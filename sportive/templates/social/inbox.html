@@ -40,7 +40,7 @@
       {{ avatar(c.id, c.full_name, c.avatar_updated, 44) }}
       <span class="convo-body">
         <strong>{{ c.full_name }}</strong>
-        <span class="muted convo-preview">{% if c.sender_id == g.user.id %}You: {% endif %}{{ c.body|truncate(70) }}</span>
+        <span class="muted convo-preview">{% if c.sender_id == g.user.id %}You: {% endif %}{{ c.body|truncate(70) if c.body else '📷 Photo' }}</span>
       </span>
       <span class="convo-meta">
         <small class="muted">{{ c.created_at|when }}</small>

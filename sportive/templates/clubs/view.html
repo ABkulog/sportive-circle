@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import avatar, icon, club_logo %}
 {% block title %}{{ club.name }}{% endblock %}
+{% block description %}{{ (club.description or club.name ~ ' on Sportive Circle, for UW Huskies.')|replace('\n', ' ')|truncate(200) }}{% endblock %}
 {% block content %}
 <a class="back-link" href="{{ url_for('clubs.directory') }}">← Clubs</a>
 {% if club.status == 'pending' %}
@@ -96,7 +97,7 @@
     <button type="button" role="tab" data-tab-button="about">About</button>
     <button type="button" role="tab" data-tab-button="updates">Updates{% if posts %} · {{ posts|length }}{% endif %}</button>
     <button type="button" role="tab" data-tab-button="events">Events{% if events %} · {{ events|length }}{% endif %}</button>
-    <button type="button" role="tab" data-tab-button="members">Members{% if role == 'officer' and requests %} <span class="count-dot">{{ requests|length }}</span>{% endif %}</button>
+    <button type="button" role="tab" data-tab-button="members">Members{% if can_decide and requests %} <span class="count-dot">{{ requests|length }}</span>{% endif %}</button>
   </nav>
 
   {# About: everything you need before joining #}
@@ -200,7 +201,7 @@
 
   {# Members (+ join requests for officers) #}
   <section class="tab-panel" data-tab-panel="members" id="members" role="tabpanel">
-    {% if role == 'officer' %}
+    {% if can_decide %}
       <div class="requests-card" id="requests">
         <h2 class="section-title">Join requests ({{ requests|length }})</h2>
         <ul class="people">

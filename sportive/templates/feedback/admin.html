@@ -45,4 +45,10 @@
     <div class="card empty"><p class="empty-emoji" aria-hidden="true">💡</p><p><strong>No suggestions yet.</strong></p></div>
   {% endfor %}
 </div>
+{% if page > 1 or more %}
+  <nav class="pager" aria-label="More suggestions">
+    {% if page > 1 %}<a class="btn btn-small btn-ghost" href="{{ url_for('feedback.admin_suggestions', kind=kind or None, page=page - 1) }}">← Newer</a>{% endif %}
+    {% if more %}<a class="btn btn-small btn-ghost" href="{{ url_for('feedback.admin_suggestions', kind=kind or None, page=page + 1) }}">Older →</a>{% endif %}
+  </nav>
+{% endif %}
 {% endblock %}

@@ -25,7 +25,8 @@ from .mail import compose, send_email
 from .social import friends_of, is_blocked_between
 from .spirit import greeting, top_dawgs
 from .textutil import multi_line, one_line, same_secret
-from .timeutil import exists_in_seattle, fmt_clock, fmt_when, from_db, now_local, parse_form, to_db, to_form
+from .timeutil import (add_real, exists_in_seattle, fmt_clock, fmt_when, from_db, now_local, parse_form, real_gap,
+                       to_db, to_form)
 
 bp = Blueprint("events", __name__)
 log = logging.getLogger(__name__)
@@ -79,9 +80,18 @@ def get_event(event_id, host_only=False):
     if not rows:
         abort(404)
     event = rows[0]
-    if host_only and event["host_id"] != g.user["id"]:
+    if host_only and not can_manage(event):
         abort(403)
     return event
+
+
+def can_manage(event):
+    """Who can edit, cancel and take people off a game: its host. A club event belongs to the club: any of its
+    current officers, and not a host who has stopped being one (left, removed, or stepped down)."""
+    if not event["club_id"]:
+        return event["host_id"] == g.user["id"]
+    return get_db().execute("SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ? AND role = 'officer'",
+                            (event["club_id"], g.user["id"])).fetchone() is not None
 
 
 # SQL for "is this game full?": spots held for invited friends count as taken (for their 30 minutes).
@@ -220,7 +230,7 @@ PASSWORD_WORDS = ("husky", "dawgs", "purple", "gold", "rally", "court", "field",
 
 
 # Which form field an error message is about, so the step-by-step form opens on it and marks it (wizard.js).
-ERROR_FIELDS = [("name is too long", "title"), ("can't be played at", "location"), ("Off campus", "note"),
+ERROR_FIELDS = [("name is too long", "title"), ("can be at most", "ends_at"), ("can't be played at", "location"), ("Off campus", "note"),
                 ("location", "location"), ("sport", "sport"), ("skill level", "skill_level"),
                 ("start time", "starts_at"), ("end time", "ends_at"), ("end after it starts", "ends_at"),
                 ("Event date", "starts_at"), ("when you're playing", "starts_in"), ("Note", "note"),
@@ -421,7 +431,7 @@ def read_event_form(form, event=None):
             return None, (f"{fmt_clock(to_db(moment))} doesn't exist on {moment.strftime('%b')} {moment.day}: "
                           "clocks jump ahead an hour for daylight saving. Pick another time.")
     max_hours = SPORT_MAX_HOURS.get(sport, DEFAULT_MAX_HOURS)
-    if ends - starts > timedelta(hours=max_hours):
+    if real_gap(starts, ends) > timedelta(hours=max_hours):  # real hours, even the night the clocks change
         longest = f"{max_hours // 24} days" if max_hours % 24 == 0 else f"{max_hours} hours"
         return None, f"{SPORTS[sport]} events can be at most {longest} long."
     if ends <= now:
@@ -551,6 +561,8 @@ def create():
                         members_only=1 if form.get("is_private") == "members" else 0)
             if not 1 <= repeat <= MAX_REPEAT_WEEKS:
                 error = f"A club event can repeat for up to {MAX_REPEAT_WEEKS} weeks."
+            elif from_db(data["starts_at"]) + timedelta(weeks=repeat - 1) > now_local() + timedelta(days=MAX_DAYS_AHEAD):
+                error = "The last week would be more than a year away. Repeat for fewer weeks."
         elif error is None:
             repeat = 1
         if error is None:
@@ -638,6 +650,9 @@ def edit(event_id):
     if event["cancelled"]:
         flash("This game was canceled, so it can't be edited.", "error")
         return redirect(url_for("events.detail", event_id=event_id))
+    if from_db(event["ends_at"]) < now_local():  # it happened: it stays in everyone's history as it was
+        flash("This game is over, so it can't be edited. Post a new one instead.", "error")
+        return redirect(url_for("events.detail", event_id=event_id))
     if request.method == "POST":
         form = request.form
         data, error = read_event_form(form, event)
@@ -664,9 +679,15 @@ def edit(event_id):
                 return render_template("events/form.html", form=form, event=get_event(event_id), min_start="")
             if data["starts_at"] != event["starts_at"]:  # a reminder for the old time doesn't cover the new one
                 db.execute("UPDATE rsvps SET reminder_sent = 0 WHERE event_id = ?", (event_id,))
-            told = tell_players_it_changed(event, data)
+            if data["members_only"] and not event["members_only"]:  # now members-only: outsiders are out
+                left_out = drop_non_members(event)
+            else:
+                left_out = 0
+            told = tell_players_it_changed(event, data, by=g.user)
             db.commit()
-            flash("Saved. Everyone going got a heads-up." if told else "Saved.", "success")
+            flash(("Saved. Everyone going got a heads-up." if told else "Saved.")
+                  + (f" {left_out} who aren't members are off the game now and were told." if left_out else ""),
+                  "success")
             return redirect(url_for("events.detail", event_id=event_id))
         form_error(error)
     else:
@@ -691,15 +712,36 @@ def cancel(event_id):
     db = get_db()
     db.execute("UPDATE events SET cancelled = 1, revision = revision + 1 WHERE id = ?", (event_id,))
     db.commit()
-    tell_players_it_was_cancelled(event)
+    tell_players_it_was_cancelled(event, by=g.user)
     flash("Canceled. Everyone who joined was told.", "info")
     return redirect(url_for("events.my_events"))
 
 
-def players_except_host(event):
+def players_except_host(event, by=None):
+    """Everyone going, except whoever made the change (`by`; the host when not given). When another officer
+    changes a club event, the host is told like everyone else."""
     return get_db().execute(
         """SELECT u.id, u.email, u.full_name FROM rsvps r JOIN users u ON u.id = r.user_id
-           WHERE r.event_id = ? AND r.user_id != ? AND u.suspended = 0""", (event["id"], event["host_id"])).fetchall()
+           WHERE r.event_id = ? AND r.user_id != ? AND u.suspended = 0""",
+        (event["id"], by["id"] if by is not None else event["host_id"])).fetchall()
+
+
+def drop_non_members(event):
+    """A club event just became members-only: people going who aren't members (and invites to them) are off it,
+    with a notice. Returns how many. The caller commits."""
+    db = get_db()
+    outsiders = db.execute(
+        """SELECT r.user_id FROM rsvps r WHERE r.event_id = ? AND r.user_id != ? AND r.user_id NOT IN
+           (SELECT user_id FROM club_members WHERE club_id = ? AND role IN ('member', 'officer'))""",
+        (event["id"], event["host_id"], event["club_id"])).fetchall()
+    for row in outsiders:
+        db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event["id"], row["user_id"]))
+        notify(row["user_id"], "game_updates", f"{event_title(event)} is now for {event['club_name']} members only, "
+               "so you're off it.", url_for("clubs.view", club_id=event["club_id"]), key=f"change:{event['id']}")
+    db.execute("""UPDATE invites SET status = 'canceled' WHERE event_id = ? AND status IN ('pending', 'requested')
+                  AND guest_id NOT IN (SELECT user_id FROM club_members WHERE club_id = ? AND role IN ('member', 'officer'))""",
+               (event["id"], event["club_id"]))
+    return len(outsiders)
 
 
 def what_changed(event, data):
@@ -718,15 +760,16 @@ def what_changed(event, data):
     return changes
 
 
-def tell_players_it_changed(event, data):
-    """The host changed something important: a notice in everyone's bell, plus an email when the time or
-    place changed (so nobody shows up at the old one). Returns True if anyone was told. Caller commits."""
+def tell_players_it_changed(event, data, by=None):
+    """The host (or, for a club event, `by`, the officer who did it) changed something important: a notice in
+    everyone's bell, plus an email when the time or place changed (so nobody shows up at the old one).
+    Returns True if anyone was told. Caller commits."""
     changes = what_changed(event, data)
-    players = players_except_host(event)
+    players = players_except_host(event, by)
     if not changes or not players:
         return False
     title = data["title"] if not event["is_quick"] else event_title({**dict(event), **data})
-    host = event["host_name"].split()[0]
+    host = (by["full_name"] if by is not None else event["host_name"]).split()[0]
     link = url_for("events.detail", event_id=event["id"])
     for player in players:
         notify(player["id"], "game_updates", f"{host} changed {title}: {', '.join(changes)}", link,
@@ -752,14 +795,15 @@ def tell_players_it_changed(event, data):
     return True
 
 
-def tell_players_it_was_cancelled(event, page_stays=True, by_host=True):
+def tell_players_it_was_cancelled(event, page_stays=True, by_host=True, by=None):
     """Tell everyone who joined (except the host), so nobody shows up to an empty field.
     page_stays=False when the game is about to be deleted (the host's account is going), so links go to the feed.
     by_host=False when Sportive Circle canceled it (a suspended host, a denied club): it doesn't name the host."""
-    players = players_except_host(event)
+    players = players_except_host(event, by)
     title, when = event_title(event), fmt_when(event["starts_at"])
-    who = event["host_name"].split()[0] if by_host else "Sportive Circle"
-    who_full = event["host_name"] if by_host else "Sportive Circle"
+    name = by["full_name"] if by is not None else event["host_name"]  # the officer who canceled a club event
+    who = name.split()[0] if by_host else "Sportive Circle"
+    who_full = name if by_host else "Sportive Circle"
     link = url_for("events.detail", event_id=event["id"]) if page_stays else url_for("events.feed")
     for player in players:
         notify(player["id"], "game_updates", f"{who} canceled {title} ({when})",
@@ -839,8 +883,11 @@ def quick():
             error = "Everyone's already coming, so there's no one to find. Pick more participants."
 
         if error is None:
-            starts = round_up_5(now_local() + timedelta(minutes=_int(form.get("starts_in"))))
-            ends = starts + timedelta(minutes=_int(form.get("duration")))
+            # Real minutes from now, so a game never lands in the hour skipped when clocks jump ahead.
+            starts = round_up_5(add_real(now_local(), timedelta(minutes=_int(form.get("starts_in")))))
+            if not exists_in_seattle(starts):  # rounded up into the skipped hour (1:58 -> 2:00): it's 3:00
+                starts += timedelta(hours=1)
+            ends = add_real(starts, timedelta(minutes=_int(form.get("duration"))))
             event_id = insert_event({
                 "title": f"{team_size}v{team_size} {SPORTS[sport]}" if team_size else f"Need {needed} for {SPORTS[sport]}",
                 "sport": sport, "location": location,
@@ -890,6 +937,7 @@ def detail(event_id):
     first_game = get_db().execute("SELECT event_id FROM rsvps WHERE user_id = ? ORDER BY created_at, event_id LIMIT 1",
                                   (me,)).fetchone()
     return render_template("events/detail.html", event=event, attendees=attendees, inside=inside,
+                           manage=can_manage(event),
                            first_game=bool(first_game) and first_game["event_id"] == event_id,
                            my_reminder=my_rsvp["remind_minutes"] if my_rsvp else None, remind_choices=REMIND_CHOICES,
                            ended=from_db(event["ends_at"]) < now_local(),
@@ -897,7 +945,7 @@ def detail(event_id):
                            blocked=is_blocked_between(me, event["host_id"]),
                            invite=invite, hold_minutes=hold_minutes_left(invite),
                            invited=pending_invites(event_id), teams=teams, my_team=my_team,
-                           requests=requested_invites(event_id) if event["i_am_going"] else [],
+                           requests=requested_invites(event_id) if event["i_am_going"] or can_manage(event) else [],
                            # my own held spot is still mine to take, even if the game looks full to others
                            spots_for_me=None if spots_left(event) is None
                            else spots_left(event) + (1 if hold_minutes_left(invite) else 0),
@@ -973,7 +1021,8 @@ def join_problem(event, password=None):
         if too_many_password_tries(event["id"], me):
             return "Too many wrong passwords. Try again in an hour, or ask to be invited."
         if not password or not same_secret(password.strip(), event["password"]):
-            count_wrong_password(event["id"], me)
+            if password and password.strip():  # tapping Join before typing it isn't a wrong guess
+                count_wrong_password(event["id"], me)
             return "That's not the password." if password else "This game is private. Enter the password."
     return None
 
@@ -1142,7 +1191,7 @@ def leave(event_id):
 def remove_player(event_id, user_id):
     """The host takes someone off their game (e.g. they don't fit who it's for). They get a notice."""
     event = get_event(event_id, host_only=True)
-    if user_id == g.user["id"] or from_db(event["ends_at"]) < now_local():
+    if user_id in (g.user["id"], event["host_id"]) or from_db(event["ends_at"]) < now_local():
         abort(400)
     db = get_db()
     cur = db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, user_id))

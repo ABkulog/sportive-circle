@@ -181,10 +181,13 @@ def check_phone_code(user_id, code):
         db.execute("UPDATE users SET sms_code_attempts = sms_code_attempts + 1 WHERE id = ?", (user_id,))
         db.commit()
         return "That texted code isn't right."
-    db.execute("""UPDATE users SET phone_verified = 1, sms_updates = 1, sms_consent_at = ?, sms_code = NULL,
-                  sms_code_expires = NULL, sms_code_attempts = 0 WHERE id = ?""", (to_db(now_local()), user_id))
+    # Only if nobody confirmed the same number in the meantime (two accounts can both ask for a code).
+    confirmed = db.execute("""UPDATE users SET phone_verified = 1, sms_updates = 1, sms_consent_at = ?, sms_code = NULL,
+                              sms_code_expires = NULL, sms_code_attempts = 0 WHERE id = ? AND NOT EXISTS (
+                                SELECT 1 FROM users other WHERE other.phone = users.phone AND other.phone_verified = 1
+                                AND other.id != users.id)""", (to_db(now_local()), user_id)).rowcount
     db.commit()
-    return None
+    return None if confirmed else "That number is already used by another account."
 
 
 def remove_phone(user_id):

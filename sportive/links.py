@@ -7,5 +7,5 @@ from flask import current_app, url_for
 
 
 def public_url(endpoint, **values):
-    """public_url("events.detail", event_id=3) -> "https://sportivecircle.org/events/3"."""
+    """public_url("events.detail", event_id=3) -> "https://sportivecircle.com/events/3"."""
     return current_app.config["PUBLIC_URL"].rstrip("/") + url_for(endpoint, **values)
