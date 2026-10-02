@@ -187,6 +187,8 @@ section.band > .section-title:first-child { margin-top: 0; }
 .pick-list li + li { border-top: 1px solid var(--line); }
 .pick-row { display: flex; align-items: center; gap: 12px; padding: 10px 2px; cursor: pointer; font-weight: 600; }
 .pick-row input { width: 20px; height: 20px; flex: none; accent-color: var(--accent); }
+.pick-row.is-unavailable { cursor: default; color: var(--muted); }
+.pick-why { display: block; font-weight: 400; }
 
 /* The bell page */
 .bell-dot { flex: none; width: 9px; height: 9px; margin: 6px 0 0 auto; border-radius: 50%; background: var(--purple); }

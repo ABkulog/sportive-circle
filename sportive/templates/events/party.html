@@ -17,25 +17,30 @@
     {% if room is not none %}<strong>{{ room - (1 if joining_now else 0) }} spot{{ 's' if room - (1 if joining_now else 0) != 1 }} for friends.</strong>{% endif %}
   </p>
   {% endif %}
+  {% set can_pick = friends|selectattr('why_not', 'none')|list %}
   {% if friends %}
     <form method="post" class="form">
       {{ csrf_field() }}
+      {# Every friend is listed (like Send to friends); the ones you can't pick right now say why. #}
       <ul class="pick-list">
         {% for f in friends %}
-          <li><label class="pick-row">
-            <input type="checkbox" name="friend" value="{{ f.id }}">
-            {{ avatar(f.id, f.full_name, f.avatar_updated, 36) }}<span>{{ f.full_name }}</span>
+          <li><label class="pick-row{% if f.why_not %} is-unavailable{% endif %}">
+            <input type="checkbox" name="friend" value="{{ f.id }}"{% if f.why_not %} disabled{% endif %}>
+            {{ avatar(f.id, f.full_name, f.avatar_updated, 36) }}<span>{{ f.full_name }}
+              {% if f.why_not %}<small class="muted pick-why">{{ f.why_not }}</small>
+              {% elif f.hold_ran_out %}<small class="muted pick-why">Their held spot ran out. Reserve it again?</small>{% endif %}</span>
           </label></li>
         {% endfor %}
       </ul>
+      {% if not can_pick %}<p class="muted">Everyone's already in or has a spot held.</p>{% endif %}
       {% if host_ok %}
         <label class="field"><span>Note for {{ event.host_name.split()[0] }} <em>(it's a private game, so they say yes first)</em></span>
           <input name="note" maxlength="{{ max_note }}" placeholder="My roommate, he's good"></label>
       {% endif %}
-      <button class="btn btn-block btn-large">{{ 'Ask ' ~ event.host_name.split()[0] if host_ok and not joining_now else ('Join + reserve' if joining_now else ('Invite' if event.is_private else 'Reserve')) }}</button>
+      <button class="btn btn-block btn-large"{% if not can_pick %} disabled{% endif %}>{{ 'Ask ' ~ event.host_name.split()[0] if host_ok and not joining_now else ('Join + reserve' if joining_now else ('Invite' if event.is_private else 'Reserve')) }}</button>
     </form>
   {% else %}
-    <p>None of your friends can be invited to this one yet.</p>
+    <p>You don't have friends on Sportive Circle yet.</p>
     <a class="btn btn-ghost" href="{{ url_for('social.friends') }}">Add friends</a>
   {% endif %}
 </div>

@@ -314,12 +314,29 @@
       {% for i in invited %}
         <li class="post-game-row">
           <span class="person">{{ avatar(i.guest_id, i.guest_name, i.guest_avatar, 32) }}<span>{{ i.guest_name }}
-            <small class="muted person-extra">{{ i.inviter_name.split()[0] }}'s invite{% if i.expires_at > now_db() %} · spot held{% endif %}</small></span></span>
+            <small class="muted person-extra">{{ i.inviter_name.split()[0] }}'s invite{% if i.expires_at > now_db() %} · spot held{% else %} · held spot ran out{% endif %}</small></span></span>
           {% if i.inviter_id == g.user.id %}
             <form method="post" action="{{ url_for('parties.cancel_invite', event_id=event.id, guest_id=i.guest_id) }}">
               {{ csrf_field() }}<button class="btn btn-small btn-ghost">Cancel</button>
             </form>
           {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
+
+{# Where did a reserved friend go? The host sees every invite that didn't work out; others see their own. #}
+{% set outcomes = invite_outcomes(event.id) if (is_host or event.i_am_going) else [] %}
+{% set my_outcomes = outcomes if is_host else outcomes|selectattr('inviter_id', 'equalto', g.user.id)|list %}
+{% if my_outcomes %}
+  <section class="band">
+    <h2>Invites that didn't work out</h2>
+    <ul class="people">
+      {% for o in my_outcomes %}
+        <li class="post-game-row">
+          <span class="person">{{ avatar(o.guest_id, o.guest_name, o.guest_avatar, 32) }}<span>{{ o.guest_name }}
+            <small class="muted person-extra">{{ o.inviter_name.split()[0] }}'s invite · {{ o.what }}</small></span></span>
         </li>
       {% endfor %}
     </ul>
