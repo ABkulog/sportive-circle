@@ -49,7 +49,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-PROF-5 | On the photo page, Save without picking a new photo goes back to the profile, and users can remove their photo (with an "Are you sure?"). | Should | ✅ |
 | FR-PROF-6 | Optional pronouns, gender (says it's only used for games open to women or men), and Instagram / Snapchat / TikTok / X usernames right under the bio in Edit profile, shown on the profile only if filled in. | Should | ✅ |
 | FR-PROF-7 | Emails shown to people you've played with are hidden once either of you blocks the other. Top Dawgs ties share a place and medal. | Must | ✅ |
-| FR-PROF-8 | Someone you blocked (or who blocked you) sees only your name and photo, not your bio, pronouns, gender, class year, sports, badges or socials; suspended people's photos aren't served. Pronouns and names can't hide behind invisible or right-to-left characters. Pasted social links keep the full username (long links aren't cut off), short links like vm.tiktok.com are refused, and long handles wrap on a phone. | Must | ✅ |
+| FR-PROF-8 | Someone you blocked (or who blocked you) sees only your name and photo, not your bio, pronouns, gender, class year, sports, badges or socials; suspended people's photos aren't served. Pronouns and names can't hide behind invisible or right-to-left characters. Pasted social links keep the full username (long links aren't cut off), pasted short links like vm.tiktok.com/… are refused (a username like maya.co is fine), and long handles wrap on a phone. | Must | ✅ |
 
 ### Games and events (EVT)
 
@@ -141,6 +141,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-SOC-7 | Unfriending or blocking ends the spots held and invites either person sent the other, in any game (and their "You down?" notices). Suspended people don't count as mutual friends in search or suggestions. | Must | ✅ |
 | FR-SOC-8 | People search never fails on odd input (only accent marks, emoji, wildcards) and folds letters like ı and ß; friends come first, so Messages search finds a friend even among many people with the same name. Messages with only invisible characters aren't sent; photo-only chats preview as "📷 Photo"; an unsent draft (even all emoji) comes back. | Must | ✅ |
 | FR-SOC-9 | Game chats hide people blocked either way (their messages, reactions and unread counts) and suspended people's messages. | Must | ✅ |
+| FR-SOC-10 | Suspended people disappear from game player lists (past games too), club member lists, invite lists and open chats. | Must | ✅ |
 
 ### Notifications (NOTIF)
 
@@ -194,6 +195,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | NFR-SEC-6 | Limits against abuse: code attempts, resend cooldown (with a countdown), login lockout, 10 wrong private-game passwords/hour, 20 messages/minute, 10 reports/hour, 3 pending clubs per person, length limits on every text field and search, and double-tap protection on forms. | Checked on the server (and in the browser for double taps). | ✅ |
 | NFR-SEC-7 | Security headers on every response. | CSP, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors 'none'`. | ✅ |
 | NFR-SEC-8 | Redirects after login only go to pages on this site. | `safe_next()` blocks `//evil.com`. | ✅ |
+| NFR-SEC-9 | One person can't flood others: at most 30 games posted an hour; at most 5 "posted a game" notices a day from one host to one person; spots reserved for the same friend in at most 5 games a day; "Changed" emails and texts about one game at most 3 a day per player (the bell keeps the latest). | Limits checked on the server. | ✅ |
 
 ### Privacy (NFR-PRIV)
 

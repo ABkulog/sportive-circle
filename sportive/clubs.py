@@ -326,7 +326,7 @@ def roster(club_id):
     return get_db().execute(
         """SELECT u.id, u.full_name, u.email, u.grad_year, u.avatar_updated, m.role, m.joined_at
            FROM club_members m JOIN users u ON u.id = m.user_id
-           WHERE m.club_id = ? AND m.role IN ('member', 'officer')
+           WHERE m.club_id = ? AND m.role IN ('member', 'officer') AND u.suspended = 0  -- suspended: hidden everywhere
            ORDER BY m.role = 'officer' DESC, u.full_name""", (club_id,)).fetchall()
 
 

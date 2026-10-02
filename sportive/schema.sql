@@ -429,3 +429,11 @@ CREATE TABLE IF NOT EXISTS game_alerts (
     PRIMARY KEY (user_id, event_id)
 );
 CREATE INDEX IF NOT EXISTS idx_game_alerts_user ON game_alerts(user_id, sent_at);
+
+-- "Changed: <game>" emails and texts sent, so a host editing over and over can't flood players (events.py).
+CREATE TABLE IF NOT EXISTS change_alerts (
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    sent_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_change_alerts ON change_alerts(event_id, user_id, sent_at);

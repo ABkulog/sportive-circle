@@ -169,6 +169,8 @@ def admin_reports():
     db = get_db()
     suspended = db.execute("SELECT id, full_name, email FROM users WHERE suspended = 1 ORDER BY fold(full_name)").fetchall()
     page = min(max(1, request.args.get("page", 1, type=int) or 1), 10000)  # a huge number would overflow SQLite
+    total = db.execute("SELECT COUNT(*) FROM reports WHERE status = ?", (status,)).fetchone()[0]
+    page = min(page, max(1, -(-total // REPORTS_PER_PAGE)))  # past the end (the last one there was handled): last page
     reports = db.execute(
         """SELECT r.*, reporter.full_name AS reporter_name, reported.full_name AS reported_name,
                   reported.email AS reported_email, reported.suspended AS reported_suspended

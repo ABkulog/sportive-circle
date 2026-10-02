@@ -21,6 +21,7 @@ from .timeutil import fmt_when, now_local, to_db
 log = logging.getLogger(__name__)
 
 EMAILS_PER_DAY = 3
+NOTICES_PER_HOST_PER_DAY = 5  # "Maya posted a game" notices from one host to one person a day
 
 
 def audience(event):
@@ -64,6 +65,10 @@ def announce_new_game(event):
     since = to_db(now_local() - timedelta(days=1))
     to_email = []
     for person in people:
+        if db.execute("""SELECT COUNT(*) FROM notices WHERE user_id = ? AND created_at >= ? AND key IN
+                         (SELECT 'friend_game:' || id FROM events WHERE host_id = ?)""",
+                      (person["id"], since, event["host_id"])).fetchone()[0] >= NOTICES_PER_HOST_PER_DAY:
+            continue  # enough from this host today: one person can't fill a friend's bell
         notify(person["id"], "friend_games", f"{host} posted {title}{via} ({when}). Want in?", link,
                key=f"friend_game:{event['id']}")
         if person["wants_email"] and db.execute(

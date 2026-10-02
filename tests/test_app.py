@@ -3757,6 +3757,7 @@ def test_social_links_and_short_links(accounts, client, app):
     from sportive.profile import clean_social
     assert clean_social("tiktok", "https://www.tiktok.com/@dubs.husky.official?_t=8kL") == "dubs.husky.official"
     assert clean_social("tiktok", "vm.tiktok.com/ZMabc/").endswith("/")             # a short link, refused
+    assert clean_social("instagram", "maya.co") == "maya.co"                        # a real username: fine
     assert 'maxlength="200"' in pathlib.Path(app.root_path, "templates/profile/edit_sports.html").read_text()
 
 
@@ -3850,6 +3851,82 @@ def test_need_players_place_check_uses_seattle_time_on_any_phone(app):
     """Round 16: on a phone set to Seoul, Need players asked the place check about Seoul's clock time."""
     js = (pathlib.Path(app.root_path) / "static" / "forms.js").read_text()
     assert 'timeZone: "America/Los_Angeles"' in js and "getHours()" not in js
+
+
+def test_one_person_cant_flood_others(accounts, client, app):
+    """Round 17: editing a game 100 times emailed every player 99 times; posting 100 games put 100 notices in each
+    friend's bell; reserving spots in game after game did the same."""
+    ids = _people(accounts, app, "Spam", "Vic")
+    _friends(app, ids["Spam"], ids["Vic"])
+    _as(accounts, "Spam")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    _as(accounts, "Vic")
+    client.post(f"/events/{game}/join")
+    _as(accounts, "Spam")
+    for n in range(10):
+        client.post(f"/events/{game}/edit", data=event_form(title="Hoops", starts_at=form_time(timedelta(days=1, hours=n % 2)),
+                                                           ends_at=form_time(timedelta(days=1, hours=2 + n % 2))))
+    changed = [m for m in app.extensions["outbox"] if m["to"] == "vic@uw.edu" and m["subject"].startswith("Changed")]
+    assert len(changed) == 3                                                      # the bell keeps the latest
+    games = [event_id_from(client.post("/events/new", data=event_form(title=f"Game {n}", players="10")))
+             for n in range(8)]
+    with app.app_context():
+        posted = get_db().execute("SELECT COUNT(*) FROM notices WHERE user_id = ? AND kind = 'friend_games'",
+                                  (ids["Vic"],)).fetchone()[0]
+    assert posted == 5                                                            # 5 a day from one host
+    for game_id in games[:5]:
+        client.post(f"/events/{game_id}/party", data={"friend": [ids["Vic"]]})
+    sixth = client.post(f"/events/{games[5]}/party", data={"friend": [ids["Vic"]]}, follow_redirects=True)
+    assert b"a lot of games today" in sixth.data
+    with app.app_context():
+        get_db().execute("UPDATE events SET created_at = datetime('now') WHERE host_id = ?", (ids["Spam"],))
+        get_db().executemany("INSERT INTO events (title, sport, location, skill_level, starts_at, ends_at, host_id)"
+                             " VALUES ('x', 'basketball', 'IMA (Intramural Activities Building)', 'Casual', ?, ?, ?)",
+                             [(to_db(now_local() + timedelta(days=3)), to_db(now_local() + timedelta(days=3, hours=1)),
+                               ids["Spam"])] * 25)
+        get_db().commit()
+    too_many = client.post("/events/new", data=event_form(title="One more"), follow_redirects=True)
+    assert b"posted a lot of games in the last hour" in too_many.data
+
+
+def test_suspended_people_disappear_from_lists_and_blocked_profiles_stay_quiet(accounts, client, app):
+    """Round 17: a suspended person still showed (with a broken photo) in past games, club rosters, invite lists
+    and an open DM; a blocked profile still said "No sports picked yet" and "Nothing coming up"."""
+    ids = _people(accounts, app, "Host", "Sus")
+    _friends(app, ids["Host"], ids["Sus"])
+    _as(accounts, "Host")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    _as(accounts, "Sus")
+    client.post(f"/events/{game}/join")
+    client.post(f"/messages/{ids['Host']}", data={"body": "hi from sus"})
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 1 WHERE id = ?", (ids["Sus"],))
+        get_db().commit()
+    _as(accounts, "Host")
+    assert "Sus Husky" not in client.get(f"/events/{game}").data.decode()
+    poll = client.get(f"/messages/{ids['Sus']}/poll?after=0")
+    assert poll.status_code != 200 or poll.get_json()["messages"] == []
+    accounts.logout()
+    ids2 = _people(accounts, app, "Ana", "Ben")
+    _as(accounts, "Ana")
+    client.post(f"/block/{ids2['Ben']}")
+    _as(accounts, "Ben")
+    page = client.get(f"/u/{ids2['Ana']}").data.decode()
+    assert "No sports picked yet" not in page and "Nothing coming up" not in page and "Ana Husky" in page
+
+
+def test_report_pages_past_the_end_show_the_last_page(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="admin@uw.edu")
+    with app.app_context():
+        db = get_db()
+        admin = db.execute("SELECT id FROM users WHERE email = 'admin@uw.edu'").fetchone()[0]
+        db.executemany("INSERT INTO reports (reporter_id, reported_user_id, target_type, target_id, reason, details,"
+                       " status, created_at) VALUES (?, ?, 'user', ?, 'spam', 'x', 'open', '2026-10-01 12:00')",
+                       [(admin, admin, admin)] * 100)
+        db.commit()
+    page = client.get("/admin/reports?page=2").data.decode()                      # 100 reports: only 1 page
+    assert "No open reports" not in page
 
 
 def test_party_up_holds_spots_for_friends(accounts, client, app):

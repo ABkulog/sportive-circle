@@ -14,8 +14,7 @@ from .auth import login_required
 from .db import get_db
 from .events import KEPT_OUT, event_title, get_event, kept_out, not_for_me, query_events, spots_left, try_join
 from .links import public_url
-from .invites import (HOLD_TIME, MAX_PARTY, held_spots, hold_minutes_left, hold_spots, invite_outcomes, my_invite,
-                      now_param, team_counts)
+from .invites import (HOLD_TIME, MAX_PARTY, held_spots, hold_minutes_left, hold_spots, invite_outcomes, invited_too_often, my_invite, now_param, team_counts)
 from .sms import drop_queued_texts, queue_text
 from .notifications import notify
 from .social import can_message, friends_of, is_blocked_between, too_many_messages
@@ -151,6 +150,8 @@ def party_up(event_id):
                   "error")
         elif len(chosen) > MAX_PARTY:
             flash(f"You can invite up to {MAX_PARTY} friends at once.", "error")
+        elif invited_too_often(me, chosen):
+            flash("You've invited one of these friends to a lot of games today. Try again tomorrow.", "error")
         else:
             note = one_line(request.form.get("note"))[:MAX_NOTE]
             error = send_party(event, chosen, team, joining_now, note)

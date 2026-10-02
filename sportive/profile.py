@@ -49,8 +49,10 @@ def clean_social(key, value):
         value = re.sub(r"^(https?://)?([a-z]{2,3}\.)?linkedin\.com/in/", "", value, flags=re.I).strip("/")
         return value.split("?")[0].split("/")[0]
     handle = social_handle(key, value)
-    if re.search(r"\.(com|net|org|me|app|ly|co|link|gg)$", handle, re.I):
-        return handle + "/"  # a short link ("vm.tiktok.com/ZMabc"), not a username: fails the check with a message
+    # A pasted short link ("vm.tiktok.com/ZMabc", "t.co/xyz") isn't a username: fail the check with a message.
+    # A bare username that happens to end like a domain ("maya.co") is fine.
+    if "/" in value and re.search(r"\.(com|net|org|me|app|ly|co|link|gg)$", handle, re.I):
+        return handle + "/"
     return handle
 
 # Pages you can still open before adding a profile picture.
@@ -205,7 +207,7 @@ def view(user_id):
                            hosting=hosting, show_email=show_email, socials=person_socials(user), genders=GENDERS,
                            is_tester=TESTER.key in earned_badges(user_id),
                            showcase=[] if blocked else showcase(user_id), earned=earned_badges(user_id), rarity=rarity(),
-                           is_retired=is_retired, relation=relation)
+                           is_retired=is_retired, relation=relation, blocked=blocked)
 
 
 @bp.route("/admin/users/<int:user_id>/tester/<action>", methods=("POST",))

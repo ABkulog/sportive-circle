@@ -30,8 +30,8 @@
     {% endif %}
     <div class="profile-name">
       <h1>{{ user.full_name }} {% if is_team(user.id) %}<span class="team-pill" title="Runs Sportive Circle">🐾 Team</span>{% endif %}</h1>
-      <p class="muted">{{ [("Class of " ~ user.grad_year) if user.grad_year else "Husky", user.pronouns,
-                          genders[user.gender] if user.gender else ""]|select|join(" · ") }}
+      <p class="muted">{% if not blocked %}{{ [("Class of " ~ user.grad_year) if user.grad_year else "Husky", user.pronouns,
+                          genders[user.gender] if user.gender else ""]|select|join(" · ") }}{% endif %}
         {% if show_email %}<br><a href="mailto:{{ user.email }}">{{ user.email }}</a>{% endif %}</p>
       {% if user.suspended and is_admin() and not me %}{# only admins can open a suspended profile #}
         <p><span class="badge badge-danger">Suspended</span></p>
@@ -106,10 +106,12 @@
     </div>
   {% endif %}
 
+  {% if not blocked %}{# blocked either way: just the name and photo #}
   <div class="badges profile-sports">
     {% for s in sports %}<span class="chip">{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</span>
     {% else %}<span class="muted">{% if me %}<a href="{{ url_for('profile.edit_sports') }}">Pick your sports</a>{% else %}No sports picked yet.{% endif %}</span>{% endfor %}
   </div>
+  {% endif %}
 </section>
 
 {% if showcase or me %}
@@ -131,10 +133,12 @@
 </section>
 {% endif %}
 
+{% if not blocked %}
 <section class="band">
   <h2 class="section-title">{{ 'Games you host' if me else 'Games ' ~ user.full_name.split()[0] ~ ' hosts' }}</h2>
   <div class="stack">
     {% for e in hosting %}{{ event_card(e) }}{% else %}<p class="muted">Nothing coming up.</p>{% endfor %}
   </div>
 </section>
+{% endif %}
 {% endblock %}

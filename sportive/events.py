@@ -15,7 +15,7 @@ from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, OFF
                         SKILL_LEVELS, CLUB_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .db import get_db, user_sports
 from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots,
-                      holds_for_others, my_invite, now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
+                      holds_for_others, invited_too_often, my_invite, now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
 from .friendgames import announce_new_game
 from .links import public_url
 from .sms import text_user
@@ -33,6 +33,7 @@ log = logging.getLogger(__name__)
 
 MIN_PASSWORD, MAX_PASSWORD = 4, 30     # private games
 MAX_DAYS_AHEAD = 365
+CHANGE_ALERTS_PER_DAY = 3  # "Changed" emails/texts per player per game per day (the bell keeps the latest)
 OPEN_SPOT_CHOICES = ("1", "2", "3", "4", "5", "10")  # the "Open spots" filter on Home
 QUICK_WINDOW = timedelta(hours=3)      # quick posts starting this soon go to the top of the feed
 FEED_PAGE_SIZE = 50                    # games per "Show more games" step on the feed
@@ -170,6 +171,19 @@ def place_map(location):
     }
 
 
+MAX_GAMES_PER_HOUR = 30  # games one person can post in an hour (a 12-week practice is 12): stops bell spam
+
+
+def posting_too_fast(adding):
+    """An error if posting `adding` more games would go over MAX_GAMES_PER_HOUR, else None. Each game tells the
+    host's friends and club, so a script posting hundreds would fill everyone's bell."""
+    recent = get_db().execute("SELECT COUNT(*) FROM events WHERE host_id = ? AND created_at >= datetime('now', '-1 hour')",
+                              (g.user["id"],)).fetchone()[0]  # (events.created_at is UTC, from SQLite)
+    if recent + adding > MAX_GAMES_PER_HOUR:
+        return "You've posted a lot of games in the last hour. Try again a bit later."
+    return None
+
+
 def round_up_5(dt):
     return dt + timedelta(minutes=-dt.minute % 5)
 
@@ -269,6 +283,8 @@ def read_reservations(form, room):
         return [], f"You can reserve up to {MAX_PARTY} spots at once."
     if len(chosen) > room:
         return [], f"There's only room to reserve {room} spot{'s' if room != 1 else ''} for friends."
+    if invited_too_often(g.user["id"], chosen):
+        return [], "You've reserved spots for one of these friends in a lot of games today. Try again tomorrow."
     return chosen, None
 
 
@@ -567,6 +583,8 @@ def create():
         elif error is None:
             repeat = 1
         if error is None:
+            error = posting_too_fast(repeat)
+        if error is None:
             get_db().commit()
             get_db().execute("BEGIN IMMEDIATE")  # one post at a time, so a double tap can't make two copies
             duplicate = get_db().execute(
@@ -794,6 +812,14 @@ def tell_players_it_changed(event, data, by=None):
         notify(row["guest_id"], "invites", f"{row['inviter_name'].split()[0]} wants you in {title}, which changed: "
                f"{', '.join(changes)}. You down?", link, key=f"invite:{event['id']}")
     if any(change.startswith(("new time", "new place", "now ends", "now ")) for change in changes):
+        # The bell always has the latest; emails and texts about one game: at most CHANGE_ALERTS_PER_DAY a day each.
+        db, now = get_db(), now_local()
+        since = to_db(now - timedelta(days=1))
+        players = [player for player in players if db.execute(
+            "SELECT COUNT(*) FROM change_alerts WHERE event_id = ? AND user_id = ? AND sent_at >= ?",
+            (event["id"], player["id"], since)).fetchone()[0] < CHANGE_ALERTS_PER_DAY]
+        db.executemany("INSERT INTO change_alerts (user_id, event_id, sent_at) VALUES (?, ?, ?)",
+                       [(player["id"], event["id"], to_db(now)) for player in players])
         for player in players:
             text_user(player["id"], f"{host} changed {title}: now {fmt_when(data['starts_at'])} at {data['location']}. "
                                     f"{public_url('events.detail', event_id=event['id'])}")
@@ -902,6 +928,8 @@ def quick():
         needed = (max_players or 0) - 1 - extra - len(reserve)
         if error is None and needed < 1 and not team_size:
             error = "Everyone's already coming, so there's no one to find. Pick more participants."
+        if error is None:
+            error = posting_too_fast(1)
 
         if error is None:
             # Real minutes from now, so a game never lands in the hour skipped when clocks jump ahead.
@@ -942,8 +970,8 @@ def detail(event_id):
     attendees = get_db().execute(
         """SELECT u.id, u.full_name, u.grad_year, u.avatar_updated, r.team
            FROM rsvps r JOIN users u ON u.id = r.user_id
-           WHERE r.event_id = ? ORDER BY r.created_at""",
-        (event_id,),
+           WHERE r.event_id = ? AND (u.suspended = 0 OR u.id = ?) ORDER BY r.created_at""",  # suspended: hidden
+        (event_id, me),
     ).fetchall() if inside else []
     invite = None if event["i_am_going"] else my_invite(event_id, me)
     my_team = next((person["team"] for person in attendees if person["id"] == me), None)

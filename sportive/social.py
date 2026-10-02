@@ -703,7 +703,8 @@ def thread(user_id):
 def thread_poll(user_id):
     """New messages since ?after=<id> (the page asks every few seconds)."""
     me = g.user["id"]
-    if is_blocked_between(me, user_id):
+    suspended = get_db().execute("SELECT suspended FROM users WHERE id = ?", (user_id,)).fetchone()
+    if is_blocked_between(me, user_id) or suspended is None or suspended[0]:  # like the page: nothing to show
         return jsonify(messages=[])
     rows = _thread_rows(me, user_id, request.args.get("after", 0, type=int))
     _mark_read(me, user_id)
