@@ -31,6 +31,8 @@ UW_REC_PLACES = {
     "Recreation Field 1 (by the IMA)", "Recreation Field 2 (by Husky Track)",
     "Recreation Field 3 (by the golf range)", "Recreation Field 4 (by the golf range)",
     "Denny Field", "Husky Track", "Fitness Center West (under Elm Hall)", "Waterfront Activities Center (WAC)",
+    "IMA Mat Rooms (martial arts)", "IMA Pool", "IMA Archery Room", "IMA Squash & Racquetball Courts",
+    "Sand Volleyball Courts (by the IMA)", "UW Golf Driving Range",
 }
 MAX_REPEAT_WEEKS = 20   # a quarter of weekly IM nights, with room to spare
 MAX_LABEL = 80

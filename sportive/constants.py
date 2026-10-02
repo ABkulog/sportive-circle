@@ -130,25 +130,42 @@ SPORT_EMOJI = {
 LOCATIONS = [
     "Burke-Gilman Trail",
     "Denny Field",
+    "Emerald City Boxing Gym (Roosevelt)",
     "Fitness Center West (under Elm Hall)",
     "Green Lake Park pickleball courts",
     "The HUB (Husky Union Building)",
     "Hec Edmundson Pavilion",
     "Husky Track",
     "IMA (Intramural Activities Building)",
+    "IMA Archery Room",
+    "IMA Mat Rooms (martial arts)",
     "IMA North Tennis Courts",
+    "IMA Pool",
     "IMA South Tennis Courts",
+    "IMA Squash & Racquetball Courts",
     "The Quad",
     "Recreation Field 1 (by the IMA)",
     "Recreation Field 2 (by Husky Track)",
     "Recreation Field 3 (by the golf range)",
     "Recreation Field 4 (by the golf range)",
+    "Red Square",
+    "Sand Volleyball Courts (by the IMA)",
+    "UW Golf Driving Range",
     "Waterfront Activities Center (WAC)",
     "Off campus (see note)",
     "Online",
 ]
 
 IMA = "IMA (Intramural Activities Building)"
+# Rooms inside the IMA that clubs use (UW Recreation's IMA tour: washington.edu/ima/self-guided-tour-of-the-ima).
+IMA_MATS = "IMA Mat Rooms (martial arts)"          # Mat Rooms A & B: martial arts and movement clubs
+IMA_POOL = "IMA Pool"                              # 14-lane pool: swimming and water polo
+IMA_ARCHERY = "IMA Archery Room"                   # room 106: where the archery club shoots
+IMA_COURTS = "IMA Squash & Racquetball Courts"     # squash (4 international courts), racquetball, handball
+SAND_COURTS = "Sand Volleyball Courts (by the IMA)"
+GOLF_RANGE = "UW Golf Driving Range"
+RED_SQUARE = "Red Square"
+BOXING_GYM = "Emerald City Boxing Gym (Roosevelt)"  # 6516 Roosevelt Way NE: where the UW Boxing Club trains
 # UW Recreation's outdoor courts: South #1-7 (lit at night), North #8-13 (#11 and #12 have pickleball lines).
 IMA_NORTH_COURTS = "IMA North Tennis Courts"
 IMA_SOUTH_COURTS = "IMA South Tennis Courts"
@@ -191,6 +208,14 @@ LOCATION_COORDS = {
     TRAIL: None,                              # a 20-mile trail: search instead of one pin
     GREEN_LAKE_PICKLEBALL: (47.681547, -122.328384),  # next to the Green Lake Community Center
     HUB: (47.655500, -122.305100),            # the Husky Union Building, on Stevens Way
+    IMA_MATS: (47.653743, -122.301231),       # inside the IMA
+    IMA_POOL: (47.653743, -122.301231),
+    IMA_ARCHERY: (47.653743, -122.301231),
+    IMA_COURTS: (47.653743, -122.301231),
+    SAND_COURTS: (47.654300, -122.300100),    # next to the IMA
+    GOLF_RANGE: (47.661100, -122.296500),     # NE Clark Rd, past Rec Fields 3 and 4
+    RED_SQUARE: (47.655900, -122.309600),
+    BOXING_GYM: (47.676600, -122.317500),     # 6516 Roosevelt Way NE
 }
 
 # Open grass/turf areas, good for field sports like soccer and frisbee.
@@ -202,55 +227,55 @@ SPORT_LOCATIONS = {
     "basketball": [IMA, OFF_CAMPUS],
     "soccer": OPEN_FIELDS + [OFF_CAMPUS],
     "football": OPEN_FIELDS + [OFF_CAMPUS],
-    "volleyball": OPEN_FIELDS + [IMA, OFF_CAMPUS],  # outdoor fields + the IMA's indoor courts
+    "volleyball": OPEN_FIELDS + [IMA, SAND_COURTS, OFF_CAMPUS],  # indoor courts in Gym C, sand courts outside
     "spikeball": OPEN_FIELDS + [IMA, OFF_CAMPUS],
     "ultimate": OPEN_FIELDS + [OFF_CAMPUS],
     "tennis": [IMA_SOUTH_COURTS, IMA_NORTH_COURTS, OFF_CAMPUS],
     "pickleball": [IMA_NORTH_COURTS, IMA, GREEN_LAKE_PICKLEBALL, OFF_CAMPUS],  # IMA = indoor, in Gym B
-    "running": OPEN_FIELDS + [TRAIL, OFF_CAMPUS],   # sprints/intervals on the fields too
-    "climbing": [IMA, OFF_CAMPUS],
+    "running": OPEN_FIELDS + [TRAIL, RED_SQUARE, OFF_CAMPUS],   # the running club meets on the Quad
+    "climbing": [IMA, OFF_CAMPUS],                             # the Crags climbing center is in the IMA
     "gym": [IMA, FITNESS_WEST, OFF_CAMPUS],
     "rowing": [WAC, OFF_CAMPUS],
     "snow": [OFF_CAMPUS],
     "hiking": [OFF_CAMPUS],
     "biking": [TRAIL, OFF_CAMPUS],
     "esports": [HUB, ONLINE, OFF_CAMPUS],
-    # UW club sports (the IMA has the pool, squash/racquetball/handball courts and indoor gyms)
-    "archery": [IMA, OFF_CAMPUS],
-    "badminton": [IMA, OFF_CAMPUS],
+    # UW club sports
+    "archery": [IMA_ARCHERY, OFF_CAMPUS],
+    "badminton": [IMA, OFF_CAMPUS],                            # Gym B is the badminton gym
     "baseball": OPEN_FIELDS + [OFF_CAMPUS],
     "bowling": [OFF_CAMPUS],
-    "boxing": [IMA, OFF_CAMPUS],
-    "bjj": [IMA, OFF_CAMPUS],
+    "boxing": [IMA, IMA_MATS, BOXING_GYM, OFF_CAMPUS],         # IMA: heavy bags in the conditioning room
+    "bjj": [IMA, IMA_MATS, OFF_CAMPUS],
     "cricket": OPEN_FIELDS + [OFF_CAMPUS],
-    "disc_golf": [OFF_CAMPUS],
-    "dodgeball": [IMA, OFF_CAMPUS],
-    "equestrian": [OFF_CAMPUS],
-    "fencing": [IMA, OFF_CAMPUS],
+    "disc_golf": OPEN_FIELDS + [OFF_CAMPUS],
+    "dodgeball": OPEN_FIELDS + [IMA, OFF_CAMPUS],
+    "equestrian": [OFF_CAMPUS],                                # lessons at a nearby barn
+    "fencing": OPEN_FIELDS + [IMA, IMA_MATS, RED_SQUARE, OFF_CAMPUS],
     "field_hockey": OPEN_FIELDS + [OFF_CAMPUS],
     "figure_skating": [OFF_CAMPUS],
-    "golf": [OFF_CAMPUS],
-    "gymnastics": [IMA, OFF_CAMPUS],
-    "handball": [IMA, OFF_CAMPUS],
+    "golf": [GOLF_RANGE, OFF_CAMPUS],
+    "gymnastics": [IMA, IMA_MATS, OFF_CAMPUS],
+    "handball": [IMA_COURTS, IMA, OFF_CAMPUS],
     "ice_hockey": [OFF_CAMPUS],
-    "judo": [IMA, OFF_CAMPUS],
-    "karate": [IMA, OFF_CAMPUS],
-    "kendo": [IMA, OFF_CAMPUS],
+    "judo": [IMA, IMA_MATS, OFF_CAMPUS],
+    "karate": [IMA, IMA_MATS, OFF_CAMPUS],
+    "kendo": [IMA, IMA_MATS, OFF_CAMPUS],
     "lacrosse": OPEN_FIELDS + [OFF_CAMPUS],
-    "muay_thai": [IMA, OFF_CAMPUS],
-    "racquetball": [IMA, OFF_CAMPUS],
+    "muay_thai": [IMA, IMA_MATS, OFF_CAMPUS],
+    "racquetball": [IMA_COURTS, OFF_CAMPUS],
     "rugby": OPEN_FIELDS + [OFF_CAMPUS],
     "sailing": [WAC, OFF_CAMPUS],
     "skateboarding": [OFF_CAMPUS],
     "softball": OPEN_FIELDS + [OFF_CAMPUS],
-    "squash": [IMA, OFF_CAMPUS],
-    "swimming": [IMA, OFF_CAMPUS],
+    "squash": [IMA_COURTS, OFF_CAMPUS],
+    "swimming": [IMA_POOL, WAC, OFF_CAMPUS],                   # WAC: open-water swims on Union Bay
     "table_tennis": [IMA, HUB, OFF_CAMPUS],
-    "taekwondo": [IMA, OFF_CAMPUS],
-    "triathlon": [IMA, TRAIL, OFF_CAMPUS],
-    "water_polo": [IMA, OFF_CAMPUS],
+    "taekwondo": [IMA, IMA_MATS, OFF_CAMPUS],
+    "triathlon": [IMA_POOL, TRACK, TRAIL, WAC, OFF_CAMPUS],
+    "water_polo": [IMA_POOL, OFF_CAMPUS],
     "weightlifting": [IMA, FITNESS_WEST, OFF_CAMPUS],
-    "wrestling": [IMA, OFF_CAMPUS],
+    "wrestling": [IMA, IMA_MATS, OFF_CAMPUS],
     "other": LOCATIONS,
 }
 # Each sport's places in the same (alphabetical) order as the full list.
@@ -336,4 +361,29 @@ PLACE_TIPS = {
                                            "open play every day. About 2 miles north of campus.",
     ("tennis", IMA_SOUTH_COURTS): "Courts 1-7. They have lights for evening games.",
     ("tennis", IMA_NORTH_COURTS): "Courts 8-13. Court 12 is for pickleball.",
+    # Club spaces (UW Recreation's IMA tour and club pages, checked Oct 2026).
+    ("boxing", BOXING_GYM): "Where the UW Boxing Club trains: 6516 Roosevelt Way NE, about a mile north of campus.",
+    ("boxing", IMA): "The IMA's conditioning room has speed and heavy bags. Needs an IMA membership.",
+    ("archery", IMA_ARCHERY): "Room 106 in the IMA, where the archery club shoots. Needs an IMA membership.",
+    ("swimming", IMA_POOL): "14-lane pool in the IMA. Check lap-swim hours; needs an IMA membership.",
+    ("water_polo", IMA_POOL): "14-lane pool in the IMA. Check the pool schedule; needs an IMA membership.",
+    ("triathlon", IMA_POOL): "14-lane pool in the IMA. Check lap-swim hours; needs an IMA membership.",
+    ("badminton", IMA): "Gym B is the IMA's badminton gym. Needs an IMA membership.",
+    ("volleyball", IMA): "Gym C is the IMA's volleyball gym. Needs an IMA membership.",
+    ("climbing", IMA): "The Crags climbing center: a 42-foot wall and a bouldering area. Needs an IMA membership.",
+    ("golf", GOLF_RANGE): "UW's driving range on NE Clark Rd, past Rec Fields 3 and 4.",
+    ("bjj", IMA_MATS): "Mat Rooms A and B in the IMA, used by martial arts clubs. Needs an IMA membership.",
+    ("judo", IMA_MATS): "Mat Rooms A and B in the IMA, used by martial arts clubs. Needs an IMA membership.",
+    ("karate", IMA_MATS): "Mat Rooms A and B in the IMA, used by martial arts clubs. Needs an IMA membership.",
+    ("kendo", IMA_MATS): "Mat Rooms A and B in the IMA, used by martial arts clubs. Needs an IMA membership.",
+    ("muay_thai", IMA_MATS): "Mat Rooms A and B in the IMA, used by martial arts clubs. Needs an IMA membership.",
+    ("taekwondo", IMA_MATS): "Mat Rooms A and B in the IMA, used by martial arts clubs. Needs an IMA membership.",
+    ("wrestling", IMA_MATS): "Mat Rooms A and B in the IMA, used by martial arts clubs. Needs an IMA membership.",
+    ("fencing", IMA_MATS): "Mat Rooms A and B in the IMA, used by martial arts clubs. Needs an IMA membership.",
+    ("gymnastics", IMA_MATS): "Mat Rooms A and B in the IMA, used by martial arts clubs. Needs an IMA membership.",
+    ("boxing", IMA_MATS): "Mat Rooms A and B in the IMA, used by martial arts clubs. Needs an IMA membership.",
+    ("squash", IMA_COURTS): "Squash (4 international courts), racquetball and handball courts in the IMA.",
+    ("racquetball", IMA_COURTS): "Squash (4 international courts), racquetball and handball courts in the IMA.",
+    ("handball", IMA_COURTS): "Squash (4 international courts), racquetball and handball courts in the IMA.",
+    ("fencing", RED_SQUARE): "Open plaza in the middle of campus. Bring your own gear and leave room for people walking.",
 }

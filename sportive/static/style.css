@@ -470,6 +470,7 @@ section.card h2, details.card h2 { margin-top: 0; }
 .form-card { max-width: 520px; margin: 0 auto; border: 0; padding: 0; }
 .form { display: grid; gap: 14px; margin: 16px 0; }
 .row { display: grid; gap: 14px; }
+.row > .field { align-content: start; }  /* side-by-side boxes stay level even when one gets a note under it */
 @media (min-width: 520px) { .row { grid-template-columns: 1fr 1fr; } }
 .row-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }  /* side by side even on phones */
 /* iPhone Safari gives date boxes a fixed built-in width that ignores the column, so two side by side overlapped
