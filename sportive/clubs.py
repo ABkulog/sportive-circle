@@ -25,7 +25,7 @@ from .phones import phone_from_form
 from .photos import make_avatar
 from .sms import text_user
 from .textutil import fold, multi_line, one_line, social_handle
-from .timeutil import from_db, now_local, to_db
+from .timeutil import fmt_when, from_db, now_local, to_db
 
 bp = Blueprint("clubs", __name__)
 log = logging.getLogger(__name__)
@@ -869,13 +869,20 @@ def public_url_for(path):
 def _tell_players_on_hold(club):
     """A club went back to review, so its upcoming events are on hold: tell everyone going (in their bell)."""
     from .notifications import notify  # imported here: notifications.py is loaded after this module
+    # One notice per person (a weekly practice is 12 games: not 12 identical notices), about their next one.
     rows = get_db().execute(
-        """SELECT DISTINCT r.user_id, e.id, e.title FROM rsvps r JOIN events e ON e.id = r.event_id
-           WHERE e.club_id = ? AND e.cancelled = 0 AND e.ends_at >= ?""", (club["id"], to_db(now_local()))).fetchall()
+        """SELECT r.user_id, e.id, e.title, MIN(e.starts_at) AS starts_at, COUNT(*) AS games
+           FROM rsvps r JOIN events e ON e.id = r.event_id
+           WHERE e.club_id = ? AND e.cancelled = 0 AND e.ends_at >= ? GROUP BY r.user_id""",
+        (club["id"], to_db(now_local()))).fetchall()
     for row in rows:
+        what = (f"{row['title']} ({fmt_when(row['starts_at'])})" if row["games"] == 1
+                else f"Your {row['games']} {club['name']} events")
+        verb = "is" if row["games"] == 1 else "are"
         notify(row["user_id"], "game_updates",
-               f"{row['title']} is on hold while {club['name']} is checked again. You're still in it.",
-               url_for("events.detail", event_id=row["id"]), key=f"on_hold:{row['id']}")
+               f"{what} {verb} on hold while {club['name']} is checked again. You're still in "
+               f"{'it' if row['games'] == 1 else 'them'}.",
+               url_for("events.detail", event_id=row["id"]), key=f"on_hold:{club['id']}")
 
 
 def _notify_officers(club, subject, heading, lines, button, notice):

@@ -122,6 +122,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-CLUB-11 | Officers see members' UW emails, can copy them all and download the roster as a spreadsheet (CSV). Members don't see each other's emails. | Should | ✅ |
 | FR-CLUB-12 | The person who registered a club is its owner: only they add officers (searching anyone on the app by name or UW NetID, on Manage officers) or take officer rights away; they always stay an officer. Other officers edit the club, post, make club events and confirm members. The owner can hand the club to another officer (Make owner); they stay an officer. If the owner is no longer an officer, any officer can manage officers. | Must | ✅ |
 | FR-CLUB-13 | Club events belong to the club: any current officer can edit or cancel them and take players off, and an officer who leaves or steps down can't anymore. Someone who leaves the club or is removed is taken out of its upcoming members-only events (they stop seeing the note, players and chat). | Must | ✅ |
+| FR-CLUB-14 | Weekly practices: the last week must be within a year. Turning a club event members-only takes people who aren't members off it (they're told). When another officer edits or cancels a club event, players hear it from that officer and the host is told too. A club going back to review sends each person one on-hold notice, not one per week. | Must | ✅ |
 
 ### Friends and messages (SOC)
 
@@ -142,6 +143,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-NOTIF-1 | Everything new shows in exactly one place, never twice: messages on ✉️, friend requests on 👥, club news on the Clubs tab, and everything else (invites, game changes, game chats, Need players, badges) in the 🔔 bell, in plain sentences. A number clears when you open that place. | Must | ✅ |
 | FR-NOTIF-2 | Settings → Notifications: one on/off switch per kind, saying where it shows up. No pop-ups. | Must | ✅ |
 | FR-NOTIF-3 | No repeats: a newer notice about the same thing replaces the older one (a host editing a game three times = one notice). New accounts start with nothing to catch up on. | Should | ✅ |
+| FR-NOTIF-4 | Optional emails (Monday email, friends' and clubs' new games, reminders, announcements) have an Unsubscribe link that works without logging in, plus the List-Unsubscribe headers mail apps show a button for. The texts announcement skips people who turned off the Monday email. | Must | ✅ |
 | FR-SMS-1 | Texts are optional: people can add a phone number (at sign-up step 3 or in Settings → Texts), must tick a permission box, and confirm it with a texted code. Email stays required (the UW email is the proof of being a UW student). | Should | ✅ |
 | FR-SMS-2 | Confirmed, opted-in numbers get texts for game reminders (at the time each player picked), changed times/places, cancellations, invites and password-reset codes. Texts can be turned off or the number removed anytime; replying STOP is respected; texts are limited per day. | Should | ✅ |
 | FR-SMS-3 | People who joined before texts (or skipped them) see a "New: game updates by text" card on Home after logging in: add a number right there, or "Not now" hides it for good. `tools/announce_texts.py` emails everyone without a number once (dry run by default). Club officers also get their club alerts by text. | Should | ✅ |
@@ -165,6 +167,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-INFO-1 | How it works is 3 steps (Find a game, Start your own, Join a club); the FAQ has its own page behind the ? icon. | Must | ✅ |
 | FR-INFO-2 | Privacy and Terms pages, linked from every page and from sign-up. | Must | ✅ |
 | FR-INFO-4 | A Suggestions link in the footer: logged-in students send ideas or problems (optionally anonymous, max 5 an hour); only admins can read them. Suggestions are scanned for keywords, and admins are notified only when 3+ different people bring up the same topic within 30 days. | Should | ✅ |
+| FR-INFO-5 | Suggestions: only real people count toward a trending topic (not deleted accounts), admins can page through all of them, a trend's link shows every matching suggestion from its 30 days, and invisible characters alone aren't a suggestion. | Should | ✅ |
 
 ---
 

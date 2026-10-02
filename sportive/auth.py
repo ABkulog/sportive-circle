@@ -62,7 +62,9 @@ def csrf_field():
 @bp.before_app_request
 def check_csrf():
     # The scheduler's reminder call proves itself with its own secret token instead (reminders.py).
-    if request.method == "POST" and current_app.config["CSRF_ENABLED"] and request.endpoint != "tasks.send_reminders_task":
+    # So does an unsubscribe link (the signed link is the proof; mail apps' one-click button sends no form token).
+    if (request.method == "POST" and current_app.config["CSRF_ENABLED"]
+            and request.endpoint not in ("tasks.send_reminders_task", "unsubscribe.one_click")):
         sent = request.form.get("csrf_token", "")
         expected = session.get("csrf_token", "")
         if not sent or not expected or not same_secret(sent, expected):

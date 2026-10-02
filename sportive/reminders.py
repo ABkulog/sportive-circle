@@ -23,6 +23,7 @@ from .digest import weekly_round
 from .mail import compose, send_email
 from .sms import text_user
 from .textutil import same_secret
+from .unsubscribe import unsubscribe_url
 from .timeutil import fmt_clock, from_db, now_local, real_gap, to_db
 from .uwrec import sync_round as uw_rec_round
 
@@ -57,7 +58,8 @@ def reminder_email(row, minutes):
         button=("See the game", link),
         reason="You're getting this because you joined this game. Pick 30 min or no reminder on the game page, "
                "or turn these off in Settings → Email.",
-        preheader=f"{fmt_clock(row['starts_at'])} at {row['location']}")
+        preheader=f"{fmt_clock(row['starts_at'])} at {row['location']}",
+        unsubscribe=unsubscribe_url(row["email"], "reminders"))
     return subject, body, html
 
 
@@ -97,7 +99,7 @@ def send_due_reminders():
             if row["email_reminders"]:
                 subject, body, html = reminder_email(row, minutes=minutes)
                 try:
-                    send_email(row["email"], subject, body, html=html)
+                    send_email(row["email"], subject, body, html=html, unsubscribe=unsubscribe_url(row["email"], "reminders"))
                     sent += 1
                 except Exception:  # one bad address or email hiccup must not stop everyone else's reminders
                     log.exception("Couldn't send a reminder to %s", row["email"])

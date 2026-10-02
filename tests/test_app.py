@@ -3083,6 +3083,29 @@ def test_suggestion_text_is_escaped_and_length_checked(accounts, client, app):
     assert "Something&#39;s broken" in client.get("/admin/suggestions?kind=bug").data.decode()
 
 
+def test_suggestions_trends_paging_and_blank_text(accounts, client, app):
+    """Bot round 10: suggestions from deleted accounts made fake trends, admins couldn't page back, a trend's
+    link could come up empty, and zero-width spaces passed as text."""
+    from sportive.feedback import trending
+    accounts.signup()
+    zero_width = client.post("/suggestions", data={"kind": "idea", "body": "\u200b" * 6}, follow_redirects=True)
+    assert b"5 to 2000 characters" in zero_width.data
+    with app.app_context():
+        db = get_db()
+        for _ in range(3):                                               # one person, then their account was deleted
+            db.execute("INSERT INTO suggestions (user_id, anonymous, kind, body, created_at) VALUES "
+                       "(NULL, 0, 'idea', 'pickleball courts please', ?)", (to_db(now_local()),))
+        db.executemany("INSERT INTO suggestions (user_id, anonymous, kind, body, created_at) VALUES (NULL, 0, 'idea', ?, ?)",
+                       [(f"idea number {n}", to_db(now_local())) for n in range(700)])
+        db.commit()
+        assert "pickleball" not in [word for word, *_ in trending()]
+    app.config["ADMIN_EMAILS"] = "dubs@uw.edu"
+    first = client.get("/admin/suggestions").data.decode()
+    assert "Older →" in first and "pickleball courts please" not in first
+    assert "pickleball courts please" in client.get("/admin/suggestions?page=3").data.decode()
+    assert client.get("/admin/suggestions?topic=pickleball").data.decode().count("pickleball courts please") == 3
+
+
 def test_admins_are_only_notified_about_topics_3_people_mention(accounts, client, app):
     app.config["ADMIN_EMAILS"] = "boss@uw.edu"
     accounts.signup(email="boss@uw.edu")
@@ -3457,6 +3480,78 @@ def test_16_bit_and_see_through_pngs_come_out_right():
     data = BytesIO()
     black_is_clear.save(data, "PNG", transparency=(0, 0, 0))
     assert Image.open(BytesIO(_clean_photo(data.getvalue(), 64, False, 85))).getpixel((5, 5))[0] > 240
+
+
+def test_club_event_changes_by_another_officer_and_members_only_switch(accounts, client, app):
+    """Bot round 10: switching a game to members-only kept outsiders in it; notices named the host even when
+    another officer made the change (and the host wasn't told)."""
+    ids = _people(accounts, app, "Maya", "Sam", "Out")
+    club = _club_with_officer(accounts, client, app)                         # Maya owns it
+    _as(accounts, "Maya")
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Sam"], "action": "add"})
+    form = dict(title="Practice", sport="spikeball", location="The Quad", club=str(club))
+    game = event_id_from(client.post(f"/events/new?club={club}", data=event_form(**form)))
+    _as(accounts, "Out")
+    client.post(f"/events/{game}/join")
+    _as(accounts, "Sam")
+    saved = client.post(f"/events/{game}/edit", data=event_form(**form, is_private="members"), follow_redirects=True)
+    assert "1 who aren&#39;t members are off the game" in saved.data.decode()
+    with app.app_context():
+        assert not get_db().execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (game, ids["Out"])).fetchone()
+    _as(accounts, "Out")
+    assert "members only, so you&#39;re off it" in client.get("/notifications").data.decode()
+    _as(accounts, "Sam")
+    client.post(f"/events/{game}/cancel")
+    _as(accounts, "Maya")                                                     # the host hears it, from Sam
+    assert "Sam canceled Practice" in client.get("/notifications").data.decode()
+
+
+def test_weekly_practices_one_on_hold_notice_and_within_a_year(accounts, client, app):
+    club = _club_with_member(accounts, client, app)                          # logged in as the captain
+    form = dict(title="Weekly", sport="spikeball", location="The Quad", club=str(club))
+    client.post(f"/events/new?club={club}", data=event_form(**form, repeat="4"))
+    far = client.post(f"/events/new?club={club}", data=event_form(
+        **form, starts_at=form_time(timedelta(days=360)), ends_at=form_time(timedelta(days=360, hours=1)), repeat="8"))
+    assert b"more than a year away" in far.data
+    with app.app_context():
+        db = get_db()
+        member = db.execute("SELECT id FROM users WHERE email = 'member@uw.edu'").fetchone()[0]
+        db.executemany("INSERT INTO rsvps (event_id, user_id, created_at) VALUES (?, ?, '2026-09-01 10:00')",
+                       [(row[0], member) for row in db.execute("SELECT id FROM events WHERE title = 'Weekly'")])
+        db.commit()
+    client.post(f"/clubs/{club}/edit", data={**CLUB, "name": "UW Spikeball Club Renamed"})   # back to review
+    with app.app_context():
+        notices = get_db().execute("SELECT text FROM notices WHERE user_id = ? AND kind = 'game_updates'",
+                                   (member,)).fetchall()
+    assert len(notices) == 1 and "Your 4 " in notices[0][0]
+
+
+def test_one_click_unsubscribe_without_logging_in(accounts, client, app, monkeypatch):
+    """Bot round 10: optional emails only linked to Settings (a login), with no List-Unsubscribe headers."""
+    from sportive import digest
+    from sportive.unsubscribe import unsubscribe_url
+    accounts.signup(email="hoop@uw.edu", name="Hoop Husky")
+    game = client.post("/events/new", data=event_form(title="Tuesday hoops"))
+    assert game.status_code == 302
+    accounts.logout()
+    with app.test_request_context():
+        digest.send_weekly()
+        link = unsubscribe_url("hoop@uw.edu", "digest")
+    sent = [m for m in app.extensions["outbox"] if m["to"] == "hoop@uw.edu" and m["subject"].startswith("Games this week")]
+    assert sent and sent[-1]["unsubscribe"] == link and "Unsubscribe from these emails" in sent[-1]["body"]
+    path = link.split("localhost:5050")[-1] if "localhost" in link else "/" + link.split("/", 3)[3]
+    assert b"Unsubscribe?" in client.get(path).data                           # opening it changes nothing
+    with app.app_context():
+        assert get_db().execute("SELECT weekly_digest FROM users WHERE email = 'hoop@uw.edu'").fetchone()[0] == 1
+    app.config["CSRF_ENABLED"] = True                                          # mail apps send no form token
+    try:
+        done = client.post(path, data={"List-Unsubscribe": "One-Click"})
+    finally:
+        app.config["CSRF_ENABLED"] = False
+    assert done.status_code == 200 and b"You're unsubscribed" in done.data
+    with app.app_context():
+        assert get_db().execute("SELECT weekly_digest FROM users WHERE email = 'hoop@uw.edu'").fetchone()[0] == 0
+    assert client.get("/unsubscribe/forged-token").status_code == 404
 
 
 def test_party_up_holds_spots_for_friends(accounts, client, app):
@@ -5981,7 +6076,7 @@ def test_monday_email_games_this_week(accounts, client, app, monkeypatch):
     from datetime import datetime
     from sportive import digest
     sent = []
-    monkeypatch.setattr(digest, "send_email", lambda to, subject, body, html=None: sent.append((to, body)))
+    monkeypatch.setattr(digest, "send_email", lambda to, subject, body, html=None, **kw: sent.append((to, body)))
     ids = _people(accounts, app, "Host", "Hooper", "Runner", "Quiet")
     with app.app_context():
         db = get_db()

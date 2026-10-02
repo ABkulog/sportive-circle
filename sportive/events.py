@@ -561,6 +561,8 @@ def create():
                         members_only=1 if form.get("is_private") == "members" else 0)
             if not 1 <= repeat <= MAX_REPEAT_WEEKS:
                 error = f"A club event can repeat for up to {MAX_REPEAT_WEEKS} weeks."
+            elif from_db(data["starts_at"]) + timedelta(weeks=repeat - 1) > now_local() + timedelta(days=MAX_DAYS_AHEAD):
+                error = "The last week would be more than a year away. Repeat for fewer weeks."
         elif error is None:
             repeat = 1
         if error is None:
@@ -677,9 +679,15 @@ def edit(event_id):
                 return render_template("events/form.html", form=form, event=get_event(event_id), min_start="")
             if data["starts_at"] != event["starts_at"]:  # a reminder for the old time doesn't cover the new one
                 db.execute("UPDATE rsvps SET reminder_sent = 0 WHERE event_id = ?", (event_id,))
-            told = tell_players_it_changed(event, data)
+            if data["members_only"] and not event["members_only"]:  # now members-only: outsiders are out
+                left_out = drop_non_members(event)
+            else:
+                left_out = 0
+            told = tell_players_it_changed(event, data, by=g.user)
             db.commit()
-            flash("Saved. Everyone going got a heads-up." if told else "Saved.", "success")
+            flash(("Saved. Everyone going got a heads-up." if told else "Saved.")
+                  + (f" {left_out} who aren't members are off the game now and were told." if left_out else ""),
+                  "success")
             return redirect(url_for("events.detail", event_id=event_id))
         form_error(error)
     else:
@@ -704,15 +712,36 @@ def cancel(event_id):
     db = get_db()
     db.execute("UPDATE events SET cancelled = 1, revision = revision + 1 WHERE id = ?", (event_id,))
     db.commit()
-    tell_players_it_was_cancelled(event)
+    tell_players_it_was_cancelled(event, by=g.user)
     flash("Canceled. Everyone who joined was told.", "info")
     return redirect(url_for("events.my_events"))
 
 
-def players_except_host(event):
+def players_except_host(event, by=None):
+    """Everyone going, except whoever made the change (`by`; the host when not given). When another officer
+    changes a club event, the host is told like everyone else."""
     return get_db().execute(
         """SELECT u.id, u.email, u.full_name FROM rsvps r JOIN users u ON u.id = r.user_id
-           WHERE r.event_id = ? AND r.user_id != ? AND u.suspended = 0""", (event["id"], event["host_id"])).fetchall()
+           WHERE r.event_id = ? AND r.user_id != ? AND u.suspended = 0""",
+        (event["id"], by["id"] if by is not None else event["host_id"])).fetchall()
+
+
+def drop_non_members(event):
+    """A club event just became members-only: people going who aren't members (and invites to them) are off it,
+    with a notice. Returns how many. The caller commits."""
+    db = get_db()
+    outsiders = db.execute(
+        """SELECT r.user_id FROM rsvps r WHERE r.event_id = ? AND r.user_id != ? AND r.user_id NOT IN
+           (SELECT user_id FROM club_members WHERE club_id = ? AND role IN ('member', 'officer'))""",
+        (event["id"], event["host_id"], event["club_id"])).fetchall()
+    for row in outsiders:
+        db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event["id"], row["user_id"]))
+        notify(row["user_id"], "game_updates", f"{event_title(event)} is now for {event['club_name']} members only, "
+               "so you're off it.", url_for("clubs.view", club_id=event["club_id"]), key=f"change:{event['id']}")
+    db.execute("""UPDATE invites SET status = 'canceled' WHERE event_id = ? AND status IN ('pending', 'requested')
+                  AND guest_id NOT IN (SELECT user_id FROM club_members WHERE club_id = ? AND role IN ('member', 'officer'))""",
+               (event["id"], event["club_id"]))
+    return len(outsiders)
 
 
 def what_changed(event, data):
@@ -731,15 +760,16 @@ def what_changed(event, data):
     return changes
 
 
-def tell_players_it_changed(event, data):
-    """The host changed something important: a notice in everyone's bell, plus an email when the time or
-    place changed (so nobody shows up at the old one). Returns True if anyone was told. Caller commits."""
+def tell_players_it_changed(event, data, by=None):
+    """The host (or, for a club event, `by`, the officer who did it) changed something important: a notice in
+    everyone's bell, plus an email when the time or place changed (so nobody shows up at the old one).
+    Returns True if anyone was told. Caller commits."""
     changes = what_changed(event, data)
-    players = players_except_host(event)
+    players = players_except_host(event, by)
     if not changes or not players:
         return False
     title = data["title"] if not event["is_quick"] else event_title({**dict(event), **data})
-    host = event["host_name"].split()[0]
+    host = (by["full_name"] if by is not None else event["host_name"]).split()[0]
     link = url_for("events.detail", event_id=event["id"])
     for player in players:
         notify(player["id"], "game_updates", f"{host} changed {title}: {', '.join(changes)}", link,
@@ -765,14 +795,15 @@ def tell_players_it_changed(event, data):
     return True
 
 
-def tell_players_it_was_cancelled(event, page_stays=True, by_host=True):
+def tell_players_it_was_cancelled(event, page_stays=True, by_host=True, by=None):
     """Tell everyone who joined (except the host), so nobody shows up to an empty field.
     page_stays=False when the game is about to be deleted (the host's account is going), so links go to the feed.
     by_host=False when Sportive Circle canceled it (a suspended host, a denied club): it doesn't name the host."""
-    players = players_except_host(event)
+    players = players_except_host(event, by)
     title, when = event_title(event), fmt_when(event["starts_at"])
-    who = event["host_name"].split()[0] if by_host else "Sportive Circle"
-    who_full = event["host_name"] if by_host else "Sportive Circle"
+    name = by["full_name"] if by is not None else event["host_name"]  # the officer who canceled a club event
+    who = name.split()[0] if by_host else "Sportive Circle"
+    who_full = name if by_host else "Sportive Circle"
     link = url_for("events.detail", event_id=event["id"]) if page_stays else url_for("events.feed")
     for player in players:
         notify(player["id"], "game_updates", f"{who} canceled {title} ({when})",

@@ -13,14 +13,15 @@ log = logging.getLogger(__name__)
 SMTP_TIMEOUT_SECONDS = 15
 
 
-def send_email(to, subject, body, html=None):
-    """Send an email (plain text, plus the designed HTML version when given).
+def send_email(to, subject, body, html=None, unsubscribe=None):
+    """Send an email (plain text, plus the designed HTML version when given). `unsubscribe`: the one-click link
+    for an optional email (unsubscribe.py), also sent as the List-Unsubscribe headers mail apps show a button for.
     Returns False in local development, where nothing is actually sent."""
     cfg = current_app.config
     if current_app.testing:
         # Tests read what would have been sent from app.extensions["outbox"].
         current_app.extensions.setdefault("outbox", []).append({"to": to, "subject": subject, "body": body,
-                                                                "html": html})
+                                                                "html": html, "unsubscribe": unsubscribe})
     if not cfg.get("MAIL_SERVER"):
         if current_app.debug or current_app.testing:
             log.warning("DEV email (not sent) to %s: %s\n%s", to, subject, body)
@@ -30,6 +31,9 @@ def send_email(to, subject, body, html=None):
     msg["Subject"] = subject
     msg["From"] = cfg.get("MAIL_FROM") or f"Sportive Circle <{cfg['MAIL_USERNAME']}>"
     msg["To"] = to
+    if unsubscribe:
+        msg["List-Unsubscribe"] = f"<{unsubscribe}>"
+        msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
     msg.set_content(body)
     if html:
         msg.add_alternative(html, subtype="html")
@@ -40,10 +44,11 @@ def send_email(to, subject, body, html=None):
     return True
 
 
-def compose(subject, heading, lines, code=None, after=(), button=None, reason=None, preheader=None):
+def compose(subject, heading, lines, code=None, after=(), button=None, reason=None, preheader=None, unsubscribe=None):
     """A friendly email in the app's design: (plain text, HTML), with the same words in both.
 
     lines/after: short paragraphs before/after the code. button: (label, url). reason: why they got it.
+    unsubscribe: the one-click link for an optional email (shown in the footer).
     """
     site = current_app.config["PUBLIC_URL"].rstrip("/")
     text = [heading, ""]
@@ -56,11 +61,14 @@ def compose(subject, heading, lines, code=None, after=(), button=None, reason=No
     text += ["Go Dawgs! 💜💛", "The Sportive Circle team", "", "--"]
     if reason:
         text.append(reason)
+    if unsubscribe:
+        text.append(f"Unsubscribe from these emails: {unsubscribe}")
     text.append(f"Change what we email you: {site}/settings")
     text.append("Sportive Circle is a student project for UW Huskies, not an official University of Washington service.")
     text.append(site)
     html = render_template("emails/message.html", subject=subject, heading=heading, lines=lines, code=code,
                            after=after, button=button, reason=reason, preheader=preheader, site=site,
+                           unsubscribe=unsubscribe,
                            site_name=site.replace("https://", "").replace("http://", ""))
     return "\n".join(text), html
 
@@ -68,7 +76,7 @@ def compose(subject, heading, lines, code=None, after=(), button=None, reason=No
 def send_designed(to, subject, heading, lines, **options):
     """compose() + send_email(): the way every email in the app is sent."""
     text, html = compose(subject, heading, lines, **options)
-    return send_email(to, subject, text, html=html)
+    return send_email(to, subject, text, html=html, unsubscribe=options.get("unsubscribe"))
 
 
 def failure_reason(error):
