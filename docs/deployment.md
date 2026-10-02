@@ -117,7 +117,8 @@ until a texting service is set up:
 Render → sportive-circle → **Environment** → **Edit** → give `SECRET_KEY` and `TASK_TOKEN` new random values
 → **Save, rebuild and deploy**. To make a value on a Mac:
 `python3 -c "import secrets; print(secrets.token_hex(32))" | pbcopy` (copies it; paste it into Render).
-A new `SECRET_KEY` logs everyone out once and turns off invite links that were already shared.
+A new `SECRET_KEY` logs everyone out once and turns off invite links that were already shared, and the
+Unsubscribe links in emails already sent (people can still turn emails off in Settings).
 
 ## 5. Backups
 
@@ -130,7 +131,9 @@ The whole app is one file: `sportive_circle.db` on the disk.
   which the daily copies (on the same disk) can't. Keep them on.
 - Now and then, download a copy somewhere off the server.
 
-To restore: stop the service, copy a backup over `/data/sportive_circle.db`, start it again.
+To restore: stop the service, copy a backup over `/data/sportive_circle.db`, delete
+`/data/sportive_circle.db-wal` and `/data/sportive_circle.db-shm` if they're there (left over, they would be
+applied on top of the backup), and start it again.
 
 ## 6. After launch
 

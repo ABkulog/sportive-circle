@@ -2168,11 +2168,15 @@ def test_pending_club_doesnt_block_deleting_the_account(accounts, client, app):
         assert db.execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == 0
 
 
-def test_signup_cant_flood_an_inbox(accounts, client):
+def test_signup_cant_flood_an_inbox(accounts, client, app):
     accounts.signup(email="target@uw.edu", verify=False)
     client.post("/logout")
-    again = accounts.signup(email="target@uw.edu", verify=False).data
-    assert b"We just sent a code to that email" in again
+    again = accounts.signup(email="target@uw.edu", password="someone-else-1", verify=False).data
+    assert b"We just sent a code to that email" in again                       # someone else: wait a minute
+    client.post("/logout")
+    accounts.signup(email="target@uw.edu", verify=False)                       # the same person again (double tap):
+    codes = [m for m in app.extensions["outbox"] if m["to"] == "target@uw.edu"]
+    assert len(codes) == 1                                                     # no second code to confuse them
 
 
 # ------------------------------------------------------------ launch-readiness checks
@@ -3619,6 +3623,100 @@ def test_invite_link_on_login_asks_and_admins_can_let_members_in(accounts, clien
     client.post("/signup", data={**data, "email": "typo@uw.edu"})
     with app.app_context():
         assert not get_db().execute("SELECT 1 FROM users WHERE email = 'tpyo@uw.edu'").fetchone()
+
+
+def test_two_cancels_tell_players_once_and_a_canceled_game_cant_be_edited(accounts, client, app):
+    """Round 13: two officers canceling at once emailed everyone twice; an edit could land after the cancel."""
+    ids = _people(accounts, app, "Maya", "Sam", "Pat")
+    _friends(app, ids["Maya"], ids["Pat"])
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Maya")
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Sam"], "action": "add"})
+    form = dict(title="Club night", sport="spikeball", location="The Quad", club=str(club))
+    game = event_id_from(client.post(f"/events/new?club={club}", data=event_form(**form)))
+    _as(accounts, "Pat")
+    client.post(f"/events/{game}/join")
+    _as(accounts, "Maya")
+    from sportive import events
+    client.post(f"/events/{game}/cancel")
+    with app.app_context():
+        get_db().execute("UPDATE events SET cancelled = 0 WHERE id = ?", (game,))  # (as the 2nd officer saw it)
+        get_db().commit()
+    import unittest.mock as mock
+    stale = None
+    with app.test_request_context():
+        from flask import g
+        g.user = {"id": ids["Sam"]}
+        stale = dict(events.query_events(["e.id = :id"], {"id": game}, limit=1, on_hold=True)[0])
+    with app.app_context():
+        get_db().execute("UPDATE events SET cancelled = 1 WHERE id = ?", (game,))
+        get_db().commit()
+    _as(accounts, "Sam")
+    with mock.patch.object(events, "get_event", lambda event_id, host_only=False: stale):
+        client.post(f"/events/{game}/cancel")                                 # lands second: nobody told again
+        edited = client.post(f"/events/{game}/edit", data=event_form(**{**form, "location": "Denny Field"}),
+                             follow_redirects=True).data.decode()
+    canceled = [m for m in app.extensions["outbox"] if m["to"] == "pat@uw.edu" and m["subject"].startswith("Canceled")]
+    assert len(canceled) == 1
+    assert "This game was canceled, so it can&#39;t be edited" in edited
+    with app.app_context():
+        assert get_db().execute("SELECT location FROM events WHERE id = ?", (game,)).fetchone()[0] == "The Quad"
+
+
+def test_stale_posted_a_game_and_invite_notices_go_away(accounts, client, app):
+    """Round 13: "Maya posted a game" stayed after a cancel or a block; suspending a host left friends' "You down?"
+    notices up with no "that invite is off"."""
+    ids = _people(accounts, app, "Maya", "Ben", "Cara")
+    _friends(app, ids["Maya"], ids["Ben"], ids["Cara"])
+    _as(accounts, "Maya")
+    g1 = event_id_from(client.post("/events/new", data=event_form(title="Game one")))
+    g2 = event_id_from(client.post("/events/new", data=event_form(title="Game two", reserve=[str(ids["Ben"])])))
+    posted = "SELECT COUNT(*) FROM notices WHERE user_id = ? AND key = ?"
+    with app.app_context():
+        assert get_db().execute(posted, (ids["Cara"], f"friend_game:{g1}")).fetchone()[0] == 1
+    client.post(f"/events/{g1}/cancel")
+    with app.app_context():
+        assert get_db().execute(posted, (ids["Cara"], f"friend_game:{g1}")).fetchone()[0] == 0
+    _as(accounts, "Cara")
+    client.post(f"/block/{ids['Maya']}")
+    with app.app_context():
+        assert get_db().execute(posted, (ids["Cara"], f"friend_game:{g2}")).fetchone()[0] == 0
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    client.post(f"/admin/users/{ids['Maya']}/suspend")
+    _as(accounts, "Ben")
+    bell = client.get("/notifications").data.decode()
+    assert "You down?" not in bell and "so that invite is off" in bell
+
+
+def test_two_workers_starting_at_once_dont_crash_adding_columns(tmp_path):
+    """Round 13: the 2 workers both added the same new column at startup; one crashed ("duplicate column name")."""
+    import sqlite3
+    import threading
+    from sportive.db import ADDED_COLUMNS
+    if sqlite3.sqlite_version_info < (3, 35):                                   # DROP COLUMN (to fake an old DB)
+        return
+    for attempt in range(8):
+        path = str(tmp_path / f"t{attempt}.db")
+        create_app({"TESTING": True, "DATABASE": path, "SECRET_KEY": "x" * 40})
+        db = sqlite3.connect(path)
+        for table, column, _ in ADDED_COLUMNS[-4:]:                              # an older database
+            db.execute(f"ALTER TABLE {table} DROP COLUMN {column}")
+        db.commit()
+        db.close()
+        errors, start = [], threading.Barrier(2)
+
+        def boot():
+            try:
+                start.wait()
+                create_app({"TESTING": True, "DATABASE": path, "SECRET_KEY": "x" * 40})
+            except Exception as error:  # noqa: BLE001 - the test reports any crash
+                errors.append(error)
+        workers = [threading.Thread(target=boot) for _ in range(2)]
+        [worker.start() for worker in workers]
+        [worker.join() for worker in workers]
+        assert errors == []
 
 
 def test_party_up_holds_spots_for_friends(accounts, client, app):

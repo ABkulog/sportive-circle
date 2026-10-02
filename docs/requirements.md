@@ -145,6 +145,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-NOTIF-2 | Settings → Notifications: one on/off switch per kind, saying where it shows up. No pop-ups. | Must | ✅ |
 | FR-NOTIF-3 | No repeats: a newer notice about the same thing replaces the older one (a host editing a game three times = one notice). New accounts start with nothing to catch up on. | Should | ✅ |
 | FR-NOTIF-4 | Optional emails (Monday email, friends' and clubs' new games, reminders, announcements) have an Unsubscribe link that works without logging in, plus the List-Unsubscribe headers mail apps show a button for. The texts announcement skips people who turned off the Monday email. | Must | ✅ |
+| FR-NOTIF-5 | Notices don't outlive what they're about: "Maya posted a game" goes when the game is canceled or either person blocks the other; "You down?" goes when the invite ends (unfriend, block, members-only switch, a suspended host, whose invited friends hear the invite is off). Two officers canceling at once tell players once, and a canceled game can't be edited. | Must | ✅ |
 | FR-SMS-1 | Texts are optional: people can add a phone number (at sign-up step 3 or in Settings → Texts), must tick a permission box, and confirm it with a texted code. Email stays required (the UW email is the proof of being a UW student). | Should | ✅ |
 | FR-SMS-2 | Confirmed, opted-in numbers get texts for game reminders (at the time each player picked), changed times/places, cancellations, invites and password-reset codes. Texts can be turned off or the number removed anytime; replying STOP is respected; texts are limited per day. | Should | ✅ |
 | FR-SMS-3 | People who joined before texts (or skipped them) see a "New: game updates by text" card on Home after logging in: add a number right there, or "Not now" hides it for good. `tools/announce_texts.py` emails everyone without a number once (dry run by default). Club officers also get their club alerts by text. | Should | ✅ |
@@ -232,6 +233,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | NFR-MAINT-2 | Sports, places and caps live in one file (`constants.py`). | ✅ |
 | NFR-MAINT-3 | Database upgrades happen automatically (`ADDED_COLUMNS` in `db.py`). | ✅ |
 | NFR-MAINT-4 | Small modules, one per area (auth, events, clubs, social...), with docstrings that explain *why*. | ✅ |
+| NFR-MAINT-5 | Safe deploys: the two workers starting together upgrade the database one at a time (no "duplicate column" crash); the deployment guide says a new SECRET_KEY also turns off emailed Unsubscribe links, and how to restore a backup cleanly. | ✅ |
 
 ### Compatibility (NFR-COMP)
 

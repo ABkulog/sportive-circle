@@ -272,6 +272,15 @@ def validate_signup(full_name, email, password, password2, grad_year, birth_date
     return None
 
 
+def _same_person_signing_up(email, password):
+    """The unverified account for this email is this browser's (it's the one waiting for a code here) or was
+    started with this same password (a double tap, or Back from another tab)."""
+    if session.get("pending_email") == email:
+        return True
+    row = get_db().execute("SELECT password_hash FROM users WHERE email = ? AND verified = 0", (email,)).fetchone()
+    return row is not None and check_password_hash(row["password_hash"], password)
+
+
 def claim_code_try(user_id):
     """Use up one of the 5 tries on an email code, in a single statement: guesses sent at the same moment from
     many tabs can't all slip past the limit. True if there was a try left. (A right code resets the count.)"""
@@ -298,12 +307,18 @@ def signup():
         birth_date = form.get("birth_date", "").strip()
         error = validate_signup(full_name, email, password, password2, grad_year, birth_date)
         db = get_db()
-        if error is None and code_recently_sent(email) and session.get("pending_email") == email:
-            # Came back to fix something (Back, or "Wrong email?"): same email, so keep the code already sent.
+        if error is None:
+            # One sign-up for this email at a time, until its code is saved: a double tap waits here, then finds
+            # the code just sent (below) instead of sending a second one that makes the first one wrong.
+            db.commit()
+            db.execute("BEGIN IMMEDIATE")
+        if error is None and code_recently_sent(email) and _same_person_signing_up(email, password):
+            # Came back to fix something (Back, "Wrong email?", or a double tap): keep the code already sent.
             db.execute("UPDATE users SET password_hash = ?, full_name = ?, grad_year = ?, birth_date = ?"
                        " WHERE email = ? AND verified = 0",
                        (hash_password(password), full_name, int(grad_year) if grad_year else None, birth_date, email))
             db.commit()
+            session["pending_email"] = email
             session.pop("signup_form", None)
             return redirect(url_for("auth.signup_sports"))
         if error is None and code_recently_sent(email):
@@ -326,14 +341,15 @@ def signup():
                     (email, hash_password(password), full_name, int(grad_year) if grad_year else None, birth_date),
                 )
                 set_user_sports(cur.lastrowid, [s for s in form.getlist("sports") if s in SPORTS])
-                db.commit()
             except sqlite3.IntegrityError:
                 db.rollback()
                 error = "This email is already in use."
             else:
                 session.pop("signup_form", None)
-                start_verification(email)  # the code arrives while they pick their sports
+                start_verification(email)  # saves the code (ending the one-at-a-time hold), then emails it
+                db.commit()  # (and the account, even if no code could be sent today)
                 return redirect(url_for("auth.signup_sports"))
+        db.rollback()  # let go of the hold, if taken
         flash(error, "error")
         # Back to a normal page (not the answer to a form post), so the phone's Back button works on the next
         # step. What they typed comes back, except the passwords.

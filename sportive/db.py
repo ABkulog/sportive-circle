@@ -111,6 +111,10 @@ def init_db():
     db = get_db()
     with current_app.open_resource("schema.sql") as f:
         db.executescript(f.read().decode("utf-8"))
+    # The site runs 2 workers that start at the same moment: one at a time from here, so they can't both add the
+    # same column (the second one would crash with "duplicate column name" and take the deploy down).
+    db.commit()
+    db.execute("BEGIN IMMEDIATE")
     for table, column, definition in ADDED_COLUMNS:
         existing = {row["name"] for row in db.execute(f"PRAGMA table_info({table})")}
         if column not in existing:

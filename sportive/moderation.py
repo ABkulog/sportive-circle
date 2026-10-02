@@ -233,9 +233,16 @@ def suspend(user_id, action):
         # Free the spots they held in other people's upcoming games.
         db.execute("""DELETE FROM rsvps WHERE user_id = ? AND event_id IN
                       (SELECT id FROM events WHERE host_id != ? AND ends_at >= ?)""", (user_id, user_id, now))
-        db.execute("""UPDATE invites SET status = 'canceled' WHERE (guest_id = ? OR inviter_id = ?)
-                      AND status IN ('pending', 'requested')
-                      AND event_id IN (SELECT id FROM events WHERE ends_at >= ?)""", (user_id, user_id, now))
+        # Their invites in other people's games end, with the "You down?" notices they caused. (Invites to their
+        # own games are closed, with an "invite is off" notice, by tell_players_it_was_cancelled below.)
+        others = """(guest_id = :u OR inviter_id = :u) AND status IN ('pending', 'requested')
+                    AND event_id IN (SELECT id FROM events WHERE ends_at >= :now AND host_id != :u)"""
+        db.execute("""DELETE FROM notices WHERE EXISTS (
+                        SELECT 1 FROM invites i JOIN events e ON e.id = i.event_id
+                        WHERE i.inviter_id = :u AND i.status IN ('pending', 'requested') AND e.ends_at >= :now
+                          AND e.host_id != :u AND i.guest_id = notices.user_id AND notices.key = 'invite:' || i.event_id)""",
+                   {"u": user_id, "now": now})
+        db.execute(f"UPDATE invites SET status = 'canceled' WHERE {others}", {"u": user_id, "now": now})
         db.commit()
         for event in hosted:
             tell_players_it_was_cancelled(event, by_host=False)
