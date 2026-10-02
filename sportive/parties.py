@@ -143,7 +143,7 @@ def party_up(event_id):
     friends = invitable_friends(event_id, me)
     if request.method == "POST":
         allowed = {friend["id"] for friend in friends if friend["why_not"] is None}
-        chosen = list(dict.fromkeys(int(value) for value in request.form.getlist("friend") if value.isdigit()))
+        chosen = list(dict.fromkeys(int(value) for value in request.form.getlist("friend") if value.isascii() and value.isdigit()))
         if not chosen:
             flash("Pick at least one friend.", "error")
         elif any(friend_id not in allowed for friend_id in chosen):
@@ -455,7 +455,7 @@ def send_to_friends(event_id):
     friends = sharable_friends(event_id, me)
     if request.method == "POST":
         allowed = {friend["id"] for friend in friends if friend["why_not"] is None}
-        chosen = list(dict.fromkeys(int(value) for value in request.form.getlist("friend") if value.isdigit()))
+        chosen = list(dict.fromkeys(int(value) for value in request.form.getlist("friend") if value.isascii() and value.isdigit()))
         note = one_line(request.form.get("note"))[:MAX_SHARE_NOTE]
         if not chosen:
             flash("Pick at least one friend.", "error")
