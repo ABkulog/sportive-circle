@@ -50,10 +50,13 @@ def announce_new_game(event):
     """Call right after a game is posted (and committed). Bell notices now; emails just after the page answers."""
     from .events import event_title  # events.py imports this module
     from .notifications import notify
+    db = get_db()
+    db.commit()
+    db.execute("BEGIN IMMEDIATE")  # who to tell and the notices in one go: a block at the same moment is seen
     people = audience(event)
     if not people:
+        db.commit()
         return 0
-    db = get_db()
     host = event["host_name"].split()[0]
     title, when = event_title(event), fmt_when(event["starts_at"])
     via = f" for {event['club_name']}" if event["club_id"] else ""

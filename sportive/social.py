@@ -120,9 +120,15 @@ def block_user(me, other):
     now = to_db(now_local())
     db.execute("""DELETE FROM rsvps WHERE user_id = ? AND event_id IN
                   (SELECT id FROM events WHERE host_id = ? AND cancelled = 0 AND ends_at >= ?)""", (other, me, now))
-    db.execute("""UPDATE invites SET status = 'canceled' WHERE guest_id = ? AND status IN ('pending', 'requested')
-                  AND event_id IN (SELECT id FROM events WHERE host_id = ?)""", (other, me))
+    mine = "guest_id = ? AND status IN ('pending', 'requested') AND event_id IN (SELECT id FROM events WHERE host_id = ?)"
+    db.execute(f"DELETE FROM notices WHERE user_id = ? AND key IN (SELECT 'invite:' || event_id FROM invites WHERE {mine})",
+               (other, other, me))
+    db.execute(f"UPDATE invites SET status = 'canceled' WHERE {mine}", (other, me))
     cancel_invites_between(me, other)
+    # "Maya posted a game. Want in?" from either of them, to the other, goes too.
+    for a, b in ((me, other), (other, me)):
+        db.execute("""DELETE FROM notices WHERE user_id = ? AND key IN
+                      (SELECT 'friend_game:' || id FROM events WHERE host_id = ?)""", (a, b))
 
 
 def cancel_invites_between(a, b):

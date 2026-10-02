@@ -668,11 +668,15 @@ def edit(event_id):
                        starts_at = :starts_at, ends_at = :ends_at, skill_level = :skill_level,
                        max_players = :max_players, note = :note, is_private = :is_private, password = :password,
                        open_to = :open_to, members_only = :members_only
-                   WHERE id = :id AND (:max_players IS NULL OR :max_players >= (
+                   WHERE id = :id AND cancelled = 0 AND (:max_players IS NULL OR :max_players >= (
                        SELECT e.extra_players + {HELD} + (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id)
                        FROM events e WHERE e.id = :id))""",
                 {**data, "id": event_id, "hold_now": now_param()},
             ).rowcount
+            if not saved and db.execute("SELECT cancelled FROM events WHERE id = ?", (event_id,)).fetchone()[0]:
+                db.rollback()  # canceled while this was being edited: nothing to change, nobody to tell
+                flash("This game was canceled, so it can't be edited.", "error")
+                return redirect(url_for("events.detail", event_id=event_id))
             if not saved:
                 db.rollback()
                 form_error("Someone just joined, so there are more people in than that. Pick more players.")
@@ -710,7 +714,11 @@ def cancel(event_id):
     if event["cancelled"] or from_db(event["ends_at"]) < now_local():
         return redirect(url_for("events.detail", event_id=event_id))
     db = get_db()
-    db.execute("UPDATE events SET cancelled = 1, revision = revision + 1 WHERE id = ?", (event_id,))
+    # Only if nobody canceled it in the meantime (two officers at once): players are told once.
+    if not db.execute("UPDATE events SET cancelled = 1, revision = revision + 1 WHERE id = ? AND cancelled = 0",
+                      (event_id,)).rowcount:
+        db.commit()
+        return redirect(url_for("events.detail", event_id=event_id))
     db.commit()
     tell_players_it_was_cancelled(event, by=g.user)
     flash("Canceled. Everyone who joined was told.", "info")
@@ -738,9 +746,11 @@ def drop_non_members(event):
         db.execute("DELETE FROM rsvps WHERE event_id = ? AND user_id = ?", (event["id"], row["user_id"]))
         notify(row["user_id"], "game_updates", f"{event_title(event)} is now for {event['club_name']} members only, "
                "so you're off it.", url_for("clubs.view", club_id=event["club_id"]), key=f"change:{event['id']}")
-    db.execute("""UPDATE invites SET status = 'canceled' WHERE event_id = ? AND status IN ('pending', 'requested')
-                  AND guest_id NOT IN (SELECT user_id FROM club_members WHERE club_id = ? AND role IN ('member', 'officer'))""",
-               (event["id"], event["club_id"]))
+    outside = """event_id = ? AND status IN ('pending', 'requested') AND guest_id NOT IN
+                 (SELECT user_id FROM club_members WHERE club_id = ? AND role IN ('member', 'officer'))"""
+    db.execute(f"DELETE FROM notices WHERE key = ? AND user_id IN (SELECT guest_id FROM invites WHERE {outside})",
+               (f"invite:{event['id']}", event["id"], event["club_id"]))
+    db.execute(f"UPDATE invites SET status = 'canceled' WHERE {outside}", (event["id"], event["club_id"]))
     return len(outsiders)
 
 
@@ -805,6 +815,8 @@ def tell_players_it_was_cancelled(event, page_stays=True, by_host=True, by=None)
     who = name.split()[0] if by_host else "Sportive Circle"
     who_full = name if by_host else "Sportive Circle"
     link = url_for("events.detail", event_id=event["id"]) if page_stays else url_for("events.feed")
+    # "Maya posted a game. Want in?" is over too.
+    get_db().execute("DELETE FROM notices WHERE key = ?", (f"friend_game:{event['id']}",))
     for player in players:
         notify(player["id"], "game_updates", f"{who} canceled {title} ({when})",
                link, key=f"change:{event['id']}")
