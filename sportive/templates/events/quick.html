@@ -18,9 +18,10 @@
           <option value="">Choose a place</option>
           {% for loc in LOCATIONS %}<option {% if form.get('location') == loc %}selected{% endif %}>{{ loc }}</option>{% endfor %}
         </select>
-        <small class="muted place-tip" data-place-tip></small>
       </label>
     </div>
+    {# Under both boxes (not inside Where), so Sport and Where stay level when a tip shows up. #}
+    <small class="muted place-tip" data-place-tip></small>
     <div class="row row-pair">
       {{ select('starts_in', 'Starting', start_options, form.get('starts_in', '30')) }}
       {{ select('duration', 'For', durations, form.get('duration', '60')) }}

@@ -6282,3 +6282,25 @@ def test_joining_clears_the_posted_a_game_notice(accounts, client, app):
     _as(accounts, "Jordan")
     client.post(f"/events/{game}/join")
     assert "Maya posted Sunset hoops" not in client.get("/notifications").data.decode()
+
+
+# ---- Places for every sport; Need players boxes stay level ----
+
+def test_sports_offer_the_places_clubs_really_use():
+    from sportive.constants import LOCATIONS, SPORT_LOCATIONS
+    fencing = SPORT_LOCATIONS["fencing"]
+    assert "Red Square" in fencing and "IMA Mat Rooms (martial arts)" in fencing and "Recreation Field 1 (by the IMA)" in fencing
+    assert "Emerald City Boxing Gym (Roosevelt)" in SPORT_LOCATIONS["boxing"]
+    assert SPORT_LOCATIONS["archery"][0] == "IMA Archery Room" and "IMA Pool" in SPORT_LOCATIONS["water_polo"]
+    for sport in ("judo", "bjj", "karate", "taekwondo", "wrestling", "muay_thai", "kendo"):
+        assert "IMA Mat Rooms (martial arts)" in SPORT_LOCATIONS[sport], sport
+    for sport, places in SPORT_LOCATIONS.items():
+        assert places and all(p in LOCATIONS for p in places), sport
+
+
+def test_need_players_tip_sits_under_both_boxes(accounts, client):
+    accounts.signup()
+    page = client.get("/need-players").data.decode()
+    row = page[page.index('<div class="row">'):page.index("</div>", page.index('<div class="row">'))]
+    assert 'name="sport"' in row and 'name="location"' in row and "data-place-tip" not in row
+    assert "data-place-tip" in page
