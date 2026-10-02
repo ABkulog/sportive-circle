@@ -92,6 +92,12 @@
   show(Math.max(errorStep, 0));
   if (errorField) {
     errorField.setAttribute("aria-invalid", "true");
+    const problem = document.querySelector(".flash-error");  // read out with the field, not just once at the top
+    if (problem) {
+      problem.id = problem.id || "form-problem";
+      errorField.setAttribute("aria-describedby",
+                              [errorField.getAttribute("aria-describedby"), problem.id].filter(Boolean).join(" "));
+    }
     errorField.focus();
   }
 })();

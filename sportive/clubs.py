@@ -611,7 +611,8 @@ def join(club_id):
 def decide(club_id, user_id, decision):
     """Officers confirm or decline people waiting to join (and can remove members)."""
     club = get_club(club_id)
-    if my_role(club_id) != "officer" or decision not in ("approve", "decline", "remove"):
+    # Admins too: a club whose only officer was suspended still has people waiting to be let in.
+    if (my_role(club_id) != "officer" and not is_admin()) or decision not in ("approve", "decline", "remove"):
         abort(403)
     db = get_db()
     row = db.execute("SELECT role FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, user_id)).fetchone()

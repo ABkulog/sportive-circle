@@ -1,5 +1,6 @@
 import json
 import os
+import pathlib
 import re
 from datetime import timedelta
 from io import BytesIO
@@ -2335,6 +2336,60 @@ def test_suspending_cancels_their_upcoming_games(accounts, client, app):
         assert get_db().execute("SELECT suspended FROM users WHERE email = 'admin@uw.edu'").fetchone()[0] == 0
 
 
+def test_suspending_a_host_tells_players_even_when_their_club_is_in_review(accounts, client, app):
+    """Bot round 6: a club game on hold (club back in review) was canceled without telling its players."""
+    club = _club_with_member(accounts, client, app)                       # logged in as the captain
+    game = event_id_from(client.post(f"/events/new?club={club}", data=event_form(
+        title="Club night", sport="spikeball", location="The Quad", club=str(club))))
+    accounts.logout()
+    accounts.login(email="member@uw.edu")
+    client.post(f"/events/{game}/join")
+    accounts.logout()
+    accounts.signup(email="waiting@uw.edu", name="Wai Ting")
+    client.post(f"/clubs/{club}/join", data={"message": "Can I join?"})
+    accounts.logout()
+    with app.app_context():
+        get_db().execute("UPDATE clubs SET status = 'pending' WHERE id = ?", (club,))
+        get_db().commit()
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="admin@uw.edu")
+    page = client.post(f"/admin/users/{_user_id(app, 'captain@uw.edu')}/suspend", follow_redirects=True).data.decode()
+    outbox = app.extensions.get("outbox", [])
+    assert any(m["to"] == "member@uw.edu" and m["subject"].startswith("Canceled: Club night") for m in outbox)
+    assert "only officer of UW Spikeball Club" in page                    # someone has to take the club over
+    waiting = _user_id(app, "waiting@uw.edu")
+    assert client.post(f"/clubs/{club}/members/{waiting}/approve").status_code == 302   # an admin can let them in
+    with app.app_context():
+        assert get_db().execute("SELECT role FROM club_members WHERE club_id = ? AND user_id = ?",
+                                (club, waiting)).fetchone()[0] == "member"
+
+
+def test_report_queue_pages_and_two_admins_dont_overwrite_each_other(accounts, client, app):
+    accounts.signup(email="bad@uw.edu", name="Rowan Ruleb")
+    bad = _user_id(app, "bad@uw.edu")
+    accounts.logout()
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="admin@uw.edu")
+    admin = _user_id(app, "admin@uw.edu")
+    with app.app_context():
+        db = get_db()
+        for n in range(150):
+            db.execute("INSERT INTO reports (reporter_id, reported_user_id, target_type, target_id, reason, details,"
+                       " status, created_at) VALUES (?, ?, 'user', ?, 'spam', ?, 'open', '2026-10-01 12:00')",
+                       (admin, bad, bad, f"report number {n}"))
+        db.commit()
+        first, last = (db.execute(f"SELECT {f}(id) FROM reports").fetchone()[0] for f in ("MIN", "MAX"))
+    page = client.get("/admin/reports").data.decode()
+    assert "Showing 1–100 of 150" in page and "report number 149" not in page and "Next →" in page
+    assert "report number 149" in client.get("/admin/reports?page=2").data.decode()   # the newest can be reached
+    client.post(f"/admin/reports/{first}/dismissed?from=open")            # one admin dismisses it...
+    page = client.post(f"/admin/reports/{first}/reviewed?from=open", follow_redirects=True).data.decode()
+    assert "Another admin already handled that report" in page            # ...the other admin's click doesn't overwrite
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM reports WHERE id = ?", (first,)).fetchone()[0] == "dismissed"
+    assert last
+
+
 def test_admins_can_find_and_restore_suspended_accounts(accounts, client, app):
     accounts.signup(email="bad@uw.edu", name="Rowan Ruleb")
     bad = _user_id(app, "bad@uw.edu")
@@ -2788,6 +2843,20 @@ def test_form_fields_keep_a_focus_outline():
     css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
     assert "input:focus, select:focus, textarea:focus { outline: none" not in css
     assert "input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid" in css
+
+
+def test_big_phone_text_and_keyboard_users(accounts, client, app):
+    """Bot round 6: with bigger phone text the tab bar pushed pages sideways; keyboard users lost their place."""
+    root = pathlib.Path(app.root_path) / "static"
+    css, chat, app_js = ((root / f).read_text() for f in ("style.css", "chat.js", "app.js"))
+    assert "min-width: 0;  /* with bigger phone text the tabs shrink" in css
+    assert "body.has-app-nav .topbar .brand { flex: 0 1 auto; min-width: 0; }" in css
+    assert '"details.more-menu[open], details.chat-more[open]"' in app_js        # Esc closes a message's ⋯
+    assert 'menu.setAttribute("role", "dialog")' in chat and "closeMenu(true)" in chat
+    club = _approved_club(accounts, client, app)
+    accounts.login(email="captain@uw.edu")
+    page = client.get("/create").data.decode()
+    assert '<span class="person"><strong>' in page and f"/events/new?club={club}" in page   # long club names shrink
 
 
 def test_leap_day_birthdays():

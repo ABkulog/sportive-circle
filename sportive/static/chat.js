@@ -321,14 +321,29 @@
   // The menu that opens when you hold a message.
   const menu = el("div", "chat-menu");
   menu.hidden = true;
-  menu.setAttribute("role", "menu");
+  menu.setAttribute("role", "dialog");  // a small panel of buttons (not an arrow-key menu)
+  menu.setAttribute("aria-label", "Message options");
   document.body.appendChild(menu);
   let menuFor = null;
-  const closeMenu = () => {
+  // refocus: put the keyboard (or screen reader) back on the message, so nobody loses their place in the chat.
+  const closeMenu = (refocus) => {
+    const item = menuFor;
+    const wasInside = menu.contains(document.activeElement);
     menu.hidden = true;
-    if (menuFor) menuFor.classList.remove("is-held");
+    if (item) item.classList.remove("is-held");
     menuFor = null;
+    if (item && refocus === true && wasInside) item.querySelector(".chat-bubble").focus({ preventScroll: true });
   };
+  // Tab stays inside the open panel (it sits at the end of the page) until it's closed.
+  menu.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab") return;
+    const stops = [...menu.querySelectorAll("button, a[href]")];
+    if (!stops.length) return;
+    const at = stops.indexOf(document.activeElement);
+    const next = event.shiftKey ? (at <= 0 ? stops.length - 1 : at - 1) : (at + 1) % stops.length;
+    event.preventDefault();
+    stops[next].focus();
+  });
   function openMenu(item) {
     closeMenu();
     menuFor = item;
@@ -340,7 +355,7 @@
       const button = el("button", emoji === mine ? "is-mine" : "", emoji);
       button.type = "button";
       button.setAttribute("aria-label", `React ${emoji}`);
-      button.addEventListener("click", () => { react(item, emoji); closeMenu(); });
+      button.addEventListener("click", () => { react(item, emoji); closeMenu(true); });
       emojis.appendChild(button);
     });
     const actions = el("div", "chat-menu-actions");
@@ -348,7 +363,7 @@
     if (text && navigator.clipboard) {
       const copy = el("button", "", "Copy");
       copy.type = "button";
-      copy.addEventListener("click", () => { navigator.clipboard.writeText(text.textContent).catch(() => {}); closeMenu(); });
+      copy.addEventListener("click", () => { navigator.clipboard.writeText(text.textContent).catch(() => {}); closeMenu(true); });
       actions.appendChild(copy);
     }
     const report = item.querySelector(".chat-more a");
@@ -373,7 +388,7 @@
   document.addEventListener("pointerdown", (event) => {
     if (!menu.hidden && !menu.contains(event.target)) closeMenu();
   });
-  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !menu.hidden) closeMenu(); });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !menu.hidden) closeMenu(true); });
   list.addEventListener("scroll", closeMenu, { passive: true });
 
   // Hold (about half a second, without moving) opens the menu.
