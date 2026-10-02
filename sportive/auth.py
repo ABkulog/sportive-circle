@@ -15,7 +15,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from .constants import SPORTS
 from .db import get_db, set_user_sports
 from .mail import compose, failure_reason, send_email
-from .textutil import has_a_letter, person_name, same_secret, typed_code
+from .textutil import has_a_letter, is_number, person_name, same_secret, typed_code
 from .timeutil import SEATTLE, from_db, now_local, to_db
 
 bp = Blueprint("auth", __name__)
@@ -251,7 +251,7 @@ def validate_signup(full_name, email, password, password2, grad_year, birth_date
     problem = password_problem(password, password2)
     if problem:
         return problem
-    if grad_year and (not grad_year.isdigit() or not 1950 <= int(grad_year) <= now_local().year + 8):
+    if grad_year and (not is_number(grad_year) or not 1950 <= int(grad_year) <= now_local().year + 8):
         return "Please enter a valid graduation year."
     if not birth_date:
         return "Date of birth cannot be empty."

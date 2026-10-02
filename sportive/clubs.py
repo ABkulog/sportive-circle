@@ -24,7 +24,7 @@ from .notifications import mark_seen
 from .phones import phone_from_form
 from .photos import make_avatar
 from .sms import text_user
-from .textutil import fold, multi_line, one_line, social_handle
+from .textutil import fold, is_number, multi_line, one_line, social_handle
 from .timeutil import fmt_when, from_db, now_local, to_db
 
 bp = Blueprint("clubs", __name__)
@@ -217,7 +217,7 @@ def read_club_form(form, club_id=None, phone_on_file=""):
                        "sees it). Pick the country, then the number.")
     if not 2 <= len(data["officer_role"]) <= 40:
         return problem("officer_role", "What's your role in the club? (e.g. President, Captain, Treasurer)")
-    if not members.isdigit() or int(members) < MIN_ACTIVE_MEMBERS:
+    if not is_number(members) or int(members) < MIN_ACTIVE_MEMBERS:
         return problem("member_estimate", f"Sportive Circle is for active clubs with at least {MIN_ACTIVE_MEMBERS} members.")
     data["member_estimate"] = min(int(members), 5000)
     if not form.get("attest"):

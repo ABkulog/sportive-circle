@@ -13,13 +13,16 @@ def one_line(text):
     return " ".join((text or "").split())
 
 
+# Count as letters but show as nothing (Hangul fillers, the blank Braille cell): a name of only these looks empty.
+BLANK_LOOKING = set("\u3164\u115f\u1160\uffa0\u2800")
 ZWJ = "\u200d"  # joins emoji into one picture (👩🏽‍🦱): kept, it can't disguise a name
 
 
 def person_name(text):
     """A name as it should be shown: one line, without invisible characters (zero-width spaces, and
     right-to-left overrides that can make "Maya" display as someone else's name)."""
-    visible = "".join(ch for ch in (text or "") if ch == ZWJ or unicodedata.category(ch) not in ("Cf", "Cc"))
+    visible = "".join(ch for ch in (text or "") if ch not in BLANK_LOOKING
+                      and (ch == ZWJ or unicodedata.category(ch) not in ("Cf", "Cc")))
     return one_line(visible)
 
 
@@ -82,3 +85,8 @@ def social_handle(key, value):
         value = re.sub(rf"^(https?://)?(www\.|m\.)?{site}/", "", value, flags=re.I)
         value = value.split("?")[0].split("#")[0].strip("/").split("/")[0]
     return value.lstrip("@")
+
+
+def is_number(text):
+    """Plain digits 0-9 only. (str.isdigit() also says yes to "²" or "٣", which int() can't read: a 500.)"""
+    return text.isascii() and text.isdigit()

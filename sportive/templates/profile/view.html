@@ -33,6 +33,11 @@
       <p class="muted">{{ [("Class of " ~ user.grad_year) if user.grad_year else "Husky", user.pronouns,
                           genders[user.gender] if user.gender else ""]|select|join(" · ") }}
         {% if show_email %}<br><a href="mailto:{{ user.email }}">{{ user.email }}</a>{% endif %}</p>
+      {% if user.suspended and is_admin() and not me %}{# only admins can open a suspended profile #}
+        <p><span class="badge badge-danger">Suspended</span></p>
+        <form method="post" action="{{ url_for('moderation.suspend', user_id=user.id, action='restore', **{'from': 'suspended'}) }}">
+          {{ csrf_field() }}<button class="btn btn-small btn-ghost">Restore account</button></form>
+      {% endif %}
     </div>
   </div>
 

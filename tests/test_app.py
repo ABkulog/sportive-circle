@@ -2360,7 +2360,7 @@ def test_suspending_a_host_tells_players_even_when_their_club_is_in_review(accou
     page = client.post(f"/admin/users/{_user_id(app, 'captain@uw.edu')}/suspend", follow_redirects=True).data.decode()
     outbox = app.extensions.get("outbox", [])
     assert any(m["to"] == "member@uw.edu" and m["subject"].startswith("Canceled: Club night") for m in outbox)
-    assert "only officer of UW Spikeball Club" in page                    # someone has to take the club over
+    assert "only officer of" in page and "UW Spikeball Club</a>" in page   # someone has to take the club over
     waiting = _user_id(app, "waiting@uw.edu")
     assert client.post(f"/clubs/{club}/members/{waiting}/approve").status_code == 302   # an admin can let them in
     with app.app_context():
@@ -3717,6 +3717,139 @@ def test_two_workers_starting_at_once_dont_crash_adding_columns(tmp_path):
         [worker.start() for worker in workers]
         [worker.join() for worker in workers]
         assert errors == []
+
+
+def test_odd_digits_and_huge_pages_dont_crash(accounts, client, app):
+    """Round 14: "²" passes str.isdigit() but not int(): Home's ?page= and grad years crashed (500)."""
+    accounts.signup()
+    assert client.get("/?page=²").status_code == 200
+    assert client.post("/profile/edit", data={"full_name": "Dubs Husky", "grad_year": "²⁰²⁷"}).status_code in (200, 302)
+    assert client.post("/signup", data={"full_name": "A B", "email": "ab@uw.edu", "password": "purple-and-gold",
+                                        "password2": "purple-and-gold", "birth_date": "2005-01-01",
+                                        "grad_year": "²⁰²⁷"}).status_code == 302
+    app.config["ADMIN_EMAILS"] = "dubs@uw.edu"
+    assert client.get("/admin/reports?page=99999999999999999999999").status_code == 200
+    assert client.get("/admin/suggestions?page=99999999999999999999999").status_code == 200
+
+
+def test_blocked_profiles_show_only_name_and_photo(accounts, client, app):
+    """Round 14: someone you blocked still saw your bio, gender and socials; pronouns could fake text."""
+    ids = _people(accounts, app, "Alice", "Bob")
+    _as(accounts, "Alice")
+    client.post("/profile/edit", data={"full_name": "Alice Husky", "bio": "Hoops every night", "gender": "woman",
+                                       "pronouns": "\u202enamow", "grad_year": "2027"})
+    with app.app_context():
+        assert get_db().execute("SELECT pronouns FROM users WHERE id = ?", (ids["Alice"],)).fetchone()[0] == "namow"
+        get_db().execute("UPDATE users SET instagram = 'alice.ig' WHERE id = ?", (ids["Alice"],))
+        get_db().commit()
+    _as(accounts, "Bob")
+    assert "alice.ig" in client.get(f"/u/{ids['Alice']}").data.decode()
+    _as(accounts, "Alice")
+    client.post(f"/block/{ids['Bob']}")
+    _as(accounts, "Bob")
+    page = client.get(f"/u/{ids['Alice']}").data.decode()
+    assert "Alice Husky" in page and "alice.ig" not in page and "Hoops every night" not in page
+    from sportive.textutil import person_name
+    assert person_name("\u3164\u3164") == ""                                     # looks blank: not a name
+
+
+def test_social_links_and_short_links(accounts, client, app):
+    from sportive.profile import clean_social
+    assert clean_social("tiktok", "https://www.tiktok.com/@dubs.husky.official?_t=8kL") == "dubs.husky.official"
+    assert clean_social("tiktok", "vm.tiktok.com/ZMabc/").endswith("/")             # a short link, refused
+    assert 'maxlength="200"' in pathlib.Path(app.root_path, "templates/profile/edit_sports.html").read_text()
+
+
+def test_home_says_when_there_are_more_games_than_it_lists(accounts, client, app):
+    accounts.signup(email="host@uw.edu")
+    with app.app_context():
+        db = get_db()
+        host = db.execute("SELECT id FROM users WHERE email = 'host@uw.edu'").fetchone()[0]
+        start = now_local() + timedelta(days=2)
+        db.executemany("INSERT INTO events (title, sport, location, skill_level, starts_at, ends_at, host_id, created_at)"
+                       " VALUES (?, 'basketball', 'IMA (Intramural Activities Building)', 'Casual', ?, ?, ?, ?)",
+                       [(f"Game {n}", to_db(start), to_db(start + timedelta(hours=1)), host, to_db(now_local()))
+                        for n in range(1010)])
+        db.commit()
+    assert "There are even more games" in client.get("/?page=20").data.decode()
+
+
+def test_changes_reach_invited_friends_and_say_what_changed(accounts, client, app):
+    """Round 15: a friend with a spot held wasn't told the time or place changed; the "Changed" email didn't say
+    what changed (an end-time edit looked like nothing changed); a canceled game still showed spots left."""
+    ids = _people(accounts, app, "Maya", "Jordan", "Priya")
+    _friends(app, ids["Maya"], ids["Jordan"], ids["Priya"])
+    _as(accounts, "Maya")
+    form = dict(title="Hoops", players="6")
+    game = event_id_from(client.post("/events/new", data=event_form(**form)))
+    client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"], ids["Priya"]]})
+    _as(accounts, "Jordan")
+    client.post(f"/events/{game}/invite/answer", data={"answer": "yes"})
+    _as(accounts, "Maya")
+    client.post(f"/events/{game}/edit", data=event_form(**form, ends_at=form_time(timedelta(days=1, hours=3))))
+    email = [m for m in app.extensions["outbox"] if m["to"] == "jordan@uw.edu" and m["subject"] == "Changed: Hoops"][-1]
+    assert "Maya changed this game: now ends at" in email["body"]
+    _as(accounts, "Priya")                                                   # only invited: told too
+    assert "which changed: now ends at" in client.get("/notifications").data.decode()
+    _as(accounts, "Maya")
+    client.post(f"/events/{game}/cancel")
+    assert "spots left" not in client.get(f"/events/{game}").data.decode()
+
+
+def test_game_chats_hide_blocked_people_both_ways_and_suspended_people(accounts, client, app):
+    """Round 16: in a game chat, blocking only hid the blocked person from the blocker; a suspended person's
+    old messages still showed and counted as unread."""
+    ids = _people(accounts, app, "Host", "Ann", "Ben", "Sus")
+    _as(accounts, "Host")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    for name in ("Ann", "Ben", "Sus"):
+        _as(accounts, name)
+        client.post(f"/events/{game}/join")
+    _as(accounts, "Sus")
+    client.post(f"/events/{game}/chat", data={"body": "buy my stuff"})
+    _as(accounts, "Ann")
+    client.post(f"/block/{ids['Ben']}")
+    client.post(f"/events/{game}/chat", data={"body": "ann private plan"})
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 1 WHERE id = ?", (ids["Sus"],))
+        get_db().commit()
+    _as(accounts, "Ben")
+    seen = json.dumps(client.get(f"/events/{game}/chat/poll?after=0").get_json())
+    assert "ann private plan" not in seen and "buy my stuff" not in seen
+    _as(accounts, "Host")
+    seen = json.dumps(client.get(f"/events/{game}/chat/poll?after=0").get_json())
+    assert "ann private plan" in seen and "buy my stuff" not in seen
+
+
+def test_admin_tools_on_a_suspended_profile_and_report_pages(accounts, client, app):
+    """Round 16: a suspended profile looked normal to admins (no label, no Restore, no photo); acting on page 2
+    of reports jumped back to page 1."""
+    ids = _people(accounts, app, "Sam")
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="admin@uw.edu")
+    client.post(f"/admin/users/{ids['Sam']}/suspend")
+    page = client.get(f"/u/{ids['Sam']}").data.decode()
+    assert "Suspended" in page and "Restore account" in page
+    assert client.get(f"/u/{ids['Sam']}/photo").status_code == 200
+    with app.app_context():
+        db = get_db()
+        admin = db.execute("SELECT id FROM users WHERE email = 'admin@uw.edu'").fetchone()[0]
+        for n in range(130):
+            db.execute("INSERT INTO reports (reporter_id, reported_user_id, target_type, target_id, reason, details,"
+                       " status, created_at) VALUES (?, ?, 'user', ?, 'spam', ?, 'open', '2026-10-01 12:00')",
+                       (admin, ids["Sam"], ids["Sam"], f"r{n}"))
+        db.commit()
+        last = db.execute("SELECT MAX(id) FROM reports").fetchone()[0]
+    page2 = client.get("/admin/reports?page=2").data.decode()
+    assert f"/admin/reports/{last}/reviewed?page=2" in page2 or "page=2&amp;from=open" in page2
+    done = client.post(f"/admin/reports/{last}/reviewed?page=2&from=open")
+    assert "page=2" in done.headers["Location"]
+
+
+def test_need_players_place_check_uses_seattle_time_on_any_phone(app):
+    """Round 16: on a phone set to Seoul, Need players asked the place check about Seoul's clock time."""
+    js = (pathlib.Path(app.root_path) / "static" / "forms.js").read_text()
+    assert 'timeZone: "America/Los_Angeles"' in js and "getHours()" not in js
 
 
 def test_party_up_holds_spots_for_friends(accounts, client, app):
@@ -5202,7 +5335,7 @@ def test_hosts_are_told_to_check_the_place_is_free(accounts, client, app):
     accounts.signup()
     for page in ("/events/new", "/need-players"):
         html = client.get(page).data.decode()
-        assert "Heads up: check the" in html and "We don't reserve places" in html
+        assert "Heads up: check you can use the" in html and "We don't reserve places" in html
     html = client.get("/events/new").data.decode()
     assert '"space"' in html and '"courts"' in html and '"trail"' in html  # the word follows the sport (forms.js)
     assert "make sure the place is free" in client.get("/terms").data.decode()

@@ -49,6 +49,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-PROF-5 | On the photo page, Save without picking a new photo goes back to the profile, and users can remove their photo (with an "Are you sure?"). | Should | ✅ |
 | FR-PROF-6 | Optional pronouns, gender (says it's only used for games open to women or men), and Instagram / Snapchat / TikTok / X usernames right under the bio in Edit profile, shown on the profile only if filled in. | Should | ✅ |
 | FR-PROF-7 | Emails shown to people you've played with are hidden once either of you blocks the other. Top Dawgs ties share a place and medal. | Must | ✅ |
+| FR-PROF-8 | Someone you blocked (or who blocked you) sees only your name and photo, not your bio, pronouns, gender, class year, sports, badges or socials; suspended people's photos aren't served. Pronouns and names can't hide behind invisible or right-to-left characters. Pasted social links keep the full username (long links aren't cut off), short links like vm.tiktok.com are refused, and long handles wrap on a phone. | Must | ✅ |
 
 ### Games and events (EVT)
 
@@ -72,8 +73,10 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-EVT-16 | Games have a sensible maximum length: 6 hours for court and field sports, 12 for running, rowing and esports, 3 days for trips. | Should | ✅ |
 | FR-EVT-17 | Game pages have a Back button that returns to where you came from (never into the game's own chat). | Should | ✅ |
 | FR-EVT-18 | Open games can be "Open to" anyone, women, men, nonbinary players or Other (like UW Recreation's women-only hours). People whose profile gender is outside the group can't join and don't see it in their feed; people who left gender blank confirm instead. Hosts can remove a player (who gets a notice). | Should | ✅ |
-| FR-EVT-19 | Creating a game (New event and Need players) shows a heads-up: check the courts / field / trail (the word follows the sport) is free at that time, since it could be booked, full or closed for an event. Sportive Circle doesn't reserve or check places; the host does. The Terms say the same. | Must | ✅ |
+| FR-EVT-19 | Creating a game (New event and Need players) shows a heads-up: check you can use the courts / field / trail (the word follows the sport) then, since it could be booked, full or closed for an event. Sportive Circle doesn't reserve or check places; the host does. The Terms say the same. | Must | ✅ |
 | FR-EVT-21 | A game that's over can't be edited (it stays in everyone's history as it was). Time math uses real elapsed time on the nights clocks change: sport length limits, Need players start times (never in the skipped hour) and reminders (sent at the right moment, with the right minutes). | Must | ✅ |
+| FR-EVT-23 | When a host changes a game, the email and notice say what changed (new time, now ends at, new place, new note) and show the full time; friends with a spot held get their invite updated too. A canceled game doesn't show spots left. | Must | ✅ |
+| FR-EVT-24 | Need players checks the place at the right Seattle time even on a phone set to another time zone. | Must | ✅ |
 | FR-EVT-20 | While making a game, and on its page, people see what else is on at that place then: **UW Rec reservations** ("UW Rec: reserved 6–10 PM · IM flag football", you probably can't play there) and **other Sportive Circle games** (busy, not taken: you can still post, or join theirs). Private games show only as "a private game". UW Rec places link to UW Rec's schedule. UW Rec's bookings are copied automatically once a day from its public Facility Schedule; admins can add their own entries (Admin → UW Rec reservations, weekly repeats). | Should | ✅ |
 | FR-EVT-22 | The UW Rec copy holds up to bad data: a space that sends nothing or junk keeps its place's last copy (and so does a place that suddenly lost most bookings); an odd booking is left out and reported, not the whole copy; times with "Z" or an offset are read correctly; a place we no longer read loses its old bookings; admins see when the last good copy was saved (a run where nothing could be read doesn't count); past the 4 weeks copied, the form says it can't tell yet. | Must | ✅ |
 
@@ -136,6 +139,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-SOC-6 | When someone posts a public game, their friends (and, for a club event, the club's followers and members; members-only events: members only) get a bell notice and an email ("Maya posted a game", with a button to see and join it). Never for private games, blocked or suspended people, people already in it, or a game open only to another gender. At most 3 of these emails a day per person; the email can be turned off in Settings. A weekly practice is announced once. | Should | ✅ |
 | FR-SOC-7 | Unfriending or blocking ends the spots held and invites either person sent the other, in any game (and their "You down?" notices). Suspended people don't count as mutual friends in search or suggestions. | Must | ✅ |
 | FR-SOC-8 | People search never fails on odd input (only accent marks, emoji, wildcards) and folds letters like ı and ß; friends come first, so Messages search finds a friend even among many people with the same name. Messages with only invisible characters aren't sent; photo-only chats preview as "📷 Photo"; an unsent draft (even all emoji) comes back. | Must | ✅ |
+| FR-SOC-9 | Game chats hide people blocked either way (their messages, reactions and unread counts) and suspended people's messages. | Must | ✅ |
 
 ### Notifications (NOTIF)
 
@@ -162,6 +166,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-SAFE-4 | The people who run the app (admins) show a gold 🐾 Team label on their profile, in game lists and in messages, plus a 💜 Sportive Circle Team badge. It can't be earned or faked, and goes away if someone stops being an admin. | Should | ✅ |
 | FR-SAFE-5 | Admin tools hold up when busy: the report queue pages 100 at a time; two admins handling the same report don't overwrite each other ("Another admin already handled that report"); suspending a host tells every player of the canceled games, club games on hold included; it warns when they were a club's only officer, and admins can confirm that club's waiting members (the club page shows them the join requests). | Must | ✅ |
 | FR-SAFE-6 | A reported message keeps a copy of its words and notes when it had a photo, so admins can tell what was reported. | Must | ✅ |
+| FR-SAFE-7 | Admin tools on a phone: a suspended person's profile says so, with Restore and their photo; the only-officer warning links to each club's Officers page (which tells an admin they're managing it as admin); report actions keep the page you were on; removing one UW Rec reservation asks first. | Should | ✅ |
 
 ### Info pages (INFO)
 

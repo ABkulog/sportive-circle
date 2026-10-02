@@ -8,6 +8,7 @@ import functools
 from datetime import timedelta
 
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
+from markupsafe import Markup
 
 from .auth import login_required
 from .db import get_db
@@ -167,7 +168,7 @@ def admin_reports():
         status = "open"
     db = get_db()
     suspended = db.execute("SELECT id, full_name, email FROM users WHERE suspended = 1 ORDER BY fold(full_name)").fetchall()
-    page = max(1, request.args.get("page", 1, type=int) or 1)
+    page = min(max(1, request.args.get("page", 1, type=int) or 1), 10000)  # a huge number would overflow SQLite
     reports = db.execute(
         """SELECT r.*, reporter.full_name AS reporter_name, reported.full_name AS reported_name,
                   reported.email AS reported_email, reported.suspended AS reported_suspended
@@ -199,7 +200,8 @@ def resolve(report_id, action):
                       (action, to_db(now_local()) if action != "open" else None, report_id, seen)).rowcount:
         flash("Another admin already handled that report.", "info")
     db.commit()
-    return redirect(url_for("moderation.admin_reports", status=seen))
+    page = min(max(1, request.args.get("page", 1, type=int) or 1), 10000)
+    return redirect(url_for("moderation.admin_reports", status=seen, page=page if page > 1 else None))
 
 
 @bp.route("/admin/users/<int:user_id>/<action>", methods=("POST",))
@@ -218,6 +220,9 @@ def suspend(user_id, action):
     elif action == "suspend":
         from .events import query_events, tell_players_it_was_cancelled
         now = to_db(now_local())
+        db.commit()
+        db.execute("BEGIN IMMEDIATE")  # read their games and cancel them in one go: an officer canceling one of
+        # them at the same moment can't make its players hear about it twice
         db.execute("UPDATE users SET suspended = 1 WHERE id = ?", (user_id,))
         hosted = query_events(["e.host_id = :host", "e.cancelled = 0", "e.ends_at >= :now"],
                               {"host": user_id, "now": now}, on_hold=True, limit=100000)  # club games on hold too
@@ -248,8 +253,10 @@ def suspend(user_id, action):
             tell_players_it_was_cancelled(event, by_host=False)
         flash(f"{user['full_name']} is suspended. Their upcoming games were canceled and players were told.", "info")
         if stranded:
-            flash("They were the only officer of " + ", ".join(c["name"] for c in stranded)
-                  + ". Add a new officer on the club's Officers page so join requests get answered.", "error")
+            links = Markup(", ").join(Markup('<a href="{}">{}</a>').format(url_for("clubs.officers", club_id=c["id"]),
+                                                                          c["name"]) for c in stranded)
+            flash(Markup("They were the only officer of {}. Add a new officer there so join requests get answered.")
+                  .format(links), "error")
     else:
         db.execute("UPDATE users SET suspended = 0 WHERE id = ?", (user_id,))
         flash(f"{user['full_name']} can log in again.", "success")

@@ -24,7 +24,7 @@ from .notifications import mark_seen, notify
 from .mail import compose, send_email
 from .social import friends_of, is_blocked_between
 from .spirit import greeting, top_dawgs
-from .textutil import multi_line, one_line, same_secret
+from .textutil import is_number, multi_line, one_line, same_secret
 from .timeutil import (add_real, exists_in_seattle, fmt_clock, fmt_when, from_db, now_local, parse_form, real_gap,
                        to_db, to_form)
 
@@ -213,7 +213,7 @@ def read_game_options(form, sport, event=None):
     if event is None and team_raw:
         if not sizes:
             return 0, "", None, f"{SPORTS[sport]} isn't played team vs team. Pick Regular game."
-        if not team_raw.isdigit() or int(team_raw) not in sizes:
+        if not is_number(team_raw) or int(team_raw) not in sizes:
             return 0, "", None, f"{SPORTS[sport]} teams can be {', '.join(f'{n}v{n}' for n in sizes)}."
         team_size = int(team_raw)
     if event is not None and team_size and team_size not in sizes:
@@ -261,7 +261,7 @@ def created_message(is_private, reserve, public_text):
 
 def read_reservations(form, room):
     """Friends the host picked to reserve spots for. Returns (friend ids, error). `room` = spots they can use."""
-    chosen = list(dict.fromkeys(int(value) for value in form.getlist("reserve") if value.isdigit()))
+    chosen = list(dict.fromkeys(int(value) for value in form.getlist("reserve") if is_number(value)))
     friends = {friend["id"] for friend in friends_of(g.user["id"])}
     if any(friend_id not in friends for friend_id in chosen):
         return [], "You can only reserve spots for your friends."
@@ -345,9 +345,10 @@ def feed():
 
     # "Show more games" grows the list a page at a time (one extra row tells us if there's more).
     page = request.args.get("page", "1")
-    page = min(int(page), MAX_FEED_PAGES) if page.isdigit() and int(page) > 0 else 1
+    page = min(int(page), MAX_FEED_PAGES) if is_number(page) and int(page) > 0 else 1
     events = query_events(where, params, limit=page * FEED_PAGE_SIZE + 1)
     more_page = page + 1 if len(events) > page * FEED_PAGE_SIZE and page < MAX_FEED_PAGES else None
+    capped = len(events) > page * FEED_PAGE_SIZE and page >= MAX_FEED_PAGES  # even more games than we list
     events = events[:page * FEED_PAGE_SIZE]
 
     # "Need players" posts starting soon (any sport) go in their own strip at the top. While filtering,
@@ -379,7 +380,7 @@ def feed():
     mark_seen("need_players")
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
-                           month_name=now.strftime("%B"), more_page=more_page,
+                           month_name=now.strftime("%B"), more_page=more_page, capped=capped,
                            hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now, viewer=g.user["id"]),
                            club_picks=suggested_clubs(g.user["id"], my_sports), texts_card=show_texts_card())
 
@@ -776,7 +777,12 @@ def tell_players_it_changed(event, data, by=None):
     Returns True if anyone was told. Caller commits."""
     changes = what_changed(event, data)
     players = players_except_host(event, by)
-    if not changes or not players:
+    # Friends with a spot held ("You down?") are deciding on the old time and place: their invite is updated too.
+    invited = get_db().execute(
+        """SELECT i.guest_id, v.full_name AS inviter_name FROM invites i JOIN users v ON v.id = i.inviter_id
+           JOIN users u ON u.id = i.guest_id WHERE i.event_id = ? AND i.status = 'pending' AND u.suspended = 0""",
+        (event["id"],)).fetchall()
+    if not changes or not (players or invited):
         return False
     title = data["title"] if not event["is_quick"] else event_title({**dict(event), **data})
     host = (by["full_name"] if by is not None else event["host_name"]).split()[0]
@@ -784,6 +790,9 @@ def tell_players_it_changed(event, data, by=None):
     for player in players:
         notify(player["id"], "game_updates", f"{host} changed {title}: {', '.join(changes)}", link,
                key=f"change:{event['id']}")
+    for row in invited:
+        notify(row["guest_id"], "invites", f"{row['inviter_name'].split()[0]} wants you in {title}, which changed: "
+               f"{', '.join(changes)}. You down?", link, key=f"invite:{event['id']}")
     if any(change.startswith(("new time", "new place", "now ends", "now ")) for change in changes):
         for player in players:
             text_user(player["id"], f"{host} changed {title}: now {fmt_when(data['starts_at'])} at {data['location']}. "
@@ -793,9 +802,9 @@ def tell_players_it_changed(event, data, by=None):
                 subject = f"Changed: {title}"
                 body, html = compose(
                     subject, f"{title} changed",
-                    [f"Hey {player['full_name'].split()[0]}, {host} changed this game.",
+                    [f"Hey {player['full_name'].split()[0]}, {host} changed this game: {', '.join(changes)}.",
                      *([f"🏅 Now {SPORTS[data['sport']]}"] if data["sport"] != event["sport"] else []),
-                     f"🕐 {fmt_when(data['starts_at'])}", f"📍 {data['location']}"],
+                     f"🕐 {fmt_when(data['starts_at'])} – {fmt_clock(data['ends_at'])}", f"📍 {data['location']}"],
                     button=("See the game", public_url("events.detail", event_id=event["id"])),
                     reason="You're getting this because you joined this game.",
                     preheader=f"{host} changed {title}.")

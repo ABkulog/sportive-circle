@@ -6,7 +6,9 @@
 <div class="card form-card">
   <h1>Officers</h1>
   <p class="muted">Officers can edit the club, post updates, make club events and confirm new members.
-    Only the owner (you) can add or remove officers, or hand the club to another officer with <strong>Make owner</strong>.</p>
+    {% if club.created_by == g.user.id %}Only the owner (you) can add or remove officers, or hand the club to another
+    officer with <strong>Make owner</strong>.{% else %}You're managing this club's officers as an admin (or because
+    its owner isn't an officer anymore).{% endif %}</p>
 
   <ul class="people officer-admin">
     {% for o in officers %}

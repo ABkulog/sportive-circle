@@ -121,6 +121,8 @@
 </div>
 {% if more_page %}
   <p class="show-more"><a class="btn btn-ghost btn-block" href="{{ url_for('events.feed', page=more_page, **filters) }}#game-{{ events[-1].id }}">Show more games</a></p>
+{% elif capped %}
+  <p class="show-more muted">There are even more games. Pick a sport or a day above to see the rest.</p>
 {% endif %}
 </section>
 
