@@ -945,7 +945,7 @@ def detail(event_id):
                            blocked=is_blocked_between(me, event["host_id"]),
                            invite=invite, hold_minutes=hold_minutes_left(invite),
                            invited=pending_invites(event_id), teams=teams, my_team=my_team,
-                           requests=requested_invites(event_id) if event["i_am_going"] else [],
+                           requests=requested_invites(event_id) if event["i_am_going"] or can_manage(event) else [],
                            # my own held spot is still mine to take, even if the game looks full to others
                            spots_for_me=None if spots_left(event) is None
                            else spots_left(event) + (1 if hold_minutes_left(invite) else 0),

@@ -291,7 +291,8 @@ def view(club_id):
         flash(f"{club['name']} is verified! Every Husky can find it now.", "celebrate")  # confetti
     if g.get("user") is not None:
         members = roster(club_id)
-    if role == "officer":
+    can_decide = role == "officer" or is_admin()  # admins too: a club whose only officer was suspended
+    if can_decide:
         requests = db.execute(
             """SELECT u.id, u.full_name, u.avatar_updated, m.role, m.message, m.joined_at
                FROM club_members m JOIN users u ON u.id = m.user_id
@@ -312,7 +313,7 @@ def view(club_id):
         events = [e for e in events if not e["members_only"]]
     return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
                            members_only_hidden=members_only_hidden,
-                           role=role, owner=is_owner(club), requests=requests, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
+                           role=role, owner=is_owner(club), requests=requests, can_decide=can_decide, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
                            socials=social_links(club),
                            joining=JOINING,
                            experience=EXPERIENCE, who=WHO_CAN_JOIN_LABELS)

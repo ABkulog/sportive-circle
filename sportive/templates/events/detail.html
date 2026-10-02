@@ -281,15 +281,15 @@
 {% endif %}
 
 {% set my_requests = requests|selectattr('inviter_id', 'equalto', g.user.id)|list %}
-{% if requests and (is_host or my_requests) %}
+{% if requests and (manage or my_requests) %}
   <section class="band" id="requests">
-    <h2>{{ 'Requests' if is_host else 'Waiting for ' ~ event.host_name.split()[0] }}</h2>
+    <h2>{{ 'Requests' if manage else 'Waiting for ' ~ event.host_name.split()[0] }}</h2>
     <ul class="people">
-      {% for r in (requests if is_host else my_requests) %}
+      {% for r in (requests if manage else my_requests) %}
         <li class="post-game-row">
           <span class="person">{{ avatar(r.guest_id, r.guest_name, r.guest_avatar, 32) }}<span>{{ r.guest_name }}
             <small class="muted person-extra">{{ r.inviter_name.split()[0] }}'s friend{% if r.note %} · “{{ r.note }}”{% endif %}</small></span></span>
-          {% if is_host %}
+          {% if manage %}
             <span class="action-pair">
               <form method="post" action="{{ url_for('parties.answer_request', event_id=event.id, guest_id=r.guest_id, action='approve') }}">
                 {{ csrf_field() }}<button class="btn btn-small">Approve</button></form>

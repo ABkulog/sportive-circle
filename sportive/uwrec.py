@@ -137,6 +137,7 @@ def fetch(start, end):
     ids = facility_ids()
     rows, seen, problems = [], set(), []
     unread = set()  # our places where a space didn't answer properly: their last copy is kept (see sync)
+    asked = set()   # our places with at least one space on UW Rec's site
     spaces_read = 0
     for place, spaces in UW_REC_SPACES.items():
         for name, fid in ids.items():
@@ -145,6 +146,7 @@ def fetch(start, end):
             if spaces_read:
                 time.sleep(current_app.config.get("UW_REC_PAUSE", PAUSE_SECONDS))
             spaces_read += 1
+            asked.add(place)
             answer = _get("/Facility/GetScheduleCustomAppointmentsForDevExtremeScheduler",
                           {"selectedFacilityId": fid, "start": start.strftime("%Y-%m-%dT%H:%M:%S"),
                            "end": end.strftime("%Y-%m-%dT%H:%M:%S")})
@@ -178,7 +180,7 @@ def fetch(start, end):
                     rows.append((place, label, starts, ends))
     if not spaces_read:
         problems.append("None of our places were found on UW Rec's site (did its page change?)")
-    return rows, problems, unread
+    return rows, problems, unread, asked
 
 
 def sync(days=DAYS_AHEAD):
@@ -191,7 +193,7 @@ def sync(days=DAYS_AHEAD):
                                " GROUP BY location", (to_db(now),)).fetchall())
     previous = sum(by_place.values())
     try:
-        rows, problems, unread = fetch(now - timedelta(hours=12), now + timedelta(days=days))
+        rows, problems, unread, asked = fetch(now - timedelta(hours=12), now + timedelta(days=days))
     except Exception as error:
         _report("failed", 0, previous, [f"UW Rec's site didn't answer ({type(error).__name__}: {str(error)[:80]})"])
         raise
@@ -208,17 +210,20 @@ def sync(days=DAYS_AHEAD):
             unread.add(place)
             problems.append(f"{place}: only {new_counts.get(place, 0)} bookings came back (it had {before}), "
                             "so its last copy is kept")
-    replaced = [place for place in UW_REC_SPACES if place not in unread]
-    if replaced:
-        db.execute(f"DELETE FROM rec_reservations WHERE source = 'feed' AND location IN ({', '.join('?' for _ in replaced)})",
-                   replaced)
+    # Every place we read gets a fresh copy. Places that didn't answer properly, or that UW Rec's page didn't
+    # list this time, keep yesterday's; places we no longer read at all (not in UW_REC_SPACES) lose theirs.
+    kept = sorted(unread | (set(UW_REC_SPACES) - asked))
+    db.execute(f"DELETE FROM rec_reservations WHERE source = 'feed' AND location NOT IN ({', '.join('?' for _ in kept)})",
+               kept)
     db.executemany("""INSERT INTO rec_reservations (location, starts_at, ends_at, label, source, created_by, created_at)
                       VALUES (?, ?, ?, ?, 'feed', NULL, ?)""",
                    [(place, to_db(starts), to_db(ends), label, to_db(now)) for place, label, starts, ends in rows
                     if place not in unread])
     db.commit()
     saved = sum(1 for row in rows if row[0] not in unread)
-    _report("ok" if not problems else "warnings", saved, previous, problems)
+    replaced_any = bool(asked - unread)
+    # Nothing replaced at all (every place sent junk) isn't a good copy, whatever else happened.
+    _report(("ok" if not problems else "warnings") if replaced_any else "kept", saved, previous, problems)
     return saved
 
 
@@ -256,9 +261,13 @@ def last_synced():
 
 
 def last_copied():
-    """When a copy of UW Rec's schedule was last really saved, or None."""
+    """When a copy of UW Rec's schedule was last really saved, or None. (A copy saved before this was tracked
+    counts too: the last try, if it worked.)"""
     row = get_db().execute("SELECT value FROM app_state WHERE key = 'uw_rec_copied_at'").fetchone()
-    return row[0] if row else None
+    if row:
+        return row[0]
+    report = last_report() or {}
+    return last_synced() if report.get("status") in ("ok", "warnings") else None
 
 
 def sync_round(app):

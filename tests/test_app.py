@@ -3592,6 +3592,35 @@ def test_message_odd_contents(accounts, client, app):
         assert "sent a photo" in get_db().execute("SELECT snapshot FROM reports").fetchone()[0]
 
 
+def test_invite_link_on_login_asks_and_admins_can_let_members_in(accounts, client, app):
+    """Round 12 review: logging in (not signing up) through an invite link still made friends for accounts under
+    a day old; admins could be told to confirm a club's members but had no buttons; "Wrong email?" left the
+    mistyped account behind."""
+    ids = _people(accounts, app, "Maya", "Newbie")
+    link = _app_invite_link(app, ids["Maya"])
+    client.post(link)                                                          # logged out: saved for after login
+    accounts.login(email="newbie@uw.edu")
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM friendships").fetchone()[0] == "pending"
+    accounts.logout()
+    club = _club_with_member(accounts, client, app)
+    accounts.logout()
+    accounts.signup(email="waits@uw.edu", name="Wai Ting")
+    client.post(f"/clubs/{club}/join", data={"message": "please"})
+    accounts.logout()
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="admin@uw.edu")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Join requests (1)" in page and "Confirm member" in page
+    accounts.logout()
+    data = {"full_name": "Typo Husky", "email": "tpyo@uw.edu", "password": "purple-and-gold",
+            "password2": "purple-and-gold", "birth_date": "2006-03-01", "grad_year": "2030"}
+    client.post("/signup", data=data)
+    client.post("/signup", data={**data, "email": "typo@uw.edu"})
+    with app.app_context():
+        assert not get_db().execute("SELECT 1 FROM users WHERE email = 'tpyo@uw.edu'").fetchone()
+
+
 def test_party_up_holds_spots_for_friends(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Stranger")
     _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])
@@ -6106,6 +6135,35 @@ def test_changing_your_password_kills_a_pending_reset_code_and_phones_stay_one_a
         ids = dict(db.execute("SELECT email, id FROM users").fetchall())
         assert check_phone_code(ids["bob@uw.edu"], "111111") is None            # Bob confirms first...
         assert check_phone_code(ids["alice@uw.edu"], "222222") == "That number is already used by another account."
+
+
+def test_uw_rec_copy_drops_old_places_and_only_counts_real_copies(app, monkeypatch):
+    """Round 12 review: bookings for a place we no longer read stayed forever; a run where every place sent junk
+    still counted as a fresh copy; databases from before "last good copy" showed nothing."""
+    from sportive import uwrec
+    app.config["UW_REC_PAUSE"] = 0
+    page = '<a href="/Facility/GetFacility?facilityId=11111111-1111-1111-1111-111111111111">Denny Field - Turf</a>'
+    start = (now_local() + timedelta(days=1)).replace(hour=18, minute=0, second=0, microsecond=0)
+    answer = {"text": json.dumps([{"Text": "Rugby", "StartDate": start.strftime("%Y-%m-%dT%H:%M:%S"),
+                                   "EndDate": (start + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")}])}
+    monkeypatch.setattr(uwrec, "_get", lambda path, params=None: page if path == "/Facility" else answer["text"])
+    with app.app_context():
+        db = get_db()
+        db.execute("INSERT INTO app_state (key, value) VALUES ('uw_rec_synced_at', '2026-09-01 06:00')")
+        db.execute("INSERT INTO app_state (key, value) VALUES ('uw_rec_report', ?)",
+                   (json.dumps({"at": "2026-09-01 06:00", "status": "ok", "saved": 1, "previous": 0, "problems": [],
+                                "more": 0}),))
+        db.execute("INSERT INTO rec_reservations (location, starts_at, ends_at, label, source, created_at)"
+                   " VALUES ('Old Place', ?, ?, 'Gone', 'feed', ?)", (to_db(start), to_db(start), to_db(now_local())))
+        db.commit()
+        assert uwrec.last_copied() == "2026-09-01 06:00"                       # from before this was tracked
+        assert uwrec.sync() == 1
+        assert db.execute("SELECT COUNT(*) FROM rec_reservations WHERE location = 'Old Place'").fetchone()[0] == 0
+        copied = uwrec.last_copied()
+        answer["text"] = "<html>busy</html>"                                    # every place sends junk
+        uwrec.sync()
+        assert uwrec.last_report()["status"] == "kept" and uwrec.last_copied() == copied
+        assert db.execute("SELECT COUNT(*) FROM rec_reservations WHERE location = 'Denny Field'").fetchone()[0] == 1
 
 
 def test_monday_email_games_this_week(accounts, client, app, monkeypatch):

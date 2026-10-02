@@ -118,8 +118,9 @@ def safe_next(target):
     return url_for("index")
 
 
-def log_in(user, remember=True):
-    """remember=False ("Remember me" unticked): the login ends when the browser closes."""
+def log_in(user, remember=True, just_signed_up=False):
+    """remember=False ("Remember me" unticked): the login ends when the browser closes.
+    just_signed_up: they just confirmed a new account (a friend's invite link then makes them friends)."""
     after = session.get("after_login")  # e.g. a shared event link they opened before signing up
     invite = session.get("invite_link")  # a friend's "you're in my game" link
     session.clear()
@@ -137,7 +138,7 @@ def log_in(user, remember=True):
             flash(f"Happy birthday, {user['full_name'].split()[0]}! 🎂", "birthday")
     if invite:
         from .parties import accept_invite_link  # imported here: parties.py imports this module
-        destination = accept_invite_link(user, invite)
+        destination = accept_invite_link(user, invite, just_signed_up=just_signed_up)
         if destination:
             return destination
     return safe_next(after)
@@ -316,6 +317,8 @@ def signup():
             same_inbox = [f"{local}@{domain}" for domain in current_app.config["ALLOWED_EMAIL_DOMAINS"]]
             db.execute(f"DELETE FROM users WHERE verified = 0 AND email IN ({', '.join('?' for _ in same_inbox)})",
                        same_inbox)
+            if session.get("pending_email") and session["pending_email"] != email:  # "Wrong email? Fix it"
+                db.execute("DELETE FROM users WHERE verified = 0 AND email = ?", (session["pending_email"],))
             try:
                 cur = db.execute(
                     "INSERT INTO users (email, password_hash, full_name, grad_year, birth_date)"
@@ -468,7 +471,7 @@ def verify():
             from .notifications import start_markers  # imported here: notifications.py imports this module
             start_markers(user["id"])
             db.commit()
-            destination = log_in(user)
+            destination = log_in(user, just_signed_up=True)
             flash(f"Welcome, {user['full_name'].split()[0]}!", "celebrate")
             if user["phone"] and not user["phone_verified"]:
                 # The email is real now, so the number from step 3 gets its code.

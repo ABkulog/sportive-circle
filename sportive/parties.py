@@ -7,8 +7,6 @@ Yes takes the held spot; No frees it for someone else.
 Team vs team: the host's party is team 1. Another group "challenges" them by claiming team 2 the same
 way (the leader joins and holds spots for their friends).
 """
-from datetime import timedelta
-
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, session, url_for
 from itsdangerous import BadSignature, URLSafeSerializer
 
@@ -21,7 +19,7 @@ from .sms import drop_queued_texts, queue_text
 from .notifications import notify
 from .social import can_message, friends_of, is_blocked_between, too_many_messages
 from .textutil import one_line
-from .timeutil import fmt_when, from_db, from_sqlite_utc, now_local, to_db
+from .timeutil import fmt_when, from_db, now_local, to_db
 
 bp = Blueprint("parties", __name__)
 
@@ -350,7 +348,7 @@ def open_invite_link(token):
     return render_template("events/invite_link.html", inviter=inviter, event=event, token=token, full=full)
 
 
-def accept_invite_link(user, token):
+def accept_invite_link(user, token, just_signed_up=False):
     """Someone opened a friend's invite link and is now logged in (maybe just signed up): make them friends and,
     if it was for a game, put them in it. Returns where to go next (None = nowhere special)."""
     link = _read_link(token)
@@ -365,13 +363,11 @@ def accept_invite_link(user, token):
     friendship = db.execute("""SELECT requester_id, status FROM friendships WHERE (requester_id = ? AND addressee_id = ?)
                                OR (requester_id = ? AND addressee_id = ?)""",
                             (inviter_id, user["id"], user["id"], inviter_id)).fetchone()
-    joined = from_sqlite_utc(user["created_at"]) if "created_at" in user.keys() and user["created_at"] else None
-    new_here = joined is not None and now_local() - joined < timedelta(days=1)
     if friendship is not None:
         if friendship["requester_id"] == inviter_id:  # they'd asked me already: the link says yes
             db.execute("UPDATE friendships SET status = 'accepted' WHERE requester_id = ? AND addressee_id = ?",
                        (inviter_id, user["id"]))
-    elif new_here:  # signed up through a friend's link: friends right away
+    elif just_signed_up:  # signed up through a friend's link: friends right away
         db.execute("INSERT OR IGNORE INTO friendships (requester_id, addressee_id, status, created_at) VALUES (?, ?, 'accepted', ?)",
                    (inviter_id, user["id"], now_param()))
     else:
