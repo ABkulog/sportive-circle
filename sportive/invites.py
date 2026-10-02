@@ -65,6 +65,23 @@ def pending_invites(event_id):
            WHERE i.event_id = ? AND i.status = 'pending' ORDER BY i.id""", (event_id,)).fetchall()
 
 
+def invite_outcomes(event_id):
+    """Invites to this game that didn't end with the friend in it, and why, for the host and whoever invited them:
+    so nobody has to wonder where a reserved friend went."""
+    rows = get_db().execute(
+        """SELECT i.inviter_id, i.status, g.full_name AS guest_name, g.avatar_updated AS guest_avatar, i.guest_id,
+                  v.full_name AS inviter_name,
+                  EXISTS (SELECT 1 FROM removed_players p WHERE p.event_id = i.event_id AND p.user_id = i.guest_id)
+                      AS taken_off
+           FROM invites i JOIN users g ON g.id = i.guest_id JOIN users v ON v.id = i.inviter_id
+           WHERE i.event_id = ? AND i.status IN ('accepted', 'declined', 'canceled')
+             AND i.guest_id NOT IN (SELECT user_id FROM rsvps WHERE event_id = i.event_id)
+           ORDER BY i.id""", (event_id,)).fetchall()
+    what = {"declined": "said they can't make it", "canceled": "invite was taken back", "accepted": "joined, then left"}
+    return [{**dict(row), "what": "the host took them off" if row["taken_off"] else what[row["status"]]}
+            for row in rows]
+
+
 def requested_invites(event_id):
     """Friends players asked to bring to a private game, waiting for the host's yes."""
     return get_db().execute(

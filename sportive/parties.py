@@ -14,7 +14,8 @@ from .auth import login_required
 from .db import get_db
 from .events import KEPT_OUT, event_title, get_event, kept_out, not_for_me, query_events, spots_left, try_join
 from .links import public_url
-from .invites import HOLD_TIME, MAX_PARTY, held_spots, hold_spots, my_invite, now_param, team_counts
+from .invites import (HOLD_TIME, MAX_PARTY, held_spots, hold_minutes_left, hold_spots, invite_outcomes, my_invite,
+                      now_param, team_counts)
 from .sms import drop_queued_texts, queue_text
 from .notifications import notify
 from .social import can_message, friends_of, is_blocked_between, too_many_messages
@@ -27,19 +28,39 @@ MAX_NOTE = 150  # "this is my roommate": the note for the host of a private game
 
 
 def invitable_friends(event_id, me):
-    """My friends who aren't in this game and haven't been invited to it yet (blocked people aren't friends)."""
-    return get_db().execute(
-        """SELECT u.id, u.full_name, u.avatar_updated FROM friendships f
+    """All my friends (like Send to friends), each with `why_not`: None if I can reserve a spot for them now,
+    else the reason, shown next to their name. A held spot that ran out (30 min, no answer) can be held again."""
+    rows = get_db().execute(
+        """SELECT u.id, u.full_name, u.avatar_updated,
+                  EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = :event AND r.user_id = u.id) AS going,
+                  (SELECT i.status FROM invites i WHERE i.event_id = :event AND i.guest_id = u.id) AS invite_status,
+                  (SELECT i.expires_at FROM invites i WHERE i.event_id = :event AND i.guest_id = u.id) AS expires_at,
+                  (u.id IN (SELECT user_id FROM removed_players WHERE event_id = :event)
+                   AND :me != (SELECT host_id FROM events WHERE id = :event)) AS taken_off
+           FROM friendships f
            JOIN users u ON u.id = CASE WHEN f.requester_id = :me THEN f.addressee_id ELSE f.requester_id END
            WHERE (f.requester_id = :me OR f.addressee_id = :me) AND f.status = 'accepted'
              AND u.suspended = 0
              AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :me AND b.blocked_id = u.id)
                                                       OR (b.blocker_id = u.id AND b.blocked_id = :me))
-             AND u.id NOT IN (SELECT user_id FROM rsvps WHERE event_id = :event)
-             AND (u.id NOT IN (SELECT user_id FROM removed_players WHERE event_id = :event)
-                  OR :me = (SELECT host_id FROM events WHERE id = :event))
-             AND u.id NOT IN (SELECT guest_id FROM invites WHERE event_id = :event AND status IN ('pending', 'requested'))
            ORDER BY fold(u.full_name)""", {"me": me, "event": event_id}).fetchall()
+    now = now_param()
+    friends = []
+    for row in rows:
+        if row["going"]:
+            why_not = "Already in this game"
+        elif row["taken_off"]:
+            why_not = "The host took them off this game"
+        elif row["invite_status"] == "requested":
+            why_not = "Waiting for the host's OK"
+        elif row["invite_status"] == "pending" and row["expires_at"] > now:
+            left = hold_minutes_left({"status": "pending", "expires_at": row["expires_at"]})
+            why_not = f"Spot held for {left} more min"
+        else:
+            why_not = None
+        friends.append({**dict(row), "why_not": why_not,
+                        "hold_ran_out": row["invite_status"] == "pending" and row["expires_at"] <= now})
+    return friends
 
 
 def party_plan(event):
@@ -121,12 +142,13 @@ def party_up(event_id):
         return redirect(url_for("events.detail", event_id=event_id))
     friends = invitable_friends(event_id, me)
     if request.method == "POST":
-        allowed = {friend["id"] for friend in friends}
+        allowed = {friend["id"] for friend in friends if friend["why_not"] is None}
         chosen = list(dict.fromkeys(int(value) for value in request.form.getlist("friend") if value.isdigit()))
         if not chosen:
             flash("Pick at least one friend.", "error")
         elif any(friend_id not in allowed for friend_id in chosen):
-            flash("You can only invite your friends who aren't in this game yet.", "error")
+            flash("You can only invite your friends who aren't in this game and don't have a spot held already.",
+                  "error")
         elif len(chosen) > MAX_PARTY:
             flash(f"You can invite up to {MAX_PARTY} friends at once.", "error")
         else:
@@ -414,9 +436,11 @@ def can_send_to_friends(event):
 
 
 def sharable_friends(event_id, me):
-    """My friends who aren't already going (blocked people aren't friends)."""
+    """All my friends (the same list as Reserve spots; blocked people aren't friends), each with `why_not`:
+    "Already in this game" for those going, else None."""
     going = {row[0] for row in get_db().execute("SELECT user_id FROM rsvps WHERE event_id = ?", (event_id,))}
-    return [friend for friend in friends_of(me) if friend["id"] not in going]
+    return [{**dict(friend), "why_not": "Already in this game" if friend["id"] in going else None}
+            for friend in friends_of(me)]
 
 
 @bp.route("/events/<int:event_id>/send", methods=("GET", "POST"))
@@ -430,7 +454,7 @@ def send_to_friends(event_id):
         return redirect(url_for("events.detail", event_id=event_id))
     friends = sharable_friends(event_id, me)
     if request.method == "POST":
-        allowed = {friend["id"] for friend in friends}
+        allowed = {friend["id"] for friend in friends if friend["why_not"] is None}
         chosen = list(dict.fromkeys(int(value) for value in request.form.getlist("friend") if value.isdigit()))
         note = one_line(request.form.get("note"))[:MAX_SHARE_NOTE]
         if not chosen:
@@ -452,3 +476,9 @@ def send_to_friends(event_id):
             flash(f"Sent to {names[0]}." if len(names) == 1 else f"Sent to {len(names)} friends.", "success")
             return redirect(url_for("events.detail", event_id=event_id))
     return render_template("events/send.html", event=event, friends=friends, max_note=MAX_SHARE_NOTE)
+
+
+@bp.app_template_global("invite_outcomes")
+def invite_outcomes_for_page(event_id):
+    """For the game page: invites that didn't work out, and why (invites.invite_outcomes)."""
+    return invite_outcomes(event_id)

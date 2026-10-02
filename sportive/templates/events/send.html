@@ -7,23 +7,26 @@
   <h1>Send to friends</h1>
   <p class="muted">{{ event_title(event) }} · {{ event.starts_at|when }}</p>
   <p class="muted">They get it as a message with a link to the game. Nothing is held for them.</p>
+  {% set can_pick = friends|selectattr('why_not', 'none')|list %}
   {% if friends %}
     <form method="post" class="form">
       {{ csrf_field() }}
       <ul class="pick-list">
         {% for f in friends %}
-          <li><label class="pick-row">
-            <input type="checkbox" name="friend" value="{{ f.id }}">
-            {{ avatar(f.id, f.full_name, f.avatar_updated, 36) }}<span>{{ f.full_name }}</span>
+          <li><label class="pick-row{% if f.why_not %} is-unavailable{% endif %}">
+            <input type="checkbox" name="friend" value="{{ f.id }}"{% if f.why_not %} disabled{% endif %}>
+            {{ avatar(f.id, f.full_name, f.avatar_updated, 36) }}<span>{{ f.full_name }}
+              {% if f.why_not %}<small class="muted pick-why">{{ f.why_not }}</small>{% endif %}</span>
           </label></li>
         {% endfor %}
       </ul>
+      {% if not can_pick %}<p class="muted">They're all going already.</p>{% endif %}
       <label class="field"><span>Message <em>(optional)</em></span>
         <input name="note" maxlength="{{ max_note }}" placeholder="Want to play? {{ event_title(event) }}"></label>
-      <button class="btn btn-block btn-large">Send</button>
+      <button class="btn btn-block btn-large"{% if not can_pick %} disabled{% endif %}>Send</button>
     </form>
   {% else %}
-    <p>None of your friends can get this one: they're all going already, or you haven't added any yet.</p>
+    <p>You don't have friends on Sportive Circle yet.</p>
     <a class="btn btn-ghost" href="{{ url_for('social.friends') }}">Add friends</a>
   {% endif %}
 </div>

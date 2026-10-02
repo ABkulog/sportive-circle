@@ -6304,3 +6304,59 @@ def test_need_players_tip_sits_under_both_boxes(accounts, client):
     row = page[page.index('<div class="row">'):page.index("</div>", page.index('<div class="row">'))]
     assert 'name="sport"' in row and 'name="location"' in row and "data-place-tip" not in row
     assert "data-place-tip" in page
+
+
+def test_reserve_spots_lists_every_friend_and_holds_can_be_renewed(accounts, client, app):
+    """Vincent: Thomas was reserved, then wasn't anymore, and couldn't be picked again. Reserve spots now lists
+    every friend (like Send to friends), says why someone can't be picked, and a held spot that ran out can be
+    held again."""
+    ids = _people(accounts, app, "Maya", "Thomas", "Jordan", "Sam")
+    _friends(app, ids["Maya"], ids["Thomas"], ids["Jordan"], ids["Sam"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Sunday 5v5 IMA", players="10")))
+    client.post(f"/events/{game}/party", data={"friend": [ids["Thomas"], ids["Jordan"]]})
+    _as(accounts, "Sam")
+    client.post(f"/events/{game}/join")
+    _as(accounts, "Maya")
+    page = client.get(f"/events/{game}/party").data.decode()
+    sent = client.get(f"/events/{game}/send").data.decode()
+    for name in ("Thomas Husky", "Jordan Husky", "Sam Husky"):                  # everyone, on both pages
+        assert name in page and name in sent
+    assert "Already in this game" in page and "Spot held for 30 more min" in page
+    with app.app_context():                                                   # 30 minutes pass, Thomas never answers
+        get_db().execute("UPDATE invites SET expires_at = '2000-01-01 00:00' WHERE guest_id = ?", (ids["Thomas"],))
+        get_db().commit()
+    assert "held spot ran out" in client.get(f"/events/{game}").data.decode()
+    page = client.get(f"/events/{game}/party").data.decode()
+    assert "Their held spot ran out. Reserve it again?" in page
+    again = client.post(f"/events/{game}/party", data={"friend": [ids["Thomas"]]}, follow_redirects=True)
+    assert b"held for 30 minutes" in again.data
+    with app.app_context():
+        assert get_db().execute("SELECT expires_at > '2000-01-01 00:00' FROM invites WHERE guest_id = ?",
+                                (ids["Thomas"],)).fetchone()[0] == 1
+    refused = client.post(f"/events/{game}/party", data={"friend": [ids["Sam"]]}, follow_redirects=True)
+    assert b"only invite your friends who aren&#39;t in this game" in refused.data   # already going
+
+
+def test_the_host_sees_what_happened_to_each_invite(accounts, client, app):
+    """Vincent: "we don't know why" a reserved friend disappeared. The game page now says, for each invite that
+    didn't end with the friend in the game: can't make it, joined then left, taken off, or taken back."""
+    ids = _people(accounts, app, "Maya", "Thomas", "Jordan", "Sam", "Lee")
+    _friends(app, ids["Maya"], ids["Thomas"], ids["Jordan"], ids["Sam"], ids["Lee"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Sunday 5v5 IMA", players="10")))
+    client.post(f"/events/{game}/party", data={"friend": [ids["Thomas"], ids["Jordan"], ids["Sam"], ids["Lee"]]})
+    _as(accounts, "Thomas")
+    client.post(f"/events/{game}/invite/answer", data={"answer": "yes"})
+    client.post(f"/events/{game}/leave")
+    _as(accounts, "Jordan")
+    client.post(f"/events/{game}/invite/answer", data={"answer": "no"})
+    _as(accounts, "Sam")
+    client.post(f"/events/{game}/invite/answer", data={"answer": "yes"})
+    _as(accounts, "Maya")
+    client.post(f"/events/{game}/players/{ids['Sam']}/remove")
+    client.post(f"/events/{game}/invite/{ids['Lee']}/cancel")
+    page = client.get(f"/events/{game}").data.decode()
+    assert "Invites that didn't work out" in page
+    for line in ("joined, then left", "said they can&#39;t make it", "the host took them off", "invite was taken back"):
+        assert line in page
