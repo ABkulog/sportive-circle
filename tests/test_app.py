@@ -3339,6 +3339,126 @@ def test_top_dawgs_ties_share_a_medal():
     assert tmpl.render(top_dawgs=[{"games": 5}, {"games": 5}, {"games": 3}]) == "1 1 3 "
 
 
+def _app_invite_link(app, inviter_id):
+    from sportive.parties import _signer
+    with app.test_request_context():
+        return "/join/" + _signer().dumps([0, inviter_id])
+
+
+def _set_joined(app, email, days_ago):
+    with app.app_context():
+        get_db().execute("UPDATE users SET created_at = datetime('now', ?) WHERE email = ?", (f"-{days_ago} days", email))
+        get_db().commit()
+
+
+def test_old_invite_links_cant_undo_an_unfriend_or_a_removal(accounts, client, app):
+    """Bot round 9: an old invite link made two people friends again after an unfriend, and let a player the host
+    took off a game straight back in."""
+    ids = _people(accounts, app, "Maya", "Jordan", "Sam")
+    _set_joined(app, "jordan@uw.edu", 30)
+    _set_joined(app, "sam@uw.edu", 30)
+    link = _app_invite_link(app, ids["Maya"])
+    _as(accounts, "Jordan")
+    done = client.post(link, follow_redirects=True).data.decode()           # on the app for a month: it asks
+    assert "Sent Maya a friend request" in done
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM friendships").fetchone()[0] == "pending"
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(is_private="1", password="dawgs26", title="Hoops")))
+    game_link = _invite_path(client.get(f"/events/{game}").data.decode())
+    _as(accounts, "Sam")
+    client.post(f"/events/{game}/join", data={"password": "dawgs26"})
+    _as(accounts, "Maya")
+    client.post(f"/events/{game}/players/{ids['Sam']}/remove")
+    _as(accounts, "Sam")
+    back = client.post(game_link, follow_redirects=True).data.decode()
+    assert "The host took you off this game" in back
+    with app.app_context():
+        assert not get_db().execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (game, ids["Sam"])).fetchone()
+
+
+def test_unfriend_and_block_end_held_spots_both_ways(accounts, client, app):
+    """Bot round 9: blocking only canceled invites in the blocker's own games; unfriending kept held spots."""
+    ids = _people(accounts, app, "Maya", "Jordan", "Sam")
+    _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])
+    _friends(app, ids["Jordan"], ids["Sam"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Open run", players="10")))
+    client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"]]})   # Maya holds a spot for Jordan
+    _as(accounts, "Jordan")
+    client.post(f"/events/{game}/join")
+    client.post(f"/events/{game}/party", data={"friend": [ids["Sam"]]})      # Jordan holds one for Sam
+    status = "SELECT status FROM invites WHERE event_id = ? AND guest_id = ?"
+    _as(accounts, "Sam")
+    assert "You down?" in client.get(f"/events/{game}").data.decode()
+    client.post(f"/block/{ids['Jordan']}")                                   # Sam blocks Jordan (not the host)
+    with app.app_context():
+        assert get_db().execute(status, (game, ids["Sam"])).fetchone()[0] == "canceled"
+        assert not get_db().execute("SELECT 1 FROM notices WHERE user_id = ? AND key = ?",
+                                    (ids["Sam"], f"invite:{game}")).fetchone()
+    _as(accounts, "Maya")
+    game2 = event_id_from(client.post("/events/new", data=event_form(title="Second run", players="10")))
+    client.post(f"/events/{game2}/party", data={"friend": [ids["Sam"]]})
+    client.post(f"/friends/remove/{ids['Sam']}")                              # unfriend: the held spot ends too
+    with app.app_context():
+        assert get_db().execute(status, (game2, ids["Sam"])).fetchone()[0] == "canceled"
+
+
+def test_suspended_friends_dont_show_as_mutual(accounts, client, app):
+    ids = _people(accounts, app, "Maya", "Jordan", "Sam")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _friends(app, ids["Jordan"], ids["Sam"])
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 1 WHERE id = ?", (ids["Jordan"],))
+        get_db().commit()
+    _as(accounts, "Maya")
+    page = client.get("/friends").data.decode()
+    assert "Friends with Jordan" not in page
+    assert "mutual friend" not in client.get("/friends?q=sam").data.decode()
+
+
+def test_private_game_requests_and_passwords(accounts, client, app):
+    """Bot round 9: approving a request for someone already in held a spot nobody needed; tapping Join without
+    a password counted as a wrong guess."""
+    ids = _people(accounts, app, "Maya", "Sam", "John", "Kim")
+    _friends(app, ids["Sam"], ids["John"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(is_private="1", password="dawgs26", title="Hoops",
+                                                                     players="4")))
+    _as(accounts, "Sam")
+    client.post(f"/events/{game}/join", data={"password": "dawgs26"})
+    client.post(f"/events/{game}/party", data={"friend": [ids["John"]], "note": ""})
+    _as(accounts, "John")
+    client.post(f"/events/{game}/join", data={"password": "dawgs26"})          # gets in on his own
+    _as(accounts, "Maya")
+    said = client.post(f"/events/{game}/requests/{ids['John']}/approve", follow_redirects=True).data.decode()
+    assert "John is already in the game" in said
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM invites WHERE event_id = ? AND status = 'pending'",
+                                (game,)).fetchone()[0] == 0
+    _as(accounts, "Kim")
+    for _ in range(12):
+        client.post(f"/events/{game}/join", data={"password": ""})              # taps Join before typing
+    client.post(f"/events/{game}/join", data={"password": "dawgs26"})
+    with app.app_context():
+        assert get_db().execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (game, ids["Kim"])).fetchone()
+
+
+def test_16_bit_and_see_through_pngs_come_out_right():
+    from sportive.photos import _clean_photo
+    from PIL import Image
+    gradient = Image.new("I;16", (64, 64))
+    gradient.putdata([x * 1000 for y in range(64) for x in range(64)])
+    data = BytesIO()
+    gradient.save(data, "PNG")
+    out = Image.open(BytesIO(_clean_photo(data.getvalue(), 64, False, 85))).convert("L")
+    assert 90 < sum(out.getdata()) / (64 * 64) < 160                             # a gradient, not all white
+    black_is_clear = Image.new("RGB", (64, 64), (0, 0, 0))
+    data = BytesIO()
+    black_is_clear.save(data, "PNG", transparency=(0, 0, 0))
+    assert Image.open(BytesIO(_clean_photo(data.getvalue(), 64, False, 85))).getpixel((5, 5))[0] > 240
+
+
 def test_party_up_holds_spots_for_friends(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Stranger")
     _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])

@@ -990,7 +990,8 @@ def join_problem(event, password=None):
         if too_many_password_tries(event["id"], me):
             return "Too many wrong passwords. Try again in an hour, or ask to be invited."
         if not password or not same_secret(password.strip(), event["password"]):
-            count_wrong_password(event["id"], me)
+            if password and password.strip():  # tapping Join before typing it isn't a wrong guess
+                count_wrong_password(event["id"], me)
             return "That's not the password." if password else "This game is private. Enter the password."
     return None
 

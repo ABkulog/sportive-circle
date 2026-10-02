@@ -7,6 +7,8 @@ Yes takes the held spot; No frees it for someone else.
 Team vs team: the host's party is team 1. Another group "challenges" them by claiming team 2 the same
 way (the leader joins and holds spots for their friends).
 """
+from datetime import timedelta
+
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, session, url_for
 from itsdangerous import BadSignature, URLSafeSerializer
 
@@ -19,7 +21,7 @@ from .sms import drop_queued_texts, queue_text
 from .notifications import notify
 from .social import can_message, friends_of, is_blocked_between, too_many_messages
 from .textutil import one_line
-from .timeutil import fmt_when, from_db, now_local, to_db
+from .timeutil import fmt_when, from_db, from_sqlite_utc, now_local, to_db
 
 bp = Blueprint("parties", __name__)
 
@@ -244,6 +246,12 @@ def answer_request(event_id, guest_id, action):
         db.commit()
         flash("Declined.", "info")
         return redirect(link + "#requests")
+    if db.execute("SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (event_id, guest_id)).fetchone():
+        # They got in on their own meanwhile: nothing to hold (a held spot would block someone else for 30 min).
+        db.execute("UPDATE invites SET status = 'accepted' WHERE id = ?", (request_row["id"],))
+        db.commit()
+        flash(f"{guest_first} is already in the game.", "info")
+        return redirect(link + "#requests")
     # The host said yes to this person by name, so a past "took you off this game" no longer applies.
     db.execute("DELETE FROM removed_players WHERE event_id = ? AND user_id = ?", (event_id, guest_id))
     db.commit()
@@ -354,22 +362,34 @@ def accept_invite_link(user, token):
         return None
     g.user = user  # they may have logged in during this very request
     first = user["full_name"].split()[0]
-    friends = db.execute("""SELECT 1 FROM friendships WHERE (requester_id = ? AND addressee_id = ?)
-                            OR (requester_id = ? AND addressee_id = ?)""",
-                         (inviter_id, user["id"], user["id"], inviter_id)).fetchone()
-    if friends:
-        db.execute("""UPDATE friendships SET status = 'accepted' WHERE (requester_id = ? AND addressee_id = ?)
-                      OR (requester_id = ? AND addressee_id = ?)""", (inviter_id, user["id"], user["id"], inviter_id))
-    else:
+    friendship = db.execute("""SELECT requester_id, status FROM friendships WHERE (requester_id = ? AND addressee_id = ?)
+                               OR (requester_id = ? AND addressee_id = ?)""",
+                            (inviter_id, user["id"], user["id"], inviter_id)).fetchone()
+    joined = from_sqlite_utc(user["created_at"]) if "created_at" in user.keys() and user["created_at"] else None
+    new_here = joined is not None and now_local() - joined < timedelta(days=1)
+    if friendship is not None:
+        if friendship["requester_id"] == inviter_id:  # they'd asked me already: the link says yes
+            db.execute("UPDATE friendships SET status = 'accepted' WHERE requester_id = ? AND addressee_id = ?",
+                       (inviter_id, user["id"]))
+    elif new_here:  # signed up through a friend's link: friends right away
         db.execute("INSERT OR IGNORE INTO friendships (requester_id, addressee_id, status, created_at) VALUES (?, ?, 'accepted', ?)",
                    (inviter_id, user["id"], now_param()))
+    else:
+        # Already on the app: an old link mustn't undo an unfriend or a declined request, so it asks instead.
+        if db.execute("INSERT OR IGNORE INTO friendships (requester_id, addressee_id, status, created_at) VALUES (?, ?, 'pending', ?)",
+                      (user["id"], inviter_id, now_param())).rowcount:
+            inviter_name = db.execute("SELECT full_name FROM users WHERE id = ?", (inviter_id,)).fetchone()[0]
+            flash(f"Sent {inviter_name.split()[0]} a friend request.", "info")
     db.commit()
     event = _open_game(event_id)
     if event is None:
         if event_id:
-            flash("That game is over or was canceled, but you and your friend are connected now.", "info")
+            flash("That game is over or was canceled.", "info")
         return url_for("social.friends") if not event_id else url_for("events.feed")
     if event["i_am_going"]:
+        return url_for("events.detail", event_id=event_id)
+    if db.execute("SELECT 1 FROM removed_players WHERE event_id = ? AND user_id = ?", (event_id, user["id"])).fetchone():
+        flash("The host took you off this game, so the link doesn't work for it.", "error")  # an old link can't undo it
         return url_for("events.detail", event_id=event_id)
     inviter_team = db.execute("SELECT team FROM rsvps WHERE event_id = ? AND user_id = ?",
                               (event_id, inviter_id)).fetchone()

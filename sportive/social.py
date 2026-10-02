@@ -122,6 +122,17 @@ def block_user(me, other):
                   (SELECT id FROM events WHERE host_id = ? AND cancelled = 0 AND ends_at >= ?)""", (other, me, now))
     db.execute("""UPDATE invites SET status = 'canceled' WHERE guest_id = ? AND status IN ('pending', 'requested')
                   AND event_id IN (SELECT id FROM events WHERE host_id = ?)""", (other, me))
+    cancel_invites_between(me, other)
+
+
+def cancel_invites_between(a, b):
+    """Spots held and invites either of them sent the other, in any game, end (with their "You down?" notices):
+    after an unfriend or a block, nobody gets in on the other's invite."""
+    db = get_db()
+    pair = "((guest_id = :a AND inviter_id = :b) OR (guest_id = :b AND inviter_id = :a)) AND status IN ('pending', 'requested')"
+    for row in db.execute(f"SELECT event_id, guest_id FROM invites WHERE {pair}", {"a": a, "b": b}).fetchall():
+        db.execute("DELETE FROM notices WHERE user_id = ? AND key = ?", (row["guest_id"], f"invite:{row['event_id']}"))
+    db.execute(f"UPDATE invites SET status = 'canceled' WHERE {pair}", {"a": a, "b": b})
 
 
 def too_many_messages(me, sending=1):
@@ -282,9 +293,11 @@ def friend_suggestions(me):
     suspended accounts. Each row has `mutual` (friends in common), `via` (one of them, for "Friends with Maya")
     and `games` (finished games played together)."""
     return get_db().execute(
-        """WITH my_friends AS (
+        """WITH my_friends AS (  -- not suspended ones: nobody can see them, so they can't be "Friends with ..."
                SELECT CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END AS id
-               FROM friendships WHERE status = 'accepted' AND (requester_id = :me OR addressee_id = :me)),
+               FROM friendships WHERE status = 'accepted' AND (requester_id = :me OR addressee_id = :me)
+               AND (CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END)
+                   NOT IN (SELECT id FROM users WHERE suspended = 1)),
            friends_of_friends AS (
                SELECT f.addressee_id AS id, m.id AS via
                FROM my_friends m JOIN friendships f ON f.requester_id = m.id WHERE f.status = 'accepted'
@@ -354,9 +367,11 @@ def search_people(me, q):
         params.update({f"e{n}": f"{netid}@{domain}" for n, domain in enumerate(domains)})
         netid_match = f"LOWER(u.email) IN ({', '.join(f':e{n}' for n in range(len(domains)))})"
     rows = get_db().execute(
-        f"""WITH my_friends AS (
+        f"""WITH my_friends AS (  -- suspended friends don't count as mutual friends (nobody can see them)
                SELECT CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END AS id
-               FROM friendships WHERE status = 'accepted' AND (requester_id = :me OR addressee_id = :me)),
+               FROM friendships WHERE status = 'accepted' AND (requester_id = :me OR addressee_id = :me)
+               AND (CASE WHEN requester_id = :me THEN addressee_id ELSE requester_id END)
+                   NOT IN (SELECT id FROM users WHERE suspended = 1)),
             co_players AS (
                SELECT DISTINCT theirs.user_id FROM rsvps mine JOIN rsvps theirs ON mine.event_id = theirs.event_id
                JOIN events e ON e.id = mine.event_id WHERE mine.user_id = :me AND e.cancelled = 0)
@@ -429,6 +444,7 @@ def remove_friend(user_id):
     db = get_db()
     db.execute("""DELETE FROM friendships WHERE (requester_id = ? AND addressee_id = ?)
                   OR (requester_id = ? AND addressee_id = ?)""", (me, user_id, user_id, me))
+    cancel_invites_between(me, user_id)
     db.commit()
     return _back(url_for("social.friends"))
 
