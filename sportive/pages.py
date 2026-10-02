@@ -41,7 +41,7 @@ def touch_icon():
 
 # Pages that are for logged-in people (or private) stay out of search engines.
 PRIVATE_PATHS = ("/messages", "/profile", "/admin", "/notifications", "/friends", "/me/", "/u/", "/verify",
-                 "/reset", "/tasks/", "/suggestions")
+                 "/reset", "/tasks/", "/suggestions", "/settings")
 
 
 def robots():

@@ -83,6 +83,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-PARTY-4 | Everyone in a game has "Send invite link": "Jordan wants you in their Sportive Circle game: … Tap to sign up and you're in." Signing up (or logging in) through it puts the person in that game and makes them friends with the sender. The link is signed (can't be forged) and lets friends into a private game without the password. The Friends page has the same link for the app itself. | Must | ✅ |
 | FR-PARTY-5 | A game that's full only because spots are held for invited friends says "Full for now", how many are held and by whose invite, and the time the soonest hold ends; the page updates by itself then. Trying to join says the same instead of a bare "full". | Must | ✅ |
 | FR-PARTY-6 | "Send to friends" on any open public game (going or not): pick friends and they get a direct message with a card that opens the game. Nothing is held for them. Not for private games (they use the invite link and password). | Should | ✅ |
+| FR-PARTY-7 | An invite link's page (and its preview in iMessage, Discord and the like) never shows a private or members-only game's place: it says "Place shown once you're in". Members-only invites say the game is for club members and don't promise a spot. Invite pages aren't listed by search engines. Public games and club links preview with what they are (sport, time, place; the club's description). | Must | ✅ |
 | FR-PRIV-1 | New events and Need players posts can be private: a lock in the list, and joining needs the host's password (shown to the host and players). Wrong passwords are limited to 10 an hour. | Must | ✅ |
 | FR-PRIV-2 | Friends the host invites to a private game don't need the password. | Must | ✅ |
 | FR-PRIV-3 | In a private game, friends other players want to bring are requests with a note; the host approves or declines. | Should | ✅ |
@@ -182,6 +183,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | NFR-PRIV-3 | Deleting an account deletes the person's data (reports keep a copy for safety, without the reporter's name). | ✅ |
 | NFR-PRIV-4 | No ads, no tracking cookies, no selling data. Only a login cookie. | ✅ |
 | NFR-PRIV-5 | The database file is never committed to Git (`.gitignore`). | ✅ |
+| NFR-PRIV-6 | Chats stay correct on a slow connection: one check for new messages at a time, and a message already shown is never added again. | ✅ |
 
 ### Usability and accessibility (NFR-UX)
 

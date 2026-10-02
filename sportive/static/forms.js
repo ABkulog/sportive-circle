@@ -166,12 +166,9 @@
   if (!starts || !ends) return;
   const HOUR = 60 * 60 * 1000;
   // datetime-local values are wall-clock times ("2026-09-30T18:00"): read and write them as local time.
-  const read = (input) => { const t = new Date(input.value).getTime(); return Number.isNaN(t) ? null : t; };
-  const pad = (n) => String(n).padStart(2, "0");
-  const write = (input, time) => {
-    const d = new Date(time);
-    input.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  };
+  // Done in UTC so the night the clocks change can't stretch or shrink a game: 1:30 + 1 hour is always 2:30.
+  const read = (input) => { const t = Date.parse(input.value + "Z"); return Number.isNaN(t) ? null : t; };
+  const write = (input, time) => { input.value = new Date(time).toISOString().slice(0, 16); };
   const gap = () => {
     const s = read(starts), e = read(ends);
     return s !== null && e !== null && e > s ? e - s : HOUR;
@@ -254,7 +251,7 @@
     clearTimeout(timer);
     timer = setTimeout(async () => {
       const [starts, ends] = times();
-      if (!location.value || !starts || !ends) { show(null); return; }
+      if (!location.value || !starts || !ends) { ++asked; show(null); return; }  // and ignore older answers
       const params = new URLSearchParams({ location: location.value, starts_at: starts, ends_at: ends });
       if (form.dataset.eventId) params.set("event", form.dataset.eventId);
       const ticket = ++asked;

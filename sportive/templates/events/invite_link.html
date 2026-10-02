@@ -1,13 +1,20 @@
 {% extends "base.html" %}
 {% block title %}You're invited{% endblock %}
+{# Private and members-only games keep their place to themselves: a link can be forwarded or previewed by anyone. #}
+{% set hidden = event and (event.is_private or event.members_only) and not event.i_am_going %}
+{% set closed = event and event.members_only and not event.i_am_member %}
+{% block description %}{% if event and not hidden %}{{ SPORTS[event.sport] }} · {{ event.starts_at|when }} · {{ event.location }}. Join on Sportive Circle, for UW Huskies.{% else %}{{ super() }}{% endif %}{% endblock %}
+{% block head %}<meta name="robots" content="noindex">{% endblock %}
 {% block content %}
 <div class="card form-card center invite-landing">
   <p class="eyebrow">You're invited</p>
   {% if event %}
     <h1>{{ inviter.full_name.split()[0] }} wants you in their game</h1>
     <p class="invite-game"><span aria-hidden="true">{{ SPORT_EMOJI[event.sport] }}</span> <strong>{{ event_title(event) }}</strong><br>
-      <span class="muted">{{ event.starts_at|when }} · {{ event.location }}</span></p>
-    {% if full %}<p class="muted">This game is full right now.{% if not g.user %} Sign up anyway and you'll be
+      <span class="muted">{{ event.starts_at|when }} · {{ 'Place shown once you\'re in' if hidden else event.location }}</span></p>
+    {% if closed %}<p class="muted">This game is for {{ event.club_name }} members.{% if not g.user %} Sign up anyway and
+      you'll be friends with {{ inviter.full_name.split()[0] }}.{% endif %}</p>
+    {% elif full %}<p class="muted">This game is full right now.{% if not g.user %} Sign up anyway and you'll be
       friends with {{ inviter.full_name.split()[0] }}.{% endif %}</p>
     {% elif not g.user %}<p class="muted">Sign up with your UW email and you're in.</p>{% endif %}
   {% else %}
@@ -17,13 +24,13 @@
   {% if g.user %}
     <form method="post" action="{{ url_for('parties.open_invite_link', token=token) }}">
       {{ csrf_field() }}
-      <button class="btn btn-large btn-block">{{ 'Join the game' if event and not full else 'Connect with ' ~ inviter.full_name.split()[0] }}</button>
+      <button class="btn btn-large btn-block">{{ 'Join the game' if event and not full and not closed else 'Connect with ' ~ inviter.full_name.split()[0] }}</button>
     </form>
     <a class="btn btn-ghost btn-block" href="{{ url_for('index') }}">Not now</a>
   {% else %}
     <form method="post" action="{{ url_for('parties.open_invite_link', token=token) }}">
       {{ csrf_field() }}
-      <button class="btn btn-large btn-block">Sign up{% if event and not full %} and join{% endif %}</button>
+      <button class="btn btn-large btn-block">Sign up{% if event and not full and not closed %} and join{% endif %}</button>
       <button class="btn btn-ghost btn-block" name="go" value="login">I have an account</button>
     </form>
   {% endif %}

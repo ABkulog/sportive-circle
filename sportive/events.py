@@ -220,7 +220,7 @@ PASSWORD_WORDS = ("husky", "dawgs", "purple", "gold", "rally", "court", "field",
 
 
 # Which form field an error message is about, so the step-by-step form opens on it and marks it (wizard.js).
-ERROR_FIELDS = [("name is too long", "title"), ("can't be played at", "location"), ("Off campus", "note"),
+ERROR_FIELDS = [("name is too long", "title"), ("can be at most", "ends_at"), ("can't be played at", "location"), ("Off campus", "note"),
                 ("location", "location"), ("sport", "sport"), ("skill level", "skill_level"),
                 ("start time", "starts_at"), ("end time", "ends_at"), ("end after it starts", "ends_at"),
                 ("Event date", "starts_at"), ("when you're playing", "starts_in"), ("Note", "note"),

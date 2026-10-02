@@ -479,15 +479,28 @@
   list.addEventListener("touchend", endSwipe);
   list.addEventListener("touchcancel", endSwipe);
 
+  // One check at a time: on a slow connection the 5-second timer would otherwise start new checks before the
+  // last one answered, and each answer would add the same new messages again.
+  let polling = null;
   async function poll(now) {
     if (document.hidden && !now) return;
+    if (polling) {
+      if (!now) return;          // the timer can skip a turn
+      await polling.catch(() => {});  // after sending: wait for the one in flight, then ask again
+    }
+    polling = check();
+    try { await polling; } finally { polling = null; }
+  }
+  async function check() {
     try {
       const first = list.querySelector(".chat-msg");
       const response = await fetch(`${box.dataset.pollUrl}?after=${lastId}&from=${first ? first.dataset.id : 0}`,
                                    { headers: { Accept: "application/json" } });
       if (new URL(response.url).pathname.startsWith("/login")) { location.reload(); return; }  // logged out
       if (!response.ok) return;
-      const { messages, status, reactions } = await response.json();
+      const answer = await response.json();
+      const { status, reactions } = answer;
+      const messages = answer.messages.filter((m) => m.id > lastId && !list.querySelector(`.chat-msg[data-id="${m.id}"]`));
       if (reactions) {  // reactions change on old messages too: bring every message up to date
         list.querySelectorAll(".chat-msg").forEach((item) => showReactions(item, reactions[item.dataset.id] || []));
       }

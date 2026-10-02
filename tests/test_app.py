@@ -5039,6 +5039,12 @@ def test_one_account_per_inbox_even_with_both_uw_addresses(accounts, client, app
         assert get_db().execute("SELECT COUNT(*) FROM users WHERE email LIKE 'dup@%' AND verified = 1").fetchone()[0] == 1
 
 
+def test_an_event_thats_too_long_opens_the_form_on_the_end_time(accounts, client, app):
+    accounts.signup(email="maya@uw.edu", name="Maya Chen")
+    page = client.post("/events/new", data=event_form(ends_at=form_time(timedelta(days=1, hours=20))))
+    assert b"at most" in page.data and b'data-error-field="ends_at"' in page.data
+
+
 def test_invite_link_to_a_full_game_says_so(accounts, client, app):
     accounts.signup(email="maya@uw.edu", name="Maya Chen")
     game = event_id_from(client.post("/events/new", data=event_form(title="Full hoops", players="2")))
@@ -5058,6 +5064,42 @@ def test_invite_link_to_a_full_game_says_so(accounts, client, app):
         assert db.execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (game,)).fetchone()[0] == 2   # not overbooked
         assert db.execute("SELECT status FROM friendships WHERE requester_id = (SELECT id FROM users WHERE"
                           " email = 'maya@uw.edu')").fetchall()                                          # still friends
+
+
+def test_invite_links_to_private_games_keep_the_place_to_themselves(accounts, client, app):
+    """Bot round 5: a forwarded or previewed invite link showed a private game's place to anyone holding it."""
+    accounts.signup(email="maya@uw.edu", name="Maya Chen")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Secret hoops", is_private="1",
+                                                                     password="tiger-lily-123")))
+    link = _invite_path(client.get(f"/events/{game}").data.decode())
+    open_game = event_id_from(client.post("/events/new", data=event_form(title="Open hoops")))
+    open_link = _invite_path(client.get(f"/events/{open_game}").data.decode())
+    accounts.logout()
+    for agent in ("facebookexternalhit/1.1", "Discordbot/2.0", "Mozilla/5.0"):
+        page = client.get(link, headers={"User-Agent": agent}).data.decode()
+        assert "Secret hoops" in page and "Place shown once you" in page and 'name="robots" content="noindex"' in page
+        assert "Intramural" not in page and "tiger-lily" not in page
+    preview = client.get(open_link).data.decode()       # a public game's preview says what it is, and where
+    assert re.search(r'og:description" content="Basketball · [^"]*IMA', preview)
+
+
+def test_members_only_invite_links_dont_promise_a_spot(accounts, client, app):
+    club = _club_with_member(accounts, client, app)
+    game = event_id_from(client.post(f"/events/new?club={club}", data=event_form(
+        title="Practice", sport="spikeball", location="The Quad", is_private="members", club=str(club))))
+    link = _invite_path(client.get(f"/events/{game}").data.decode())
+    accounts.logout()
+    page = client.get(link).data.decode()
+    assert "for UW Spikeball Club members" in page and "Sign up and join" not in page and "The Quad" not in page
+    accounts.signup(email="outsider@uw.edu", name="Out Sider")
+    assert "Join the game" not in client.get(link).data.decode()
+
+
+def test_club_link_previews_use_the_club_description(accounts, client, app):
+    club = _approved_club(accounts, client, app)
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert 'og:description" content="Casual roundnet on the Quad.' in page
+    assert "Disallow: /settings" in client.get("/robots.txt").data.decode()
 
 
 def test_being_blocked_or_suspended_clears_their_messages_from_my_inbox(accounts, client, app):
