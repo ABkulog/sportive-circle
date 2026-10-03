@@ -437,3 +437,5 @@ CREATE TABLE IF NOT EXISTS change_alerts (
     sent_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_change_alerts ON change_alerts(event_id, user_id, sent_at);
+-- Games by host (profiles, "posted a game" limits, the hourly posting limit).
+CREATE INDEX IF NOT EXISTS idx_events_host ON events(host_id, created_at);

@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 
 MIN_PASSWORD, MAX_PASSWORD = 4, 30     # private games
 MAX_DAYS_AHEAD = 365
-CHANGE_ALERTS_PER_DAY = 3  # "Changed" emails/texts per player per game per day (the bell keeps the latest)
+CHANGE_ALERTS_PER_DAY = 6  # "Changed" emails/texts per player per game per day (the bell keeps the latest)
 OPEN_SPOT_CHOICES = ("1", "2", "3", "4", "5", "10")  # the "Open spots" filter on Home
 QUICK_WINDOW = timedelta(hours=3)      # quick posts starting this soon go to the top of the feed
 FEED_PAGE_SIZE = 50                    # games per "Show more games" step on the feed
@@ -171,7 +171,7 @@ def place_map(location):
     }
 
 
-MAX_GAMES_PER_HOUR = 30  # games one person can post in an hour (a 12-week practice is 12): stops bell spam
+MAX_GAMES_PER_HOUR = 60  # games one person can post in an hour (five 12-week practices fit): stops bell spam
 
 
 def posting_too_fast(adding):
@@ -180,7 +180,9 @@ def posting_too_fast(adding):
     recent = get_db().execute("SELECT COUNT(*) FROM events WHERE host_id = ? AND created_at >= datetime('now', '-1 hour')",
                               (g.user["id"],)).fetchone()[0]  # (events.created_at is UTC, from SQLite)
     if recent + adding > MAX_GAMES_PER_HOUR:
-        return "You've posted a lot of games in the last hour. Try again a bit later."
+        left = max(0, MAX_GAMES_PER_HOUR - recent)
+        return (f"You can post up to {MAX_GAMES_PER_HOUR} games an hour, and you've posted {recent}. "
+                + (f"Try {left} or fewer weeks, or try again in a bit." if left else "Try again in a bit."))
     return None
 
 
@@ -583,10 +585,12 @@ def create():
         elif error is None:
             repeat = 1
         if error is None:
-            error = posting_too_fast(repeat)
-        if error is None:
             get_db().commit()
             get_db().execute("BEGIN IMMEDIATE")  # one post at a time, so a double tap can't make two copies
+            error = posting_too_fast(repeat)  # (checked under the lock: two tabs can't both slip under the limit)
+            if error is not None:
+                get_db().rollback()
+        if error is None:
             duplicate = get_db().execute(
                 "SELECT 1 FROM events WHERE host_id = ? AND title = ? AND starts_at = ? AND cancelled = 0",
                 (g.user["id"], data["title"], data["starts_at"]),
@@ -708,7 +712,9 @@ def edit(event_id):
                 left_out = 0
             told = tell_players_it_changed(event, data, by=g.user)
             db.commit()
-            flash(("Saved. Everyone going got a heads-up." if told else "Saved.")
+            flash(("Saved. Everyone going sees it in their notifications (this game changed a lot today, so not "
+                   "everyone got another email)." if told and g.get("change_emails_skipped") else
+                   "Saved. Everyone going got a heads-up." if told else "Saved.")
                   + (f" {left_out} who aren't members are off the game now and were told." if left_out else ""),
                   "success")
             return redirect(url_for("events.detail", event_id=event_id))
@@ -815,13 +821,15 @@ def tell_players_it_changed(event, data, by=None):
         # The bell always has the latest; emails and texts about one game: at most CHANGE_ALERTS_PER_DAY a day each.
         db, now = get_db(), now_local()
         since = to_db(now - timedelta(days=1))
+        everyone = len(players)
         players = [player for player in players if db.execute(
             "SELECT COUNT(*) FROM change_alerts WHERE event_id = ? AND user_id = ? AND sent_at >= ?",
             (event["id"], player["id"], since)).fetchone()[0] < CHANGE_ALERTS_PER_DAY]
+        g.change_emails_skipped = len(players) < everyone  # the host is told honestly (edit())
         db.executemany("INSERT INTO change_alerts (user_id, event_id, sent_at) VALUES (?, ?, ?)",
                        [(player["id"], event["id"], to_db(now)) for player in players])
         for player in players:
-            text_user(player["id"], f"{host} changed {title}: now {fmt_when(data['starts_at'])} at {data['location']}. "
+            text_user(player["id"], kind="important", body=f"{host} changed {title}: now {fmt_when(data['starts_at'])} at {data['location']}. "
                                     f"{public_url('events.detail', event_id=event['id'])}")
         for player in players:
             try:
@@ -866,7 +874,7 @@ def tell_players_it_was_cancelled(event, page_stays=True, by_host=True, by=None)
                "so that invite is off.", url_for("events.feed"), key=f"invite:{event['id']}")
     db.commit()
     for player in players:
-        text_user(player["id"], f"{who} canceled {title} ({when}).")
+        text_user(player["id"], f"{who} canceled {title} ({when}).", kind="important")
     for player in players:
         try:
             subject = f"Canceled: {title} ({when})"

@@ -104,6 +104,7 @@ ADDED_COLUMNS = [
     ("users", "texts_card_done", "INTEGER NOT NULL DEFAULT 0"),  # 1 = closed the "New: texts" card on Home
     ("users", "texts_announced_at", "TEXT"),                     # when tools/announce_texts.py emailed them
     ("direct_messages", "event_id", "INTEGER REFERENCES events(id) ON DELETE SET NULL"),
+    ("users", "sms_stopped_at", "TEXT"),  # when Twilio said they replied STOP (Settings → Texts explains)
 ]
 
 

@@ -54,7 +54,7 @@ def hold_spots(event_id, inviter, friend_ids, team, message, link):
                          (event_id, inviter, friend_id, team, now_param(), expires))
         notify(friend_id, "invites", message, link, key=f"invite:{event_id}")
         queue_text(friend_id, f"{message} Your spot is held for 30 min: "
-                              f"{current_app.config['PUBLIC_URL'].rstrip('/')}{link}")  # sent after the save
+                              f"{current_app.config['PUBLIC_URL'].rstrip('/')}{link}", kind=f"invite:{inviter}")
 
 
 def pending_invites(event_id):
@@ -153,12 +153,14 @@ def count_wrong_password(event_id, user_id):
 INVITES_PER_FRIEND_PER_DAY = 5  # games one person can reserve a spot in for the same friend, a day
 
 
-def invited_too_often(inviter, friend_ids):
+def invited_too_often(inviter, friend_ids, event_id=None):
     """The first friend this person already invited to INVITES_PER_FRIEND_PER_DAY games today, or None: holding
     spots in game after game would fill a friend's bell (and texts) with "You down?"."""
     since = to_db(now_local() - timedelta(days=1))
     for friend_id in friend_ids:
-        if get_db().execute("SELECT COUNT(*) FROM invites WHERE inviter_id = ? AND guest_id = ? AND created_at >= ?",
-                            (inviter, friend_id, since)).fetchone()[0] >= INVITES_PER_FRIEND_PER_DAY:
+        # Other games only: renewing a spot that ran out in this game isn't a new invite.
+        if get_db().execute("SELECT COUNT(*) FROM invites WHERE inviter_id = ? AND guest_id = ? AND created_at >= ?"
+                            " AND event_id IS NOT ?", (inviter, friend_id, since, event_id)).fetchone()[0] \
+                >= INVITES_PER_FRIEND_PER_DAY:
             return friend_id
     return None

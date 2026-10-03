@@ -17,7 +17,7 @@ from .badges import (GIVEN_BADGES, ROLE_BADGES, SHOWCASE_SLOTS, TESTER, catalog,
 from .clubs import SOCIALS
 from .moderation import admin_required, is_admin
 from .notifications import mark_seen, notify
-from .textutil import has_a_letter, is_number, multi_line, one_line, person_name, social_handle
+from .textutil import HANDLE_SITES, has_a_letter, is_number, multi_line, one_line, person_name, social_handle
 from .social import can_message, friendship_status, i_blocked, is_blocked_between
 from .timeutil import now_local, to_db
 
@@ -50,8 +50,10 @@ def clean_social(key, value):
         return value.split("?")[0].split("/")[0]
     handle = social_handle(key, value)
     # A pasted short link ("vm.tiktok.com/ZMabc", "t.co/xyz") isn't a username: fail the check with a message.
-    # A bare username that happens to end like a domain ("maya.co") is fine.
-    if "/" in value and re.search(r"\.(com|net|org|me|app|ly|co|link|gg)$", handle, re.I):
+    # A username that happens to end like a domain ("maya.co", or instagram.com/maya.co) is fine.
+    site = HANDLE_SITES.get(key, "")
+    off_site = re.sub(rf"^(https?://)?(www\.|m\.)?{site}/", "", value, flags=re.I) if site else value
+    if "/" in off_site.split("?")[0].rstrip("/") and re.search(r"\.(com|net|org|me|app|ly|co|link|gg)$", handle, re.I):
         return handle + "/"
     return handle
 

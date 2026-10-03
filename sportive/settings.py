@@ -119,8 +119,9 @@ def texts():
             on = 1 if request.form.get("sms_updates") else 0
             db = get_db()
             changed = db.execute("UPDATE users SET sms_updates = ?, sms_consent_at = CASE WHEN ? THEN ? ELSE"
-                                 " sms_consent_at END WHERE id = ? AND phone_verified = 1",
-                                 (on, on, to_db(now_local()), me)).rowcount
+                                 " sms_consent_at END, sms_stopped_at = CASE WHEN ? THEN NULL ELSE sms_stopped_at END"
+                                 " WHERE id = ? AND phone_verified = 1",
+                                 (on, on, to_db(now_local()), on, me)).rowcount
             db.commit()
             if not changed:
                 flash("Confirm your number first.", "error")
@@ -128,7 +129,7 @@ def texts():
             remove_phone(me)
             flash("Your number is removed. No more texts.", "success")
         return redirect(url_for("settings.texts"))
-    user = get_db().execute("SELECT phone, phone_verified, sms_updates, sms_code FROM users WHERE id = ?",
+    user = get_db().execute("SELECT phone, phone_verified, sms_updates, sms_code, sms_stopped_at FROM users WHERE id = ?",
                             (me,)).fetchone()
     return render_template("settings/texts.html", user=user)
 

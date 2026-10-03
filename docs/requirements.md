@@ -195,7 +195,8 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | NFR-SEC-6 | Limits against abuse: code attempts, resend cooldown (with a countdown), login lockout, 10 wrong private-game passwords/hour, 20 messages/minute, 10 reports/hour, 3 pending clubs per person, length limits on every text field and search, and double-tap protection on forms. | Checked on the server (and in the browser for double taps). | ✅ |
 | NFR-SEC-7 | Security headers on every response. | CSP, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors 'none'`. | ✅ |
 | NFR-SEC-8 | Redirects after login only go to pages on this site. | `safe_next()` blocks `//evil.com`. | ✅ |
-| NFR-SEC-9 | One person can't flood others: at most 30 games posted an hour; at most 5 "posted a game" notices a day from one host to one person; spots reserved for the same friend in at most 5 games a day; "Changed" emails and texts about one game at most 3 a day per player (the bell keeps the latest). | Limits checked on the server. | ✅ |
+| NFR-SEC-9 | One person can't flood others: at most 60 games posted an hour (checked one post at a time, so two tabs can't both slip under it); at most 5 "posted a game" notices a day from one host to one person; spots reserved for the same friend in at most 5 games a day (renewing a spot in the same game doesn't count again); "Changed" emails and texts about one game at most 6 a day per player (the bell keeps the latest, and the host is told not everyone got another email). | Limits checked on the server. | ✅ |
+| NFR-SEC-10 | Texts can't crowd each other out: at most 20 update texts a day, with game changes, cancels and reminders getting their own 20; at most 3 "You down?" texts a day from one friend; only texts that really went out count; a STOP reply is explained in Settings → Texts (text START back, then turn texts on). | Limits checked on the server. | ✅ |
 
 ### Privacy (NFR-PRIV)
 

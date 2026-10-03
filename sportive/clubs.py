@@ -71,7 +71,8 @@ def social_links(club):
 
 # SQL for "how many confirmed members" (members + officers; followers and people waiting don't count).
 MEMBER_COUNT = ("(SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id"
-                " AND m.role IN ('member', 'officer')) AS member_count")
+                " AND m.role IN ('member', 'officer')"
+                " AND m.user_id NOT IN (SELECT id FROM users WHERE suspended = 1)) AS member_count")  # matches the roster
 
 CHOICES = {"club_kind": CLUB_KINDS, "focus": FOCUS, "joining": JOINING, "experience": EXPERIENCE,
            "who_can_join": WHO_CAN_JOIN_LABELS}

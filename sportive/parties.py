@@ -150,7 +150,7 @@ def party_up(event_id):
                   "error")
         elif len(chosen) > MAX_PARTY:
             flash(f"You can invite up to {MAX_PARTY} friends at once.", "error")
-        elif invited_too_often(me, chosen):
+        elif invited_too_often(me, chosen, event_id):
             flash("You've invited one of these friends to a lot of games today. Try again tomorrow.", "error")
         else:
             note = one_line(request.form.get("note"))[:MAX_NOTE]
@@ -290,7 +290,8 @@ def answer_request(event_id, guest_id, action):
         message = f"{inviter['full_name'].split()[0]} wants you in {title} ({fmt_when(event['starts_at'])}). You down?"
         notify(guest_id, "invites", message, link, key=f"invite:{event_id}")
         queue_text(guest_id, f"{message} Your spot is held for 30 min: "
-                             f"{current_app.config['PUBLIC_URL'].rstrip('/')}{link}")  # sent after the save
+                             f"{current_app.config['PUBLIC_URL'].rstrip('/')}{link}",
+                   kind=f"invite:{request_row['inviter_id']}")  # sent after the save
         notify(request_row["inviter_id"], "invites", f"{host_first} said yes to {guest_first} for {title}.", link,
                key=f"reply:{event_id}:{guest_id}")
         db.commit()

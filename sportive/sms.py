@@ -31,7 +31,9 @@ CODE_TTL = timedelta(minutes=10)
 MAX_CODE_ATTEMPTS = 5
 RESEND_WAIT = timedelta(seconds=60)
 MAX_CODES_PER_DAY = 5    # code texts per person per day (texts cost money; stops abuse)
-MAX_TEXTS_PER_DAY = 20   # update texts per person per day
+MAX_TEXTS_PER_DAY = 20   # update texts per person per day (and as many again for game changes/cancels/reminders)
+INVITE_TEXTS_PER_SENDER = 3  # "You down?" texts from one person to another a day
+IMPORTANT_KINDS = ("important", "reminder")  # game changed/canceled and reminders: never crowded out
 MAX_CODES_PER_NUMBER = 3  # code texts to one number per day, whoever asks (texts to strangers cost money)
 CONSENT = ("Text me reminders and updates about my games. Msg & data rates may apply. "
            "Reply STOP to stop, HELP for help.")
@@ -53,6 +55,8 @@ def normalize_phone(raw):
     US numbers can be typed without +1; other countries need their + code."""
     raw = (raw or "").strip()
     digits = re.sub(r"\D", "", raw)
+    if raw.startswith("+1") and len(digits) != 11:
+        return None  # US/Canada numbers are exactly +1 and 10 digits
     if raw.startswith("+"):
         return f"+{digits}" if 8 <= len(digits) <= 15 else None
     if len(digits) == 11 and digits.startswith("1"):
@@ -111,11 +115,20 @@ def _log(user_id, phone, kind, ok):
                      (user_id, phone, kind, 1 if ok else 0, to_db(now_local())))
 
 
-def _sent_today(user_id, codes):
+def _sent_today(user_id, codes, kind=None):
+    """Texts really sent in the last day (failed ones don't use up the allowance): codes, or updates. With `kind`,
+    only that kind ("important" for game changed/canceled and reminders, "invite:<inviter id>" for "You down?")."""
     since = to_db(now_local() - timedelta(days=1))
-    kind = "= 'code'" if codes else "!= 'code'"
-    return get_db().execute(f"SELECT COUNT(*) FROM sms_log WHERE user_id = ? AND created_at >= ? AND kind {kind}",
-                            (user_id, since)).fetchone()[0]
+    if kind in IMPORTANT_KINDS:
+        which, args = "kind IN ('important', 'reminder')", ()
+    elif kind is not None:
+        which, args = "kind = ?", (kind,)
+    elif codes:
+        which, args = "kind = 'code'", ()
+    else:  # ordinary updates: everything but codes and the important ones (those have their own allowance)
+        which, args = "kind NOT IN ('code', 'important', 'reminder')", ()
+    return get_db().execute(f"SELECT COUNT(*) FROM sms_log WHERE user_id = ? AND created_at >= ? AND ok = 1 AND {which}",
+                            (user_id, since, *args)).fetchone()[0]
 
 
 # ---------------------------------------------------------------- confirming a number
@@ -228,15 +241,21 @@ def text_user(user_id, body, kind="update"):
                       (user_id,)).fetchone()
     if not user or not user["phone"] or not user["phone_verified"] or not user["sms_updates"] or user["suspended"]:
         return False
-    if _sent_today(user_id, codes=False) >= MAX_TEXTS_PER_DAY:
+    if kind in IMPORTANT_KINDS:  # a game changed or canceled, a reminder: its own allowance, others can't use it up
+        if _sent_today(user_id, codes=False, kind=kind) >= MAX_TEXTS_PER_DAY:
+            return False
+    elif _sent_today(user_id, codes=False) >= MAX_TEXTS_PER_DAY:
         return False
+    elif kind.startswith("invite:") and _sent_today(user_id, codes=False, kind=kind) >= INVITE_TEXTS_PER_SENDER:
+        return False  # one friend can't use up someone's texts with "You down?" over and over
     try:
         send_sms(user["phone"], one_text(body))
         ok = True
     except Exception as error:
         ok = False
-        if getattr(error, "code", None) == OPTED_OUT:  # they replied STOP: respect it here too
-            db.execute("UPDATE users SET sms_updates = 0 WHERE id = ?", (user_id,))
+        if getattr(error, "code", None) == OPTED_OUT:  # they replied STOP: respect it here too (Settings says so)
+            db.execute("UPDATE users SET sms_updates = 0, sms_stopped_at = ? WHERE id = ?",
+                       (to_db(now_local()), user_id))
         else:
             log.exception("Couldn't text user %s", user_id)
     _log(user_id, user["phone"], kind, ok)
@@ -266,10 +285,10 @@ def text_code(user_id, code, purpose):
 
 # ---------------------------------------------------------------- texts that wait for the save
 
-def queue_text(user_id, body):
+def queue_text(user_id, body, kind="update"):
     """Text someone once this request has saved everything (e.g. invites made inside an all-or-nothing
     database change: no network calls while the database is locked, and nothing sent if it's undone)."""
-    g.setdefault("sms_queue", []).append((user_id, body))
+    g.setdefault("sms_queue", []).append((user_id, body, kind))
 
 
 def drop_queued_texts():
@@ -281,8 +300,8 @@ def send_queued_texts(response):
     """after_request: send the texts this request queued (only if the page worked)."""
     queued = g.pop("sms_queue", None)
     if queued and response.status_code < 400:
-        for user_id, body in queued:
-            text_user(user_id, body)
+        for user_id, body, kind in queued:
+            text_user(user_id, body, kind)
     return response
 
 

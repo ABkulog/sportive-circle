@@ -3867,7 +3867,8 @@ def test_one_person_cant_flood_others(accounts, client, app):
         client.post(f"/events/{game}/edit", data=event_form(title="Hoops", starts_at=form_time(timedelta(days=1, hours=n % 2)),
                                                            ends_at=form_time(timedelta(days=1, hours=2 + n % 2))))
     changed = [m for m in app.extensions["outbox"] if m["to"] == "vic@uw.edu" and m["subject"].startswith("Changed")]
-    assert len(changed) == 3                                                      # the bell keeps the latest
+    from sportive.events import CHANGE_ALERTS_PER_DAY
+    assert len(changed) == CHANGE_ALERTS_PER_DAY == 6                             # the bell keeps the latest
     games = [event_id_from(client.post("/events/new", data=event_form(title=f"Game {n}", players="10")))
              for n in range(8)]
     with app.app_context():
@@ -3883,10 +3884,10 @@ def test_one_person_cant_flood_others(accounts, client, app):
         get_db().executemany("INSERT INTO events (title, sport, location, skill_level, starts_at, ends_at, host_id)"
                              " VALUES ('x', 'basketball', 'IMA (Intramural Activities Building)', 'Casual', ?, ?, ?)",
                              [(to_db(now_local() + timedelta(days=3)), to_db(now_local() + timedelta(days=3, hours=1)),
-                               ids["Spam"])] * 25)
+                               ids["Spam"])] * 51)                   # 60 with the 9 above
         get_db().commit()
     too_many = client.post("/events/new", data=event_form(title="One more"), follow_redirects=True)
-    assert b"posted a lot of games in the last hour" in too_many.data
+    assert b"You can post up to 60 games an hour, and you&#39;ve posted 60. Try again in a bit." in too_many.data
 
 
 def test_suspended_people_disappear_from_lists_and_blocked_profiles_stay_quiet(accounts, client, app):
@@ -3927,6 +3928,77 @@ def test_report_pages_past_the_end_show_the_last_page(accounts, client, app):
         db.commit()
     page = client.get("/admin/reports?page=2").data.decode()                      # 100 reports: only 1 page
     assert "No open reports" not in page
+
+
+def test_text_limits_keep_important_texts_and_count_only_real_sends(accounts, client, app, monkeypatch):
+    """Round 18: twenty "posted a game" texts used up the day, so a "game canceled" text never came; one friend could
+    send someone twenty "You down?" texts; failed sends counted against the day; a STOP reply left no explanation."""
+    from sportive import sms
+    sent = _texts(monkeypatch)
+    accounts.signup()
+    me = _user_id(app, "dubs@uw.edu")
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE users SET phone = '+12065550142', phone_verified = 1, sms_updates = 1")
+        db.commit()
+        for n in range(sms.MAX_TEXTS_PER_DAY):
+            assert sms.text_user(me, f"update {n}") is True
+        assert sms.text_user(me, "one too many") is False                        # ordinary updates: capped
+        assert sms.text_user(me, "Game canceled", kind="important") is True      # changes and cancels still come
+        assert sms.text_user(me, "Reminder", kind="reminder") is True
+        db.execute("DELETE FROM sms_log")
+        for n in range(sms.INVITE_TEXTS_PER_SENDER):
+            assert sms.text_user(me, "You down?", kind="invite:7") is True
+        assert sms.text_user(me, "You down?", kind="invite:7") is False          # one friend: a few a day
+        assert sms.text_user(me, "You down?", kind="invite:8") is True           # another friend: their own
+        db.execute("DELETE FROM sms_log")
+
+        def down(to, body):
+            raise sms.SmsError(500, "down")
+        monkeypatch.setattr(sms, "send_sms", down)
+        for n in range(sms.MAX_TEXTS_PER_DAY + 5):
+            sms.text_user(me, "try")
+        monkeypatch.setattr(sms, "send_sms", lambda to, body: sent.append((to, body)))
+        assert sms.text_user(me, "works again") is True                          # failures didn't use up the day
+
+        def opted_out(to, body):
+            raise sms.SmsError(sms.OPTED_OUT, "unsubscribed")
+        monkeypatch.setattr(sms, "send_sms", opted_out)
+        sms.text_user(me, "hi", kind="important")
+        assert sms.normalize_phone("+1 206 555 01421") is None                   # +1 and too many digits
+    assert "START back to that same number" in client.get("/settings/texts").data.decode()
+    client.post("/settings/texts", data={"action": "toggle", "sms_updates": "1"})
+    assert "START back to that same number" not in client.get("/settings/texts").data.decode()
+
+
+def test_spam_limits_leave_normal_use_alone(accounts, client, app):
+    """Round 18: renewing a friend's held spot in the same game counted as another invite; a link like
+    instagram.com/maya.co was refused; club member counts included suspended people the roster hides."""
+    from sportive.invites import INVITES_PER_FRIEND_PER_DAY, invited_too_often
+    from sportive.profile import clean_social
+    ids = _people(accounts, app, "Maya", "Jordan")
+    _friends(app, ids["Maya"], ids["Jordan"])
+    _as(accounts, "Maya")
+    games = [event_id_from(client.post("/events/new", data=event_form(title=f"Hoops {n}")))
+             for n in range(INVITES_PER_FRIEND_PER_DAY)]
+    for game in games:
+        client.post(f"/events/{game}/party", data={"friend": [ids["Jordan"]]})
+    with app.app_context():
+        assert invited_too_often(ids["Maya"], [ids["Jordan"]]) == ids["Jordan"]           # a sixth game: no
+        assert invited_too_often(ids["Maya"], [ids["Jordan"]], games[0]) is None          # same game again: fine
+    assert clean_social("instagram", "instagram.com/maya.co") == "maya.co"
+    assert clean_social("instagram", "https://www.instagram.com/maya.co/") == "maya.co"
+    assert clean_social("tiktok", "vm.tiktok.com/ZMabc/").endswith("/")
+    with app.app_context():
+        from sportive.clubs import MEMBER_COUNT
+        db = get_db()
+        db.execute("INSERT INTO clubs (name, sport, description, status, created_by, created_at)"
+                   " VALUES ('Run Club', 'running', 'Easy miles', 'approved', ?, ?)", (ids["Maya"], to_db(now_local())))
+        club = db.execute("SELECT id FROM clubs WHERE name = 'Run Club'").fetchone()[0]
+        db.executemany("INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)",
+                       [(club, ids["Maya"], "officer", to_db(now_local())), (club, ids["Jordan"], "member", to_db(now_local()))])
+        db.execute("UPDATE users SET suspended = 1 WHERE id = ?", (ids["Jordan"],))
+        assert db.execute(f"SELECT {MEMBER_COUNT} FROM clubs c WHERE c.id = ?", (club,)).fetchone()[0] == 1
 
 
 def test_party_up_holds_spots_for_friends(accounts, client, app):

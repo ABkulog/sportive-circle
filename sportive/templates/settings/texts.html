@@ -8,6 +8,10 @@
   {% if user.phone and user.phone_verified %}
     <p class="muted">We text <strong>{{ pretty_phone(user.phone) }}</strong>: game reminders, changes, cancellations,
       invites, password codes and, if you run a club, club alerts. Email still gets everything.</p>
+    {% if user.sms_stopped_at and not user.sms_updates %}
+      <p class="flash flash-info">You replied STOP to one of our texts, so texts are off. To get them again, text
+        START back to that same number, then turn this switch on.</p>
+    {% endif %}
     <form method="post" data-autosave>
       {{ csrf_field() }}<input type="hidden" name="action" value="toggle">
       <label class="switch-row"><span class="switch-text">Text me updates</span>
