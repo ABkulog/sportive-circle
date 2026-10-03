@@ -16,7 +16,7 @@ from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, OFF
 from .db import get_db, user_sports
 from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots,
                       holds_for_others, invited_too_often, my_invite, now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
-from .friendgames import announce_new_game
+from .friendgames import announce_new_game, update_announcements
 from .links import public_url
 from .sms import text_user
 from .reminders import REMIND_CHOICES
@@ -376,12 +376,14 @@ def feed():
         e for e in query_events(
             ["e.cancelled = 0", "e.is_quick = 1", "e.ends_at >= :now", "e.starts_at <= :soon", NOT_BLOCKED,
              games_open_to_me(), MEMBERS_ONLY_FOR_MEMBERS,
+             SHOWN_UNLESS_FULL,  # before the limit of 10: full posts can't push open ones out of the strip
              # a game well under way isn't a call for players any more (unless it's yours to find)
              "(e.starts_at >= :late OR EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me))",
              # a private post isn't a call to everyone: only its players and invited friends see it up top
              "(e.is_private = 0 OR EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"
              " OR EXISTS (SELECT 1 FROM invites i WHERE i.event_id = e.id AND i.guest_id = :me AND i.status = 'pending'))"],
-            {"now": to_db(now), "soon": to_db(now + QUICK_WINDOW), "late": to_db(now - LATE_JOIN_WINDOW)},
+            {"now": to_db(now), "soon": to_db(now + QUICK_WINDOW), "late": to_db(now - LATE_JOIN_WINDOW),
+             "hold_now": to_db(now)},
             limit=10,
         )
         if spots_left(e) != 0 or e["i_am_going"] or e["i_am_invited"]
@@ -644,12 +646,18 @@ def post_club_event(club, event_id, data, repeat):
     get_db().commit()
 
 
-def update_club_post(event_id, data):
+def update_club_post(event, data):
     """An edited club event: its post in the club's updates (which are public) is rewritten with the new time and
     place, or without them once it's members-only or private (and with them again if it goes back to public).
-    A post about a weekly series is linked to its first week and keeps describing the series."""
+    A post about a weekly series is linked to its first week: editing that one week doesn't rewrite the series'
+    post with its new day or place (the other weeks didn't move), only who it's for, when that changes."""
     db = get_db()
-    for post in db.execute("SELECT id, weeks FROM club_posts WHERE event_id = ?", (event_id,)).fetchall():
+    for post in db.execute("SELECT id, weeks FROM club_posts WHERE event_id = ?", (event["id"],)).fetchall():
+        if post["weeks"] > 1:
+            was = (bool(event["members_only"]), bool(event["is_private"]))
+            if was == (bool(data.get("members_only")), bool(data.get("is_private"))):
+                continue
+            data = {**data, "title": event["title"], "location": event["location"], "starts_at": event["starts_at"]}
         db.execute("UPDATE club_posts SET body = ? WHERE id = ?", (club_event_text(data, post["weeks"]), post["id"]))
 
 
@@ -734,7 +742,8 @@ def edit(event_id):
             else:
                 left_out = 0
             if event["club_id"]:
-                update_club_post(event_id, data)
+                update_club_post(event, data)
+            update_announcements(get_event(event_id))  # friends' "posted a game" notices: the new time, or gone
             told = tell_players_it_changed(event, data, by=g.user)
             db.commit()
             flash(("Saved. Everyone going sees it in their notifications (this game changed a lot today, so not "
@@ -769,8 +778,6 @@ def cancel(event_id):
                       (event_id,)).rowcount:
         db.commit()
         return redirect(url_for("events.detail", event_id=event_id))
-    if event["club_id"]:
-        mark_club_post_canceled(event_id)
     db.commit()
     told = players_except_host(event, by=g.user)
     tell_players_it_was_cancelled(event, by=g.user)
@@ -862,7 +869,8 @@ def tell_players_it_changed(event, data, by=None):
                        [(player["id"], event["id"], to_db(now)) for player in players])
         db.commit()  # the change is saved before the texts and emails go out, so nobody else waits on them
         for player in players:
-            text_user(player["id"], kind="important", body=f"{host} changed {title}: now {fmt_when(data['starts_at'])} at {data['location']}. "
+            # The text says what really changed, like the email ("now ends at 9 PM" isn't a new start time).
+            text_user(player["id"], kind="important", body=f"{host} changed {title}: {', '.join(changes)}. "
                                     f"{public_url('events.detail', event_id=event['id'])}")
         for player in players:
             try:
@@ -884,7 +892,10 @@ def tell_players_it_changed(event, data, by=None):
 def tell_players_it_was_cancelled(event, page_stays=True, by_host=True, by=None):
     """Tell everyone who joined (except the host), so nobody shows up to an empty field.
     page_stays=False when the game is about to be deleted (the host's account is going), so links go to the feed.
-    by_host=False when Sportive Circle canceled it (a suspended host, a denied club): it doesn't name the host."""
+    by_host=False when Sportive Circle canceled it (a suspended host, a denied club): it doesn't name the host.
+    A club event's post in the club's updates is marked "Canceled:" too, however it was canceled."""
+    if event["club_id"]:
+        mark_club_post_canceled(event["id"])
     players = players_except_host(event, by)
     title, when = event_title(event), fmt_when(event["starts_at"])
     name = by["full_name"] if by is not None else event["host_name"]  # the officer who canceled a club event

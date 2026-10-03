@@ -4287,6 +4287,176 @@ def test_chat_never_posts_twice_or_reloads_over_a_draft(app):
     assert "photos[i] ? 90000 : 20000" in send
 
 
+def test_deleting_an_account_steps_down_first_and_keeps_clubs_true(accounts, client, app):
+    """Round 21: two officers deleting their accounts at once could both go and leave a club with none (each was
+    checked before either stepped down); a club whose other officer was suspended was deleted with the account."""
+    club = _club_with_member(accounts, client, app)                         # captain (owner) logged in
+    member = _user_id(app, "member@uw.edu")
+    client.post(f"/clubs/{club}/officers/{member}")
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
+    with app.app_context():
+        assert get_db().execute("SELECT created_by FROM clubs WHERE id = ?", (club,)).fetchone()[0] == member
+    accounts.login(email="member@uw.edu")                                   # now the only officer, with a follower
+    page = client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"},
+                       follow_redirects=True).data.decode()
+    assert "only officer" in page
+    with app.app_context():
+        assert get_db().execute("SELECT role FROM club_members WHERE user_id = ?", (member,)).fetchone()[0] == "officer"
+    accounts.logout()
+    ids = _people(accounts, app, "Maya", "Sam")
+    _as(accounts, "Maya")
+    client.post("/clubs/new", data={**CLUB, "name": "Quiet Club"})
+    quiet = _club_id(app, "Quiet Club")
+    _approve(app, quiet)
+    with app.app_context():
+        get_db().execute("INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, 'officer', ?)",
+                         (quiet, ids["Sam"], to_db(now_local())))
+        get_db().execute("UPDATE users SET suspended = 1 WHERE id = ?", (ids["Sam"],))
+        get_db().commit()
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
+    with app.app_context():                                                 # Sam may be let back in: it stays
+        assert get_db().execute("SELECT COUNT(*) FROM clubs WHERE id = ?", (quiet,)).fetchone()[0] == 1
+
+
+def test_club_posts_stay_true_however_a_game_ends_or_changes(accounts, client, app):
+    """Round 21: a club event canceled by a suspension still said "New event"; editing week 1 of a weekly series
+    rewrote the series' post with week 1's day; series posts from before posts knew their weeks were treated as one
+    event (canceling week 1 marked the whole series canceled)."""
+    from sportive.db import count_series_weeks
+    from sportive.timeutil import from_db
+    club = _club_with_member(accounts, client, app)                         # captain logged in
+    member = _user_id(app, "member@uw.edu")
+    client.post(f"/clubs/{club}/officers/{member}")
+    club_game = dict(sport="spikeball", location="The Quad", club=str(club))
+    series = event_id_from(client.post(f"/events/new?club={club}", data=event_form(
+        title="Weekly run", repeat="3", **club_game)))
+    client.post(f"/events/{series}/edit", data=event_form(title="Weekly run", **club_game,
+                                                          starts_at=form_time(timedelta(days=2)),
+                                                          ends_at=form_time(timedelta(days=2, hours=2))))
+    accounts.logout()
+    accounts.login(email="member@uw.edu")
+    single = event_id_from(client.post(f"/events/new?club={club}", data=event_form(title="Open night", **club_game)))
+    accounts.logout()
+    with app.app_context():
+        db = get_db()
+        weekly = db.execute("SELECT body FROM club_posts WHERE event_id = ?", (series,)).fetchone()[0]
+        assert "for 3 weeks" in weekly and from_db(db.execute("SELECT starts_at FROM events WHERE id = ?",
+                                                              (series,)).fetchone()[0]).strftime("%A") not in weekly
+        db.execute("INSERT INTO club_posts (club_id, author_id, body, created_at, weeks) VALUES (?, NULL, ?, ?, 1)",
+                   (club, "New: Old practice, every Monday at 5:00 PM for 4 weeks, starting Mon", to_db(now_local())))
+        count_series_weeks(db)
+        assert db.execute("SELECT weeks FROM club_posts WHERE body LIKE 'New: Old practice%'").fetchone()[0] == 4
+        db.commit()
+    accounts.signup(email="admin@uw.edu", name="Ad Min")
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    client.post(f"/admin/users/{member}/suspend")
+    with app.app_context():
+        assert get_db().execute("SELECT body FROM club_posts WHERE event_id = ?", (single,)).fetchone()[0] \
+            .startswith("Canceled: New event: Open night")
+
+
+def test_announcements_texts_and_emails_round_21(accounts, client, app, monkeypatch):
+    """Round 21: friends' "Maya posted Hoops (Sat). Want in?" kept the old time after a change, and stayed after the
+    game went private; people waiting on a club join request stopped hearing about its games; a text about a new
+    end time read like the start moved; the Monday email listed games the host took you off; Gmail's own
+    Unsubscribe button got a garbled link."""
+    from sportive import digest
+    from sportive.mail import build_message
+    from sportive.timeutil import fmt_when
+    sent = _texts(monkeypatch)
+    ids = _people(accounts, app, "Maya", "Sam", "Jordan")
+    _friends(app, ids["Maya"], ids["Sam"], ids["Jordan"])
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    later = dict(starts_at=form_time(timedelta(days=3)), ends_at=form_time(timedelta(days=3, hours=2)))
+    client.post(f"/events/{game}/edit", data=event_form(title="Hoops", **later))
+    with app.app_context():
+        text = get_db().execute("SELECT text FROM notices WHERE key = ? AND user_id = ?",
+                                (f"friend_game:{game}", ids["Sam"])).fetchone()[0]
+        assert fmt_when(to_db(now_local().replace(second=0, microsecond=0) + timedelta(days=3)))[:3] in text
+        get_db().execute("UPDATE users SET phone = '+12065550142', phone_verified = 1, sms_updates = 1 WHERE id = ?",
+                         (ids["Jordan"],))
+        get_db().commit()
+    _as(accounts, "Jordan")
+    client.post(f"/events/{game}/join")
+    _as(accounts, "Maya")
+    client.post(f"/events/{game}/edit", data=event_form(title="Hoops", starts_at=later["starts_at"],
+                                                       ends_at=form_time(timedelta(days=3, hours=3))))
+    assert "now ends" in sent[-1][1] and "new time" not in sent[-1][1]
+    other = event_id_from(client.post("/events/new", data=event_form(title="Runs")))
+    client.post(f"/events/{other}/players/{ids['Sam']}/remove")
+    client.post(f"/events/{other}/edit", data=event_form(title="Runs", is_private="1", password="huskies1"))
+    with app.app_context():
+        assert not get_db().execute("SELECT 1 FROM notices WHERE key = ?", (f"friend_game:{other}",)).fetchone()
+    other2 = event_id_from(client.post("/events/new", data=event_form(title="Pickup")))
+    _as(accounts, "Sam")
+    client.post(f"/events/{other2}/join")
+    _as(accounts, "Maya")
+    client.post(f"/events/{other2}/players/{ids['Sam']}/remove")
+    with app.test_request_context():
+        with app.app_context():
+            sam = get_db().execute("SELECT * FROM users WHERE id = ?", (ids["Sam"],)).fetchone()
+            from flask import g
+            g.user = sam
+            open_games, _ = digest.games_for(sam)
+    assert not any("Pickup" in line for line in open_games)
+    msg = build_message({"MAIL_USERNAME": "a@b.c"}, "x@uw.edu", "Hi", "body",
+                        unsubscribe="https://sportivecircle.com/unsubscribe/" + "W" * 120)
+    raw = msg.as_bytes().decode()
+    assert "List-Unsubscribe: <https://sportivecircle.com/unsubscribe/" in raw and "Message-ID:" in raw
+
+
+def test_waiting_to_join_still_hears_about_club_games(accounts, client, app):
+    """Round 21: someone waiting on a join request stopped hearing about the club's new games; the club directory
+    counted private games it doesn't show."""
+    club = _club_with_member(accounts, client, app)                         # captain logged in
+    accounts.logout()
+    accounts.signup(email="waiting@uw.edu", name="Wai Ting")
+    client.post(f"/clubs/{club}/follow")
+    client.post(f"/clubs/{club}/join", data={"message": "Hi"})
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    club_game = dict(sport="spikeball", location="The Quad", club=str(club))
+    client.post(f"/events/new?club={club}", data=event_form(title="Club night", **club_game))
+    client.post(f"/events/new?club={club}", data=event_form(title="Secret", is_private="1", password="huskies1",
+                                                           **club_game))
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM notices WHERE user_id = ? AND kind = 'friend_games'",
+                                (_user_id(app, "waiting@uw.edu"),)).fetchone()[0] == 1
+    directory = client.get("/clubs").data.decode()
+    assert "1 upcoming" in directory and "2 upcoming" not in directory          # the private one isn't counted
+
+
+def test_search_and_invite_wording_round_21(accounts, client, app):
+    """Round 21: Messages search stopped at 20 people before keeping only those you can message, so 20 other "Alex"es
+    hid the one who messaged you; clubs search didn't know sport names ("skiing"); a friend's invite link said the
+    game wasn't open when only the friend had left."""
+    ids = _people(accounts, app, "Ann", "Alex", "Sam")
+    with app.app_context():
+        db = get_db()
+        db.executemany("INSERT INTO users (email, full_name, password_hash, verified, created_at) VALUES (?, ?, 'x', 1, ?)",
+                       [(f"alex{n}@uw.edu", f"Alex A{n:02d}", to_db(now_local())) for n in range(25)])
+        db.execute("INSERT INTO direct_messages (sender_id, recipient_id, body, created_at) VALUES (?, ?, 'hey', ?)",
+                   (ids["Alex"], ids["Ann"], to_db(now_local())))
+        db.commit()
+    _as(accounts, "Ann")
+    assert "Alex Husky" in client.get("/messages?q=alex").data.decode()
+    _friends(app, ids["Ann"], ids["Sam"])
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    _as(accounts, "Sam")
+    client.post(f"/events/{game}/join")
+    link = re.search(r'/join/[\w.\-]+', client.get(f"/events/{game}").data.decode()).group(0)
+    client.post(f"/events/{game}/leave")
+    accounts.logout()
+    assert "Sam isn't in that game anymore" in client.get(link).data.decode()
+    accounts.signup(email="skier@uw.edu", name="Ski Er")
+    client.post("/clubs/new", data={**CLUB, "name": "Husky Powder Crew", "sport": "snow",
+                                    "description": "Weekend trips to the mountains."})
+    _approve(app, _club_id(app, "Husky Powder Crew"))
+    found = client.get("/clubs?q=skiing").data.decode()
+    assert "Husky Powder Crew" in found
+
+
 def test_party_up_holds_spots_for_friends(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Stranger")
     _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])

@@ -357,7 +357,10 @@ MAX_SEARCH_LENGTH = 60
 MAX_SEARCH_RESULTS = 20
 
 
-def search_people(me, q):
+SEARCH_BEFORE_FILTERING = 300  # people looked at when a search then keeps only some (Messages, officers)
+
+
+def search_people(me, q, limit=None):
     """Huskies whose name matches the search (first name, last name, or both), or whose UW NetID is exactly
     what was typed ("mchen7" or "mchen7@uw.edu"), for "Add friend".
 
@@ -370,7 +373,7 @@ def search_people(me, q):
     words = fold(q).split()[:3]
     if not words:  # only accent marks or spaces: nothing left to look for
         return []
-    params = {"me": me, "starts": words[0] + "%", "limit": MAX_SEARCH_RESULTS}
+    params = {"me": me, "starts": words[0] + "%", "limit": limit or MAX_SEARCH_RESULTS}
     for n, word in enumerate(words):
         params[f"w{n}"] = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
     name_match = " AND ".join(f"fold(u.full_name) LIKE :w{n} ESCAPE '\\'" for n in range(len(words)))
@@ -525,7 +528,10 @@ def inbox():
     if q:
         # Anyone I can message whose name (or exact UW NetID) matches: friends, people I've played with,
         # club officers, people who messaged me. Strangers only show up in Friends -> search, to add first.
-        results = [p for p in search_people(me, q) if can_message(me, p["id"])]
+        # Look further than one page before keeping only people I can message: twenty other "Alex"es mustn't
+        # hide the one Alex who messaged me.
+        results = [p for p in search_people(me, q, limit=SEARCH_BEFORE_FILTERING)
+                   if can_message(me, p["id"])][:MAX_SEARCH_RESULTS]
     return render_template("social/inbox.html", conversations=conversations, new_friends=new_friends,
                            q=q, results=results, min_search=MIN_SEARCH_LENGTH)
 

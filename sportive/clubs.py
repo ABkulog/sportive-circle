@@ -124,7 +124,7 @@ def officer_clubs(user_id):
     """Approved clubs this person can create events for."""
     return get_db().execute(
         """SELECT c.id, c.name, c.sport FROM clubs c JOIN club_members m ON m.club_id = c.id
-           WHERE m.user_id = ? AND m.role = 'officer' AND c.status = 'approved' ORDER BY c.name""",
+           WHERE m.user_id = ? AND m.role = 'officer' AND c.status = 'approved' ORDER BY fold(c.name)""",
         (user_id,)).fetchall()
 
 
@@ -144,7 +144,7 @@ def featured_clubs(limit=6):
     """Verified clubs for the landing page."""
     return get_db().execute(
         f"""SELECT c.*, {MEMBER_COUNT}
-           FROM clubs c WHERE c.status = 'approved' ORDER BY member_count DESC, c.name LIMIT ?""", (limit,)).fetchall()
+           FROM clubs c WHERE c.status = 'approved' ORDER BY member_count DESC, fold(c.name) LIMIT ?""", (limit,)).fetchall()
 
 
 def read_club_form(form, club_id=None, phone_on_file=""):
@@ -241,6 +241,7 @@ FIELDS = ("name", "sport", "description", "meets", "location", "contact_url", "c
 @bp.route("/clubs")
 def directory():
     """Open to everyone, even people without an account. Only verified clubs are listed."""
+    from .events import IS_FULL_SQL  # imported here: events.py imports this module
     q = request.args.get("q", "").strip()[:100]
     sport = request.args.get("sport", "")
     mine = request.args.get("mine") == "1" and g.get("user") is not None
@@ -252,7 +253,11 @@ def directory():
     else:
         where.append("c.status = 'approved'")
     for n, word in enumerate(fold(q).split()[:5]):  # every word, any order, accents and capitals ignored
-        where.append(f"fold(c.name || ' ' || c.description || ' ' || c.sport) LIKE :w{n} ESCAPE '\\'")
+        # The sport counts by the name people see ("Skiing", "Ultimate Frisbee"), not how it's stored.
+        sports = [key for key, name in SPORTS.items() if word in fold(name)]
+        by_sport = "".join(f" OR c.sport = :w{n}s{i}" for i in range(len(sports)))
+        params.update({f"w{n}s{i}": key for i, key in enumerate(sports)})
+        where.append(f"(fold(c.name || ' ' || c.description) LIKE :w{n} ESCAPE '\\'{by_sport})")
         params[f"w{n}"] = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
     if sport in SPORTS:
         where.append("c.sport = :sport")
@@ -268,11 +273,13 @@ def directory():
                    (SELECT m.role FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me) AS my_status,
                    (SELECT COUNT(*) FROM club_members m JOIN users wu ON wu.id = m.user_id WHERE m.club_id = c.id
                                      AND m.role IN ('requested', 'tryout') AND wu.suspended = 0) AS waiting,
+                   -- the games the club page shows anyone: not private ones (invite-only), not full ones
                    (SELECT COUNT(*) FROM events e WHERE e.club_id = c.id AND e.cancelled = 0
-                                                   AND e.ends_at >= :now) AS upcoming
+                                                   AND e.ends_at >= :now AND e.is_private = 0
+                                                   AND NOT {IS_FULL_SQL}) AS upcoming
             FROM clubs c WHERE {" AND ".join(where)}
-            ORDER BY my_status IS NOT NULL DESC, member_count DESC, c.name LIMIT 200""",
-        {**params, "now": to_db(now_local())}).fetchall()
+            ORDER BY my_status IS NOT NULL DESC, member_count DESC, fold(c.name) LIMIT 200""",
+        {**params, "now": to_db(now_local()), "hold_now": to_db(now_local())}).fetchall()
     return render_template("clubs/directory.html", clubs=clubs, q=q, sport=sport, mine=mine, easy=easy)
 
 
@@ -736,7 +743,7 @@ def officers(club_id):
     """The owner (who registered the club, or who it was handed to) adds officers by searching any Husky by name or
     UW NetID, takes officer rights away, and can hand ownership to another officer. Officers can edit the club,
     post updates, make club events and confirm members."""
-    from .social import MIN_SEARCH_LENGTH, search_people  # social.py is loaded after this module
+    from .social import MAX_SEARCH_RESULTS, MIN_SEARCH_LENGTH, SEARCH_BEFORE_FILTERING, search_people  # loaded later
     club = get_club(club_id)
     if not is_owner(club):
         abort(403)
@@ -814,7 +821,8 @@ def officers(club_id):
         (club_id, club["created_by"] or 0)).fetchall()
     q = one_line(request.args.get("q", ""))[:60]
     officer_ids = {o["id"] for o in current}
-    results = [p for p in search_people(g.user["id"], q) if p["id"] not in officer_ids] if q else []
+    results = [p for p in search_people(g.user["id"], q, limit=SEARCH_BEFORE_FILTERING)
+               if p["id"] not in officer_ids][:MAX_SEARCH_RESULTS] if q else []
     return render_template("clubs/officers.html", club=club, officers=current, q=q, results=results,
                            min_search=MIN_SEARCH_LENGTH)
 

@@ -1,5 +1,7 @@
 """Sending email (verification codes, reminders)."""
 import logging
+import email.policy
+import email.utils
 import smtplib
 from email.message import EmailMessage
 
@@ -11,6 +13,27 @@ log = logging.getLogger(__name__)
 
 # A mail server that stops answering must not hang the signup page (or the reminder loop) forever.
 SMTP_TIMEOUT_SECONDS = 15
+
+
+# Long lines aren't folded into encoded words: an unsubscribe link has to arrive as a plain <https://...> for
+# Gmail's and Yahoo's own "Unsubscribe" button to work (the default policy turned it into =?utf-8?q?...?=).
+MAIL_POLICY = email.policy.SMTP.clone(max_line_length=998)
+
+
+def build_message(cfg, to, subject, body, html=None, unsubscribe=None):
+    msg = EmailMessage(policy=MAIL_POLICY)
+    msg["Subject"] = subject
+    msg["From"] = cfg.get("MAIL_FROM") or f"Sportive Circle <{cfg['MAIL_USERNAME']}>"
+    msg["To"] = to
+    msg["Date"] = email.utils.formatdate(localtime=True)  # mail apps (and spam filters) expect both of these
+    msg["Message-ID"] = email.utils.make_msgid(domain="sportivecircle.com")
+    if unsubscribe:
+        msg["List-Unsubscribe"] = f"<{unsubscribe}>"
+        msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+    msg.set_content(body)
+    if html:
+        msg.add_alternative(html, subtype="html")
+    return msg
 
 
 def send_email(to, subject, body, html=None, unsubscribe=None):
@@ -27,16 +50,7 @@ def send_email(to, subject, body, html=None, unsubscribe=None):
             log.warning("DEV email (not sent) to %s: %s\n%s", to, subject, body)
             return False
         raise RuntimeError("MAIL_SERVER is not configured, so emails can't be sent.")
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = cfg.get("MAIL_FROM") or f"Sportive Circle <{cfg['MAIL_USERNAME']}>"
-    msg["To"] = to
-    if unsubscribe:
-        msg["List-Unsubscribe"] = f"<{unsubscribe}>"
-        msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
-    msg.set_content(body)
-    if html:
-        msg.add_alternative(html, subtype="html")
+    msg = build_message(cfg, to, subject, body, html, unsubscribe)
     with smtplib.SMTP(cfg["MAIL_SERVER"], cfg["MAIL_PORT"], timeout=SMTP_TIMEOUT_SECONDS) as smtp:
         smtp.starttls()
         smtp.login(cfg["MAIL_USERNAME"], cfg["MAIL_PASSWORD"])

@@ -34,7 +34,9 @@ def audience(event):
     friends = """SELECT CASE WHEN f.requester_id = :host THEN f.addressee_id ELSE f.requester_id END
                  FROM friendships f WHERE f.status = 'accepted' AND (f.requester_id = :host OR f.addressee_id = :host)"""
     club_people = ("SELECT m.user_id FROM club_members m WHERE m.club_id = :club AND m.role IN "
-                   + ("('member', 'officer')" if event["members_only"] else "('follower', 'member', 'officer')"))
+                   + ("('member', 'officer')" if event["members_only"]
+                      # people waiting on a join request still follow the club: they hear about its games too
+                      else "('follower', 'requested', 'tryout', 'member', 'officer')"))
     people = club_people if event["members_only"] else f"{friends} UNION {club_people}"
     rows = db.execute(
         f"""SELECT u.id, u.full_name, u.email, u.gender, u.email_friend_games AS wants_email FROM users u
@@ -45,6 +47,23 @@ def audience(event):
               AND u.id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = :host)""", params).fetchall()
     groups = OPEN_TO_GENDERS.get(event["open_to"])
     return [r for r in rows if not (groups and r["gender"] in STATED_GENDERS and r["gender"] not in groups)]
+
+
+def announcement_text(event):
+    """What a "posted a game" notice says (also rewritten when the game's time, place or title changes)."""
+    from .events import event_title  # events.py imports this module
+    via = f" for {event['club_name']}" if event["club_id"] else ""
+    return f"{event['host_name'].split()[0]} posted {event_title(event)}{via} ({fmt_when(event['starts_at'])}). Want in?"
+
+
+def update_announcements(event):
+    """A game was edited: "Maya posted Hoops (Sat 3 PM). Want in?" in friends' bells says the new time and title,
+    or goes away if the game is now private (it's no longer a call to everyone). The caller commits."""
+    key = f"friend_game:{event['id']}"
+    if event["is_private"]:
+        get_db().execute("DELETE FROM notices WHERE key = ?", (key,))
+    else:
+        get_db().execute("UPDATE notices SET text = ? WHERE key = ?", (announcement_text(event), key))
 
 
 def announce_new_game(event):
@@ -100,7 +119,7 @@ def _send(app, recipients, d):
                     [f"Hey {first}, {d['host']} just posted {d['title']}{d['via']}. Want in?",
                      f"🕐 {d['when']}", f"📍 {d['location']}"],
                     button=("See the game and join", d["url"]),
-                    reason="You're getting this because you're friends with the host or follow the club. "
+                    reason="You're getting this because you're friends with the host or follow or belong to the club. "
                            "Turn these emails off in Settings.",
                     preheader=f"{d['sport']} · {d['when']}", unsubscribe=unsubscribe_url(email, "friend_games"))
                 send_email(email, subject, body, html=html, unsubscribe=unsubscribe_url(email, "friend_games"))
