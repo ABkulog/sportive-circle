@@ -179,13 +179,14 @@ def _count(kind, me):
             f"""SELECT COUNT(*) FROM events e
                 WHERE e.is_quick = 1 AND e.is_private = 0 AND e.cancelled = 0 AND e.ends_at >= ? AND e.host_id != ?
                   AND e.id > ? AND {games_open_to_me()}
+                  AND NOT EXISTS (SELECT 1 FROM removed_players p WHERE p.event_id = e.id AND p.user_id = ?)  -- taken off it: can't join
                   AND (e.max_players IS NULL
                        OR e.extra_players + (SELECT COUNT(*) FROM rsvps x WHERE x.event_id = e.id) < e.max_players)
                   AND e.sport IN ({marks})
                   AND NOT EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = ?)
                   AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ? AND b.blocked_id = e.host_id)
                                                           OR (b.blocker_id = e.host_id AND b.blocked_id = ?))""",
-            (now, me, int(_since(me, kind)), *sports, me, me, me)).fetchone()[0]
+            (now, me, int(_since(me, kind)), me, *sports, me, me, me)).fetchone()[0]
     if kind == "club_updates":
         return db.execute(
             """SELECT COUNT(*) FROM club_posts p JOIN clubs c ON c.id = p.club_id
@@ -241,7 +242,8 @@ def bell_items():
     if found.get("game_chat"):
         from .events import event_title, query_events  # imported here because events.py imports this module
         unread = event_chat_unread()
-        games = {e["id"]: e for e in query_events([f"e.id IN ({', '.join(str(int(i)) for i in unread)})"])} if unread else {}
+        games = {e["id"]: e for e in query_events([f"e.id IN ({', '.join(str(int(i)) for i in unread)})"],
+                                                    on_hold=True)}  # same games the unread count counts if unread else {}
         for event_id, n in sorted(unread.items(), key=lambda item: -item[1]):
             if event_id in games and n:
                 items.append(("💬", f"{n} new message{'s' if n != 1 else ''} in {event_title(games[event_id])}",

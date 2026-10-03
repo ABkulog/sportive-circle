@@ -11,7 +11,7 @@
   {% from "_macros.html" import phone_field %}
   <section class="card texts-card" aria-labelledby="texts-title">
     <h2 id="texts-title">New: game updates by text 📱</h2>
-    <p class="muted">Get reminders, changes, cancellations and invites on your phone too. Email still gets everything.</p>
+    <p class="muted">Get reminders, changes, cancellations and invites on your phone too. Reminders, changes and cancellations still come by email.</p>
     <form method="post" action="{{ url_for('settings.texts') }}" class="form">
       {{ csrf_field() }}<input type="hidden" name="action" value="send">
       {{ phone_field('phone', required=True) }}

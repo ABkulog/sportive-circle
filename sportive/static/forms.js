@@ -276,3 +276,39 @@
   form.querySelector('select[name="sport"]')?.addEventListener("change", check);  // the place list changes with it
   check();
 })();
+
+// "Open 9:00 AM – 8:30 PM on Saturdays" under the place, for the date picked (Need players: today), so the host
+// picks a time while the place is open. The server checks the same hours (placehours.py).
+(function () {
+  const hoursElement = document.getElementById("place-hours");
+  const form = document.querySelector("form[data-sport-form]");
+  const line = form && form.querySelector("[data-place-hours]");
+  if (!hoursElement || !line) return;
+  const hours = JSON.parse(hoursElement.textContent);
+  const location = form.querySelector('select[name="location"]');
+  const starts = form.querySelector('[name="starts_at"]');
+  const days = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
+  const clock = (text) => {
+    const [hour, minute] = text.split(":").map(Number);
+    return `${(hour % 12) || 12}:${String(minute).padStart(2, "0")} ${hour < 12 ? "AM" : "PM"}`;
+  };
+  function update() {
+    const seasons = hours[location.value];
+    const picked = starts && /^\d{4}-\d{2}-\d{2}/.test(starts.value) ? starts.value.slice(0, 10) : null;
+    const day = picked ? new Date(`${picked}T12:00:00`) : new Date();
+    const stamp = `${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+    const season = seasons && seasons.find(([first, last]) => first <= stamp && stamp <= last);
+    if (!season) { line.textContent = ""; return; }
+    const weekday = (day.getDay() + 6) % 7;  // Monday first, like the server
+    const today = season[2][String(weekday)];
+    const allClosed = Object.values(season[2]).every((value) => value === null);
+    if (today === undefined) line.textContent = "";
+    else if (today === null) line.textContent = allClosed ? "Closed for the season then." : `Closed on ${days[weekday]}.`;
+    else if (today[0] === "00:00") line.textContent = `Lights off at ${clock(today[1])} on ${days[weekday]}.`;
+    else line.textContent = `Open ${clock(today[0])} – ${clock(today[1])} on ${days[weekday]}.`;
+  }
+  location.addEventListener("change", update);
+  form.addEventListener("change", update);
+  if (starts) starts.addEventListener("input", update);
+  update();
+})();

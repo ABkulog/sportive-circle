@@ -23,7 +23,9 @@
     {% elif not g.user %}<p class="muted">Sign up with your UW email and you're in.</p>{% endif %}
   {% else %}
     <h1>{{ inviter.full_name.split()[0] }} wants you on Sportive Circle</h1>
-    {% if game_over %}<p class="muted">The game this link was for isn't open anymore.
+    {% if inviter_left %}<p class="muted">{{ inviter.full_name.split()[0] }} isn't in that game anymore.
+      {%- if g.user %} You can still connect with {{ inviter.full_name.split()[0] }}.{% endif %}</p>
+    {% elif game_over %}<p class="muted">The game this link was for isn't open anymore.
       {%- if g.user %} You can still connect with {{ inviter.full_name.split()[0] }}.{% endif %}</p>{% endif %}
     {% if not g.user %}<p class="muted">Pickup games and UW clubs, for Huskies. Sign up with your UW email and you'll be friends.</p>{% endif %}
   {% endif %}

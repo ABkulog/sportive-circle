@@ -510,6 +510,7 @@
   // One check at a time: on a slow connection the 5-second timer would otherwise start new checks before the
   // last one answered, and each answer would add the same new messages again.
   let polling = null;
+  let whenMineArrives = null;  // set while a send that took too long might still arrive
   async function poll(now) {
     if (document.hidden && !now) return;
     if (polling) {
@@ -539,6 +540,7 @@
       if (!messages.length) { showStatus(status); return; }
       const wasNearBottom = nearBottom();
       messages.forEach(render);
+      if (whenMineArrives) whenMineArrives(messages);  // a slow send that showed up after all
       makeAlbums();
       lastId = messages[messages.length - 1].id;
       showStatus(status);
@@ -648,10 +650,17 @@
           takeSentText();
           showError(null);
           scrollDown();
+        } else if (error.name === "AbortError") {
+          showError("This is taking a while. If it doesn't show up in the chat soon, try again.");
+          const words = sentText.trim();
+          whenMineArrives = (messages) => {  // it may still get there: then the note and the sent words go
+            if (!messages.some((m) => m.mine && m.id > sentAfter && m.body === words)) return;
+            whenMineArrives = null;
+            takeSentText();
+            showError(null);
+          };
         } else {
-          showError(error.name === "AbortError"
-            ? "This is taking a while. If it doesn't show up in the chat soon, try again."
-            : "Couldn't send. Check your connection and try again.");
+          showError("Couldn't send. Check your connection and try again.");
         }
       } finally {
         sending = false;

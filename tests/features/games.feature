@@ -10,6 +10,16 @@ Feature: Games
     When "Maya" hosts a basketball game tomorrow
     Then "Jordan" sees "Pickup 5v5" in the feed
 
+  @FR-EVT-25
+  Scenario: A game can only be posted while its place is open
+    When "Maya" tries to host basketball at the IMA on a Saturday from 20 to 22
+    Then they see "The IMA is open 9:00 AM – 8:30 PM on Saturdays"
+
+  @FR-EVT-25
+  Scenario: A game inside the place's hours goes up
+    When "Maya" tries to host basketball at the IMA on a Saturday from 10 to 12
+    Then "Jordan" sees "Pickup 5v5" in the feed
+
   @FR-EVT-2
   Scenario: A sport can only be played where it makes sense
     When "Maya" tries to host rowing at "Denny Field"

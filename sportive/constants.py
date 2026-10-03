@@ -186,6 +186,41 @@ OFF_CAMPUS = "Off campus (see note)"
 ONLINE = "Online"
 HUB = "The HUB (Husky Union Building)"  # the student union: its games area is where esports meet up
 
+# Opening hours: a game can't be posted at a place while it's closed. Each place has seasons, each with
+# hours per weekday (0 = Monday): (opens, closes) as "HH:MM", or None = closed all day. A date outside every
+# season, or a place not listed (fields, the Quad, Red Square, the trail...: no posted hours), has no limit.
+# Sources, checked Oct 2026 (UW Rec hadn't posted Autumn 2026 hours yet, so its Autumn 2025 hours are used;
+# update these when washington.edu/ima/facility-hours/ shows the new quarter):
+#   IMA and its rooms: washington.edu/ima/?p=29656 (Autumn 2025). Pool: closes 30 min before the building
+#   (washington.edu/ima/ima-pool/open-rec-offerings/). South tennis courts: lights off 30 min before the IMA closes
+#   (washington.edu/ima/ima-building/facility-field-reservations/). Golf range and WAC: UW Rec, Autumn 2025.
+#   Fitness Center West: hfs.uw.edu/perks-recreation/fcw (2026-27). Green Lake: Seattle park hours, 4 AM-11:30 PM.
+ALL_YEAR = ("01-01", "12-31")
+_WEEKDAYS, _WEEKEND = range(5), (5, 6)
+
+
+def _week(weekdays, weekend):
+    return {**{day: weekdays for day in _WEEKDAYS}, **{day: weekend for day in _WEEKEND}}
+
+
+_IMA = _week(("06:00", "22:30"), ("09:00", "20:30"))
+PLACE_HOURS = {
+    IMA: [(ALL_YEAR, _IMA)],
+    IMA_ARCHERY: [(ALL_YEAR, _IMA)],
+    IMA_MATS: [(ALL_YEAR, _IMA)],
+    IMA_COURTS: [(ALL_YEAR, _IMA)],
+    IMA_POOL: [(ALL_YEAR, _week(("06:00", "22:00"), ("09:00", "20:00")))],
+    IMA_SOUTH_COURTS: [(ALL_YEAR, _week(("00:00", "22:00"), ("00:00", "20:00")))],  # only the lights-off time
+    FITNESS_WEST: [(ALL_YEAR, _week(("07:00", "23:00"), ("10:00", "20:00")))],
+    GOLF_RANGE: [(("10-01", "10-31"), {0: None, **{day: ("10:00", "19:00") for day in range(1, 7)}}),
+                 (("11-01", "11-30"), {0: None, 1: None, **{day: ("10:00", "18:00") for day in range(2, 7)}})],
+    WAC: [(("10-01", "10-12"), {**{day: None for day in _WEEKDAYS}, 5: ("10:00", "18:00"), 6: ("10:00", "18:00")}),
+          (("10-13", "12-31"), {day: None for day in range(7)}),      # closed for the season
+          (("01-01", "03-31"), {day: None for day in range(7)})],
+    GREEN_LAKE_PICKLEBALL: [(ALL_YEAR, {day: ("04:00", "23:30") for day in range(7)})],
+}
+
+
 # Map pins (latitude, longitude), from OpenStreetMap (openstreetmap.org), checked Sept 2026
 # against UW Recreation's official field map (Recreation Field 1 is right north of the IMA,
 # Field 2 is north of Husky Track, Fields 3 & 4 are by the golf range).

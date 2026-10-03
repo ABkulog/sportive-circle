@@ -374,15 +374,16 @@ def open_invite_link(token):
         session["invite_link"] = token  # used right after they sign up or log in (auth.log_in)
         return redirect(url_for("auth.login" if request.form.get("go") == "login" else "auth.signup"))
     event = _open_game(link[0]) if link[0] else None
+    inviter_left = False
     if event is not None and event["host_id"] != inviter["id"] and not get_db().execute(
             "SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (event["id"], inviter["id"])).fetchone():
-        event = None  # they left or were taken off: their link doesn't advertise the game anymore
+        event, inviter_left = None, True  # they left or were taken off: their link doesn't advertise the game
     if g.get("user") is not None and inviter["id"] == g.user["id"]:
         return redirect(url_for("events.detail", event_id=event["id"]) if event else url_for("social.friends"))
     full = bool(event) and spots_left(event) == 0 and not event["i_am_going"]
     game_over = bool(link[0]) and event is None  # a link for a game that's over or canceled: say so first
     return render_template("events/invite_link.html", inviter=inviter, event=event, token=token, full=full,
-                           game_over=game_over)
+                           game_over=game_over, inviter_left=inviter_left)
 
 
 def accept_invite_link(user, token, just_signed_up=False):

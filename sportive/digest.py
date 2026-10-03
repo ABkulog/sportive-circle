@@ -44,6 +44,8 @@ def games_for(user):
     open_games = query_events(base + sport_filter + [
         "e.is_private = 0", f"NOT {IS_FULL_SQL}", "e.host_id != :me",
         "NOT EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)",
+        # not a game the host took them off: they couldn't join it
+        "NOT EXISTS (SELECT 1 FROM removed_players p WHERE p.event_id = e.id AND p.user_id = :me)",
         NOT_BLOCKED, games_open_to_me(), MEMBERS_ONLY_FOR_MEMBERS], params, limit=MAX_GAMES)
     line = lambda e: f"{event_title(e)} · {fmt_when(e['starts_at'])} · {e['location']}"
     return [line(e) for e in open_games], [line(e) for e in going]

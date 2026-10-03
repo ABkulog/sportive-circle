@@ -134,8 +134,8 @@ small { font-size: .82rem; }
 .page-title { font-size: 1.6rem; margin: 6px 0 16px; }
 /* The UW touch: a short Husky Gold bar under page titles. */
 .page-title::after { content: ""; display: block; width: 44px; height: 4px; margin-top: 8px; background: var(--gold); }
-.place-tip { display: block; margin-top: 4px; font-size: .82rem; }
-.place-tip:empty { display: none; }
+.place-tip, .place-hours { display: block; margin-top: 4px; font-size: .82rem; }
+.place-tip:empty, .place-hours:empty { display: none; }
 .section-title { font-size: 1rem; font-weight: 700; margin: 26px 0 8px; }
 /* Dividers. Big sections of a page start with a soft full-width band (like Instagram/Facebook), so a
    long page reads as separate chunks instead of one block. Items inside a section keep thin lines. */

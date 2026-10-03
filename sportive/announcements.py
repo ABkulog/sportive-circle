@@ -49,9 +49,9 @@ def _announce_texts(send):
             send_designed(person["email"], "New on Sportive Circle: game updates by text 📱",
                           f"Hey {first}, you can get texts now",
                           ["Add your number and we'll text you game reminders, time or place changes, "
-                           "cancellations and invites, the same updates you get by email.",
-                           "It's optional and takes 30 seconds. Email still gets everything, and you can "
-                           "turn texts off anytime or reply STOP."],
+                           "cancellations, and friends' invites to games (those are in your bell, not email).",
+                           "It's optional and takes 30 seconds. Reminders, changes and cancellations still come "
+                           "by email too, and you can turn texts off anytime or reply STOP."],
                           button=("Add my number", link),
                           reason="You're getting this one-time update because you have a Sportive Circle account.",
                           unsubscribe=unsubscribe_url(person["email"], "digest"))

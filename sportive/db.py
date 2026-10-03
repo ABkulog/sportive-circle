@@ -1,3 +1,4 @@
+import re
 import sqlite3
 
 from flask import current_app, g
@@ -124,7 +125,20 @@ def init_db():
     if db.execute("PRAGMA user_version").fetchone()[0] < 1:  # once per database (version 1 = clubs sorted)
         sort_other_clubs(db)
         db.execute("PRAGMA user_version = 1")
+    if db.execute("PRAGMA user_version").fetchone()[0] < 2:  # version 2 = club posts know their weeks
+        count_series_weeks(db)
+        db.execute("PRAGMA user_version = 2")
     db.commit()
+
+
+def count_series_weeks(db):
+    """Posts about a weekly series, written before posts kept their number of weeks, get it back from their words
+    ("... for 4 weeks"), so canceling or editing one week doesn't treat the whole series as one event."""
+    for post in db.execute("""SELECT id, body FROM club_posts WHERE weeks = 1 AND (body LIKE 'New: %'
+                               OR body LIKE 'New members-only events%' OR body LIKE 'New private events%')""").fetchall():
+        post_id, body = post[0], post[1]
+        found = re.search(r"for (\d+) weeks", body)
+        db.execute("UPDATE club_posts SET weeks = ? WHERE id = ?", (int(found.group(1)) if found else 2, post_id))
 
 
 # Words in a club's name that mean one of the newer sports. Clubs registered as "Other" before that sport existed
