@@ -17,6 +17,7 @@ from .db import get_db, user_sports
 from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots,
                       holds_for_others, invited_too_often, my_invite, now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
 from .friendgames import announce_new_game, update_announcements
+from .placehours import closed_message
 from .links import public_url
 from .sms import text_user
 from .reminders import REMIND_CHOICES
@@ -462,6 +463,12 @@ def read_event_form(form, event=None):
         return None, "Event date can't be before now."
     if starts > now + timedelta(days=MAX_DAYS_AHEAD):
         return None, "Event date can't be more than a year away."
+    # Only while the place is open. (An edit that keeps the same time and place isn't held to newer hours.)
+    if event is None or (to_db(starts), to_db(ends), location) != (event["starts_at"], event["ends_at"],
+                                                                     event["location"]):
+        closed = closed_message(location, starts, ends)
+        if closed:
+            return None, closed
 
     if len(note) > 500:
         return None, "Note is too long (500 characters max)."
@@ -584,6 +591,13 @@ def create():
                 error = f"A club event can repeat for up to {MAX_REPEAT_WEEKS} weeks."
             elif from_db(data["starts_at"]) + timedelta(weeks=repeat - 1) > now_local() + timedelta(days=MAX_DAYS_AHEAD):
                 error = "The last week would be more than a year away. Repeat for fewer weeks."
+            else:  # every week has to fit the place's hours (they change with the season: the golf range, the WAC)
+                for week in range(1, repeat):
+                    closed = closed_message(data["location"], from_db(data["starts_at"]) + timedelta(weeks=week),
+                                            from_db(data["ends_at"]) + timedelta(weeks=week))
+                    if closed:
+                        error = f"Week {week + 1}: {closed}"
+                        break
         elif error is None:
             repeat = 1
         if error is None:
@@ -993,6 +1007,10 @@ def quick():
             if not exists_in_seattle(starts):  # rounded up into the skipped hour (1:58 -> 2:00): it's 3:00
                 starts += timedelta(hours=1)
             ends = add_real(starts, timedelta(minutes=_int(form.get("duration"))))
+            error = closed_message(location, starts, ends)  # only while the place is open
+            if error is not None:
+                get_db().rollback()  # (the posting lock above)
+        if error is None:
             event_id = insert_event({
                 "title": f"{team_size}v{team_size} {SPORTS[sport]}" if team_size else f"Need {needed} for {SPORTS[sport]}",
                 "sport": sport, "location": location,

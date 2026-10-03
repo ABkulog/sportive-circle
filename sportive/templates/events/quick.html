@@ -22,6 +22,7 @@
     </div>
     {# Under both boxes (not inside Where), so Sport and Where stay level when a tip shows up. #}
     <small class="muted place-tip" data-place-tip></small>
+    <small class="muted place-hours" data-place-hours aria-live="polite"></small>
     <div class="row row-pair">
       {{ select('starts_in', 'Starting', start_options, form.get('starts_in', '30')) }}
       {{ select('duration', 'For', durations, form.get('duration', '60')) }}
@@ -53,6 +54,7 @@
   </form>
 </div>
 <script type="application/json" id="sport-rules">{{ SPORT_RULES|tojson }}</script>
+<script type="application/json" id="place-hours">{{ place_hours()|tojson }}</script>
 <script src="{{ url_for('static', filename='forms.js') }}" defer></script>
 <script src="{{ url_for('static', filename='wizard.js') }}" defer></script>
 {% endblock %}

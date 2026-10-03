@@ -4457,6 +4457,64 @@ def test_search_and_invite_wording_round_21(accounts, client, app):
     assert "Husky Powder Crew" in found
 
 
+def _next(weekday, hour, minute=0, month=None):
+    """The next date at least 2 days away on `weekday` (0 = Monday), optionally in `month`, at hour:minute."""
+    day = now_local() + timedelta(days=2)
+    while day.weekday() != weekday or (month and day.month != month):
+        day += timedelta(days=1)
+    return day.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+
+def test_games_only_while_the_place_is_open(accounts, client, app):
+    """The owner: a game can't be posted at a place when it's closed (the IMA closes at 8:30 PM on weekends, the golf
+    range is closed on Mondays in October, the WAC closes for the season). The form shows the hours; editing a
+    game's note isn't held to hours that changed later; every week of a weekly practice is checked."""
+    from sportive.placehours import closed_message, hours_on
+    app.config["CHECK_PLACE_HOURS"] = True
+    at = lambda moment: moment.strftime("%Y-%m-%dT%H:%M")
+    accounts.signup()
+    saturday = _next(5, 20)
+    late = client.post("/events/new", data=event_form(starts_at=at(saturday), ends_at=at(saturday.replace(hour=22))),
+                       follow_redirects=True).data.decode()
+    assert "The IMA is open 9:00 AM – 8:30 PM on Saturdays" in late
+    game = event_id_from(client.post("/events/new", data=event_form(
+        starts_at=at(saturday.replace(hour=10)), ends_at=at(saturday.replace(hour=12)))))
+    assert game
+    early = client.post("/events/new", data=event_form(title="Early", starts_at=at(_next(0, 5)),
+                                                       ends_at=at(_next(0, 7))), follow_redirects=True).data.decode()
+    assert "The IMA is open 6:00 AM – 10:30 PM on Mondays" in early
+    page = client.get("/events/new").data.decode()
+    assert 'id="place-hours"' in page and "data-place-hours" in page
+    with app.app_context():
+        get_db().execute("UPDATE events SET starts_at = ?, ends_at = ? WHERE id = ?",   # posted before the hours
+                         (to_db(saturday.replace(hour=21)), to_db(saturday.replace(hour=22)), game))
+        get_db().commit()
+    client.post(f"/events/{game}/edit", data=event_form(note="Bring water", starts_at=at(saturday.replace(hour=21)),
+                                                       ends_at=at(saturday.replace(hour=22))))
+    with app.app_context():
+        assert get_db().execute("SELECT note FROM events WHERE id = ?", (game,)).fetchone()[0] == "Bring water"
+        golf, wac = "UW Golf Driving Range", "Waterfront Activities Center (WAC)"
+        monday = _next(0, 12, month=10)
+        assert "closed on Mondays" in closed_message(golf, monday, monday.replace(hour=13))
+        november = _next(2, 12, month=11)
+        assert "closed for the season" in closed_message(wac, november, november.replace(hour=13))
+        assert hours_on("Denny Field", november.date()) == "any"                # no posted hours: no limit
+        assert closed_message("Green Lake Park pickleball courts", november.replace(hour=23),
+                              november.replace(hour=23, minute=45)).startswith("The Green Lake pickleball courts are")
+        assert closed_message("IMA South Tennis Courts", november.replace(hour=5),
+                              november.replace(hour=6)) is None                # only a lights-off time
+    accounts.logout()
+    club = _approved_club(accounts, client, app, name="Husky Golf", sport="golf", location="UW Golf Driving Range")
+    accounts.login(email="captain@uw.edu")
+    tuesday = _next(1, 12, month=10)
+    while (tuesday + timedelta(weeks=5)).month != 11:                         # a practice that runs into November
+        tuesday += timedelta(weeks=1)
+    page = client.post(f"/events/new?club={club}", data=event_form(
+        title="Range day", sport="golf", location="UW Golf Driving Range", club=str(club), repeat="6",
+        starts_at=at(tuesday), ends_at=at(tuesday.replace(hour=14))), follow_redirects=True).data.decode()
+    assert "closed on Tuesdays" in page and "Week " in page
+
+
 def test_party_up_holds_spots_for_friends(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Stranger")
     _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])

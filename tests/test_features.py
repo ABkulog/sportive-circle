@@ -338,6 +338,22 @@ def try_host_pickleball(world, host, place):
     host_game(world, host, sport="pickleball", location=place, title="Pickleball doubles")
 
 
+def next_weekday(weekday, hour, minute=0):
+    """The next date (at least 2 days away) that falls on `weekday` (0 = Monday), at hour:minute, Seattle time."""
+    day = now_local() + timedelta(days=2)
+    while day.weekday() != weekday:
+        day += timedelta(days=1)
+    return day.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+
+@when(parsers.parse('"{host}" tries to host basketball at the IMA on a Saturday from {start:d} to {end:d}'))
+def host_at_ima_saturday(world, host, start, end):
+    world.app.config["CHECK_PLACE_HOURS"] = True  # tests run at any hour: only these check the places' hours
+    starts = next_weekday(5, start)
+    host_game(world, host, starts_at=starts.strftime("%Y-%m-%dT%H:%M"),
+              ends_at=starts.replace(hour=end).strftime("%Y-%m-%dT%H:%M"))
+
+
 @when(parsers.parse('"{host}" tries to host basketball for {n:d} players'))
 def host_too_big(world, host, n):
     host_game(world, host, players=str(n))
