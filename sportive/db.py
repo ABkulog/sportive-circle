@@ -92,6 +92,7 @@ ADDED_COLUMNS = [
     ("clubs", "contact_phone", "TEXT NOT NULL DEFAULT ''"),
     ("events", "members_only", "INTEGER NOT NULL DEFAULT 0"),
     ("club_posts", "event_id", "INTEGER REFERENCES events(id) ON DELETE SET NULL"),
+    ("club_posts", "weeks", "INTEGER NOT NULL DEFAULT 1"),  # a post about a weekly series: how many weeks
     ("notices", "key", "TEXT"),
     ("users", "theme", "TEXT NOT NULL DEFAULT 'light'"),
     ("users", "session_version", "INTEGER NOT NULL DEFAULT 0"),
@@ -104,6 +105,7 @@ ADDED_COLUMNS = [
     ("users", "texts_card_done", "INTEGER NOT NULL DEFAULT 0"),  # 1 = closed the "New: texts" card on Home
     ("users", "texts_announced_at", "TEXT"),                     # when tools/announce_texts.py emailed them
     ("direct_messages", "event_id", "INTEGER REFERENCES events(id) ON DELETE SET NULL"),
+    ("users", "sms_stopped_at", "TEXT"),  # when Twilio said they replied STOP (Settings → Texts explains)
 ]
 
 

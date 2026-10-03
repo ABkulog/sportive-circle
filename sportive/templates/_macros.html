@@ -113,10 +113,10 @@
   {% endif %}
 {% endmacro %}
 
-{% macro select(name, label, options, current, placeholder=None) %}
+{% macro select(name, label, options, current, placeholder=None, required=False) %}
   <label class="field">
     <span>{{ label }}</span>
-    <select name="{{ name }}">
+    <select name="{{ name }}"{% if required %} required{% endif %}>
       {% if placeholder %}<option value="">{{ placeholder }}</option>{% endif %}
       {% for value, text in options %}
         <option value="{{ value }}" {% if value|string == current|string %}selected{% endif %}>{{ text }}</option>

@@ -195,7 +195,9 @@ def _count(kind, me):
     if kind == "club_requests":
         return db.execute(
             """SELECT COUNT(*) FROM club_members waiting JOIN club_members mine ON mine.club_id = waiting.club_id
-               WHERE mine.user_id = ? AND mine.role = 'officer' AND waiting.role IN ('requested', 'tryout')""",
+               JOIN users w ON w.id = waiting.user_id
+               WHERE mine.user_id = ? AND mine.role = 'officer' AND waiting.role IN ('requested', 'tryout')
+                 AND w.suspended = 0""",
             (me,)).fetchone()[0]
     if kind == "badges":
         return db.execute("SELECT COUNT(*) FROM user_badges WHERE user_id = ? AND earned_at > ?",

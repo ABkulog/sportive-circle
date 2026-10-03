@@ -15,7 +15,7 @@ from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, OFF
                         SKILL_LEVELS, CLUB_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .db import get_db, user_sports
 from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots,
-                      holds_for_others, my_invite, now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
+                      holds_for_others, invited_too_often, my_invite, now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
 from .friendgames import announce_new_game
 from .links import public_url
 from .sms import text_user
@@ -33,6 +33,7 @@ log = logging.getLogger(__name__)
 
 MIN_PASSWORD, MAX_PASSWORD = 4, 30     # private games
 MAX_DAYS_AHEAD = 365
+CHANGE_ALERTS_PER_DAY = 6  # "Changed" emails/texts per player per game per day (the bell keeps the latest)
 OPEN_SPOT_CHOICES = ("1", "2", "3", "4", "5", "10")  # the "Open spots" filter on Home
 QUICK_WINDOW = timedelta(hours=3)      # quick posts starting this soon go to the top of the feed
 FEED_PAGE_SIZE = 50                    # games per "Show more games" step on the feed
@@ -170,6 +171,21 @@ def place_map(location):
     }
 
 
+MAX_GAMES_PER_HOUR = 60  # games one person can post in an hour (five 12-week practices fit): stops bell spam
+
+
+def posting_too_fast(adding):
+    """An error if posting `adding` more games would go over MAX_GAMES_PER_HOUR, else None. Each game tells the
+    host's friends and club, so a script posting hundreds would fill everyone's bell."""
+    recent = get_db().execute("SELECT COUNT(*) FROM events WHERE host_id = ? AND created_at >= datetime('now', '-1 hour')",
+                              (g.user["id"],)).fetchone()[0]  # (events.created_at is UTC, from SQLite)
+    if recent + adding > MAX_GAMES_PER_HOUR:
+        left = max(0, MAX_GAMES_PER_HOUR - recent)
+        return (f"You can post up to {MAX_GAMES_PER_HOUR} games an hour, and you've posted {recent}. "
+                + (f"Try {left} or fewer weeks, or try again in a bit." if left else "Try again in a bit."))
+    return None
+
+
 def round_up_5(dt):
     return dt + timedelta(minutes=-dt.minute % 5)
 
@@ -269,6 +285,8 @@ def read_reservations(form, room):
         return [], f"You can reserve up to {MAX_PARTY} spots at once."
     if len(chosen) > room:
         return [], f"There's only room to reserve {room} spot{'s' if room != 1 else ''} for friends."
+    if invited_too_often(g.user["id"], chosen):
+        return [], "You've reserved spots for one of these friends in a lot of games today. Try again tomorrow."
     return chosen, None
 
 
@@ -569,6 +587,10 @@ def create():
         if error is None:
             get_db().commit()
             get_db().execute("BEGIN IMMEDIATE")  # one post at a time, so a double tap can't make two copies
+            error = posting_too_fast(repeat)  # (checked under the lock: two tabs can't both slip under the limit)
+            if error is not None:
+                get_db().rollback()
+        if error is None:
             duplicate = get_db().execute(
                 "SELECT 1 FROM events WHERE host_id = ? AND title = ? AND starts_at = ? AND cancelled = 0",
                 (g.user["id"], data["title"], data["starts_at"]),
@@ -616,6 +638,34 @@ MAX_REPEAT_WEEKS = 12  # about a quarter of weekly practices
 
 def post_club_event(club, event_id, data, repeat):
     """A new club event goes in the club's updates, so followers and members hear about it (Clubs tab)."""
+    get_db().execute("INSERT INTO club_posts (club_id, author_id, body, created_at, event_id, weeks)"
+                     " VALUES (?, ?, ?, ?, ?, ?)",
+                     (club["id"], g.user["id"], club_event_text(data, repeat), to_db(now_local()), event_id, repeat))
+    get_db().commit()
+
+
+def update_club_post(event_id, data):
+    """An edited club event: its post in the club's updates (which are public) is rewritten with the new time and
+    place, or without them once it's members-only or private (and with them again if it goes back to public).
+    A post about a weekly series is linked to its first week and keeps describing the series."""
+    db = get_db()
+    for post in db.execute("SELECT id, weeks FROM club_posts WHERE event_id = ?", (event_id,)).fetchall():
+        db.execute("UPDATE club_posts SET body = ? WHERE id = ?", (club_event_text(data, post["weeks"]), post["id"]))
+
+
+def mark_club_post_canceled(event_id):
+    """A canceled club event: its post (if it's about this one event) says so, instead of still advertising it."""
+    get_db().execute("UPDATE club_posts SET body = 'Canceled: ' || body WHERE event_id = ? AND weeks = 1"
+                     " AND body NOT LIKE 'Canceled: %'", (event_id,))
+
+
+def club_event_text(data, repeat):
+    """What a club's updates say about a new event (no when or where for members-only and private ones)."""
+    if data.get("members_only"):  # updates are public: members see when and where on the Events tab
+        return (f"New members-only events: every {from_db(data['starts_at']).strftime('%A')} for {repeat} weeks."
+                if repeat > 1 else "New members-only event.") + " Members: see the Events tab."
+    if data.get("is_private"):  # private: only invited people and password holders get the details
+        return ("New private events." if repeat > 1 else "New private event.") + " Invited people: see your invites."
     when = fmt_when(data["starts_at"])
     if repeat > 1:
         starts = from_db(data["starts_at"])
@@ -623,12 +673,7 @@ def post_club_event(club, event_id, data, repeat):
                 f"for {repeat} weeks, starting {when} · {data['location']}")
     else:
         text = f"New event: {data['title']} · {when} · {data['location']}"
-    if data.get("members_only"):  # updates are public: members see when and where on the Events tab
-        text = (f"New members-only events: every {from_db(data['starts_at']).strftime('%A')} for {repeat} weeks."
-                if repeat > 1 else "New members-only event.") + " Members: see the Events tab."
-    get_db().execute("INSERT INTO club_posts (club_id, author_id, body, created_at, event_id) VALUES (?, ?, ?, ?, ?)",
-                     (club["id"], g.user["id"], text, to_db(now_local()), event_id))
-    get_db().commit()
+    return text
 
 
 def club_for_new_event(club_id):
@@ -688,9 +733,13 @@ def edit(event_id):
                 left_out = drop_non_members(event)
             else:
                 left_out = 0
+            if event["club_id"]:
+                update_club_post(event_id, data)
             told = tell_players_it_changed(event, data, by=g.user)
             db.commit()
-            flash(("Saved. Everyone going got a heads-up." if told else "Saved.")
+            flash(("Saved. Everyone going sees it in their notifications (this game changed a lot today, so not "
+                   "everyone got another email)." if told and g.get("change_emails_skipped") else
+                   "Saved. Everyone going got a heads-up." if told else "Saved.")
                   + (f" {left_out} who aren't members are off the game now and were told." if left_out else ""),
                   "success")
             return redirect(url_for("events.detail", event_id=event_id))
@@ -720,9 +769,12 @@ def cancel(event_id):
                       (event_id,)).rowcount:
         db.commit()
         return redirect(url_for("events.detail", event_id=event_id))
+    if event["club_id"]:
+        mark_club_post_canceled(event_id)
     db.commit()
+    told = players_except_host(event, by=g.user)
     tell_players_it_was_cancelled(event, by=g.user)
-    flash("Canceled. Everyone who joined was told.", "info")
+    flash("Canceled. Everyone who joined was told." if told else "Canceled.", "info")
     return redirect(url_for("events.my_events"))
 
 
@@ -752,6 +804,10 @@ def drop_non_members(event):
     db.execute(f"DELETE FROM notices WHERE key = ? AND user_id IN (SELECT guest_id FROM invites WHERE {outside})",
                (f"invite:{event['id']}", event["id"], event["club_id"]))
     db.execute(f"UPDATE invites SET status = 'canceled' WHERE {outside}", (event["id"], event["club_id"]))
+    # "Maya posted Open run (Sat 3 PM). Want in?" in outsiders' bells: gone, it's not for them anymore.
+    db.execute("""DELETE FROM notices WHERE key = ? AND user_id NOT IN
+                  (SELECT user_id FROM club_members WHERE club_id = ? AND role IN ('member', 'officer'))""",
+               (f"friend_game:{event['id']}", event["club_id"]))
     return len(outsiders)
 
 
@@ -794,8 +850,19 @@ def tell_players_it_changed(event, data, by=None):
         notify(row["guest_id"], "invites", f"{row['inviter_name'].split()[0]} wants you in {title}, which changed: "
                f"{', '.join(changes)}. You down?", link, key=f"invite:{event['id']}")
     if any(change.startswith(("new time", "new place", "now ends", "now ")) for change in changes):
+        # The bell always has the latest; emails and texts about one game: at most CHANGE_ALERTS_PER_DAY a day each.
+        db, now = get_db(), now_local()
+        since = to_db(now - timedelta(days=1))
+        everyone = len(players)
+        players = [player for player in players if db.execute(
+            "SELECT COUNT(*) FROM change_alerts WHERE event_id = ? AND user_id = ? AND sent_at >= ?",
+            (event["id"], player["id"], since)).fetchone()[0] < CHANGE_ALERTS_PER_DAY]
+        g.change_emails_skipped = len(players) < everyone  # the host is told honestly (edit())
+        db.executemany("INSERT INTO change_alerts (user_id, event_id, sent_at) VALUES (?, ?, ?)",
+                       [(player["id"], event["id"], to_db(now)) for player in players])
+        db.commit()  # the change is saved before the texts and emails go out, so nobody else waits on them
         for player in players:
-            text_user(player["id"], f"{host} changed {title}: now {fmt_when(data['starts_at'])} at {data['location']}. "
+            text_user(player["id"], kind="important", body=f"{host} changed {title}: now {fmt_when(data['starts_at'])} at {data['location']}. "
                                     f"{public_url('events.detail', event_id=event['id'])}")
         for player in players:
             try:
@@ -840,7 +907,7 @@ def tell_players_it_was_cancelled(event, page_stays=True, by_host=True, by=None)
                "so that invite is off.", url_for("events.feed"), key=f"invite:{event['id']}")
     db.commit()
     for player in players:
-        text_user(player["id"], f"{who} canceled {title} ({when}).")
+        text_user(player["id"], f"{who} canceled {title} ({when}).", kind="important")
     for player in players:
         try:
             subject = f"Canceled: {title} ({when})"
@@ -902,6 +969,12 @@ def quick():
         needed = (max_players or 0) - 1 - extra - len(reserve)
         if error is None and needed < 1 and not team_size:
             error = "Everyone's already coming, so there's no one to find. Pick more participants."
+        if error is None:
+            get_db().commit()
+            get_db().execute("BEGIN IMMEDIATE")  # checked under the lock: two tabs can't both slip under the limit
+            error = posting_too_fast(1)
+            if error is not None:
+                get_db().rollback()
 
         if error is None:
             # Real minutes from now, so a game never lands in the hour skipped when clocks jump ahead.
@@ -942,8 +1015,8 @@ def detail(event_id):
     attendees = get_db().execute(
         """SELECT u.id, u.full_name, u.grad_year, u.avatar_updated, r.team
            FROM rsvps r JOIN users u ON u.id = r.user_id
-           WHERE r.event_id = ? ORDER BY r.created_at""",
-        (event_id,),
+           WHERE r.event_id = ? AND (u.suspended = 0 OR u.id = ?) ORDER BY r.created_at""",  # suspended: hidden
+        (event_id, me),
     ).fetchall() if inside else []
     invite = None if event["i_am_going"] else my_invite(event_id, me)
     my_team = next((person["team"] for person in attendees if person["id"] == me), None)

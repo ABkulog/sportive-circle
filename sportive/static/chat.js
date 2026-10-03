@@ -233,6 +233,10 @@
   const closeViewer = () => {
     viewer.hidden = true;
     viewerImage.removeAttribute("src");
+    // Back to the photo it was opened from (not the message box: that would pop the phone's keyboard up).
+    if (openedFrom && openedFrom.isConnected && openedFrom.focus && openedFrom.tagName !== "TEXTAREA") {
+      openedFrom.focus({ preventScroll: true });
+    }
   };
   closeButton.addEventListener("click", closeViewer);
   prevButton.addEventListener("click", () => showPhoto(at - 1));
@@ -241,7 +245,12 @@
   document.addEventListener("keydown", (event) => {
     if (viewer.hidden) return;
     if (event.key === "Escape") closeViewer();
-    else if (event.key === "ArrowLeft") showPhoto(at - 1);
+    else if (event.key === "Tab") {  // it's a full-screen viewer: Tab stays on its buttons
+      const buttons = [...viewer.querySelectorAll("button")].filter((button) => !button.hidden);
+      const here = buttons.indexOf(document.activeElement);
+      event.preventDefault();
+      buttons[(here + (event.shiftKey ? -1 : 1) + buttons.length) % buttons.length].focus();
+    } else if (event.key === "ArrowLeft") showPhoto(at - 1);
     else if (event.key === "ArrowRight") showPhoto(at + 1);
   });
   let viewerTouch = null;
@@ -315,7 +324,11 @@
     item.querySelector(".chat-bubble").appendChild(pop);
     setTimeout(() => pop.remove(), 700);
     const mine = JSON.parse(item.dataset.reactions || "[]").find((reaction) => reaction.mine);
-    if (!mine || mine.emoji !== "❤️") react(item, "❤️");  // a double tap only adds a heart (like Instagram)
+    // A double tap only adds a heart (like Instagram). While the first one is on its way, another double tap
+    // waits for it: otherwise on a slow connection the second would take the heart back off.
+    if (item.dataset.hearting || (mine && mine.emoji === "❤️")) return;
+    item.dataset.hearting = "1";
+    Promise.resolve(react(item, "❤️")).finally(() => { delete item.dataset.hearting; });
   }
 
   // The menu that opens when you hold a message.
@@ -511,7 +524,11 @@
       const first = list.querySelector(".chat-msg");
       const response = await fetch(`${box.dataset.pollUrl}?after=${lastId}&from=${first ? first.dataset.id : 0}`,
                                    { headers: { Accept: "application/json" } });
-      if (new URL(response.url).pathname.startsWith("/login")) { location.reload(); return; }  // logged out
+      if (new URL(response.url).pathname.startsWith("/login")) {  // logged out (maybe in another tab)
+        const draft = box.querySelector("textarea");
+        if (!draft || !draft.value.trim()) location.reload();  // never throw away something being typed
+        return;
+      }
       if (!response.ok) return;
       const answer = await response.json();
       const { status, reactions } = answer;
@@ -531,6 +548,7 @@
     } catch (error) { /* offline for a moment; try again next time */ }
   }
   setInterval(poll, 5000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });  // back to the tab: catch up now
 
   // Enter sends, Shift+Enter makes a new line; the box grows as you type.
   const textarea = box.querySelector("textarea");
@@ -545,6 +563,8 @@
       textarea.style.height = Math.min(textarea.scrollHeight, 140) + "px";
     };
     textarea.addEventListener("keydown", (event) => {
+      // Not the Enter that finishes Japanese, Chinese or Korean typing (isComposing / 229): that one picks the word.
+      if (event.isComposing || event.keyCode === 229) return;
       if (event.key === "Enter" && !event.shiftKey && (textarea.value.trim() || hasPhoto())) {
         event.preventDefault();
         if (textarea.form.requestSubmit) textarea.form.requestSubmit();  // Safari 16+
@@ -574,6 +594,12 @@
       if (sending) return;
       sending = true;
       sendButton.disabled = true;
+      const sentText = textarea.value;  // what's going out: anything typed while it sends stays in the box
+      const sentAfter = lastId;         // newer messages of mine than this one are what this send made
+      const takeSentText = () => {      // take away only what was sent: words typed while it was on its way stay
+        textarea.value = textarea.value.startsWith(sentText) ? textarea.value.slice(sentText.length).trimStart() : textarea.value;
+        grow();
+      };
       try {
         // One request per photo (the words go with the last one), or one for words only.
         const photos = picked.length ? [...picked] : [null];
@@ -582,23 +608,51 @@
           data.delete("photo");
           if (photos[i]) data.append("photo", photos[i]);
           if (i < photos.length - 1) data.set("body", "");
-          const response = await fetch(form.action, { method: "POST", body: data,
-                                                      headers: { "X-Chat-Send": "1", Accept: "application/json" } });
-          if (new URL(response.url).pathname.startsWith("/login")) { location.reload(); return; }  // logged out
+          // A send that hangs (a bad connection) gives up after 20 seconds, so the box doesn't stay stuck.
+          const timeout = new AbortController();
+          const timer = setTimeout(() => timeout.abort(), photos[i] ? 90000 : 20000);  // a photo upload takes longer
+          let response;
+          try {
+            response = await fetch(form.action, { method: "POST", body: data, signal: timeout.signal,
+                                                  headers: { "X-Chat-Send": "1", Accept: "application/json" } });
+          } finally { clearTimeout(timer); }
+          if (new URL(response.url).pathname.startsWith("/login")) {  // logged out (on another device, say)
+            showError("You were logged out. Copy your message, then reload the page and log in.");
+            break;
+          }
           if (response.status === 413) { showError("That photo is too big. Pick one under 8 MB."); break; }
+          if (!(response.headers.get("Content-Type") || "").includes("json")) {  // e.g. logged out in another tab
+            showError("You were logged out. Copy your message, then reload the page and log in.");
+            break;
+          }
           const answer = await response.json();
           if (!answer.ok) { showError(answer.error); break; }
           if (photos[i]) photoInput.dispatchEvent(new CustomEvent("chat:sent", { detail: photos[i] }));
           if (i === photos.length - 1) {
-            textarea.value = "";
-            grow();
+            takeSentText();
             showError(null);
           }
         }
         await poll(true);
         scrollDown();
       } catch (error) {
-        showError("Couldn't send. Check your connection and try again.");
+        // A slow answer isn't always a lost message: look in the chat first, so sending again can't post it twice.
+        let arrived = false;
+        try {
+          await poll(true);
+          const words = sentText.trim();
+          arrived = Boolean(words) && [...list.querySelectorAll(".chat-msg.is-mine")].some((item) =>
+            Number(item.dataset.id) > sentAfter && (item.querySelector(".chat-bubble > p") || {}).textContent === words);
+        } catch (checkError) { /* still offline */ }
+        if (arrived) {
+          takeSentText();
+          showError(null);
+          scrollDown();
+        } else {
+          showError(error.name === "AbortError"
+            ? "This is taking a while. If it doesn't show up in the chat soon, try again."
+            : "Couldn't send. Check your connection and try again.");
+        }
       } finally {
         sending = false;
         sendButton.disabled = false;

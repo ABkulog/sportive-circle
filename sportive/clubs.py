@@ -71,7 +71,8 @@ def social_links(club):
 
 # SQL for "how many confirmed members" (members + officers; followers and people waiting don't count).
 MEMBER_COUNT = ("(SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id"
-                " AND m.role IN ('member', 'officer')) AS member_count")
+                " AND m.role IN ('member', 'officer')"
+                " AND m.user_id NOT IN (SELECT id FROM users WHERE suspended = 1)) AS member_count")  # matches the roster
 
 CHOICES = {"club_kind": CLUB_KINDS, "focus": FOCUS, "joining": JOINING, "experience": EXPERIENCE,
            "who_can_join": WHO_CAN_JOIN_LABELS}
@@ -265,8 +266,8 @@ def directory():
     clubs = get_db().execute(
         f"""SELECT c.*, {MEMBER_COUNT},
                    (SELECT m.role FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me) AS my_status,
-                   (SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id
-                                                        AND m.role IN ('requested', 'tryout')) AS waiting,
+                   (SELECT COUNT(*) FROM club_members m JOIN users wu ON wu.id = m.user_id WHERE m.club_id = c.id
+                                     AND m.role IN ('requested', 'tryout') AND wu.suspended = 0) AS waiting,
                    (SELECT COUNT(*) FROM events e WHERE e.club_id = c.id AND e.cancelled = 0
                                                    AND e.ends_at >= :now) AS upcoming
             FROM clubs c WHERE {" AND ".join(where)}
@@ -283,7 +284,8 @@ def view(club_id):
         abort(404)
     db = get_db()
     posts = db.execute(
-        """SELECT p.*, u.full_name FROM club_posts p LEFT JOIN users u ON u.id = p.author_id
+        """SELECT p.*, CASE WHEN u.suspended = 1 THEN NULL ELSE u.full_name END AS full_name  -- suspended: "An officer"
+           FROM club_posts p LEFT JOIN users u ON u.id = p.author_id
            WHERE p.club_id = ? ORDER BY p.id DESC LIMIT 20""", (club_id,)).fetchall()
     members, requests = [], []
     role = my_role(club_id)
@@ -296,21 +298,24 @@ def view(club_id):
         requests = db.execute(
             """SELECT u.id, u.full_name, u.avatar_updated, m.role, m.message, m.joined_at
                FROM club_members m JOIN users u ON u.id = m.user_id
-               WHERE m.club_id = ? AND m.role IN ('requested', 'tryout') ORDER BY m.joined_at""", (club_id,)).fetchall()
-    followers = db.execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'follower'",
-                           (club_id,)).fetchone()[0]
+               WHERE m.club_id = ? AND m.role IN ('requested', 'tryout') AND u.suspended = 0
+               ORDER BY m.joined_at""", (club_id,)).fetchall()
+    followers = db.execute("SELECT COUNT(*) FROM club_members m JOIN users u ON u.id = m.user_id"
+                           " WHERE m.club_id = ? AND m.role = 'follower' AND u.suspended = 0", (club_id,)).fetchone()[0]
     from .events import SHOWN_UNLESS_FULL  # imported here: events.py imports this module
-    events = db.execute(
-        f"""SELECT e.id, e.title, e.sport, e.starts_at, e.location, e.members_only FROM events e
-            WHERE e.club_id = :club AND e.cancelled = 0 AND e.ends_at >= :now AND {SHOWN_UNLESS_FULL}
-            ORDER BY e.starts_at LIMIT 10""",
-        {"club": club_id, "now": to_db(now_local()), "me": g.user["id"] if g.get("user") else 0,
-         "hold_now": to_db(now_local())}).fetchall()
     # Members-only events are the club's business: outsiders see how many there are, not when or where.
-    members_only_hidden = 0
-    if role not in MEMBER_ROLES and not is_admin():
-        members_only_hidden = sum(1 for e in events if e["members_only"])
-        events = [e for e in events if not e["members_only"]]
+    # Private ones are invite-only: officers see them here, everyone else through their invites.
+    # (Filtered before the limit, so ten hidden events can't push the open ones off the page.)
+    shown = {"club": club_id, "now": to_db(now_local()), "me": g.user["id"] if g.get("user") else 0,
+             "hold_now": to_db(now_local()), "member": role in MEMBER_ROLES or is_admin(),
+             "officer": role == "officer" or is_admin()}
+    upcoming = f"e.club_id = :club AND e.cancelled = 0 AND e.ends_at >= :now AND {SHOWN_UNLESS_FULL}"
+    events = db.execute(
+        f"""SELECT e.id, e.title, e.sport, e.starts_at, e.location, e.members_only, e.is_private FROM events e
+            WHERE {upcoming} AND (e.members_only = 0 OR :member) AND (e.is_private = 0 OR :officer)
+            ORDER BY e.starts_at LIMIT 10""", shown).fetchall()
+    members_only_hidden = 0 if shown["member"] else db.execute(
+        f"SELECT COUNT(*) FROM events e WHERE {upcoming} AND e.members_only = 1", shown).fetchone()[0]
     return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
                            members_only_hidden=members_only_hidden,
                            role=role, owner=is_owner(club), requests=requests, can_decide=can_decide, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
@@ -326,7 +331,7 @@ def roster(club_id):
     return get_db().execute(
         """SELECT u.id, u.full_name, u.email, u.grad_year, u.avatar_updated, m.role, m.joined_at
            FROM club_members m JOIN users u ON u.id = m.user_id
-           WHERE m.club_id = ? AND m.role IN ('member', 'officer')
+           WHERE m.club_id = ? AND m.role IN ('member', 'officer') AND u.suspended = 0  -- suspended: hidden everywhere
            ORDER BY m.role = 'officer' DESC, u.full_name""", (club_id,)).fetchall()
 
 
@@ -521,6 +526,10 @@ def edit(club_id):
 # ------------------------------------------------------------ membership
 
 MEMBER_ROLES = ("member", "officer")
+
+# SQL: officers who can still act (a suspended officer can't run the club, so they don't count toward "at least one").
+ACTIVE_OFFICERS = """SELECT COUNT(*) FROM club_members m JOIN users u ON u.id = m.user_id
+                     WHERE m.club_id = ? AND m.role = 'officer' AND u.suspended = 0"""
 WAITING_ROLES = ("requested", "tryout")
 
 
@@ -582,8 +591,12 @@ def join(club_id):
     if not emailed or from_db(emailed["sent_at"]) < now_local() - timedelta(days=1):
         db.execute("INSERT OR REPLACE INTO club_join_emails (club_id, user_id, sent_at) VALUES (?, ?, ?)",
                    (club_id, g.user["id"], to_db(now_local())))
+        # Not to an officer who blocked them (or whom they blocked): blocking works both ways, here too.
         officers = db.execute("""SELECT u.id, u.email FROM club_members m JOIN users u ON u.id = m.user_id
-                                 WHERE m.club_id = ? AND m.role = 'officer' AND u.suspended = 0""", (club_id,)).fetchall()
+                                 WHERE m.club_id = ? AND m.role = 'officer' AND u.suspended = 0
+                                   AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = u.id AND b.blocked_id = ?)
+                                                                           OR (b.blocker_id = ? AND b.blocked_id = u.id))""",
+                              (club_id, g.user["id"], g.user["id"])).fetchall()
     db.commit()
     what = "signed up for tryouts" if new_role == "tryout" else "wants to join"
     for officer in officers:
@@ -672,19 +685,24 @@ def leave(club_id):
     db.commit()
     db.execute("BEGIN IMMEDIATE")  # read who's officer/owner and leave in one go (no handover to someone leaving)
     role = my_role(club_id)
-    officers = db.execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'officer'",
-                          (club_id,)).fetchone()[0]
+    officers = db.execute(ACTIVE_OFFICERS, (club_id,)).fetchone()[0]
     club = get_club(club_id)
-    if role == "officer" and officers == 1:
+    if role == "officer" and officers <= 1:
         flash("You're the only officer. Make someone else an officer before you leave.", "error")
     elif role == "officer" and club["created_by"] == g.user["id"]:
         flash("You're the owner. On Manage officers, make another officer the owner, then you can leave.", "error")
+    elif role in ("requested", "tryout"):
+        # Canceling a request goes back to following, the same as a decline (unfollowing is one more tap).
+        db.execute("UPDATE club_members SET role = 'follower', message = '' WHERE club_id = ? AND user_id = ?",
+                   (club_id, g.user["id"]))
+        db.commit()
+        flash(("Request canceled." if role == "requested" else "Tryout sign-up canceled.")
+              + " You still follow the club.", "info")
     elif role is not None:
         db.execute("DELETE FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, g.user["id"]))
         _leave_members_only_games(club_id, g.user["id"])
         db.commit()
-        flash({"follower": "Unfollowed.", "requested": "Request canceled.", "tryout": "Tryout sign-up canceled."}
-              .get(role, "You left the club."), "info")
+        flash("Unfollowed." if role == "follower" else "You left the club.", "info")
     db.commit()
     return redirect(url_for("clubs.view", club_id=club_id))
 
@@ -695,6 +713,10 @@ def make_officer(club_id, user_id):
     if not is_owner(get_club(club_id)):
         abort(403)
     db = get_db()
+    from .social import is_blocked_between  # social.py is loaded after this module
+    if is_blocked_between(g.user["id"], user_id):  # blocking works both ways, here too
+        flash("You can't make this person an officer.", "error")
+        return redirect(url_for("clubs.view", club_id=club_id) + "#members")
     changed = db.execute("UPDATE club_members SET role = 'officer' WHERE club_id = ? AND user_id = ? AND role = 'member'",
                          (club_id, user_id)).rowcount
     if changed:
@@ -720,11 +742,20 @@ def officers(club_id):
         abort(403)
     db = get_db()
     if request.method == "POST":
+        # One officer change at a time: two officers removing each other at once can't leave the club with none,
+        # and a hand-over can't cross a removal.
+        db.commit()
+        db.execute("BEGIN IMMEDIATE")
+        club = get_club(club_id)
+        if not is_owner(club):  # handed to someone else meanwhile
+            db.rollback()
+            abort(403)
         user_id = request.form.get("user", type=int)
         action = request.form.get("action")
         person = db.execute("SELECT id, full_name FROM users WHERE id = ? AND verified = 1 AND suspended = 0",
                             (user_id,)).fetchone()
         if person is None:
+            db.rollback()
             abort(404)
         first = person["full_name"].split()[0]
         from .social import is_blocked_between  # social.py is loaded after this module
@@ -745,11 +776,12 @@ def officers(club_id):
             if not is_officer:
                 flash("Make them an officer first, then you can make them the owner.", "error")
             elif user_id != club["created_by"]:
-                if not db.execute("""UPDATE clubs SET created_by = ? WHERE id = ? AND created_by = ?
+                if not db.execute("""UPDATE clubs SET created_by = ? WHERE id = ? AND created_by IS ?
                                      AND EXISTS (SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ?
                                                  AND role = 'officer')""",
                                   (user_id, club_id, club["created_by"], club_id, user_id)).rowcount:
                     # handed to someone else meanwhile, or they just left / stopped being an officer
+                    db.rollback()
                     flash("That didn't go through: the club changed hands or they're no longer an officer.", "error")
                     return redirect(url_for("clubs.view", club_id=club_id))
                 _dm(g.user["id"], user_id, f"👑 You're now the owner of {club['name']}. You can add or remove officers "
@@ -763,8 +795,7 @@ def officers(club_id):
             if user_id == club["created_by"]:
                 flash("The owner stays an officer. To step down, make another officer the owner first.", "error")
             else:
-                count = db.execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'officer'",
-                                   (club_id,)).fetchone()[0]
+                count = db.execute(ACTIVE_OFFICERS, (club_id,)).fetchone()[0]
                 is_officer = db.execute("SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ? "
                                         "AND role = 'officer'", (club_id, user_id)).fetchone()
                 if not is_officer:
@@ -811,7 +842,9 @@ def updates():
             flash("Posted. Your followers will see it.", "success")
         return redirect(url_for("clubs.updates"))
     posts = db.execute(
-        """SELECT p.*, c.name AS club_name, c.sport, c.logo_updated AS club_logo, u.full_name, u.avatar_updated,
+        """SELECT p.*, c.name AS club_name, c.sport, c.logo_updated AS club_logo,
+                  CASE WHEN u.suspended = 1 THEN NULL ELSE u.full_name END AS full_name,
+                  CASE WHEN u.suspended = 1 THEN NULL ELSE u.avatar_updated END AS avatar_updated,
                   (SELECT m2.role FROM club_members m2 WHERE m2.club_id = c.id AND m2.user_id = u.id) AS author_role
            FROM club_posts p JOIN clubs c ON c.id = p.club_id LEFT JOIN users u ON u.id = p.author_id
            WHERE c.status = 'approved'

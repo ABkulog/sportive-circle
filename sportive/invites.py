@@ -54,7 +54,7 @@ def hold_spots(event_id, inviter, friend_ids, team, message, link):
                          (event_id, inviter, friend_id, team, now_param(), expires))
         notify(friend_id, "invites", message, link, key=f"invite:{event_id}")
         queue_text(friend_id, f"{message} Your spot is held for 30 min: "
-                              f"{current_app.config['PUBLIC_URL'].rstrip('/')}{link}")  # sent after the save
+                              f"{current_app.config['PUBLIC_URL'].rstrip('/')}{link}", kind=f"invite:{inviter}")
 
 
 def pending_invites(event_id):
@@ -62,7 +62,7 @@ def pending_invites(event_id):
     return get_db().execute(
         """SELECT i.*, g.full_name AS guest_name, g.avatar_updated AS guest_avatar, v.full_name AS inviter_name
            FROM invites i JOIN users g ON g.id = i.guest_id JOIN users v ON v.id = i.inviter_id
-           WHERE i.event_id = ? AND i.status = 'pending' ORDER BY i.id""", (event_id,)).fetchall()
+           WHERE i.event_id = ? AND g.suspended = 0 AND i.status = 'pending' ORDER BY i.id""", (event_id,)).fetchall()
 
 
 def invite_outcomes(event_id):
@@ -74,7 +74,7 @@ def invite_outcomes(event_id):
                   EXISTS (SELECT 1 FROM removed_players p WHERE p.event_id = i.event_id AND p.user_id = i.guest_id)
                       AS taken_off
            FROM invites i JOIN users g ON g.id = i.guest_id JOIN users v ON v.id = i.inviter_id
-           WHERE i.event_id = ? AND i.status IN ('accepted', 'declined', 'canceled')
+           WHERE i.event_id = ? AND g.suspended = 0 AND i.status IN ('accepted', 'declined', 'canceled')
              AND i.guest_id NOT IN (SELECT user_id FROM rsvps WHERE event_id = i.event_id)
            ORDER BY i.id""", (event_id,)).fetchall()
     what = {"declined": "said they can't make it", "canceled": "invite was taken back", "accepted": "joined, then left"}
@@ -87,7 +87,7 @@ def requested_invites(event_id):
     return get_db().execute(
         """SELECT i.*, g.full_name AS guest_name, g.avatar_updated AS guest_avatar, v.full_name AS inviter_name
            FROM invites i JOIN users g ON g.id = i.guest_id JOIN users v ON v.id = i.inviter_id
-           WHERE i.event_id = ? AND i.status = 'requested' ORDER BY i.id""", (event_id,)).fetchall()
+           WHERE i.event_id = ? AND g.suspended = 0 AND i.status = 'requested' ORDER BY i.id""", (event_id,)).fetchall()
 
 
 def held_spots(event_id, team=None, except_user=None):
@@ -148,3 +148,19 @@ def count_wrong_password(event_id, user_id):
         db.execute("UPDATE password_tries SET tries = tries + 1 WHERE event_id = ? AND user_id = ?",
                    (event_id, user_id))
     db.commit()
+
+
+INVITES_PER_FRIEND_PER_DAY = 5  # games one person can reserve a spot in for the same friend, a day
+
+
+def invited_too_often(inviter, friend_ids, event_id=None):
+    """The first friend this person already invited to INVITES_PER_FRIEND_PER_DAY games today, or None: holding
+    spots in game after game would fill a friend's bell (and texts) with "You down?"."""
+    since = to_db(now_local() - timedelta(days=1))
+    for friend_id in friend_ids:
+        # Other games only: renewing a spot that ran out in this game isn't a new invite.
+        if get_db().execute("SELECT COUNT(*) FROM invites WHERE inviter_id = ? AND guest_id = ? AND created_at >= ?"
+                            " AND event_id IS NOT ?", (inviter, friend_id, since, event_id)).fetchone()[0] \
+                >= INVITES_PER_FRIEND_PER_DAY:
+            return friend_id
+    return None

@@ -3,15 +3,19 @@
 {# Private and members-only games keep their place to themselves: a link can be forwarded or previewed by anyone. #}
 {% set hidden = event and (event.is_private or event.members_only) and not event.i_am_going %}
 {% set closed = event and event.members_only and not event.i_am_member %}
-{% block description %}{% if event and not hidden %}{{ SPORTS[event.sport] }} · {{ event.starts_at|when }} · {{ event.location }}. Join on Sportive Circle, for UW Huskies.{% else %}{{ super() }}{% endif %}{% endblock %}
+{% block description %}{% if event and not hidden and not closed %}{{ SPORTS[event.sport] }} · {{ event.starts_at|when }} · {{ event.location }}. Join on Sportive Circle, for UW Huskies.{% else %}{{ super() }}{% endif %}{% endblock %}
 {% block head %}<meta name="robots" content="noindex">{% endblock %}
 {% block content %}
 <div class="card form-card center invite-landing">
   <p class="eyebrow">You're invited</p>
   {% if event %}
     <h1>{{ inviter.full_name.split()[0] }} wants you in their game</h1>
+    {% if closed %}{# a club's members-only schedule stays with the club, even if the link is forwarded #}
+    <p class="invite-game"><span aria-hidden="true">{{ SPORT_EMOJI[event.sport] }}</span> <strong>A {{ event.club_name }} members' event</strong></p>
+    {% else %}
     <p class="invite-game"><span aria-hidden="true">{{ SPORT_EMOJI[event.sport] }}</span> <strong>{{ event_title(event) }}</strong><br>
       <span class="muted">{{ event.starts_at|when }} · {{ 'Place shown once you\'re in' if hidden else event.location }}</span></p>
+    {% endif %}
     {% if closed %}<p class="muted">This game is for {{ event.club_name }} members.{% if not g.user %} Sign up anyway and
       you'll be friends with {{ inviter.full_name.split()[0] }}.{% endif %}</p>
     {% elif full %}<p class="muted">This game is full right now.{% if not g.user %} Sign up anyway and you'll be
@@ -19,6 +23,8 @@
     {% elif not g.user %}<p class="muted">Sign up with your UW email and you're in.</p>{% endif %}
   {% else %}
     <h1>{{ inviter.full_name.split()[0] }} wants you on Sportive Circle</h1>
+    {% if game_over %}<p class="muted">The game this link was for isn't open anymore.
+      {%- if g.user %} You can still connect with {{ inviter.full_name.split()[0] }}.{% endif %}</p>{% endif %}
     {% if not g.user %}<p class="muted">Pickup games and UW clubs, for Huskies. Sign up with your UW email and you'll be friends.</p>{% endif %}
   {% endif %}
   {% if g.user %}

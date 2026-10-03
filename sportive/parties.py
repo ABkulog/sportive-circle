@@ -14,8 +14,7 @@ from .auth import login_required
 from .db import get_db
 from .events import KEPT_OUT, event_title, get_event, kept_out, not_for_me, query_events, spots_left, try_join
 from .links import public_url
-from .invites import (HOLD_TIME, MAX_PARTY, held_spots, hold_minutes_left, hold_spots, invite_outcomes, my_invite,
-                      now_param, team_counts)
+from .invites import (HOLD_TIME, MAX_PARTY, held_spots, hold_minutes_left, hold_spots, invite_outcomes, invited_too_often, my_invite, now_param, team_counts)
 from .sms import drop_queued_texts, queue_text
 from .notifications import notify
 from .social import can_message, friends_of, is_blocked_between, too_many_messages
@@ -36,7 +35,10 @@ def invitable_friends(event_id, me):
                   (SELECT i.status FROM invites i WHERE i.event_id = :event AND i.guest_id = u.id) AS invite_status,
                   (SELECT i.expires_at FROM invites i WHERE i.event_id = :event AND i.guest_id = u.id) AS expires_at,
                   (u.id IN (SELECT user_id FROM removed_players WHERE event_id = :event)
-                   AND :me != (SELECT host_id FROM events WHERE id = :event)) AS taken_off
+                   AND :me != (SELECT host_id FROM events WHERE id = :event)) AS taken_off,
+                  (SELECT e.members_only AND NOT EXISTS (SELECT 1 FROM club_members cm WHERE cm.club_id = e.club_id
+                                                         AND cm.user_id = u.id AND cm.role IN ('member', 'officer'))
+                   FROM events e WHERE e.id = :event) AS not_member
            FROM friendships f
            JOIN users u ON u.id = CASE WHEN f.requester_id = :me THEN f.addressee_id ELSE f.requester_id END
            WHERE (f.requester_id = :me OR f.addressee_id = :me) AND f.status = 'accepted'
@@ -51,6 +53,8 @@ def invitable_friends(event_id, me):
             why_not = "Already in this game"
         elif row["taken_off"]:
             why_not = "The host took them off this game"
+        elif row["not_member"]:  # members-only: a spot held for an outsider would show them the game for nothing
+            why_not = "Not a club member"
         elif row["invite_status"] == "requested":
             why_not = "Waiting for the host's OK"
         elif row["invite_status"] == "pending" and row["expires_at"] > now:
@@ -151,6 +155,8 @@ def party_up(event_id):
                   "error")
         elif len(chosen) > MAX_PARTY:
             flash(f"You can invite up to {MAX_PARTY} friends at once.", "error")
+        elif invited_too_often(me, chosen, event_id):
+            flash("You've invited one of these friends to a lot of games today. Try again tomorrow.", "error")
         else:
             note = one_line(request.form.get("note"))[:MAX_NOTE]
             error = send_party(event, chosen, team, joining_now, note)
@@ -289,7 +295,8 @@ def answer_request(event_id, guest_id, action):
         message = f"{inviter['full_name'].split()[0]} wants you in {title} ({fmt_when(event['starts_at'])}). You down?"
         notify(guest_id, "invites", message, link, key=f"invite:{event_id}")
         queue_text(guest_id, f"{message} Your spot is held for 30 min: "
-                             f"{current_app.config['PUBLIC_URL'].rstrip('/')}{link}")  # sent after the save
+                             f"{current_app.config['PUBLIC_URL'].rstrip('/')}{link}",
+                   kind=f"invite:{request_row['inviter_id']}")  # sent after the save
         notify(request_row["inviter_id"], "invites", f"{host_first} said yes to {guest_first} for {title}.", link,
                key=f"reply:{event_id}:{guest_id}")
         db.commit()
@@ -358,16 +365,24 @@ def open_invite_link(token):
     if inviter is None:
         flash("That invite link doesn't work anymore.", "error")
         return redirect(url_for("index"))
+    if g.get("user") is not None and is_blocked_between(g.user["id"], inviter["id"]):  # both ways, links too
+        flash("That invite link doesn't work anymore.", "error")
+        return redirect(url_for("index"))
     if g.get("user") is not None and request.method == "POST":
         return redirect(accept_invite_link(g.user, token) or url_for("index"))
     if request.method == "POST":  # logged out and tapped "Sign up and join" / "I have an account"
         session["invite_link"] = token  # used right after they sign up or log in (auth.log_in)
         return redirect(url_for("auth.login" if request.form.get("go") == "login" else "auth.signup"))
     event = _open_game(link[0]) if link[0] else None
+    if event is not None and event["host_id"] != inviter["id"] and not get_db().execute(
+            "SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (event["id"], inviter["id"])).fetchone():
+        event = None  # they left or were taken off: their link doesn't advertise the game anymore
     if g.get("user") is not None and inviter["id"] == g.user["id"]:
         return redirect(url_for("events.detail", event_id=event["id"]) if event else url_for("social.friends"))
     full = bool(event) and spots_left(event) == 0 and not event["i_am_going"]
-    return render_template("events/invite_link.html", inviter=inviter, event=event, token=token, full=full)
+    game_over = bool(link[0]) and event is None  # a link for a game that's over or canceled: say so first
+    return render_template("events/invite_link.html", inviter=inviter, event=event, token=token, full=full,
+                           game_over=game_over)
 
 
 def accept_invite_link(user, token, just_signed_up=False):
@@ -446,7 +461,11 @@ MAX_SHARE_NOTE = 300
 
 
 def can_send_to_friends(event):
-    """'Send to friends' is for public games that haven't ended (private games use the invite link / password)."""
+    """'Send to friends' is for public games that haven't ended (private games use the invite link / password).
+    A members-only game can be sent on only by someone who can see it (members, its host and players)."""
+    if event["members_only"] and not (event["i_am_member"] or event["i_am_going"]
+                                      or event["host_id"] == g.user["id"]):
+        return False
     return (not event["is_private"] and not event["cancelled"]
             and from_db(event["ends_at"]) >= now_local())
 
@@ -454,8 +473,15 @@ def can_send_to_friends(event):
 def sharable_friends(event_id, me):
     """All my friends (the same list as Reserve spots; blocked people aren't friends), each with `why_not`:
     "Already in this game" for those going, else None."""
-    going = {row[0] for row in get_db().execute("SELECT user_id FROM rsvps WHERE event_id = ?", (event_id,))}
-    return [{**dict(friend), "why_not": "Already in this game" if friend["id"] in going else None}
+    db = get_db()
+    going = {row[0] for row in db.execute("SELECT user_id FROM rsvps WHERE event_id = ?", (event_id,))}
+    members = None  # members-only: only club members can be sent it (the card is no use to anyone else)
+    event = db.execute("SELECT club_id, members_only FROM events WHERE id = ?", (event_id,)).fetchone()
+    if event is not None and event["members_only"]:
+        members = {row[0] for row in db.execute("SELECT user_id FROM club_members WHERE club_id = ?"
+                                                " AND role IN ('member', 'officer')", (event["club_id"],))}
+    return [{**dict(friend), "why_not": "Already in this game" if friend["id"] in going
+             else "Not a club member" if members is not None and friend["id"] not in members else None}
             for friend in friends_of(me)]
 
 

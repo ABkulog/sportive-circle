@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import club_logo %}
 {% block title %}Share {{ club.name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex">{% endblock %}{# the club page is the one to find #}
 {% block content %}
 <a class="back-link no-print" href="{{ url_for('clubs.view', club_id=club.id) }}">← {{ club.name }}</a>
 <div class="card form-card center share-club">

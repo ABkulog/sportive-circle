@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% from "_macros.html" import avatar, icon, install_tip %}
 {% block title %}{{ event_title(event) }}{% endblock %}
-{% set place = place_map(event.location) %}
+{# A members-only game's place is for members, players and invited friends (the club page hides it too). #}
+{% set place_hidden = event.members_only and not inside %}
+{% set place = none if place_hidden else place_map(event.location) %}
 {% block head %}
   {% if place and place.lat %}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
@@ -42,8 +44,8 @@
       {{ event.starts_at|when }} – {% if same_day(event.starts_at, event.ends_at) %}{{ event.ends_at|clock }}{% else %}{{ event.ends_at|when }}{% endif %}
       {% if not ended and not event.cancelled %}<span class="rel">({{ event.starts_at|relative }})</span>{% endif %}
     </dd></div>
-    <div><dt>Where</dt><dd>{{ event.location }}
-      {% set tip = place_tip(event.sport, event.location) %}{% if tip %}<small class="muted place-tip">{{ tip }}</small>{% endif %}</dd></div>
+    <div><dt>Where</dt><dd>{% if place_hidden %}<span class="muted">Members see the place</span>{% else %}{{ event.location }}
+      {% set tip = place_tip(event.sport, event.location) %}{% if tip %}<small class="muted place-tip">{{ tip }}</small>{% endif %}{% endif %}</dd></div>
     <div><dt>Host</dt><dd>{% if event.host_verified %}<a class="person" href="{{ url_for('profile.view', user_id=event.host_id) }}">{{ avatar(event.host_id, event.host_name, event.host_avatar, 28) }}{{ event.host_name }}</a>
       {%- else %}<span class="person muted">{{ event.host_name }}</span>{% endif %}</dd></div>
     <div><dt>Participants</dt><dd>
@@ -55,7 +57,7 @@
 
   {% if event.note and inside %}<p class="note">{{ event.note }}</p>{% endif %}
 
-  {% if not event.cancelled and not ended %}
+  {% if not event.cancelled and not ended and not place_hidden %}
     {% set on = whats_on(event.location, event.starts_at, event.ends_at, event.id) %}
     {% if on.reserved or on.games %}
       <section class="whats-on" aria-label="Also at this place">
@@ -219,7 +221,7 @@
           <p class="muted map-status" id="map-status" aria-live="polite"></p>
         </div>
       </details>
-    {% elif event.location.startswith('Off campus') %}
+    {% elif event.location.startswith('Off campus') and not place_hidden %}
       <p class="muted">Off campus: the address is in the note.</p>
     {% endif %}
 

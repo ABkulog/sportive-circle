@@ -264,7 +264,7 @@ def shared_game(row):
     """The game card on a message sent with "Send to friends" (None for ordinary messages)."""
     if "game_title" not in row.keys() or row["game_title"] is None:
         return None
-    return {"title": row["game_title"], "when": fmt_when(row["game_starts"]), "where": row["game_location"],
+    return {"title": row["game_title"], "when": fmt_when(row["game_starts"]), "where": row["game_location"] or "Place shown in the game",
             "emoji": SPORT_EMOJI.get(row["game_sport"], ""), "cancelled": bool(row["game_cancelled"]),
             "url": url_for("events.detail", event_id=row["event_id"])}
 
@@ -537,7 +537,9 @@ def _thread_rows(me, other, after=0):
     return get_db().execute(
         f"""SELECT * FROM (
                SELECT m.*, u.full_name, u.avatar_updated, ge.title AS game_title, ge.sport AS game_sport,
-                      ge.starts_at AS game_starts, ge.location AS game_location, ge.cancelled AS game_cancelled
+                      ge.starts_at AS game_starts, ge.cancelled AS game_cancelled,
+                      -- the card is in a chat: a game that's since become private or members-only keeps its place inside
+                      CASE WHEN ge.is_private = 0 AND ge.members_only = 0 THEN ge.location END AS game_location
                FROM direct_messages m JOIN users u ON u.id = m.sender_id
                LEFT JOIN events ge ON ge.id = m.event_id
                WHERE m.id > ? AND ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?))
@@ -703,7 +705,8 @@ def thread(user_id):
 def thread_poll(user_id):
     """New messages since ?after=<id> (the page asks every few seconds)."""
     me = g.user["id"]
-    if is_blocked_between(me, user_id):
+    suspended = get_db().execute("SELECT suspended FROM users WHERE id = ?", (user_id,)).fetchone()
+    if is_blocked_between(me, user_id) or suspended is None or suspended[0]:  # like the page: nothing to show
         return jsonify(messages=[])
     rows = _thread_rows(me, user_id, request.args.get("after", 0, type=int))
     _mark_read(me, user_id)

@@ -17,7 +17,7 @@ from .badges import (GIVEN_BADGES, ROLE_BADGES, SHOWCASE_SLOTS, TESTER, catalog,
 from .clubs import SOCIALS
 from .moderation import admin_required, is_admin
 from .notifications import mark_seen, notify
-from .textutil import has_a_letter, is_number, multi_line, one_line, person_name, social_handle
+from .textutil import HANDLE_SITES, has_a_letter, is_number, multi_line, one_line, person_name, social_handle
 from .social import can_message, friendship_status, i_blocked, is_blocked_between
 from .timeutil import now_local, to_db
 
@@ -49,8 +49,12 @@ def clean_social(key, value):
         value = re.sub(r"^(https?://)?([a-z]{2,3}\.)?linkedin\.com/in/", "", value, flags=re.I).strip("/")
         return value.split("?")[0].split("/")[0]
     handle = social_handle(key, value)
-    if re.search(r"\.(com|net|org|me|app|ly|co|link|gg)$", handle, re.I):
-        return handle + "/"  # a short link ("vm.tiktok.com/ZMabc"), not a username: fails the check with a message
+    # A pasted short link ("vm.tiktok.com/ZMabc", "t.co/xyz") isn't a username: fail the check with a message.
+    # A username that happens to end like a domain ("maya.co", or instagram.com/maya.co) is fine.
+    site = HANDLE_SITES.get(key, "")
+    off_site = re.sub(rf"^(https?://)?(www\.|m\.|mobile\.)?{site}/", "", value, flags=re.I) if site else value
+    if "/" in off_site.split("?")[0].rstrip("/") and re.search(r"\.(com|net|org|me|app|ly|co|link|gg)$", handle, re.I):
+        return handle + "/"
     return handle
 
 # Pages you can still open before adding a profile picture.
@@ -205,7 +209,7 @@ def view(user_id):
                            hosting=hosting, show_email=show_email, socials=person_socials(user), genders=GENDERS,
                            is_tester=TESTER.key in earned_badges(user_id),
                            showcase=[] if blocked else showcase(user_id), earned=earned_badges(user_id), rarity=rarity(),
-                           is_retired=is_retired, relation=relation)
+                           is_retired=is_retired, relation=relation, blocked=blocked)
 
 
 @bp.route("/admin/users/<int:user_id>/tester/<action>", methods=("POST",))
@@ -363,7 +367,8 @@ def what_you_would_lose(user_id):
 
 SOLE_OFFICER = """SELECT c.id, c.name FROM clubs c JOIN club_members m ON m.club_id = c.id
            WHERE m.user_id = ? AND m.role = 'officer'
-             AND (SELECT COUNT(*) FROM club_members o WHERE o.club_id = c.id AND o.role = 'officer') = 1
+             AND (SELECT COUNT(*) FROM club_members o JOIN users ou ON ou.id = o.user_id  -- suspended officers can't lead
+                  WHERE o.club_id = c.id AND o.role = 'officer' AND ou.suspended = 0) <= 1
              AND {} (c.status = 'approved' AND EXISTS (SELECT 1 FROM club_members o WHERE o.club_id = c.id
                                                         AND o.role != 'officer'))"""
 
@@ -423,6 +428,12 @@ def delete_account():
     db = get_db()
     for club in clubs_that_go_with_me(g.user["id"]):
         db.execute("DELETE FROM clubs WHERE id = ?", (club["id"],))
+    # Clubs they own go to the officer who's been there longest (otherwise nobody could ever be made owner again).
+    db.execute("""UPDATE clubs SET created_by = (
+                      SELECT m.user_id FROM club_members m JOIN users u ON u.id = m.user_id
+                      WHERE m.club_id = clubs.id AND m.role = 'officer' AND m.user_id != :me AND u.suspended = 0
+                      ORDER BY m.joined_at, m.user_id LIMIT 1)
+                  WHERE created_by = :me""", {"me": g.user["id"]})
     keep_games_other_people_played(g.user["id"])
     # Games still hosted by this account are deleted with it: older notices linking to them would 404.
     for row in db.execute("SELECT id FROM events WHERE host_id = ?", (g.user["id"],)).fetchall():
