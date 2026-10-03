@@ -72,7 +72,7 @@ def typed_code(text):
     return unicodedata.normalize("NFKC", text or "").strip()
 
 
-HANDLE_SITES = {"instagram": r"instagram\.com", "tiktok": r"tiktok\.com", "snapchat": r"snapchat\.com/add",
+HANDLE_SITES = {"instagram": r"instagram\.com", "tiktok": r"tiktok\.com", "snapchat": r"snapchat\.com(/add)?",
                 "x_handle": r"(x|twitter)\.com"}
 
 
@@ -82,8 +82,13 @@ def social_handle(key, value):
     value = one_line(value).strip()
     site = HANDLE_SITES.get(key)
     if site:
-        value = re.sub(rf"^(https?://)?(www\.|m\.)?{site}/", "", value, flags=re.I)
-        value = value.split("?")[0].split("#")[0].strip("/").split("/")[0]
+        value = re.sub(rf"^(https?://)?(www\.|m\.|mobile\.)?{site}/", "", value, flags=re.I)
+        parts = value.split("?")[0].split("#")[0].strip("/").split("/")
+        if key == "instagram" and parts[0] in ("_u", "stories") and len(parts) > 1:
+            parts = parts[1:]  # instagram.com/stories/maya/123 and instagram.com/_u/maya are maya's
+        elif key in ("instagram", "tiktok") and parts[0].lower() in ("p", "reel", "reels", "tv", "explore", "video"):
+            return "/".join(parts)  # a link to a post, not to a person: fails the username check
+        value = parts[0]
     return value.lstrip("@")
 
 

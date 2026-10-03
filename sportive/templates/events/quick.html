@@ -7,12 +7,12 @@
   <h1>Need players</h1>
   <p class="muted" data-show="public" {% if form.get('is_private') == '1' %}hidden{% endif %}>Goes to the top of everyone's feed.</p>
   <p class="muted" data-show="private" {% if form.get('is_private') != '1' %}hidden{% endif %}>Only people you invite or give the password to can join.</p>
-  <form method="post" class="form" data-sport-form data-wizard data-error-field="{{ g.get('error_field', '') }}" >
+  <form method="post" class="form" data-sport-form data-need-players data-wizard data-error-field="{{ g.get('error_field', '') }}" >
     {{ csrf_field() }}
     <section class="wizard-step">
     <h2 class="form-step"><span>1</span> The game</h2>
     <div class="row">
-      {{ select('sport', 'Sport', SPORTS.items(), form.get('sport', ''), 'Choose a sport') }}
+      {{ select('sport', 'Sport', SPORTS.items(), form.get('sport', ''), 'Choose a sport', required=True) }}
       <label class="field"><span>Where</span>
         <select name="location" required>
           <option value="">Choose a place</option>

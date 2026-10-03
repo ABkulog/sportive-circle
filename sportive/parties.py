@@ -369,7 +369,9 @@ def open_invite_link(token):
     if g.get("user") is not None and inviter["id"] == g.user["id"]:
         return redirect(url_for("events.detail", event_id=event["id"]) if event else url_for("social.friends"))
     full = bool(event) and spots_left(event) == 0 and not event["i_am_going"]
-    return render_template("events/invite_link.html", inviter=inviter, event=event, token=token, full=full)
+    game_over = bool(link[0]) and event is None  # a link for a game that's over or canceled: say so first
+    return render_template("events/invite_link.html", inviter=inviter, event=event, token=token, full=full,
+                           game_over=game_over)
 
 
 def accept_invite_link(user, token, just_signed_up=False):
@@ -448,7 +450,11 @@ MAX_SHARE_NOTE = 300
 
 
 def can_send_to_friends(event):
-    """'Send to friends' is for public games that haven't ended (private games use the invite link / password)."""
+    """'Send to friends' is for public games that haven't ended (private games use the invite link / password).
+    A members-only game can be sent on only by someone who can see it (members, its host and players)."""
+    if event["members_only"] and not (event["i_am_member"] or event["i_am_going"]
+                                      or event["host_id"] == g.user["id"]):
+        return False
     return (not event["is_private"] and not event["cancelled"]
             and from_db(event["ends_at"]) >= now_local())
 

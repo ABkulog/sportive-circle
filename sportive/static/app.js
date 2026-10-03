@@ -352,6 +352,13 @@
     addButton.addEventListener("click", async () => {
       if (await install()) location.replace(next);
     });
+    // "Maybe later" counts as closing the home-screen card: it doesn't pop up again on the very next page.
+    const later = welcome.querySelector("[data-welcome-later]");
+    if (later) later.addEventListener("click", () => {
+      const closes = Number(store.get("installTipCloses") || 0);
+      store.set("installTipCloses", String(Math.max(closes, 1)));
+      store.set("installTipClosedAt", String(Date.now()));
+    });
   }
 
   // "⋯" menus (<details class="more-menu">, and a chat message's ⋯): Esc closes the open one and puts focus
@@ -366,18 +373,30 @@
 
   // <form data-autosave>: each switch saves the moment it's flipped, in the background (no reload, no jump
   // back to the top). If that fails, the form is sent the normal way.
+  // No connection: it says so and puts the switch back, instead of swapping the page for the browser's
+  // "No internet" page. Saves go one at a time, in order, so two quick flips can't land the wrong way round.
   document.querySelectorAll("form[data-autosave]").forEach((form) => {
     const status = (form.closest(".card") || form).querySelector("[data-autosave-status]");
-    form.addEventListener("change", async () => {
-      try {
-        const response = await fetch(form.action || location.href, { method: "POST", body: new FormData(form),
-                                                                      credentials: "same-origin" });
-        // Logged out meanwhile: the server answers with the log-in page. Send it the normal way (to log in).
-        if (!response.ok || new URL(response.url).pathname.startsWith("/login")) throw new Error("not saved");
+    let queue = Promise.resolve();
+    form.addEventListener("change", (event) => {
+      const changed = event.target;
+      const before = changed.type === "checkbox" ? !changed.checked : null;
+      const body = new FormData(form);
+      if (status) status.textContent = "Saving…";
+      queue = queue.then(async () => {
+        let response;
+        try {
+          response = await fetch(form.action || location.href, { method: "POST", body, credentials: "same-origin" });
+        } catch (error) {  // offline or the connection dropped
+          if (before !== null) changed.checked = before;
+          if (status) status.textContent = "Couldn't save. Check your connection and try again.";
+          return;
+        }
+        // Logged out meanwhile (the log-in page answers) or the server said no: send it the normal way, which
+        // shows the real reason (log in, or "your form expired").
+        if (!response.ok || new URL(response.url).pathname.startsWith("/login")) { form.submit(); return; }
         if (status) status.textContent = "Saved";
-      } catch (error) {
-        form.submit();
-      }
+      });
     });
   });
 

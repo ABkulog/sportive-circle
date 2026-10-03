@@ -127,7 +127,10 @@ def _sent_today(user_id, codes, kind=None):
         which, args = "kind = 'code'", ()
     else:  # ordinary updates: everything but codes and the important ones (those have their own allowance)
         which, args = "kind NOT IN ('code', 'important', 'reminder')", ()
-    return get_db().execute(f"SELECT COUNT(*) FROM sms_log WHERE user_id = ? AND created_at >= ? AND ok = 1 AND {which}",
+    # Code requests all count, sent or not: asking about a number that's already taken has to cost a try too
+    # (otherwise anyone could check which numbers are on the app for free).
+    counted = "" if codes and kind is None else " AND ok = 1"
+    return get_db().execute(f"SELECT COUNT(*) FROM sms_log WHERE user_id = ? AND created_at >= ?{counted} AND {which}",
                             (user_id, since, *args)).fetchone()[0]
 
 
@@ -196,7 +199,8 @@ def check_phone_code(user_id, code):
         return "That texted code isn't right."
     # Only if nobody confirmed the same number in the meantime (two accounts can both ask for a code).
     confirmed = db.execute("""UPDATE users SET phone_verified = 1, sms_updates = 1, sms_consent_at = ?, sms_code = NULL,
-                              sms_code_expires = NULL, sms_code_attempts = 0 WHERE id = ? AND NOT EXISTS (
+                              sms_code_expires = NULL, sms_code_attempts = 0, sms_stopped_at = NULL
+                              WHERE id = ? AND NOT EXISTS (
                                 SELECT 1 FROM users other WHERE other.phone = users.phone AND other.phone_verified = 1
                                 AND other.id != users.id)""", (to_db(now_local()), user_id)).rowcount
     db.commit()
@@ -205,7 +209,7 @@ def check_phone_code(user_id, code):
 
 def remove_phone(user_id):
     get_db().execute("""UPDATE users SET phone = '', phone_verified = 0, sms_updates = 0, sms_code = NULL,
-                        sms_code_expires = NULL WHERE id = ?""", (user_id,))
+                        sms_code_expires = NULL, sms_stopped_at = NULL WHERE id = ?""", (user_id,))
     get_db().commit()
 
 

@@ -638,6 +638,33 @@ MAX_REPEAT_WEEKS = 12  # about a quarter of weekly practices
 
 def post_club_event(club, event_id, data, repeat):
     """A new club event goes in the club's updates, so followers and members hear about it (Clubs tab)."""
+    get_db().execute("INSERT INTO club_posts (club_id, author_id, body, created_at, event_id) VALUES (?, ?, ?, ?, ?)",
+                     (club["id"], g.user["id"], club_event_text(data, repeat), to_db(now_local()), event_id))
+    get_db().commit()
+
+
+def update_club_post(event_id, data):
+    """An edited club event: its post in the club's updates (which are public) says the new time and place, or
+    stops showing them once the event is members-only or private. A post about a whole series is left as it was
+    unless this week became members-only or private."""
+    db = get_db()
+    for post in db.execute("SELECT id, body FROM club_posts WHERE event_id = ?", (event_id,)).fetchall():
+        series = post["body"].startswith(("New: ", "New members-only events:", "New private events"))
+        if not series:
+            db.execute("UPDATE club_posts SET body = ? WHERE id = ?", (club_event_text(data, 1), post["id"]))
+        elif data.get("members_only") or data.get("is_private"):
+            db.execute("UPDATE club_posts SET body = ? WHERE id = ?", (club_event_text(data, 2, series=True), post["id"]))
+
+
+def club_event_text(data, repeat, series=False):
+    """What a club's updates say about a new event (no when or where for members-only and private ones)."""
+    if data.get("members_only"):  # updates are public: members see when and where on the Events tab
+        if series:
+            return "New members-only events. Members: see the Events tab."
+        return (f"New members-only events: every {from_db(data['starts_at']).strftime('%A')} for {repeat} weeks."
+                if repeat > 1 else "New members-only event.") + " Members: see the Events tab."
+    if data.get("is_private"):  # private: only invited people and password holders get the details
+        return ("New private events." if repeat > 1 else "New private event.") + " Invited people: see your invites."
     when = fmt_when(data["starts_at"])
     if repeat > 1:
         starts = from_db(data["starts_at"])
@@ -645,12 +672,7 @@ def post_club_event(club, event_id, data, repeat):
                 f"for {repeat} weeks, starting {when} · {data['location']}")
     else:
         text = f"New event: {data['title']} · {when} · {data['location']}"
-    if data.get("members_only"):  # updates are public: members see when and where on the Events tab
-        text = (f"New members-only events: every {from_db(data['starts_at']).strftime('%A')} for {repeat} weeks."
-                if repeat > 1 else "New members-only event.") + " Members: see the Events tab."
-    get_db().execute("INSERT INTO club_posts (club_id, author_id, body, created_at, event_id) VALUES (?, ?, ?, ?, ?)",
-                     (club["id"], g.user["id"], text, to_db(now_local()), event_id))
-    get_db().commit()
+    return text
 
 
 def club_for_new_event(club_id):
@@ -710,6 +732,8 @@ def edit(event_id):
                 left_out = drop_non_members(event)
             else:
                 left_out = 0
+            if event["club_id"]:
+                update_club_post(event_id, data)
             told = tell_players_it_changed(event, data, by=g.user)
             db.commit()
             flash(("Saved. Everyone going sees it in their notifications (this game changed a lot today, so not "
@@ -828,6 +852,7 @@ def tell_players_it_changed(event, data, by=None):
         g.change_emails_skipped = len(players) < everyone  # the host is told honestly (edit())
         db.executemany("INSERT INTO change_alerts (user_id, event_id, sent_at) VALUES (?, ?, ?)",
                        [(player["id"], event["id"], to_db(now)) for player in players])
+        db.commit()  # the change is saved before the texts and emails go out, so nobody else waits on them
         for player in players:
             text_user(player["id"], kind="important", body=f"{host} changed {title}: now {fmt_when(data['starts_at'])} at {data['location']}. "
                                     f"{public_url('events.detail', event_id=event['id'])}")
@@ -937,7 +962,11 @@ def quick():
         if error is None and needed < 1 and not team_size:
             error = "Everyone's already coming, so there's no one to find. Pick more participants."
         if error is None:
+            get_db().commit()
+            get_db().execute("BEGIN IMMEDIATE")  # checked under the lock: two tabs can't both slip under the limit
             error = posting_too_fast(1)
+            if error is not None:
+                get_db().rollback()
 
         if error is None:
             # Real minutes from now, so a game never lands in the hour skipped when clocks jump ahead.

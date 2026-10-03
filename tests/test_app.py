@@ -4001,6 +4001,122 @@ def test_spam_limits_leave_normal_use_alone(accounts, client, app):
         assert db.execute(f"SELECT {MEMBER_COUNT} FROM clubs c WHERE c.id = ?", (club,)).fetchone()[0] == 1
 
 
+def test_private_and_members_only_club_events_keep_their_place_to_themselves(accounts, client, app):
+    """Round 19: a club event marked Private had its title, time and place posted on the club's public page; an
+    edit to members-only left the old post (with the place) up; anyone could open a members-only game's page and
+    see the place and map, or send it on with "Send to friends"."""
+    ids = _people(accounts, app, "Maya", "Sam", "Jordan")
+    _friends(app, ids["Sam"], ids["Jordan"])
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Maya")
+    club_game = dict(sport="spikeball", location="The Quad", club=str(club))
+    event_id_from(client.post(f"/events/new?club={club}", data=event_form(
+        title="Secret run", is_private="1", password="huskies1", **club_game)))
+    open_run = event_id_from(client.post(f"/events/new?club={club}", data=event_form(title="Open run", **club_game)))
+    _as(accounts, "Sam")
+    client.post(f"/events/{open_run}/join")
+    client.post(f"/events/{open_run}/send", data={"friend": [ids["Jordan"]]})
+    accounts.logout()
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Secret run" not in page and "New private event." in page          # a stranger with the club link
+    assert "Open run" in page and "The Quad" in page
+    _as(accounts, "Maya")
+    client.post(f"/events/{open_run}/edit", data=event_form(title="Open run", is_private="members", **club_game))
+    accounts.logout()
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Open run" not in page and "New members-only event." in page        # the old post was rewritten
+    _as(accounts, "Jordan")                                                    # not a member
+    game_page = client.get(f"/events/{open_run}").data.decode()
+    assert "Members see the place" in game_page and "The Quad" not in game_page and "event-map" not in game_page
+    assert "Place shown in the game" in client.get(f"/messages/{ids['Sam']}").data.decode()   # Sam's old card
+    _friends(app, ids["Jordan"], ids["Maya"])
+    assert client.get(f"/events/{open_run}/send").status_code in (302, 303)     # can't send what you can't see
+    _as(accounts, "Maya")
+    assert "The Quad" in client.get(f"/events/{open_run}").data.decode()        # the club officer still sees it
+    assert "Secret run" in client.get(f"/clubs/{club}").data.decode()
+
+
+def test_editing_a_game_saves_before_emailing_players(accounts, client, app, monkeypatch):
+    """Round 19: the "Changed" emails went out while the edit still held the database, so everyone else on the site
+    (joins, messages) waited behind a slow mail server."""
+    from sportive import events
+    ids = _people(accounts, app, "Maya", "Sam")
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    _as(accounts, "Sam")
+    client.post(f"/events/{game}/join")
+    _as(accounts, "Maya")
+    busy = []
+    real = events.send_email
+    monkeypatch.setattr(events, "send_email", lambda *a, **k: busy.append(get_db().in_transaction) or real(*a, **k))
+    client.post(f"/events/{game}/edit", data=event_form(title="Hoops", starts_at=form_time(timedelta(days=1, hours=1)),
+                                                       ends_at=form_time(timedelta(days=1, hours=3))))
+    assert busy == [False]                                                  # saved first, then Sam's email
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM change_alerts WHERE user_id = ?", (ids["Sam"],)).fetchone()[0] == 1
+
+
+def test_invite_link_for_a_finished_game_says_so_and_social_post_links(accounts, client, app):
+    """Round 19: a link for a canceled game quietly became "Maya wants you on Sportive Circle"; pasted Instagram post
+    or story links saved "p" or "stories" as the username; newer Snapchat and mobile Twitter links were refused."""
+    from sportive.profile import clean_social
+    _people(accounts, app, "Maya", "Sam")
+    _as(accounts, "Maya")
+    game = event_id_from(client.post("/events/new", data=event_form(title="Hoops")))
+    page = client.get(f"/events/{game}").data.decode()
+    link = re.search(r'/join/[\w.\-]+', page).group(0)
+    client.post(f"/events/{game}/cancel")
+    _as(accounts, "Sam")
+    assert "over or was canceled" in client.get(link).data.decode()
+    assert clean_social("instagram", "instagram.com/p/Cxyz123/") == "p/Cxyz123"          # a post: fails the check
+    assert clean_social("instagram", "https://www.instagram.com/stories/maya/123") == "maya"
+    assert clean_social("instagram", "instagram.com/_u/maya") == "maya"
+    assert clean_social("snapchat", "snapchat.com/@maya") == "maya"
+    assert clean_social("x_handle", "mobile.twitter.com/maya") == "maya"
+    from sportive.profile import PERSON_SOCIAL_RULES
+    assert not re.fullmatch(PERSON_SOCIAL_RULES["instagram"][1], "p/Cxyz123")         # "doesn't look right"
+
+
+def test_stop_note_and_number_lookups(accounts, client, app, monkeypatch):
+    """Round 19: the "You replied STOP" note stayed after changing numbers; checking whether a number is taken
+    stopped costing a code try (so anyone could look up which numbers are on the app)."""
+    from sportive import sms
+    _texts(monkeypatch)
+    ids = _people(accounts, app, "Maya", "Sam")
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE users SET phone = '+12065550142', phone_verified = 1, sms_updates = 1 WHERE id = ?",
+                   (ids["Maya"],))
+        db.execute("UPDATE users SET phone = '+12065550143', phone_verified = 1, sms_updates = 0, "
+                   "sms_stopped_at = '2026-01-01 00:00' WHERE id = ?", (ids["Sam"],))
+        db.commit()
+        sms.remove_phone(ids["Sam"])
+        assert db.execute("SELECT sms_stopped_at FROM users WHERE id = ?", (ids["Sam"],)).fetchone()[0] is None
+        for n in range(sms.MAX_CODES_PER_NUMBER):
+            assert "already used" in sms.start_phone_check(ids["Sam"], "+12065550142")
+        assert sms._sent_today(ids["Sam"], codes=True) == sms.MAX_CODES_PER_NUMBER   # each lookup used a try
+
+
+def test_phone_scripts_keep_typing_and_say_what_happened(app):
+    """Round 19 (real-browser testers): chat emptied words typed while a message was sending, hung forever on a
+    stuck send, sent half-typed Japanese/Chinese/Korean on the Enter that picks the word, kept keyboard focus
+    outside the photo viewer, and a second double tap on a slow phone took the heart off again. Settings switches
+    swapped the page for "No internet" when offline. "Maybe later" didn't stick, the wizard let you past an empty
+    sport, and Need players said "full" when there was nobody left to find."""
+    static = pathlib.Path(app.root_path) / "static"
+    chat = (static / "chat.js").read_text()
+    assert "isComposing" in chat and "AbortController" in chat and "sentText" in chat
+    assert "openedFrom.focus" in chat and 'event.key === "Tab"' in chat and "dataset.hearting" in chat
+    assert "visibilitychange" in chat and "never throw away something being typed" in chat
+    script = (static / "app.js").read_text()
+    assert "Couldn't save. Check your connection" in script and "Saving…" in script and "data-welcome-later" in script
+    assert "nobody left to find" in (static / "forms.js").read_text()
+    templates = pathlib.Path(app.root_path) / "templates"
+    assert "data-welcome-later" in (templates / "profile/welcome.html").read_text()
+    for name in ("events/form.html", "events/quick.html"):
+        assert "'Choose a sport', required=True" in (templates / name).read_text()
+
+
 def test_party_up_holds_spots_for_friends(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Stranger")
     _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])

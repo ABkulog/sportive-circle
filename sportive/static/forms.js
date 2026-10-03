@@ -96,9 +96,12 @@
     const total = parseInt(players && players.value, 10) || 0;
     text += ` = ${coming} of ${total}`;
     const need = total - coming;
-    text += need > 0 ? ` · need ${need} more` : need === 0 ? " · full" : ` · that's ${-need} too many`;
+    // On Need players, "full" means there's nobody left to find, which can't be posted: warn like "too many".
+    const findingNobody = need === 0 && form.hasAttribute("data-need-players");
+    text += need > 0 ? ` · need ${need} more` : findingNobody ? " · nobody left to find, so add more players"
+      : need === 0 ? " · full" : ` · that's ${-need} too many`;
     math.textContent = text;
-    math.classList.toggle("is-over", need < 0);
+    math.classList.toggle("is-over", need < 0 || findingNobody);
   }
   form.addEventListener("change", update);
   form.addEventListener("input", update);

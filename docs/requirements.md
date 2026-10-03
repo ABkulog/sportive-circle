@@ -205,6 +205,8 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | NFR-PRIV-1 | Location from "Where am I?" never leaves the browser. | ✅ |
 | NFR-PRIV-2 | Photo metadata is removed. | ✅ |
 | NFR-PRIV-7 | Photos come out right from any phone: 16-bit grayscale and see-through PNGs too (on white). | ✅ |
+| NFR-PRIV-8 | A club's public page and updates never show when or where a private or members-only club event is, including after an edit makes it so; a members-only game's page, map and "Send to friends" are for members, its host and players; game cards in chats stop showing the place once a game is private or members-only. | ✅ |
+| NFR-PRIV-9 | Checking whether a number is already on the app costs a code try (5 a day), so nobody can look numbers up for free. | ✅ |
 | NFR-PRIV-3 | Deleting an account deletes the person's data (reports keep a copy for safety, without the reporter's name). | ✅ |
 | NFR-PRIV-4 | No ads, no tracking cookies, no selling data. Only a login cookie. | ✅ |
 | NFR-PRIV-5 | The database file is never committed to Git (`.gitignore`). | ✅ |
@@ -219,6 +221,8 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | NFR-UX-7 | Long pages are split into clear sections by soft full-width bands; items inside a section are split by thin lines. | ✅ |
 | NFR-UX-3 | Keyboard and screen-reader friendly: labels on every field, skip link, visible focus, `aria-current` on tabs, alt text rules, and text contrast of at least 4.5:1 (WCAG AA). | ✅ |
 | NFR-UX-9 | Works with bigger phone text (130–160%) and at 320px: no sideways scrolling, the tab bar and top icons stay on screen. Keyboard and screen-reader users: the chat message panel keeps Tab inside and gives focus back on Esc; Esc closes a message's ⋯; a form problem is read out with its field; a "Full for now" page doesn't reload under someone using a keyboard. | ✅ |
+| NFR-UX-10 | Nothing typed is lost on a bad connection: chat keeps words typed while a message sends, gives up on a stuck send after 20 seconds with a message, and doesn't reload over a draft when logged out elsewhere; Settings switches say "Couldn't save" offline and flip back. Chat waits for the Enter that finishes Japanese/Chinese/Korean typing; the photo viewer keeps keyboard focus and gives it back. | ✅ |
+| NFR-UX-11 | Forms say what's missing early: the new-game wizard asks for a sport on step 1; Need players warns when there's nobody left to find; "Maybe later" after sign-up hides the home-screen card; an invite link for a game that's over says so; the "You replied STOP" note goes away with a new number. | ✅ |
 | NFR-UX-4 | Light and dark mode; animations are skipped for "reduce motion". | ✅ |
 | NFR-UX-5 | Error messages say what went wrong and how to fix it. Friendly pages for 400/403/404/405/413/500. | ✅ |
 | NFR-UX-6 | Husky look and feel: UW purple and gold, paw logo, without using UW's trademarked logos or corny slogans. | ✅ |

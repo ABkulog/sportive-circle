@@ -17,6 +17,7 @@ The only difference from the real site: pages may be shown in a frame on the sam
 import contextlib
 import io
 import os
+import socket
 import sys
 import tempfile
 
@@ -28,7 +29,12 @@ import seed  # noqa: E402
 from flask import send_file  # noqa: E402
 from sportive import CONTENT_SECURITY_POLICY, create_app  # noqa: E402
 
-DB = os.path.join(tempfile.gettempdir(), "sportive-audit.db")
+PORT = int(os.environ.get("AUDIT_PORT", "5070"))
+# Check the port first: if another audit server is already running, starting a second one mustn't wipe its database.
+with socket.socket() as probe:
+    if probe.connect_ex(("127.0.0.1", PORT)) == 0:
+        sys.exit(f"Port {PORT} is already in use (another audit server?). Set AUDIT_PORT to use another port.")
+DB = os.path.join(tempfile.gettempdir(), f"sportive-audit-{PORT}.db")  # each port its own database
 if os.path.exists(DB):
     os.remove(DB)
 app = create_app({"DEBUG": True, "DATABASE": DB, "ADMIN_EMAILS": "demo.jordan@uw.edu"})
@@ -48,4 +54,4 @@ def allow_audit_frame(response):
 
 
 if __name__ == "__main__":
-    app.run(port=5070, debug=True, use_reloader=False)
+    app.run(port=PORT, debug=True, use_reloader=False)

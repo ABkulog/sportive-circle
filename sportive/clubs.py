@@ -298,11 +298,11 @@ def view(club_id):
             """SELECT u.id, u.full_name, u.avatar_updated, m.role, m.message, m.joined_at
                FROM club_members m JOIN users u ON u.id = m.user_id
                WHERE m.club_id = ? AND m.role IN ('requested', 'tryout') ORDER BY m.joined_at""", (club_id,)).fetchall()
-    followers = db.execute("SELECT COUNT(*) FROM club_members WHERE club_id = ? AND role = 'follower'",
-                           (club_id,)).fetchone()[0]
+    followers = db.execute("SELECT COUNT(*) FROM club_members m JOIN users u ON u.id = m.user_id"
+                           " WHERE m.club_id = ? AND m.role = 'follower' AND u.suspended = 0", (club_id,)).fetchone()[0]
     from .events import SHOWN_UNLESS_FULL  # imported here: events.py imports this module
     events = db.execute(
-        f"""SELECT e.id, e.title, e.sport, e.starts_at, e.location, e.members_only FROM events e
+        f"""SELECT e.id, e.title, e.sport, e.starts_at, e.location, e.members_only, e.is_private FROM events e
             WHERE e.club_id = :club AND e.cancelled = 0 AND e.ends_at >= :now AND {SHOWN_UNLESS_FULL}
             ORDER BY e.starts_at LIMIT 10""",
         {"club": club_id, "now": to_db(now_local()), "me": g.user["id"] if g.get("user") else 0,
@@ -312,6 +312,7 @@ def view(club_id):
     if role not in MEMBER_ROLES and not is_admin():
         members_only_hidden = sum(1 for e in events if e["members_only"])
         events = [e for e in events if not e["members_only"]]
+    events = [e for e in events if not e["is_private"] or role == "officer" or is_admin()]  # private: invite only
     return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
                            members_only_hidden=members_only_hidden,
                            role=role, owner=is_owner(club), requests=requests, can_decide=can_decide, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,

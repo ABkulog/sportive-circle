@@ -52,7 +52,7 @@ def clean_social(key, value):
     # A pasted short link ("vm.tiktok.com/ZMabc", "t.co/xyz") isn't a username: fail the check with a message.
     # A username that happens to end like a domain ("maya.co", or instagram.com/maya.co) is fine.
     site = HANDLE_SITES.get(key, "")
-    off_site = re.sub(rf"^(https?://)?(www\.|m\.)?{site}/", "", value, flags=re.I) if site else value
+    off_site = re.sub(rf"^(https?://)?(www\.|m\.|mobile\.)?{site}/", "", value, flags=re.I) if site else value
     if "/" in off_site.split("?")[0].rstrip("/") and re.search(r"\.(com|net|org|me|app|ly|co|link|gg)$", handle, re.I):
         return handle + "/"
     return handle
