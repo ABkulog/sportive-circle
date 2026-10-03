@@ -89,7 +89,7 @@ EXPIRE = [("notices", "created_at", 90),         # the bell shows the last 30 da
           ("club_join_emails", "sent_at", 7),    # one email a day per person per club
           ("password_tries", "first_try", 7),    # 10 tries an hour
           ("login_failures", "failed_at", 7),    # 15-minute lockouts
-          ("change_alerts", "sent_at", 7)]       # "Changed" emails: 3 a day per game per player
+          ("change_alerts", "sent_at", 7)]       # "Changed" emails: 6 a day per game per player
 
 
 def clean_up_old_records():
