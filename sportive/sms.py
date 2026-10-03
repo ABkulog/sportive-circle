@@ -116,20 +116,19 @@ def _log(user_id, phone, kind, ok):
 
 
 def _sent_today(user_id, codes, kind=None):
-    """Texts really sent in the last day (failed ones don't use up the allowance): codes, or updates. With `kind`,
+    """Texts really sent in the last day (failed ones don't use up the allowance; checks on a number that's
+    already taken do count as codes): codes, or updates. With `kind`,
     only that kind ("important" for game changed/canceled and reminders, "invite:<inviter id>" for "You down?")."""
     since = to_db(now_local() - timedelta(days=1))
     if kind in IMPORTANT_KINDS:
         which, args = "kind IN ('important', 'reminder')", ()
     elif kind is not None:
         which, args = "kind = ?", (kind,)
-    elif codes:
-        which, args = "kind = 'code'", ()
+    elif codes:  # code texts that went out, and every check on a number someone else already uses
+        which, args = "(kind = 'lookup' OR (kind = 'code' AND ok = 1))", ()
     else:  # ordinary updates: everything but codes and the important ones (those have their own allowance)
-        which, args = "kind NOT IN ('code', 'important', 'reminder')", ()
-    # Code requests all count, sent or not: asking about a number that's already taken has to cost a try too
-    # (otherwise anyone could check which numbers are on the app for free).
-    counted = "" if codes and kind is None else " AND ok = 1"
+        which, args = "kind NOT IN ('code', 'lookup', 'important', 'reminder')", ()
+    counted = "" if codes and kind is None else " AND ok = 1"  # (codes: `which` says which count)
     return get_db().execute(f"SELECT COUNT(*) FROM sms_log WHERE user_id = ? AND created_at >= ?{counted} AND {which}",
                             (user_id, since, *args)).fetchone()[0]
 
@@ -159,7 +158,9 @@ def start_phone_check(user_id, phone):
     taken = db.execute("SELECT 1 FROM users WHERE phone = ? AND phone_verified = 1 AND id != ?",
                        (phone, user_id)).fetchone()
     if taken:
-        _log(user_id, phone, "code", False)  # counts toward the day's codes, so nobody can look up numbers
+        # Costs the person asking one of their day's codes (so nobody can look numbers up for free), but isn't
+        # a code to that number: it doesn't use up the real owner's codes.
+        _log(user_id, phone, "lookup", False)
         db.commit()
         return "That number is already used by another account."
     code = f"{secrets.randbelow(10**6):06d}"

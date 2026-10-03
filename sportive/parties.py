@@ -35,7 +35,10 @@ def invitable_friends(event_id, me):
                   (SELECT i.status FROM invites i WHERE i.event_id = :event AND i.guest_id = u.id) AS invite_status,
                   (SELECT i.expires_at FROM invites i WHERE i.event_id = :event AND i.guest_id = u.id) AS expires_at,
                   (u.id IN (SELECT user_id FROM removed_players WHERE event_id = :event)
-                   AND :me != (SELECT host_id FROM events WHERE id = :event)) AS taken_off
+                   AND :me != (SELECT host_id FROM events WHERE id = :event)) AS taken_off,
+                  (SELECT e.members_only AND NOT EXISTS (SELECT 1 FROM club_members cm WHERE cm.club_id = e.club_id
+                                                         AND cm.user_id = u.id AND cm.role IN ('member', 'officer'))
+                   FROM events e WHERE e.id = :event) AS not_member
            FROM friendships f
            JOIN users u ON u.id = CASE WHEN f.requester_id = :me THEN f.addressee_id ELSE f.requester_id END
            WHERE (f.requester_id = :me OR f.addressee_id = :me) AND f.status = 'accepted'
@@ -50,6 +53,8 @@ def invitable_friends(event_id, me):
             why_not = "Already in this game"
         elif row["taken_off"]:
             why_not = "The host took them off this game"
+        elif row["not_member"]:  # members-only: a spot held for an outsider would show them the game for nothing
+            why_not = "Not a club member"
         elif row["invite_status"] == "requested":
             why_not = "Waiting for the host's OK"
         elif row["invite_status"] == "pending" and row["expires_at"] > now:
@@ -360,12 +365,18 @@ def open_invite_link(token):
     if inviter is None:
         flash("That invite link doesn't work anymore.", "error")
         return redirect(url_for("index"))
+    if g.get("user") is not None and is_blocked_between(g.user["id"], inviter["id"]):  # both ways, links too
+        flash("That invite link doesn't work anymore.", "error")
+        return redirect(url_for("index"))
     if g.get("user") is not None and request.method == "POST":
         return redirect(accept_invite_link(g.user, token) or url_for("index"))
     if request.method == "POST":  # logged out and tapped "Sign up and join" / "I have an account"
         session["invite_link"] = token  # used right after they sign up or log in (auth.log_in)
         return redirect(url_for("auth.login" if request.form.get("go") == "login" else "auth.signup"))
     event = _open_game(link[0]) if link[0] else None
+    if event is not None and event["host_id"] != inviter["id"] and not get_db().execute(
+            "SELECT 1 FROM rsvps WHERE event_id = ? AND user_id = ?", (event["id"], inviter["id"])).fetchone():
+        event = None  # they left or were taken off: their link doesn't advertise the game anymore
     if g.get("user") is not None and inviter["id"] == g.user["id"]:
         return redirect(url_for("events.detail", event_id=event["id"]) if event else url_for("social.friends"))
     full = bool(event) and spots_left(event) == 0 and not event["i_am_going"]
@@ -462,8 +473,15 @@ def can_send_to_friends(event):
 def sharable_friends(event_id, me):
     """All my friends (the same list as Reserve spots; blocked people aren't friends), each with `why_not`:
     "Already in this game" for those going, else None."""
-    going = {row[0] for row in get_db().execute("SELECT user_id FROM rsvps WHERE event_id = ?", (event_id,))}
-    return [{**dict(friend), "why_not": "Already in this game" if friend["id"] in going else None}
+    db = get_db()
+    going = {row[0] for row in db.execute("SELECT user_id FROM rsvps WHERE event_id = ?", (event_id,))}
+    members = None  # members-only: only club members can be sent it (the card is no use to anyone else)
+    event = db.execute("SELECT club_id, members_only FROM events WHERE id = ?", (event_id,)).fetchone()
+    if event is not None and event["members_only"]:
+        members = {row[0] for row in db.execute("SELECT user_id FROM club_members WHERE club_id = ?"
+                                                " AND role IN ('member', 'officer')", (event["club_id"],))}
+    return [{**dict(friend), "why_not": "Already in this game" if friend["id"] in going
+             else "Not a club member" if members is not None and friend["id"] not in members else None}
             for friend in friends_of(me)]
 
 

@@ -367,7 +367,8 @@ def what_you_would_lose(user_id):
 
 SOLE_OFFICER = """SELECT c.id, c.name FROM clubs c JOIN club_members m ON m.club_id = c.id
            WHERE m.user_id = ? AND m.role = 'officer'
-             AND (SELECT COUNT(*) FROM club_members o WHERE o.club_id = c.id AND o.role = 'officer') = 1
+             AND (SELECT COUNT(*) FROM club_members o JOIN users ou ON ou.id = o.user_id  -- suspended officers can't lead
+                  WHERE o.club_id = c.id AND o.role = 'officer' AND ou.suspended = 0) <= 1
              AND {} (c.status = 'approved' AND EXISTS (SELECT 1 FROM club_members o WHERE o.club_id = c.id
                                                         AND o.role != 'officer'))"""
 
@@ -427,6 +428,12 @@ def delete_account():
     db = get_db()
     for club in clubs_that_go_with_me(g.user["id"]):
         db.execute("DELETE FROM clubs WHERE id = ?", (club["id"],))
+    # Clubs they own go to the officer who's been there longest (otherwise nobody could ever be made owner again).
+    db.execute("""UPDATE clubs SET created_by = (
+                      SELECT m.user_id FROM club_members m JOIN users u ON u.id = m.user_id
+                      WHERE m.club_id = clubs.id AND m.role = 'officer' AND m.user_id != :me AND u.suspended = 0
+                      ORDER BY m.joined_at, m.user_id LIMIT 1)
+                  WHERE created_by = :me""", {"me": g.user["id"]})
     keep_games_other_people_played(g.user["id"])
     # Games still hosted by this account are deleted with it: older notices linking to them would 404.
     for row in db.execute("SELECT id FROM events WHERE host_id = ?", (g.user["id"],)).fetchall():

@@ -4067,14 +4067,14 @@ def test_invite_link_for_a_finished_game_says_so_and_social_post_links(accounts,
     link = re.search(r'/join/[\w.\-]+', page).group(0)
     client.post(f"/events/{game}/cancel")
     _as(accounts, "Sam")
-    assert "over or was canceled" in client.get(link).data.decode()
-    assert clean_social("instagram", "instagram.com/p/Cxyz123/") == "p/Cxyz123"          # a post: fails the check
+    assert "isn't open anymore" in client.get(link).data.decode()
+    assert clean_social("instagram", "instagram.com/p/Cxyz123/") == "p/Cxyz123/"         # a post: fails the check
     assert clean_social("instagram", "https://www.instagram.com/stories/maya/123") == "maya"
     assert clean_social("instagram", "instagram.com/_u/maya") == "maya"
     assert clean_social("snapchat", "snapchat.com/@maya") == "maya"
     assert clean_social("x_handle", "mobile.twitter.com/maya") == "maya"
     from sportive.profile import PERSON_SOCIAL_RULES
-    assert not re.fullmatch(PERSON_SOCIAL_RULES["instagram"][1], "p/Cxyz123")         # "doesn't look right"
+    assert not re.fullmatch(PERSON_SOCIAL_RULES["instagram"][1], "p/Cxyz123/")         # "doesn't look right"
 
 
 def test_stop_note_and_number_lookups(accounts, client, app, monkeypatch):
@@ -4115,6 +4115,176 @@ def test_phone_scripts_keep_typing_and_say_what_happened(app):
     assert "data-welcome-later" in (templates / "profile/welcome.html").read_text()
     for name in ("events/form.html", "events/quick.html"):
         assert "'Choose a sport', required=True" in (templates / name).read_text()
+
+
+def test_clubs_keep_an_owner_and_active_officers(accounts, client, app):
+    """Round 20: after the owner deleted their account nobody could ever be made owner again; a suspended officer
+    still counted as "another officer", so the last real one could leave; "Make officer" ignored blocks."""
+    club = _club_with_member(accounts, client, app)                         # logged in as the captain (owner)
+    member, fan = _user_id(app, "member@uw.edu"), _user_id(app, "fan@uw.edu")
+    client.post(f"/clubs/{club}/officers/{member}")
+    accounts.logout()
+    accounts.signup(email="third@uw.edu", name="Third Officer")
+    client.post(f"/clubs/{club}/join", data={"message": "Hi"})
+    third = _user_id(app, "third@uw.edu")
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    client.post(f"/clubs/{club}/members/{third}/approve")
+    client.post(f"/clubs/{club}/officers/{third}")
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
+    with app.app_context():
+        assert get_db().execute("SELECT created_by FROM clubs WHERE id = ?", (club,)).fetchone()[0] == member
+        get_db().execute("UPDATE clubs SET created_by = NULL WHERE id = ?", (club,))   # an older club, owner gone
+        get_db().commit()
+    accounts.login(email="member@uw.edu")
+    client.post(f"/clubs/{club}/officers", data={"user": third, "action": "owner"})
+    with app.app_context():
+        assert get_db().execute("SELECT created_by FROM clubs WHERE id = ?", (club,)).fetchone()[0] == third
+        get_db().execute("UPDATE users SET suspended = 1 WHERE id = ?", (third,))      # the owner is suspended
+        get_db().commit()
+    page = client.post(f"/clubs/{club}/leave", follow_redirects=True).data.decode()
+    assert "only officer" in page                                          # the suspended one doesn't count
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 0 WHERE id = ?", (third,))
+        get_db().execute("UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ?", (club, fan))
+        get_db().execute("INSERT INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, '2026-09-01 10:00')",
+                         (fan, third))
+        get_db().commit()
+    accounts.logout()
+    accounts.login(email="third@uw.edu")
+    client.post(f"/clubs/{club}/officers/{fan}")                            # Fan blocked them: no
+    with app.app_context():
+        assert get_db().execute("SELECT role FROM club_members WHERE club_id = ? AND user_id = ?",
+                                (club, fan)).fetchone()[0] == "member"
+
+
+def test_club_requests_posts_and_events_round_20(accounts, client, app, monkeypatch):
+    """Round 20: canceling a join request also dropped the follow; a blocked person's join request emailed the
+    officer who blocked them; a suspended officer's name stayed on old posts; a canceled event's post still
+    advertised it; edits to a weekly series turned its post into one game's; ten private events pushed the open
+    ones off the club page."""
+    club = _club_with_member(accounts, client, app)                         # captain logged in
+    captain = _user_id(app, "captain@uw.edu")
+    client.post(f"/clubs/{club}/posts", data={"body": "Practice is on!"})
+    club_game = dict(sport="spikeball", location="The Quad", club=str(club))
+    for week in range(10):
+        client.post(f"/events/new?club={club}", data=event_form(
+            title=f"Secret {week}", is_private="1", password="huskies1", **club_game,
+            starts_at=form_time(timedelta(days=1 + week)), ends_at=form_time(timedelta(days=1 + week, hours=1))))
+    later = event_id_from(client.post(f"/events/new?club={club}", data=event_form(
+        title="Open later", **club_game, starts_at=form_time(timedelta(days=20)),
+        ends_at=form_time(timedelta(days=20, hours=1)))))
+    series = event_id_from(client.post(f"/events/new?club={club}", data=event_form(
+        title="Weekly run", repeat="4", **club_game, starts_at=form_time(timedelta(days=2, hours=3)),
+        ends_at=form_time(timedelta(days=2, hours=4)))))
+    for change in ("members", "members", ""):
+        client.post(f"/events/{series}/edit", data=event_form(title="Weekly run", is_private=change, **club_game,
+                                                              starts_at=form_time(timedelta(days=2, hours=3)),
+                                                              ends_at=form_time(timedelta(days=2, hours=4))))
+    client.post(f"/events/{later}/cancel")
+    accounts.logout()
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Canceled: New event: Open later" in page
+    assert "every" in page and "for 4 weeks" in page                         # still the series' post
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 1 WHERE id = ?", (captain,))
+        get_db().commit()
+    accounts.login(email="member@uw.edu")
+    assert "Cap Tain" not in client.get(f"/clubs/{club}").data.decode()     # "An officer" now
+    with app.app_context():
+        get_db().execute("UPDATE users SET suspended = 0 WHERE id = ?", (captain,))
+        get_db().commit()
+    accounts.logout()
+    accounts.login(email="fan@uw.edu")
+    client.post(f"/clubs/{club}/join", data={"message": "Me too"})
+    page = client.post(f"/clubs/{club}/leave", follow_redirects=True).data.decode()
+    assert "You still follow the club" in page
+    with app.app_context():
+        assert get_db().execute("SELECT role FROM club_members WHERE club_id = ? AND user_id = ?",
+                                (club, _user_id(app, "fan@uw.edu"))).fetchone()[0] == "follower"
+        get_db().execute("INSERT INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, '2026-09-01 10:00')",
+                         (captain, _user_id(app, "fan@uw.edu")))
+        get_db().execute("DELETE FROM club_join_emails")
+        get_db().commit()
+    before = len(app.extensions["outbox"])
+    client.post(f"/clubs/{club}/join", data={"message": "Again"})
+    assert not [m for m in app.extensions["outbox"][before:] if m["to"] == "captain@uw.edu"]
+    with app.app_context():
+        from sportive.events import club_event_text
+        assert club_event_text({"members_only": 1, "starts_at": "2026-10-10 10:00"}, 1).startswith("New members-only")
+
+
+def test_members_only_games_and_invite_links_round_20(accounts, client, app):
+    """Round 20: a member could hold a spot in a members-only game for a friend who isn't in the club (who then
+    saw its note and players); a removed player's invite link kept advertising the game; a blocked person could
+    open the link of someone who blocked them; a forwarded members-only link showed the club's schedule."""
+    club = _club_with_member(accounts, client, app)                         # captain logged in
+    member = _user_id(app, "member@uw.edu")
+    accounts.logout()
+    ids = _people(accounts, app, "Pal", "Pest")
+    _friends(app, member, ids["Pal"])
+    accounts.login(email="captain@uw.edu")
+    club_game = dict(sport="spikeball", location="The Quad", club=str(club))
+    members_game = event_id_from(client.post(f"/events/new?club={club}", data=event_form(
+        title="Members run", is_private="members", note="Court 3", **club_game)))
+    open_game = event_id_from(client.post(f"/events/new?club={club}", data=event_form(title="Open run", **club_game)))
+    accounts.logout()
+    accounts.login(email="member@uw.edu")
+    client.post(f"/events/{members_game}/join")
+    assert "Not a club member" in client.get(f"/events/{members_game}/party").data.decode()
+    client.post(f"/events/{members_game}/party", data={"friend": [ids["Pal"]]})
+    assert "Not a club member" in client.get(f"/events/{members_game}/send").data.decode()
+    members_link = re.search(r'/join/[\w.\-]+', client.get(f"/events/{members_game}").data.decode()).group(0)
+    client.post(f"/events/{open_game}/join")
+    open_link = re.search(r'/join/[\w.\-]+', client.get(f"/events/{open_game}").data.decode()).group(0)
+    with app.app_context():
+        assert not get_db().execute("SELECT 1 FROM invites WHERE guest_id = ?", (ids["Pal"],)).fetchone()
+    accounts.logout()
+    page = client.get(members_link).data.decode()
+    assert "members' event" in page and "Members run" not in page        # no title or time to outsiders
+    assert "Open run" in client.get(open_link).data.decode()
+    client.post(f"/events/{open_game}/leave")
+    accounts.login(email="member@uw.edu")
+    client.post(f"/events/{open_game}/leave")
+    accounts.logout()
+    assert "Open run" not in client.get(open_link).data.decode()            # they left: the link is app-only
+    with app.app_context():
+        get_db().execute("INSERT INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, '2026-09-01 10:00')",
+                         (member, ids["Pest"]))
+        get_db().commit()
+    _as(accounts, "Pest")
+    assert "doesn&#39;t work anymore" in client.get(open_link, follow_redirects=True).data.decode()
+
+
+def test_number_lookups_and_pasted_page_links(accounts, client, app, monkeypatch):
+    """Round 20: a check on a number that's already taken used up that number's own codes for the day (so someone
+    could stop its owner getting a code); snapchat.com/discover/… and story-highlight links saved as usernames."""
+    from sportive import sms
+    from sportive.profile import clean_social
+    _texts(monkeypatch)
+    ids = _people(accounts, app, "Maya", "Sam")
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE users SET phone = '+12065550142', phone_verified = 1 WHERE id = ?", (ids["Maya"],))
+        db.commit()
+        for n in range(sms.MAX_CODES_PER_NUMBER):
+            assert "already used" in sms.start_phone_check(ids["Sam"], "+12065550142")
+        assert sms._sent_today(ids["Sam"], codes=True) == sms.MAX_CODES_PER_NUMBER     # costs the asker
+        assert db.execute("SELECT COUNT(*) FROM sms_log WHERE phone = '+12065550142' AND kind = 'code'").fetchone()[0] == 0
+    assert clean_social("snapchat", "snapchat.com/discover/foo").endswith("/")
+    assert clean_social("snapchat", "snapchat.com/add").endswith("/")
+    assert clean_social("snapchat", "add") == "add"                                  # typed, not a link
+    assert clean_social("instagram", "instagram.com/stories/highlights/123").endswith("/")
+    assert clean_social("instagram", "instagram.com/Stories/maya/1") == "maya"
+
+
+def test_chat_never_posts_twice_or_reloads_over_a_draft(app):
+    """Round 20: a send that answered after 20 seconds showed "Couldn't send", and sending again posted it twice;
+    being logged out on another device reloaded the chat and lost the typed message."""
+    chat = (pathlib.Path(app.root_path) / "static" / "chat.js").read_text()
+    send = chat[chat.index("const sentText"):chat.index("// Picked photos")]
+    assert "location.reload" not in send and "sentAfter" in send and "This is taking a while" in send
+    assert "photos[i] ? 90000 : 20000" in send
 
 
 def test_party_up_holds_spots_for_friends(accounts, client, app):

@@ -221,7 +221,7 @@
           <p class="muted map-status" id="map-status" aria-live="polite"></p>
         </div>
       </details>
-    {% elif event.location.startswith('Off campus') %}
+    {% elif event.location.startswith('Off campus') and not place_hidden %}
       <p class="muted">Off campus: the address is in the note.</p>
     {% endif %}
 

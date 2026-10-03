@@ -74,6 +74,11 @@ def typed_code(text):
 
 HANDLE_SITES = {"instagram": r"instagram\.com", "tiktok": r"tiktok\.com", "snapchat": r"snapchat\.com(/add)?",
                 "x_handle": r"(x|twitter)\.com"}
+# The first part of a link that points at a post, a page or a menu, not at a person.
+NOT_A_PERSON = {"instagram": {"p", "reel", "reels", "tv", "explore", "highlights", "accounts", "direct"},
+                "tiktok": {"video", "t", "discover", "explore", "tag"},
+                "snapchat": {"add", "discover", "spotlight", "t", "p", "lens", "unlock"},
+                "x_handle": {"i", "home", "search", "hashtag", "intent", "share"}}
 
 
 def social_handle(key, value):
@@ -82,12 +87,14 @@ def social_handle(key, value):
     value = one_line(value).strip()
     site = HANDLE_SITES.get(key)
     if site:
+        pasted = value
         value = re.sub(rf"^(https?://)?(www\.|m\.|mobile\.)?{site}/", "", value, flags=re.I)
+        linked = value != pasted  # a pasted link, not a typed username (someone may really be called "add")
         parts = value.split("?")[0].split("#")[0].strip("/").split("/")
-        if key == "instagram" and parts[0] in ("_u", "stories") and len(parts) > 1:
+        if key == "instagram" and parts[0].lower() in ("_u", "stories") and len(parts) > 1:
             parts = parts[1:]  # instagram.com/stories/maya/123 and instagram.com/_u/maya are maya's
-        elif key in ("instagram", "tiktok") and parts[0].lower() in ("p", "reel", "reels", "tv", "explore", "video"):
-            return "/".join(parts)  # a link to a post, not to a person: fails the username check
+        if linked and parts[0].lower() in NOT_A_PERSON.get(key, ()):
+            return "/".join(parts) + "/"  # a link to a post or a page, not to a person: fails the username check
         value = parts[0]
     return value.lstrip("@")
 

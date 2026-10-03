@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Flyer{% endblock %}
+{% block head %}<meta name="robots" content="noindex">{% endblock %}{# a printout, not a page to find #}
 {% block content %}
 <p class="no-print muted flyer-tip">Print it (Letter, portrait) or show it on a laptop. <button type="button" class="btn btn-small" data-print>Print</button></p>
 <article class="flyer">

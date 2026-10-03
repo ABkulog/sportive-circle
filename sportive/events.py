@@ -638,29 +638,30 @@ MAX_REPEAT_WEEKS = 12  # about a quarter of weekly practices
 
 def post_club_event(club, event_id, data, repeat):
     """A new club event goes in the club's updates, so followers and members hear about it (Clubs tab)."""
-    get_db().execute("INSERT INTO club_posts (club_id, author_id, body, created_at, event_id) VALUES (?, ?, ?, ?, ?)",
-                     (club["id"], g.user["id"], club_event_text(data, repeat), to_db(now_local()), event_id))
+    get_db().execute("INSERT INTO club_posts (club_id, author_id, body, created_at, event_id, weeks)"
+                     " VALUES (?, ?, ?, ?, ?, ?)",
+                     (club["id"], g.user["id"], club_event_text(data, repeat), to_db(now_local()), event_id, repeat))
     get_db().commit()
 
 
 def update_club_post(event_id, data):
-    """An edited club event: its post in the club's updates (which are public) says the new time and place, or
-    stops showing them once the event is members-only or private. A post about a whole series is left as it was
-    unless this week became members-only or private."""
+    """An edited club event: its post in the club's updates (which are public) is rewritten with the new time and
+    place, or without them once it's members-only or private (and with them again if it goes back to public).
+    A post about a weekly series is linked to its first week and keeps describing the series."""
     db = get_db()
-    for post in db.execute("SELECT id, body FROM club_posts WHERE event_id = ?", (event_id,)).fetchall():
-        series = post["body"].startswith(("New: ", "New members-only events:", "New private events"))
-        if not series:
-            db.execute("UPDATE club_posts SET body = ? WHERE id = ?", (club_event_text(data, 1), post["id"]))
-        elif data.get("members_only") or data.get("is_private"):
-            db.execute("UPDATE club_posts SET body = ? WHERE id = ?", (club_event_text(data, 2, series=True), post["id"]))
+    for post in db.execute("SELECT id, weeks FROM club_posts WHERE event_id = ?", (event_id,)).fetchall():
+        db.execute("UPDATE club_posts SET body = ? WHERE id = ?", (club_event_text(data, post["weeks"]), post["id"]))
 
 
-def club_event_text(data, repeat, series=False):
+def mark_club_post_canceled(event_id):
+    """A canceled club event: its post (if it's about this one event) says so, instead of still advertising it."""
+    get_db().execute("UPDATE club_posts SET body = 'Canceled: ' || body WHERE event_id = ? AND weeks = 1"
+                     " AND body NOT LIKE 'Canceled: %'", (event_id,))
+
+
+def club_event_text(data, repeat):
     """What a club's updates say about a new event (no when or where for members-only and private ones)."""
     if data.get("members_only"):  # updates are public: members see when and where on the Events tab
-        if series:
-            return "New members-only events. Members: see the Events tab."
         return (f"New members-only events: every {from_db(data['starts_at']).strftime('%A')} for {repeat} weeks."
                 if repeat > 1 else "New members-only event.") + " Members: see the Events tab."
     if data.get("is_private"):  # private: only invited people and password holders get the details
@@ -768,9 +769,12 @@ def cancel(event_id):
                       (event_id,)).rowcount:
         db.commit()
         return redirect(url_for("events.detail", event_id=event_id))
+    if event["club_id"]:
+        mark_club_post_canceled(event_id)
     db.commit()
+    told = players_except_host(event, by=g.user)
     tell_players_it_was_cancelled(event, by=g.user)
-    flash("Canceled. Everyone who joined was told.", "info")
+    flash("Canceled. Everyone who joined was told." if told else "Canceled.", "info")
     return redirect(url_for("events.my_events"))
 
 
@@ -800,6 +804,10 @@ def drop_non_members(event):
     db.execute(f"DELETE FROM notices WHERE key = ? AND user_id IN (SELECT guest_id FROM invites WHERE {outside})",
                (f"invite:{event['id']}", event["id"], event["club_id"]))
     db.execute(f"UPDATE invites SET status = 'canceled' WHERE {outside}", (event["id"], event["club_id"]))
+    # "Maya posted Open run (Sat 3 PM). Want in?" in outsiders' bells: gone, it's not for them anymore.
+    db.execute("""DELETE FROM notices WHERE key = ? AND user_id NOT IN
+                  (SELECT user_id FROM club_members WHERE club_id = ? AND role IN ('member', 'officer'))""",
+               (f"friend_game:{event['id']}", event["club_id"]))
     return len(outsiders)
 
 

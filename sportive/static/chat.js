@@ -595,6 +595,11 @@
       sending = true;
       sendButton.disabled = true;
       const sentText = textarea.value;  // what's going out: anything typed while it sends stays in the box
+      const sentAfter = lastId;         // newer messages of mine than this one are what this send made
+      const takeSentText = () => {      // take away only what was sent: words typed while it was on its way stay
+        textarea.value = textarea.value.startsWith(sentText) ? textarea.value.slice(sentText.length).trimStart() : textarea.value;
+        grow();
+      };
       try {
         // One request per photo (the words go with the last one), or one for words only.
         const photos = picked.length ? [...picked] : [null];
@@ -605,13 +610,16 @@
           if (i < photos.length - 1) data.set("body", "");
           // A send that hangs (a bad connection) gives up after 20 seconds, so the box doesn't stay stuck.
           const timeout = new AbortController();
-          const timer = setTimeout(() => timeout.abort(), 20000);
+          const timer = setTimeout(() => timeout.abort(), photos[i] ? 90000 : 20000);  // a photo upload takes longer
           let response;
           try {
             response = await fetch(form.action, { method: "POST", body: data, signal: timeout.signal,
                                                   headers: { "X-Chat-Send": "1", Accept: "application/json" } });
           } finally { clearTimeout(timer); }
-          if (new URL(response.url).pathname.startsWith("/login")) { location.reload(); return; }  // logged out
+          if (new URL(response.url).pathname.startsWith("/login")) {  // logged out (on another device, say)
+            showError("You were logged out. Copy your message, then reload the page and log in.");
+            break;
+          }
           if (response.status === 413) { showError("That photo is too big. Pick one under 8 MB."); break; }
           if (!(response.headers.get("Content-Type") || "").includes("json")) {  // e.g. logged out in another tab
             showError("You were logged out. Copy your message, then reload the page and log in.");
@@ -621,16 +629,30 @@
           if (!answer.ok) { showError(answer.error); break; }
           if (photos[i]) photoInput.dispatchEvent(new CustomEvent("chat:sent", { detail: photos[i] }));
           if (i === photos.length - 1) {
-            // Take away only what was sent: words typed while it was on its way stay.
-            textarea.value = textarea.value.startsWith(sentText) ? textarea.value.slice(sentText.length).trimStart() : textarea.value;
-            grow();
+            takeSentText();
             showError(null);
           }
         }
         await poll(true);
         scrollDown();
       } catch (error) {
-        showError("Couldn't send. Check your connection and try again.");
+        // A slow answer isn't always a lost message: look in the chat first, so sending again can't post it twice.
+        let arrived = false;
+        try {
+          await poll(true);
+          const words = sentText.trim();
+          arrived = Boolean(words) && [...list.querySelectorAll(".chat-msg.is-mine")].some((item) =>
+            Number(item.dataset.id) > sentAfter && (item.querySelector(".chat-bubble > p") || {}).textContent === words);
+        } catch (checkError) { /* still offline */ }
+        if (arrived) {
+          takeSentText();
+          showError(null);
+          scrollDown();
+        } else {
+          showError(error.name === "AbortError"
+            ? "This is taking a while. If it doesn't show up in the chat soon, try again."
+            : "Couldn't send. Check your connection and try again.");
+        }
       } finally {
         sending = false;
         sendButton.disabled = false;
