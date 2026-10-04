@@ -55,10 +55,13 @@ def test_signup_rejects_mismatched_passwords(client):
     assert b"Passwords do not match." in response.data
 
 
-def test_signup_rejects_too_young(accounts):
-    young = (now_local().date() - timedelta(days=365 * 10)).isoformat()
-    response = accounts.signup(birth_date=young, verify=False)
-    assert b"age range" in response.data
+def test_signup_is_18_and_over(accounts, client):
+    today = now_local().date()
+    seventeen = today.replace(year=today.year - 18, day=1) + timedelta(days=40)   # turns 18 in a month or so
+    assert b"You need to be 18 or older" in accounts.signup(birth_date=seventeen.isoformat(), verify=False).data
+    eighteen = today.replace(year=today.year - 18, day=1) - timedelta(days=1)
+    assert b"18 or older" not in accounts.signup(email="adult@uw.edu", birth_date=eighteen.isoformat(), verify=False).data
+    assert f'max="{today.year - 18}-' in client.get("/signup").data.decode()          # the date picker stops at 18
 
 
 def test_signup_verify_and_login(accounts, client, app):
@@ -2143,6 +2146,45 @@ def test_only_officer_cant_delete_account(accounts, client, app):
     client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
     with app.app_context():
         assert get_db().execute("SELECT COUNT(*) FROM users WHERE email = 'captain@uw.edu'").fetchone()[0] == 1
+
+
+def test_denied_club_frees_its_name_for_the_real_club(accounts, client, app):
+    # Someone grabs the real club's name before its officers sign up: denying it as spam frees the name.
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="squatter@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    squat = _club_id(app, CLUB["name"])
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    client.post(f"/admin/clubs/{squat}/deny")
+    assert CLUB["name"] in client.get("/admin/clubs?status=denied").data.decode()   # still findable by the admin
+    accounts.logout()
+    accounts.signup(email="captain@uw.edu")
+    page = client.post("/clubs/new", data=CLUB, follow_redirects=True).data.decode()
+    assert "already on Sportive Circle" not in page
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT COUNT(*) FROM clubs WHERE name = ? AND status = 'pending'", (CLUB["name"],)).fetchone()[0] == 1
+        assert db.execute("SELECT name FROM clubs WHERE id = ?", (squat,)).fetchone()[0] == f"{CLUB['name']} (denied #{squat})"
+    # Restoring the denied one while the real club has the name keeps the marked name
+    accounts.logout()
+    accounts.login(email="admin@uw.edu")
+    client.post(f"/admin/clubs/{squat}/restore")
+    with app.app_context():
+        assert get_db().execute("SELECT name FROM clubs WHERE id = ?", (squat,)).fetchone()[0].endswith(f"(denied #{squat})")
+
+
+def test_restored_club_gets_its_name_back(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    club = _club_id(app, CLUB["name"])
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    client.post(f"/admin/clubs/{club}/deny")
+    client.post(f"/admin/clubs/{club}/restore")                  # the denial was a mistake
+    with app.app_context():
+        assert tuple(get_db().execute("SELECT name, status FROM clubs WHERE id = ?", (club,)).fetchone()) == (CLUB["name"], "pending")
 
 
 def test_make_officer_only_reports_success_when_it_worked(accounts, client, app):
@@ -4350,9 +4392,13 @@ def test_club_posts_stay_true_however_a_game_ends_or_changes(accounts, client, a
     accounts.signup(email="admin@uw.edu", name="Ad Min")
     app.config["ADMIN_EMAILS"] = "admin@uw.edu"
     client.post(f"/admin/users/{member}/suspend")
-    with app.app_context():
-        assert get_db().execute("SELECT body FROM club_posts WHERE event_id = ?", (single,)).fetchone()[0] \
-            .startswith("Canceled: New event: Open night")
+    with app.app_context():   # another officer (the captain) takes the game over, so it isn't canceled
+        db = get_db()
+        assert db.execute("SELECT body FROM club_posts WHERE event_id = ?", (single,)).fetchone()[0] \
+            .startswith("New event: Open night")
+        assert db.execute("SELECT cancelled FROM events WHERE id = ?", (single,)).fetchone()[0] == 0
+    # (A suspension that does cancel a club game marks its post "Canceled:": see
+    # test_club_events_with_no_other_officer_are_still_canceled_on_suspension.)
 
 
 def test_announcements_texts_and_emails_round_21(accounts, client, app, monkeypatch):
@@ -6210,6 +6256,68 @@ def test_live_club_or_one_with_people_cant_be_withdrawn(accounts, client, app):
         assert get_db().execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == 1
 
 
+def _weekly_run_by_second_officer(accounts, client, app):
+    """Maya owns the club; Sam, another officer, posts a 3-week run. Returns (ids, club). Ends logged out."""
+    ids = _people(accounts, app, "Maya", "Sam", "Admin")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Maya")
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Sam"], "action": "add"})
+    _as(accounts, "Sam")
+    client.post("/events/new", data={**event_form(title="Tuesday Run", sport="spikeball", location="The Quad"),
+                                     "club": club, "repeat": "3"})
+    accounts.logout()
+    return ids, club
+
+
+def _runs(app):
+    with app.app_context():
+        return [tuple(row) for row in get_db().execute(
+            "SELECT host_id, cancelled FROM events WHERE title = 'Tuesday Run' ORDER BY starts_at").fetchall()]
+
+
+def test_club_events_go_to_the_owner_when_their_officer_steps_down(accounts, client, app):
+    ids, club = _weekly_run_by_second_officer(accounts, client, app)
+    assert _runs(app) == [(ids["Sam"], 0)] * 3
+    _as(accounts, "Maya")
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Sam"], "action": "remove"})
+    assert _runs(app) == [(ids["Maya"], 0)] * 3                     # the club's runs go on, run by the owner
+    _as(accounts, "Sam")                                             # and Sam is a player who can leave
+    with app.app_context():
+        first = get_db().execute("SELECT id FROM events WHERE title = 'Tuesday Run' ORDER BY starts_at").fetchone()[0]
+    page = client.post(f"/events/{first}/leave", follow_redirects=True).data.decode()
+    assert "You left" in page and "You&#39;re the host" not in page
+
+
+def test_club_events_stay_when_their_officer_deletes_their_account(accounts, client, app):
+    ids, club = _weekly_run_by_second_officer(accounts, client, app)
+    _as(accounts, "Sam")
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
+    assert _runs(app) == [(ids["Maya"], 0)] * 3                     # not deleted, not canceled
+
+
+def test_club_events_stay_when_their_officer_is_suspended(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    ids, club = _weekly_run_by_second_officer(accounts, client, app)
+    _as(accounts, "Admin")
+    client.post(f"/admin/users/{ids['Sam']}/suspend")
+    assert _runs(app) == [(ids["Maya"], 0)] * 3
+
+
+def test_club_events_with_no_other_officer_are_still_canceled_on_suspension(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    ids = _people(accounts, app, "Maya", "Admin")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Maya")
+    client.post("/events/new", data={**event_form(title="Tuesday Run", sport="spikeball", location="The Quad"),
+                                     "club": club})
+    _as(accounts, "Admin")
+    client.post(f"/admin/users/{ids['Maya']}/suspend")
+    assert _runs(app) == [(ids["Maya"], 1)]                          # nobody to hand it to: canceled, as before
+    with app.app_context():
+        assert get_db().execute("SELECT body FROM club_posts WHERE club_id = ? AND body LIKE '%Tuesday Run%'",
+                                (club,)).fetchone()[0].startswith("Canceled: ")
+
+
 def test_fixing_capitals_in_a_club_name_keeps_it_live(accounts, client, app):
     _people(accounts, app, "Maya")
     club = _club_with_officer(accounts, client, app)
@@ -6227,6 +6335,21 @@ def test_fixing_capitals_in_a_club_name_keeps_it_live(accounts, client, app):
     client.post(f"/clubs/{club}/edit", data={**CLUB, "name": "UW Roundnet Club"})   # a real new name: re-checked
     with app.app_context():
         assert get_db().execute("SELECT status FROM clubs WHERE id = ?", (club,)).fetchone()[0] == "pending"
+
+
+def test_follow_after_the_login_ended_goes_back_to_the_club(accounts, client, app):
+    _people(accounts, app, "Maya", "Sam")
+    club = _club_with_officer(accounts, client, app)                          # ends logged out
+    sent = client.post(f"/clubs/{club}/follow", headers={"Referer": f"http://localhost/clubs/{club}"})
+    assert sent.status_code == 302 and f"next=/clubs/{club}" in sent.headers["Location"]
+    assert "follow" not in sent.headers["Location"]                              # not the form's address (a 405)
+    page = client.post(f"/login?next=/clubs/{club}", data={"email": "sam@uw.edu", "password": "purple-and-gold"},
+                       follow_redirects=True)
+    assert page.status_code == 200 and CLUB["name"] in page.data.decode()
+    # A form sent from another website goes to Home instead
+    accounts.logout()
+    elsewhere = client.post(f"/clubs/{club}/follow", headers={"Referer": "https://evil.example/clubs/1"})
+    assert elsewhere.headers["Location"] == "/login?next=/"
 
 
 def test_forms_have_back_buttons(accounts, client, app):

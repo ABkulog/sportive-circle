@@ -21,9 +21,9 @@ Feature: Accounts
     Then they see "Wrong code, try again."
 
   @FR-AUTH-3
-  Scenario: You must be at least 15
-    When someone born 10 years ago signs up with the email "kid@uw.edu"
-    Then they see "not within the age range"
+  Scenario: You must be at least 18
+    When someone born 17 years ago signs up with the email "kid@uw.edu"
+    Then they see "You need to be 18 or older"
 
   @FR-AUTH-4
   Scenario: Too many wrong passwords lock the account for a while
