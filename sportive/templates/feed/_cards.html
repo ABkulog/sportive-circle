@@ -105,8 +105,24 @@
   </article>
 {% endmacro %}
 
+{% macro news_card(item) %}
+  {# A headline from GoHuskies.com: tapping it opens the story there. #}
+  <article class="card feed-card is-news">
+    <header class="feed-head">
+      <span class="feed-who">
+        <span class="club-emoji news-logo" style="--size: 40px" aria-hidden="true">{{ item.emoji }}</span>
+        <span><strong>Husky {{ item.team }}</strong><small class="muted">News · {{ item.at|ago }}</small></span>
+      </span>
+      {% if item.sport %}{{ sport_tag(item.sport) }}{% endif %}
+    </header>
+    <a class="news-title" href="{{ item.story.link }}" target="_blank" rel="noopener">{{ item.story.title }}</a>
+    <p class="muted small news-source">GoHuskies.com ↗</p>
+  </article>
+{% endmacro %}
+
 {% macro feed_item(item, photos) %}
   {% if item.kind == 'post' %}{{ post_card(item, photos) }}
   {% elif item.kind == 'club_post' %}{{ club_post_card(item) }}
+  {% elif item.kind == 'news' %}{{ news_card(item) }}
   {% else %}{{ game_card(item) }}{% endif %}
 {% endmacro %}

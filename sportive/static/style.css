@@ -1323,3 +1323,7 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .reply-actions form { margin: 0; }
 .reply-form { display: flex; gap: 8px; align-items: flex-end; }
 .reply-form textarea { flex: 1; min-width: 0; }
+.feed-card.is-news { border-left: 4px solid var(--gold); }
+.news-logo { background: var(--purple); }
+.news-title { display: block; margin-top: 10px; font-weight: 700; font-size: 1.02rem; color: var(--text); overflow-wrap: anywhere; }
+.news-source { margin: 6px 0 0; }

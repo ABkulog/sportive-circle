@@ -118,6 +118,10 @@ def feed_items(sport=None, before=None, limit=PAGE):
         if posted < params["before"]:
             items.append({"kind": "game", "at": posted, "event": row})
 
+    # 4. Husky news: scores and results from UW's teams in these sports (from GoHuskies.com)
+    from .news import feed_news
+    items += feed_news(sports, params["before"], limit + 1, channel=bool(sport))
+
     items.sort(key=lambda item: item["at"], reverse=True)
     older = items[limit - 1]["at"] if len(items) > limit else None
     items = items[:limit]
