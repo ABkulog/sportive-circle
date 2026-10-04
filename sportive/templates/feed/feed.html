@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import home_tabs, icon %}
+{% from "_macros.html" import home_tabs, icon, club_logo %}
 {% from "feed/_cards.html" import feed_item %}
 {% block title %}{{ '#' ~ SPORTS[sport] if sport else "Feed: what's happening" }}{% endblock %}
 {% block content %}
@@ -47,6 +47,23 @@
     <button class="btn post-button">Post {{ icon("send") }}</button>
   </div>
 </form>
+
+{% if club_picks %}
+  <section class="card clubs-for-you" aria-labelledby="clubs-for-you">
+    <h2 id="clubs-for-you" class="home-section-title">Clubs for you</h2>
+    <p class="muted small">Follow a club and its practices, events and posts show up here.</p>
+    <ul class="pick-row">
+      {% for c in club_picks %}
+        <li class="pick">
+          <a href="{{ url_for('clubs.view', club_id=c.id) }}">{{ club_logo(c, 48) }}<span>{{ c.name }}</span></a>
+          <form method="post" action="{{ url_for('clubs.follow', club_id=c.id) }}">
+            {{ csrf_field() }}<input type="hidden" name="next" value="/feed">
+            <button class="btn btn-small">+ Follow</button></form>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
 
 <div class="stack feed">
   {% for item in items %}

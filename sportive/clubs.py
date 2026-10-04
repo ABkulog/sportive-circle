@@ -128,6 +128,63 @@ def officer_clubs(user_id):
         (user_id,)).fetchall()
 
 
+def announce_new_club(club):
+    """A club's first approval: a post everyone who plays its sport sees in their feed (a launch moment)."""
+    db = get_db()
+    if db.execute("SELECT 1 FROM club_posts WHERE club_id = ? AND body LIKE '🆕 %'", (club["id"],)).fetchone():
+        return  # approved again after a re-check: it was announced already
+    about = " ".join(club["description"].split())
+    about = about if len(about) <= 140 else about[:137].rstrip() + "…"
+    db.execute("INSERT INTO club_posts (club_id, author_id, body, created_at) VALUES (?, NULL, ?, ?)",
+               (club["id"], f"🆕 {club['name']} just joined Sportive Circle! {about} Follow to see their practices "
+                            "and events.", to_db(now_local())))
+    db.commit()
+
+
+def friends_in_club(club_id, me, limit=2):
+    """(first names of a few friends who follow or are in the club, how many in all), for "Maya and 2 friends"."""
+    rows = get_db().execute(
+        """SELECT u.full_name FROM club_members m JOIN users u ON u.id = m.user_id
+           WHERE m.club_id = ? AND m.role IN ('member', 'officer', 'follower') AND u.suspended = 0 AND u.id != ?
+             AND EXISTS (SELECT 1 FROM friendships f WHERE f.status = 'accepted'
+                         AND ((f.requester_id = ? AND f.addressee_id = u.id) OR (f.addressee_id = ? AND f.requester_id = u.id)))
+           ORDER BY m.joined_at DESC""", (club_id, me, me, me)).fetchall()
+    return [row["full_name"].split()[0] for row in rows[:limit]], len(rows)
+
+
+def friends_line(club_id, me):
+    """"Maya follows this club", "Maya and Sam are in this club", "Maya and 3 other friends …", or None."""
+    names, count = friends_in_club(club_id, me)
+    if not count:
+        return None
+    if count == 1:
+        return f"Your friend {names[0]} is in this club"
+    if count == 2:
+        return f"Your friends {names[0]} and {names[1]} are in this club"
+    return f"Your friends {names[0]} and {count - 1} others are in this club"
+
+
+def officer_week(club_id):
+    """This week for a club's officers: new followers, new join requests, people going to its events."""
+    db = get_db()
+    since = to_db(now_local() - timedelta(days=7))
+    new_people = db.execute(
+        """SELECT COUNT(*) FROM club_members m JOIN users u ON u.id = m.user_id
+           WHERE m.club_id = ? AND m.joined_at >= ? AND m.role != 'officer' AND u.suspended = 0""",
+        (club_id, since)).fetchone()[0]
+    waiting = db.execute(
+        """SELECT COUNT(*) FROM club_members m JOIN users u ON u.id = m.user_id
+           WHERE m.club_id = ? AND m.role IN ('requested', 'tryout') AND u.suspended = 0""", (club_id,)).fetchone()[0]
+    now = now_local()
+    going = db.execute(
+        """SELECT COUNT(DISTINCT r.user_id) FROM rsvps r JOIN events e ON e.id = r.event_id
+           WHERE e.club_id = ? AND e.cancelled = 0 AND e.starts_at >= ? AND e.starts_at < ? AND r.user_id != e.host_id""",
+        (club_id, to_db(now - timedelta(days=7)), to_db(now + timedelta(days=7)))).fetchone()[0]
+    posts = db.execute("SELECT COUNT(*) FROM club_posts WHERE club_id = ? AND created_at >= ?",
+                       (club_id, since)).fetchone()[0]
+    return {"new_people": new_people, "waiting": waiting, "going": going, "posts": posts}
+
+
 def clubs_of(user_id):
     """Verified clubs someone is a member or officer of (shown on their profile), officer roles first."""
     return get_db().execute(
@@ -331,7 +388,10 @@ def view(club_id):
             ORDER BY e.starts_at LIMIT 10""", shown).fetchall()
     members_only_hidden = 0 if shown["member"] else db.execute(
         f"SELECT COUNT(*) FROM events e WHERE {upcoming} AND e.members_only = 1", shown).fetchone()[0]
+    me = g.user["id"] if g.get("user") else None
     return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
+                           friends_line=friends_line(club_id, me) if me and role not in MEMBER_ROLES else None,
+                           week=officer_week(club_id) if role == "officer" and club["status"] == "approved" else None,
                            members_only_hidden=members_only_hidden,
                            role=role, owner=is_owner(club), requests=requests, can_decide=can_decide, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
                            socials=social_links(club),
@@ -1118,6 +1178,7 @@ def review(club_id, decision):
     db.commit()
     link = _club_link(club_id)
     if decision == "approve":
+        announce_new_club(club)
         _notify_officers(club, f"✅ {club['name']} is live on Sportive Circle!", f"{club['name']} is live! 🎉",
                          ["Your club is verified and now visible to every Husky.",
                           "Next: post an update and add your next practice as a club event."],

@@ -129,7 +129,10 @@ def feed_items(sport=None, before=None, limit=PAGE):
     events = _events_by_id([i["post"]["event_id"] for i in items if i["kind"] == "post" and i["post"]["event_id"]]
                            + [i["club_post"]["event_id"] for i in items
                               if i["kind"] == "club_post" and i["club_post"]["event_id"]])
+    from .clubs import friends_line
     for item in items:
+        if item["kind"] == "club_post" and not item["club_post"]["my_role"]:
+            item["friends"] = friends_line(item["club_post"]["club_id"], me)
         source = item.get("post") or item.get("club_post")
         item["event"] = item.get("event") or (events.get(source["event_id"]) if source and source["event_id"] else None)
     return items, older
@@ -155,13 +158,16 @@ def feed():
     before = request.args.get("before", "")
     before = before if len(before) == 16 and before[:4].isdigit() else None
     items, older = feed_items(sport, before)
+    from .clubs import suggested_clubs  # "Clubs for you" until you follow one: clubs fill the feed
+    in_a_club = get_db().execute("SELECT 1 FROM club_members WHERE user_id = ?", (g.user["id"],)).fetchone()
+    club_picks = [] if in_a_club or before else suggested_clubs(g.user["id"], user_sports(g.user["id"]), limit=6)
     if not sport and not before:
         from .notifications import mark_seen  # (notifications.py is loaded after this module)
         mark_seen("feed_posts")  # the new-posts number on Home is cleared once you've seen the top of your feed
     return render_template("feed/feed.html", items=items, older=older, sport=sport, my_sports=user_sports(g.user["id"]),
                            photos=photos_of([i["post"]["id"] for i in items if i["kind"] == "post"]),
                            durations=PLAN_DURATIONS, max_photos=MAX_PHOTOS, max_body=MAX_BODY, form={},
-                           member_roles=MEMBER_ROLES)
+                           member_roles=MEMBER_ROLES, club_picks=club_picks)
 
 
 def get_post(post_id):

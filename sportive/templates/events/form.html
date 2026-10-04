@@ -35,6 +35,11 @@
           {% endfor %}
         </div>
       </fieldset>
+      {% if club %}
+        <label class="toggle"><input type="checkbox" name="try_it" value="1" {% if form.get('try_it') %}checked{% endif %}>
+          <span>👋 <strong>Try-it-out session</strong>: new people welcome. It's shown in the feed to everyone who plays
+            {{ SPORTS[club.sport] }}, not only your followers.</span></label>
+      {% endif %}
     {% endif %}
     <label class="field"><span>Note <em>(optional)</em></span>
       <textarea name="note" maxlength="500" rows="2" placeholder="Court 3, bring a light and a dark shirt">{{ form.get('note', '') }}</textarea></label>

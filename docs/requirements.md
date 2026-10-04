@@ -151,6 +151,11 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-CLUB-20 | A club waiting for verification isn't a dead end: its page shows Manage officers (to the owner), says the link and QR code will be ready once it's verified, and the owner can withdraw the request while nobody else has joined. | Should | ✅ |
 | FR-CLUB-21 | The Clubs tab's **My clubs** page shows a row of your clubs (with Officer / Member / Following), what's coming up in them (open events, members-only ones if you're a member) and their posts. With no clubs it suggests clubs for your sports. | Must | ✅ |
 | FR-CLUB-22 | Profiles show the verified clubs someone is a member or officer of (officers marked), not to people they blocked or who blocked them; your own profile links to Find clubs. | Should | ✅ |
+| FR-CLUB-23 | A club's first approval posts "🆕 <club> just joined Sportive Circle!" with its description, which everyone who plays its sport sees in the feed (once, even if it's approved again after a re-check). | Should | ✅ |
+| FR-CLUB-24 | The feed shows **Clubs for you** (clubs for your sports, with **+ Follow**) until you follow or join any club. | Should | ✅ |
+| FR-CLUB-25 | Officers can mark a club event as a **Try-it-out session** (open events only): its post says "👋 Try it out, new people welcome!", and the event shows "New people welcome" on Play and in the feed. | Should | ✅ |
+| FR-CLUB-26 | A club's page and its posts in the feed say which of your friends follow or are in it ("Your friends Maya and 2 others are in this club"), when you aren't a member yet. | Should | ✅ |
+| FR-CLUB-27 | Officers see **This week** on their club page: new followers or members, people waiting to join, people going to its events (last and next 7 days) and posts, with a nudge to post when there were none. | Should | ✅ |
 
 ### Friends and messages (SOC)
 
