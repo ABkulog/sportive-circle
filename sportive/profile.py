@@ -203,6 +203,8 @@ def view(user_id):
         relation = {"friend": friendship_status(me, user_id), "can_message": can_message(me, user_id),
                     "i_blocked": i_blocked(me, user_id), "blocked_me": is_blocked_between(me, user_id)
                     and not i_blocked(me, user_id)}
+    from .posts import posts_by  # (posts.py is loaded after this module)
+    post_items, post_photos = ([], {}) if blocked else posts_by(user_id)
     if blocked:  # either of them blocked the other: just the name and photo (and the Unblock button), nothing else
         user = {**dict(user), "bio": None, "pronouns": None, "gender": None, "grad_year": None,
                 **{column: "" for column in ("instagram", "snapchat", "tiktok", "x_handle", "linkedin")}}
@@ -211,7 +213,8 @@ def view(user_id):
                            is_tester=TESTER.key in earned_badges(user_id),
                            showcase=[] if blocked else showcase(user_id), earned=earned_badges(user_id), rarity=rarity(),
                            is_retired=is_retired, relation=relation, blocked=blocked,
-                           clubs=[] if blocked else clubs_of(user_id))
+                           clubs=[] if blocked else clubs_of(user_id),
+                           post_items=post_items, post_photos=post_photos)
 
 
 @bp.route("/admin/users/<int:user_id>/tester/<action>", methods=("POST",))

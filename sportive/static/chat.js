@@ -193,6 +193,7 @@
   viewer.setAttribute("aria-modal", "true");
   viewer.setAttribute("aria-label", "Photo");
   const viewerImage = el("img");
+  viewerImage.alt = "";  // (described by the dialog's label; the photo is set when it opens)
   const viewerAvatar = el("div", "lightbox-avatar");  // profile pictures: a background, so no "Save image"
   viewerAvatar.setAttribute("role", "img");
   const viewerCount = el("span", "lightbox-count");

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import event_card, avatar, club_logo %}
+{% from "feed/_cards.html" import feed_item %}
 {% block title %}{{ user.full_name }}{% endblock %}
 {% block content %}
 {% set me = user.id == g.user.id %}
@@ -113,6 +114,20 @@
   </div>
   {% endif %}
 </section>
+
+{% if not blocked %}
+<section class="band" aria-labelledby="profile-posts">
+  <div class="section-head">
+    <h2 id="profile-posts">Posts</h2>
+    {% if me %}<a href="{{ url_for('posts.feed') }}">New post</a>{% endif %}
+  </div>
+  {% if post_items %}
+    <div class="stack feed">{% for item in post_items %}{{ feed_item(item, post_photos) }}{% endfor %}</div>
+  {% else %}
+    <p class="muted">{{ "You haven't posted yet. Share a PR, a plan or a question on the feed." if me else "No posts yet." }}</p>
+  {% endif %}
+</section>
+{% endif %}
 
 {% if not blocked and (clubs or me) %}
 <section class="band" aria-labelledby="profile-clubs">

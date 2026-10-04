@@ -83,7 +83,7 @@ def test_a_plan_post_is_a_real_game_people_can_join(accounts, client, app):
     page = post(client, sport="hiking", body="Hiking Mt Si tomorrow, have a car, need 2 more",
                 plan="1", starts_at=form_time(timedelta(days=1)), duration="480",
                 location="Off campus (see note)", spots="2").data.decode()
-    assert "People can tap I&#39;m in" in page and "Your plan" in page and "1</strong>/3 going" in page
+    assert "People can tap I&#39;m in" in page and "Hosting" in page and "1</strong>/3 going" in page
     with app.app_context():
         db = get_db()
         event = db.execute("SELECT * FROM events").fetchone()

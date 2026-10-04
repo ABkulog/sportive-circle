@@ -175,6 +175,19 @@ def feed():
                            member_roles=MEMBER_ROLES, club_picks=club_picks)
 
 
+def posts_by(user_id, limit=10):
+    """Someone's latest posts, for their profile (as feed items, with photos), as the viewer may see them."""
+    rows = get_db().execute(
+        f"""SELECT p.*, u.full_name, u.avatar_updated, {POST_COUNTS}
+            FROM posts p JOIN users u ON u.id = p.author_id
+            WHERE p.author_id = :author AND {POST_VISIBLE} ORDER BY p.created_at DESC, p.id DESC LIMIT :limit""",
+        {"author": user_id, "me": g.user["id"], "limit": limit}).fetchall()
+    events = _events_by_id([row["event_id"] for row in rows if row["event_id"]])
+    items = [{"kind": "post", "at": row["created_at"], "post": row,
+              "event": events.get(row["event_id"]) if row["event_id"] else None} for row in rows]
+    return items, photos_of([row["id"] for row in rows])
+
+
 def get_post(post_id):
     """A post the person logged in can see (or 404)."""
     post = get_db().execute(
