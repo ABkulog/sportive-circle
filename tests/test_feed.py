@@ -185,7 +185,7 @@ def test_club_posts_and_new_games_fill_the_feed(accounts, client, app):
     accounts.signup(email="fresh@uw.edu", sports=("running", "basketball"))
     feed = client.get("/feed").data.decode()
     assert "Tuesday run moved to Green Lake" in feed and "UW Run Club" in feed and "Club ·" in feed
-    assert "posted a game" in feed and "Pickup 5v5" in feed
+    assert "posted a game" not in feed and "Pickup 5v5" not in feed                    # games are on Play
     followed = client.post(f"/clubs/{club}/follow", data={"next": "/feed"})
     assert followed.headers["Location"] == "/feed"                                       # + Follow stays on the feed
     assert 'class="head-follow"' not in client.get("/feed").data.decode()

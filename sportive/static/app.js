@@ -592,8 +592,23 @@
   document.querySelectorAll("[data-composer]").forEach((form) => {
     form.classList.add("is-collapsible");
     const open = () => form.classList.add("is-open");
+    const close = () => {
+      form.classList.remove("is-open");
+      if (document.activeElement && form.contains(document.activeElement)) document.activeElement.blur();
+    };
     form.addEventListener("focusin", open);
     form.addEventListener("click", open);
+    // It closes back to one line when you tap anywhere else, or scroll it out of sight. What you wrote, the
+    // photos you picked and the plan stay in it for when you open it again. (Not while a menu or file picker
+    // from inside it is open: those take the focus away without being "somewhere else".)
+    document.addEventListener("pointerdown", (event) => {
+      if (form.classList.contains("is-open") && !form.contains(event.target)) close();
+    });
+    if (window.IntersectionObserver) {
+      new IntersectionObserver((entries) => {
+        entries.forEach((entry) => { if (!entry.isIntersecting && form.classList.contains("is-open")) close(); });
+      }).observe(form);
+    }
     const pick = form.querySelector("[data-sport-pick]");
     const hint = form.querySelector("[data-sport-hint]");
     const say = () => {

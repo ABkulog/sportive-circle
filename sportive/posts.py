@@ -2,8 +2,8 @@
 
 People post with a sport tag (words, up to 10 photos), and a post can be a plan ("hiking Mt Si tomorrow, have a
 car, need 2"): a real game behind the scenes, so "I'm in" gives it a headcount, a group chat and a reminder.
-The feed mixes those posts with what the app already makes: new games, club updates and club events, for the
-sports you picked. Tapping a sport tag shows just that sport (its "channel").
+The feed mixes those posts with club posts and updates and Husky news, for the sports you picked. (Games people
+post on their own are on Play: the feed is for posts.) Tapping a sport tag shows just that sport (its "channel").
 """
 from datetime import timedelta
 
@@ -16,15 +16,15 @@ from .auth import login_required, safe_next
 from .clubs import MEMBER_ROLES, officer_clubs
 from .constants import LOCATIONS, SPORTS
 from .db import get_db, user_sports
-from .events import (MEMBERS_ONLY_FOR_MEMBERS, NOT_BLOCKED, SHOWN_UNLESS_FULL, games_open_to_me, insert_event,
-                     posting_too_fast, query_events, read_event_form)
+from .events import (MEMBERS_ONLY_FOR_MEMBERS, NOT_BLOCKED, insert_event, posting_too_fast, query_events,
+                     read_event_form)
 from .friendgames import announce_new_game
 from .moderation import is_admin
 from .photos import make_chat_photo
 from .social import is_blocked_between
 from .textutil import multi_line
 from .videos import MAX_SECONDS, VideoError, check_and_save, path_of, remove_files
-from .timeutil import add_real, exists_in_seattle, from_sqlite_utc, now_local, parse_form, to_db
+from .timeutil import add_real, exists_in_seattle, now_local, parse_form, to_db
 
 bp = Blueprint("posts", __name__)
 
@@ -33,7 +33,6 @@ MAX_PHOTOS = 10          # photos in one post
 MAX_POST_UPLOAD_MB = 80  # all of a post's photos together (each one is shrunk to ~200 KB when saved)
 POSTS_PER_HOUR = 10      # stops one person (or a script) flooding everyone's feed
 PAGE = 25                # feed items per page ("Show older")
-NEW_GAME_DAYS = 14       # new games show up in the feed for this long (while they're still to come)
 PLAN_DAYS_AHEAD = 60     # how far ahead a plan can be
 PLAN_DURATIONS = [(60, "1 hour"), (120, "2 hours"), (180, "3 hours"), (240, "4 hours"), (480, "All day")]
 MAX_PLAN_SPOTS = 50
@@ -89,7 +88,7 @@ def _order(item):
 
 
 def feed_items(sport=None, before=None, limit=PAGE):
-    """The feed for the person logged in: posts, club updates and new games, newest first.
+    """The feed for the person logged in: posts, club posts and updates, and news, newest first.
     sport: one sport's channel. before: "YYYY-MM-DD HH:MM|n" for "Show older": things up to that minute, after
     skipping the n from that minute the last page already showed.
     Returns (items, older) where older is the `before` value for the next page, or None."""
@@ -126,20 +125,7 @@ def feed_items(sport=None, before=None, limit=PAGE):
                 ORDER BY cp.created_at DESC, cp.id DESC LIMIT :limit""", params).fetchall():
         items.append({"kind": "club_post", "at": row["created_at"], "club_post": row})
 
-    # 3. New games people posted (not club events, which come as club updates, and not plan posts, which are posts)
-    now = now_local()
-    game_params = {"now": to_db(now), "since": (now - timedelta(days=NEW_GAME_DAYS)).strftime("%Y-%m-%d")}
-    game_sports = _sports_clause("e.sport", sports, game_params)
-    for row in query_events(
-            ["e.cancelled = 0", "e.ends_at >= :now", "e.club_id IS NULL", "e.is_private = 0", game_sports,
-             "NOT EXISTS (SELECT 1 FROM posts p WHERE p.event_id = e.id)", "e.created_at >= :since",
-             NOT_BLOCKED, games_open_to_me(), SHOWN_UNLESS_FULL],
-            game_params, order="e.created_at DESC", limit=limit + 1):
-        posted = to_db(from_sqlite_utc(row["created_at"]))  # (SQLite's UTC -> Seattle time)
-        if posted <= params["before"]:
-            items.append({"kind": "game", "at": posted, "event": row})
-
-    # 4. Husky news: scores and results from UW's teams in these sports (from GoHuskies.com)
+    # 3. Husky news: scores and results from UW's teams in these sports (from GoHuskies.com)
     from .news import feed_news
     items += feed_news(sports, params["before"], params["limit"], channel=bool(sport))
 
@@ -167,19 +153,7 @@ def feed_items(sport=None, before=None, limit=PAGE):
             add_club_info(item, roles)
         source = item.get("post") or item.get("club_post")
         item["event"] = item.get("event") or (events.get(source["event_id"]) if source and source["event_id"] else None)
-    return _group_games(items), older
-
-
-def _group_games(items):
-    """New games go together in one swipeable row, where the newest one would be, so a few posted games don't
-    push people's posts off the screen."""
-    games = [item for item in items if item["kind"] == "game"]
-    if not games:
-        return items
-    rest = [item for item in items if item["kind"] != "game"]
-    at = sum(1 for item in items[:items.index(games[0])] if item["kind"] != "game")
-    rest.insert(at, {"kind": "games", "at": games[0]["at"], "games": games})
-    return rest
+    return items, older
 
 
 def _my_club_roles(user_id):
