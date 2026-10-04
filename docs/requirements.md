@@ -116,7 +116,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
 | FR-CLUB-1 | Only officers can register a club. A social media account or a website is required, either one or both (how admins check it's real); and the HuskyLink / UW Recreation page isn't asked (people put their website there and got stuck). | Must | ✅ |
-| FR-CLUB-2 | A club is only public after an admin approves it. Rejections include a note on what to fix. Denying a club as spam frees its name (it's kept as "Name (denied #id)"), so a squatter can't keep the real club from registering; restoring gives the name back if it's still free. | Must | ✅ |
+| FR-CLUB-2 | A club is only public after an admin approves it. Changing a live club's name or kind sends it back for a quick check (the edit form warns first); fixing capitals or spaces doesn't. Rejections include a note on what to fix. Denying a club as spam frees its name (it's kept as "Name (denied #id)"), so a squatter can't keep the real club from registering; restoring gives the name back if it's still free. | Must | ✅ |
 | FR-CLUB-3 | Anyone (even logged out) can browse verified clubs and search or filter them (sport, beginner-friendly, free, no tryouts). | Must | ✅ |
 | FR-CLUB-4 | Students can follow a club, or request to join / apply / sign up for tryouts. They're a member only after an officer confirms them. | Must | ✅ |
 | FR-CLUB-5 | Officers can post updates, create club events, confirm or decline people, remove members and add officers. | Must | ✅ |

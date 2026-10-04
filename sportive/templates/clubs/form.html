@@ -25,7 +25,9 @@
     <section class="wizard-step" data-step="1">
     <h2 class="form-step"><span>1</span> Your club</h2>
     <label class="field"><span>Club name</span>
-      <input name="name" maxlength="60" value="{{ form.get('name', '') }}" placeholder="UW Women's Ultimate" required></label>
+      <input name="name" maxlength="60" value="{{ form.get('name', '') }}" placeholder="UW Women's Ultimate" required>
+      {% if club and club.status == 'approved' %}<small class="muted">Changing the name (not just capitals) or the
+        kind of club sends it back for a quick check, and it's hidden until then. Your QR code stays the same.</small>{% endif %}</label>
     <label class="field"><span>Main sport</span>
       <select name="sport" required>
         <option value="">Choose a sport</option>
