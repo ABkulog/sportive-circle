@@ -663,8 +663,9 @@
   document.addEventListener("submit", async (event) => {
     const form = event.target;
     if (event.defaultPrevented || !form.matches || !form.matches("form[data-inplace]")) return;
-    const box = form.closest("[data-swap][id]");
-    if (!box || !window.fetch || !window.DOMParser) return;
+    // What changes: the form's own card, or (data-swap-target) a list, e.g. the post box refreshes the feed below it
+    const box = form.dataset.swapTarget ? document.querySelector(form.dataset.swapTarget) : form.closest("[data-swap][id]");
+    if (!box || !box.id || !window.fetch || !window.DOMParser) return;
     event.preventDefault();
     const fallback = () => { delete form.dataset.sending; form.submit(); };
     let response;
@@ -673,14 +674,33 @@
     } catch (error) { fallback(); return; }
     if (!response.ok || response.redirected && new URL(response.url).pathname === "/login") { fallback(); return; }
     const page = new DOMParser().parseFromString(await response.text(), "text/html");
-    toast([...page.querySelectorAll("main > .flash")]);
+    const flashes = [...page.querySelectorAll("main > .flash")];
+    toast(flashes);
     const fresh = page.getElementById(box.id);
+    if (form.dataset.swapTarget) {  // a post box: it stays, so empty and close it (unless the post was refused)
+      delete form.dataset.sending;
+      form.querySelectorAll("button").forEach((button) => { button.disabled = false; });
+      setTimeout(() => form.querySelectorAll("button").forEach((button) => { button.disabled = false; }));
+      if (!flashes.some((flash) => flash.classList.contains("flash-error"))) {
+        form.reset();
+        form.classList.remove("is-open");
+        form.querySelectorAll("[data-picked]").forEach((line) => { line.hidden = true; line.textContent = ""; });
+        form.querySelectorAll("select").forEach((select) => select.dispatchEvent(new Event("change")));
+        if (document.activeElement && form.contains(document.activeElement)) document.activeElement.blur();
+      }
+    }
     if (form.dataset.inplace === "remove") {
       if (/^\/posts\/\d+$/.test(location.pathname)) { location.assign(response.url); return; }  // its own page
       box.classList.add("is-leaving");
       setTimeout(() => box.remove(), 250);
     } else if (fresh) {
       box.replaceWith(fresh);
+      // Replies: keep the 💬 number on the card in step ("3 replies")
+      const count = fresh.id.startsWith("replies-") && fresh.querySelector(".section-title");
+      const button = count && document.querySelector(`[data-replies="${fresh.id}"] span`);
+      if (button) button.textContent = parseInt(count.textContent, 10) || "Reply";
+    } else if (form.dataset.swapTarget) {
+      // (the list isn't on the page it came back with: leave this page as it is)
     } else {
       location.assign(response.url);  // it went somewhere else (e.g. a game's page): follow it
     }
@@ -691,5 +711,32 @@
     select.addEventListener("change", () => {
       if (select.form.requestSubmit) select.form.requestSubmit(); else select.form.submit();
     });
+  });
+
+  // 💬 on a feed card opens the replies right there, under the post (and closes them again), instead of going
+  // to the post's own page. Replying in there happens in place too (data-inplace above).
+  document.addEventListener("click", async (event) => {
+    const link = event.target.closest && event.target.closest("a[data-replies]");
+    if (!link || !window.fetch || !window.DOMParser || event.metaKey || event.ctrlKey) return;
+    const card = link.closest(".feed-card");
+    if (!card) return;
+    event.preventDefault();
+    const open = card.querySelector(`#${link.dataset.replies}`);
+    if (open) {
+      open.hidden = !open.hidden;
+      link.setAttribute("aria-expanded", open.hidden ? "false" : "true");
+      if (!open.hidden) open.querySelector("textarea")?.focus();
+      return;
+    }
+    try {
+      const response = await fetch(link.href, { credentials: "same-origin" });
+      const page = new DOMParser().parseFromString(await response.text(), "text/html");
+      const section = page.getElementById(link.dataset.replies);
+      if (!response.ok || !section) throw new Error("no replies");
+      section.classList.add("inline-replies");
+      card.appendChild(section);
+      link.setAttribute("aria-expanded", "true");
+      section.querySelector("textarea")?.focus({ preventScroll: true });
+    } catch (error) { window.location.assign(link.href); }
   });
 })();

@@ -7,8 +7,8 @@
 <h1 class="visually-hidden">Post by {{ item.post.club_name if item.post.club_id else item.post.full_name }}</h1>
 {{ feed_item(item, photos) }}
 
-<section class="card replies" id="replies" data-swap aria-labelledby="replies-title">
-  <h2 id="replies-title" class="section-title">{{ replies|length }} repl{{ 'y' if replies|length == 1 else 'ies' }}</h2>
+<section class="card replies" id="replies-{{ item.post.id }}" data-swap aria-labelledby="replies-title-{{ item.post.id }}">
+  <h2 id="replies-title-{{ item.post.id }}" class="section-title">{{ replies|length }} repl{{ 'y' if replies|length == 1 else 'ies' }}</h2>
   <ul class="reply-list">
     {% for r in replies %}
       <li class="reply" id="reply-{{ r.id }}">
@@ -48,8 +48,8 @@
           {% for c in post_as %}<option value="{{ c.id }}" {% if c.id == item.post.club_id %}selected{% endif %}>{{ c.name }} ✓ (club)</option>{% endfor %}
         </select></label>
     {% endif %}
-    <label class="visually-hidden" for="reply-body">Your reply</label>
-    <textarea id="reply-body" name="body" rows="2" maxlength="{{ max_reply }}" placeholder="Reply…" required></textarea>
+    <label class="visually-hidden" for="reply-body-{{ item.post.id }}">Your reply</label>
+    <textarea id="reply-body-{{ item.post.id }}" name="body" rows="2" maxlength="{{ max_reply }}" placeholder="Reply…" required></textarea>
     <button class="btn">Reply</button>
   </form>
 </section>
