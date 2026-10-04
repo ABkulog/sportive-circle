@@ -111,9 +111,10 @@
     {% block content %}{% endblock %}
   </main>
 
-  {# "Help?" bubble in the corner; its × hides it for good on this device (app.js). Not on sign-up/log-in
+  {# "Help?" bubble in the corner, for visitors only (logged in, the ? is in the top bar, and the bubble covered
+     posts and games on phones); its × hides it for good on this device (app.js). Not on sign-up/log-in
      screens or the help pages themselves, and never over a chat's message box (hide-tabs pages). #}
-  {% if not ep.startswith('auth.') and ep not in ('faq', 'how_it_works') and '.admin' not in ep
+  {% if not g.user and not ep.startswith('auth.') and ep not in ('faq', 'how_it_works') and '.admin' not in ep
         and ep not in ('clubs.review_queue', 'posts.feed', 'posts.view', 'clubs.updates', 'clubs.all_posts') %}
     <div class="help-bubble" data-help-bubble hidden>
       <a href="{{ url_for('faq') }}">{{ icon('help') }}<span>Help?</span></a>
