@@ -7,6 +7,7 @@ from flask import (Blueprint, Response, abort, flash, g, redirect, render_templa
 from werkzeug.datastructures import MultiDict
 from werkzeug.security import check_password_hash
 
+from .clubs import hand_club_games_to_the_club
 from .auth import MAX_NAME_LENGTH, check_current_password, end_other_sessions, hash_password, login_required, password_problem, safe_next
 from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
@@ -442,6 +443,7 @@ def delete_account():
                       WHERE m.club_id = clubs.id AND m.role = 'officer' AND m.user_id != :me AND u.suspended = 0
                       ORDER BY m.joined_at, m.user_id LIMIT 1)
                   WHERE created_by = :me""", {"me": g.user["id"]})
+    hand_club_games_to_the_club(g.user["id"])  # the club's upcoming games go on with another officer
     db.commit()
     # Games they host disappear with the account, so warn everyone who joined (like canceling would).
     for event in query_events(["e.host_id = :me", "e.cancelled = 0", "e.ends_at >= :now"],
