@@ -2038,7 +2038,7 @@ def test_club_updates_feed(accounts, client, app):
     accounts.logout()
     accounts.signup(email="stranger@uw.edu")
     feed = client.get("/clubs/updates").data.decode()
-    assert "Practice moved to the Quad!" not in feed and "Follow clubs to see their updates" in feed
+    assert "Practice moved to the Quad!" not in feed and "Your clubs live here." in feed
     assert "Post an update" not in feed
     assert client.post("/clubs/updates", data={"club": club, "body": "spam"}).status_code == 403   # not an officer
     client.post(f"/clubs/{club}/follow")

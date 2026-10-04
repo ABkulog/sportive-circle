@@ -1,9 +1,30 @@
 {% extends "base.html" %}
-{% from "_macros.html" import clubs_tabs, avatar, club_logo %}
-{% block title %}Club updates{% endblock %}
+{% from "_macros.html" import clubs_tabs, avatar, club_logo, event_card %}
+{% block title %}My clubs{% endblock %}
 {% block content %}
 {{ clubs_tabs('updates') }}
-<h1 class="page-title">Club updates</h1>
+<h1 class="page-title">My clubs</h1>
+
+{% if my_clubs %}
+  <nav class="my-club-row" aria-label="Your clubs">
+    {% for c in my_clubs %}
+      <a class="my-club" href="{{ url_for('clubs.view', club_id=c.id) }}">
+        {{ club_logo(c, 56) }}
+        <span class="my-club-name">{{ c.name }}</span>
+        <small class="muted">{{ {'officer': 'Officer', 'member': 'Member', 'follower': 'Following'}.get(c.role, 'Asked to join') }}</small>
+      </a>
+    {% endfor %}
+    <a class="my-club my-club-more" href="{{ url_for('clubs.directory') }}"><span class="club-emoji" style="--size: 56px" aria-hidden="true">＋</span>
+      <span class="my-club-name">Find more</span></a>
+  </nav>
+{% endif %}
+
+{% if coming_up %}
+  <section class="band" aria-labelledby="coming-up">
+    <h2 class="home-section-title" id="coming-up">Coming up in your clubs</h2>
+    <div class="stack">{% for e in coming_up %}{{ event_card(e) }}{% endfor %}</div>
+  </section>
+{% endif %}
 
 {% if my_officer_clubs %}
   <form method="post" class="card update-composer">
@@ -44,8 +65,18 @@
         <p><strong>No updates yet.</strong></p>
         <p class="muted">When your clubs post, it shows up here.</p>
       {% else %}
-        <p><strong>Follow clubs to see their updates here.</strong></p>
-        <p class="muted">Follow a club to see its updates here.</p>
+        <p><strong>Your clubs live here.</strong></p>
+        <p class="muted">Follow or join clubs, and their posts, practices and events fill this page.</p>
+        {% if suggestions %}
+          <div class="club-grid suggest-grid">
+            {% for c in suggestions %}
+              <a class="card club-card" href="{{ url_for('clubs.view', club_id=c.id) }}">
+                {{ club_logo(c) }}<strong class="club-name">{{ c.name }}</strong>
+                <span class="club-desc muted">{{ c.description|truncate(80) }}</span>
+              </a>
+            {% endfor %}
+          </div>
+        {% endif %}
         <a class="btn" href="{{ url_for('clubs.directory') }}">Find clubs</a>
       {% endif %}
     </div>

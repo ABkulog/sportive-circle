@@ -16,7 +16,7 @@ from werkzeug.datastructures import MultiDict
 
 from .auth import login_required, safe_next
 from .constants import LOCATIONS, SPORT_EMOJI, SPORTS
-from .db import get_db
+from .db import get_db, user_sports
 from .links import public_url
 from .mail import compose, send_email
 from .moderation import is_admin
@@ -126,6 +126,14 @@ def officer_clubs(user_id):
         """SELECT c.id, c.name, c.sport FROM clubs c JOIN club_members m ON m.club_id = c.id
            WHERE m.user_id = ? AND m.role = 'officer' AND c.status = 'approved' ORDER BY fold(c.name)""",
         (user_id,)).fetchall()
+
+
+def clubs_of(user_id):
+    """Verified clubs someone is a member or officer of (shown on their profile), officer roles first."""
+    return get_db().execute(
+        """SELECT c.id, c.name, c.sport, c.logo_updated, m.role FROM clubs c JOIN club_members m ON m.club_id = c.id
+           WHERE m.user_id = ? AND m.role IN ('member', 'officer') AND c.status = 'approved'
+           ORDER BY m.role = 'officer' DESC, fold(c.name)""", (user_id,)).fetchall()
 
 
 def suggested_clubs(user_id, sports, limit=3):
@@ -884,7 +892,8 @@ def officers(club_id):
 @bp.route("/clubs/updates", methods=("GET", "POST"))
 @login_required
 def updates():
-    """Posts from every club you follow, asked to join, or are in. Officers can post here too."""
+    """My clubs: the clubs you're in or follow, what's coming up in them, and their posts. Officers post here too.
+    The fuller it is, the more joining clubs is worth it, so with no clubs it suggests some."""
     me = g.user["id"]
     db = get_db()
     my_officer_clubs = officer_clubs(me)
@@ -911,9 +920,19 @@ def updates():
              AND EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = ?)
            ORDER BY p.id DESC LIMIT 100""", (me,)).fetchall()
     following = db.execute("SELECT COUNT(*) FROM club_members WHERE user_id = ?", (me,)).fetchone()[0]
+    my_clubs = db.execute(
+        """SELECT c.id, c.name, c.sport, c.logo_updated, m.role FROM clubs c JOIN club_members m ON m.club_id = c.id
+           WHERE m.user_id = ? AND c.status = 'approved'
+           ORDER BY m.role = 'officer' DESC, m.role = 'member' DESC, fold(c.name)""", (me,)).fetchall()
+    from .events import MEMBERS_ONLY_FOR_MEMBERS, SHOWN_UNLESS_FULL, query_events  # events.py imports this module
+    coming_up = query_events(
+        ["e.club_id IS NOT NULL", "e.cancelled = 0", "e.ends_at >= :now", "e.is_private = 0", MEMBERS_ONLY_FOR_MEMBERS,
+         SHOWN_UNLESS_FULL, "EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = e.club_id AND m.user_id = :me)"],
+        {"now": to_db(now_local())}, limit=6)
     mark_seen("club_updates")
     return render_template("clubs/updates.html", posts=posts, my_officer_clubs=my_officer_clubs,
-                           following=following)
+                           following=following, my_clubs=my_clubs, coming_up=coming_up,
+                           suggestions=[] if following else suggested_clubs(me, user_sports(me), limit=6))
 
 
 # --------------------------------------------------------- announcements
