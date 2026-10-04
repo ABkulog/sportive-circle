@@ -1305,3 +1305,4 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
   background: var(--control); color: var(--text); font-size: .9rem; max-width: 100%; }
 .profile-clubs a:hover { text-decoration: none; }
 .profile-clubs span:not(.badge) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hello { margin: 0 0 2px; font-size: .95rem; }

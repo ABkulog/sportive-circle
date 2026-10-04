@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% from "_macros.html" import home_tabs, icon %}
 {% from "feed/_cards.html" import feed_item %}
-{% block title %}{{ '#' ~ SPORTS[sport] if sport else 'Feed' }}{% endblock %}
+{% block title %}{{ '#' ~ SPORTS[sport] if sport else "Feed: what's happening" }}{% endblock %}
 {% block content %}
 {{ home_tabs('posts') }}
+{% if not sport %}<p class="hello muted">Hey, {{ g.user.full_name.split()[0] }} 👋</p>{% endif %}
 <h1 class="page-title">{{ SPORT_EMOJI[sport] ~ ' ' ~ SPORTS[sport] if sport else "What's happening" }}</h1>
 
 {# Sports as channels: everything from your sports, or tap one to see just that sport. #}

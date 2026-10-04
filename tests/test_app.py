@@ -1695,7 +1695,7 @@ def test_same_sections_everywhere(accounts, client):
     assert '<span class="tab-label">News<' not in page                       # one thing: playing
     assert 'class="tab is-active" href="/feed" aria-current="page"' in page  # Home (the feed) is highlighted
     assert 'aria-label="FAQ"' in page                                       # ❓ in the top bar opens the FAQ
-    assert ">Feed <" in page and ">Games<" in page and "My events" in page  # Home tabs
+    assert ">Feed <" in page and ">Play<" in page and "My events" in page   # Home tabs
     menu = client.get("/create").data.decode()
     assert "Need players" in menu and "New event" in menu and "Register your club" in menu
 

@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% from "_macros.html" import event_card, avatar, home_tabs, icon, club_logo, install_tip %}
-{% block title %}Home{% endblock %}
+{% block title %}Play: find a game{% endblock %}
 {% block content %}
 {{ home_tabs('feed') }}
-<h1 class="page-title">{{ hello }}</h1>
+<p class="hello muted">{{ hello }}</p>
+<h1 class="page-title">Find a game</h1>
 
 {{ install_tip() }}
 {% if texts_card %}

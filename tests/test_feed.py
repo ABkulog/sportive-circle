@@ -194,7 +194,7 @@ def test_club_posts_and_new_games_fill_the_feed(accounts, client, app):
 def test_feed_is_home_and_has_rules(accounts, client):
     accounts.signup()
     home = client.get("/feed").data.decode()
-    assert 'class="tab is-active" href="/feed"' in home and ">Feed <" in home and ">Games<" in home
+    assert 'class="tab is-active" href="/feed"' in home and ">Feed <" in home and ">Play<" in home
     assert "Make it a plan" in home and 'href="/rules"' in home and 'data-max-files="10"' in home
     rules = client.get("/rules").data.decode()
     assert "Athletic, not thirsty" in rules and "18 and older" in rules

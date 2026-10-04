@@ -46,3 +46,15 @@ def test_profiles_show_the_clubs_someone_is_in(accounts, client, app):
     assert "You're not in a club yet" in mine and "Find clubs" in mine
     client.post(f"/block/{user_id(app, 'officer@uw.edu')}")
     assert "UW Run Club" not in client.get(f"/u/{user_id(app, 'officer@uw.edu')}").data.decode()   # blocked: hidden
+
+
+def test_officers_see_who_is_waiting_on_my_clubs(accounts, client, app):
+    accounts.signup(email="officer@uw.edu", sports=("running",))
+    club = approved_club(app, "officer@uw.edu")
+    accounts.logout()
+    accounts.signup(email="hopeful@uw.edu", sports=("running",))
+    client.post(f"/clubs/{club}/join", data={"message": "Hi!"})
+    accounts.logout()
+    accounts.login(email="officer@uw.edu")
+    assert "1 waiting</span>" in client.get("/clubs/updates").data.decode()
+    assert "All clubs</a>" not in client.get("/clubs").data.decode()          # Find a club is only for finding

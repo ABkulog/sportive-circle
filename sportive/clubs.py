@@ -921,7 +921,11 @@ def updates():
            ORDER BY p.id DESC LIMIT 100""", (me,)).fetchall()
     following = db.execute("SELECT COUNT(*) FROM club_members WHERE user_id = ?", (me,)).fetchone()[0]
     my_clubs = db.execute(
-        """SELECT c.id, c.name, c.sport, c.logo_updated, m.role FROM clubs c JOIN club_members m ON m.club_id = c.id
+        """SELECT c.id, c.name, c.sport, c.logo_updated, m.role,
+                  CASE WHEN m.role = 'officer' THEN (
+                    SELECT COUNT(*) FROM club_members w JOIN users wu ON wu.id = w.user_id
+                    WHERE w.club_id = c.id AND w.role IN ('requested', 'tryout') AND wu.suspended = 0) END AS waiting
+           FROM clubs c JOIN club_members m ON m.club_id = c.id
            WHERE m.user_id = ? AND c.status = 'approved'
            ORDER BY m.role = 'officer' DESC, m.role = 'member' DESC, fold(c.name)""", (me,)).fetchall()
     from .events import MEMBERS_ONLY_FOR_MEMBERS, SHOWN_UNLESS_FULL, query_events  # events.py imports this module
