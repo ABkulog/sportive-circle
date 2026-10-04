@@ -98,6 +98,14 @@ def resolve_target(target_type, target_id):
         return {"user_id": message["sender_id"], "name": message["full_name"], "snapshot": _snapshot(message),
                 "what": f"a group chat message from {message['full_name']}",
                 "back": url_for("social.event_chat", event_id=message["event_id"])}
+    if target_type == "reply":
+        reply = db.execute(
+            """SELECT r.*, u.full_name FROM post_replies r JOIN users u ON u.id = r.author_id
+               WHERE r.id = ? AND r.author_id != ? AND u.suspended = 0""", (target_id, me)).fetchone()
+        if reply is None:
+            abort(404)
+        return {"user_id": reply["author_id"], "name": reply["full_name"], "snapshot": reply["body"],
+                "what": f"a reply by {reply['full_name']}", "back": url_for("posts.view", post_id=reply["post_id"])}
     if target_type == "post":
         post = db.execute(
             """SELECT p.*, u.full_name, (SELECT COUNT(*) FROM post_photos ph WHERE ph.post_id = p.id) AS photo_count

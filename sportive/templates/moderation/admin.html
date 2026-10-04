@@ -52,7 +52,7 @@
     <article class="card report-card">
       <div class="report-head">
         <span class="badge badge-danger">{{ reasons.get(r.reason, r.reason) }}</span>
-        <span class="muted">{{ {'user': 'Profile', 'dm': 'Direct message', 'event_message': 'Event chat', 'post': 'Feed post'}[r.target_type] }} · {{ r.created_at|when }}</span>
+        <span class="muted">{{ {'user': 'Profile', 'dm': 'Direct message', 'event_message': 'Event chat', 'post': 'Feed post', 'reply': 'Reply to a post'}[r.target_type] }} · {{ r.created_at|when }}</span>
       </div>
       <p><strong>Reported:</strong>
         {% if r.reported_user_id %}<a href="{{ url_for('profile.view', user_id=r.reported_user_id) }}">{{ r.reported_name }}</a>
