@@ -2148,6 +2148,28 @@ def test_only_officer_cant_delete_account(accounts, client, app):
         assert get_db().execute("SELECT COUNT(*) FROM users WHERE email = 'captain@uw.edu'").fetchone()[0] == 1
 
 
+def test_club_taken_off_the_list_isnt_deleted_with_its_only_officer(accounts, client, app):
+    # An admin taking a live club off the list for a re-check puts it back to pending, but its members are
+    # still in it: its only officer has to hand it over, not delete it (and its members) with their account.
+    club = _approved_club(accounts, client, app)
+    accounts.signup(email="fan@uw.edu")
+    accounts.logout()
+    with app.app_context():
+        db = get_db()
+        db.execute("INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, 'member', '2026-01-01 10:00')",
+                   (club, _user_id(app, "fan@uw.edu")))
+        db.execute("UPDATE clubs SET status = 'pending' WHERE id = ?", (club,))
+        db.commit()
+    accounts.login(email="captain@uw.edu")
+    page = client.get("/profile/delete").data.decode()
+    assert "the only officer" in page and "deleted too" not in page
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT COUNT(*) FROM users WHERE email = 'captain@uw.edu'").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM club_members WHERE club_id = ?", (club,)).fetchone()[0] == 2
+
+
 def test_denied_club_frees_its_name_for_the_real_club(accounts, client, app):
     # Someone grabs the real club's name before its officers sign up: denying it as spam frees the name.
     app.config["ADMIN_EMAILS"] = "admin@uw.edu"
