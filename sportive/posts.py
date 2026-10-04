@@ -77,14 +77,26 @@ def _events_by_id(ids):
     return {row["id"]: row for row in rows}
 
 
+def _order(item):
+    """Newest first, and a fixed order among things posted in the same minute (so paging never skips one)."""
+    source = item.get("post") or item.get("club_post") or item.get("event")
+    return (item["at"], item["kind"], source["id"] if source is not None else 0,
+            item["story"]["link"] if item["kind"] == "news" else "")
+
+
 def feed_items(sport=None, before=None, limit=PAGE):
     """The feed for the person logged in: posts, club updates and new games, newest first.
-    sport: one sport's channel. before: a Seattle-time string, for "Show older".
+    sport: one sport's channel. before: "YYYY-MM-DD HH:MM|n" for "Show older": things up to that minute, after
+    skipping the n from that minute the last page already showed.
     Returns (items, older) where older is the `before` value for the next page, or None."""
+    shown_in_minute = 0
+    if before and "|" in before:
+        before, count = before.split("|", 1)
+        shown_in_minute = int(count) if count.isdigit() else 0
     db = get_db()
     me = g.user["id"]
     sports = [sport] if sport else (user_sports(me) or list(SPORTS))
-    params = {"me": me, "limit": limit + 1, "before": before or "9999"}
+    params = {"me": me, "limit": limit + 1 + shown_in_minute, "before": before or "9999"}
     items = []
 
     # 1. What people posted (your own posts always show in your feed, whatever their sport)
@@ -93,7 +105,7 @@ def feed_items(sport=None, before=None, limit=PAGE):
     for row in db.execute(
             f"""SELECT p.*, u.full_name, u.avatar_updated, {POST_COUNTS}
                 FROM posts p JOIN users u ON u.id = p.author_id
-                WHERE ({in_sports}{mine}) AND {POST_VISIBLE} AND p.created_at < :before
+                WHERE ({in_sports}{mine}) AND {POST_VISIBLE} AND p.created_at <= :before
                 ORDER BY p.created_at DESC, p.id DESC LIMIT :limit""", params).fetchall():
         items.append({"kind": "post", "at": row["created_at"], "post": row})
 
@@ -105,7 +117,7 @@ def feed_items(sport=None, before=None, limit=PAGE):
             f"""SELECT cp.*, c.name AS club_name, c.sport, c.logo_updated AS club_logo,
                        (SELECT m.role FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me) AS my_role
                 FROM club_posts cp JOIN clubs c ON c.id = cp.club_id
-                WHERE c.status = 'approved' AND ({club_sports}{mine}) AND cp.created_at < :before
+                WHERE c.status = 'approved' AND ({club_sports}{mine}) AND cp.created_at <= :before
                 ORDER BY cp.created_at DESC, cp.id DESC LIMIT :limit""", params).fetchall():
         items.append({"kind": "club_post", "at": row["created_at"], "club_post": row})
 
@@ -119,15 +131,23 @@ def feed_items(sport=None, before=None, limit=PAGE):
              NOT_BLOCKED, games_open_to_me(), SHOWN_UNLESS_FULL],
             game_params, order="e.created_at DESC", limit=limit + 1):
         posted = to_db(from_sqlite_utc(row["created_at"]))  # (SQLite's UTC -> Seattle time)
-        if posted < params["before"]:
+        if posted <= params["before"]:
             items.append({"kind": "game", "at": posted, "event": row})
 
     # 4. Husky news: scores and results from UW's teams in these sports (from GoHuskies.com)
     from .news import feed_news
-    items += feed_news(sports, params["before"], limit + 1, channel=bool(sport))
+    items += feed_news(sports, params["before"], params["limit"], channel=bool(sport))
 
-    items.sort(key=lambda item: item["at"], reverse=True)
-    older = items[limit - 1]["at"] if len(items) > limit else None
+    items.sort(key=_order, reverse=True)
+    if before:  # drop the ones from that minute the last page already showed
+        same = [i for i in items if i["at"] == before]
+        skipped = {id(i) for i in same[:shown_in_minute]}
+        items = [i for i in items if id(i) not in skipped]
+    older = None
+    if len(items) > limit:
+        last = items[limit - 1]["at"]
+        on_page = sum(1 for i in items[:limit] if i["at"] == last)
+        older = f"{last}|{on_page + (shown_in_minute if last == before else 0)}"
     items = items[:limit]
     # The games behind plan posts and club event posts, for their "I'm in" buttons
     events = _events_by_id([i["post"]["event_id"] for i in items if i["kind"] == "post" and i["post"]["event_id"]]
@@ -160,7 +180,7 @@ def feed():
     sport = request.args.get("sport", "")
     sport = sport if sport in SPORTS else None
     before = request.args.get("before", "")
-    before = before if len(before) == 16 and before[:4].isdigit() else None
+    before = before if len(before.split("|")[0]) == 16 and before[:4].isdigit() else None
     items, older = feed_items(sport, before)
     from .clubs import suggested_clubs  # "Clubs for you" until you follow one: clubs fill the feed
     in_a_club = get_db().execute("SELECT 1 FROM club_members WHERE user_id = ?", (g.user["id"],)).fetchone()

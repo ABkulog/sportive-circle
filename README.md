@@ -9,6 +9,17 @@ It is a student project, not an official University of Washington service.
 
 ## Features
 
+**The feed** (Home)
+- **Everything happening in sports on campus**, for the sports you picked: what students post, club updates and
+  club events, new games and **Husky news and scores** (GoHuskies.com). A pulsing LIVE pill and a new-posts number
+  on Home bring people back.
+- **Posts** have a sport tag (tap **#running** for that sport's channel), words, up to 10 photos or a 1-minute video.
+- **Make it a plan**: "hiking Mt Si tomorrow, need 2" becomes a real game with a headcount and an **I'm in** button.
+- **🔥 and replies**, with one bell notice per post; report and delete on posts and replies; community rules
+  ("athletic, not thirsty"). 18+ only.
+- **Play** finds a game (filters), **My events** is your schedule: one job per page.
+
+
 **Playing**
 - **Home feed** of games for your sports, with filters (sport, day, place, level, open spots) and a
   "happening soon" row at the top.
