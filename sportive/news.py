@@ -131,7 +131,7 @@ def feed_news(sports, before, limit, channel=False):
             continue
         at = to_db(story["published"])
         about = story_sports(story) & wanted
-        if at >= before or not (about or (story["general"] and not channel)):
+        if at > before or not (about or (story["general"] and not channel)):
             continue
         code = next((c for c in story["teams"] if TEAMS[c][2] in wanted), story["teams"][0] if story["teams"] else None)
         items.append({"kind": "news", "at": at, "story": story,

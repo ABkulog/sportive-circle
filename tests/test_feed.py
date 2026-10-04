@@ -229,3 +229,24 @@ def test_home_shows_how_many_new_posts_until_you_open_the_feed(accounts, client)
     assert "LIVE" in games
     client.get("/feed")                                                    # seen
     assert '<span class="count-dot">2</span>' not in client.get("/").data.decode()
+
+
+def test_paging_never_skips_posts_from_the_same_minute(accounts, client, app):
+    accounts.signup(sports=("running",))
+    me = user_id(app, "dubs@uw.edu")
+    same_minute = to_db(now_local() - timedelta(minutes=5))
+    with app.app_context():
+        db = get_db()
+        for n in range(40):                                    # 40 posts in one minute: across two pages
+            db.execute("INSERT INTO posts (author_id, sport, body, created_at) VALUES (?, 'running', ?, ?)",
+                       (me, f"Lap {n}.", same_minute))
+        db.commit()
+    seen = []
+    page = client.get("/feed").data.decode()
+    while True:
+        seen += re.findall(r"Lap (\d+)\.", page)
+        more = re.search(r'href="(/feed\?before=[^"]+)"', page)
+        if not more:
+            break
+        page = client.get(more.group(1).replace("&amp;", "&")).data.decode()
+    assert sorted(map(int, seen)) == list(range(40))          # every one, once
