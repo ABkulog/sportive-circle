@@ -210,9 +210,9 @@ def someone_signs_up(world, email):
     sign_up(world, world.app.test_client(), email)
 
 
-@when(parsers.parse('someone born 10 years ago signs up with the email "{email}"'))
-def child_signs_up(world, email):
-    born = now_local().date().replace(year=now_local().year - 10, day=1)
+@when(parsers.parse('someone born {years:d} years ago signs up with the email "{email}"'))
+def child_signs_up(world, email, years):
+    born = now_local().date().replace(year=now_local().year - years, day=1)
     sign_up(world, world.app.test_client(), email, birth_date=born.isoformat())
 
 
