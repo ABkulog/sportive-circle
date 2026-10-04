@@ -29,7 +29,7 @@ RESEND_COOLDOWN = timedelta(seconds=60)
 MAX_FAILED_LOGINS = 10
 MAX_FAILED_LOGINS_PER_IP = 30  # wrong passwords from one address, across all accounts, per LOCKOUT window
 LOCKOUT = timedelta(minutes=15)
-MIN_AGE, MAX_AGE = 15, 123  # same age range as the original desktop app
+MIN_AGE, MAX_AGE = 18, 123  # adults only: the feed has photos, and people message people they don't know
 MIN_PASSWORD_LENGTH = 8
 MAX_PASSWORD_LENGTH = 128
 MAX_NAME_LENGTH = 60
@@ -43,9 +43,21 @@ def login_required(view):
     @functools.wraps(view)
     def wrapped(**kwargs):
         if g.user is None:
-            return redirect(url_for("auth.login", next=request.path))
+            # A form sent after the login ended (e.g. Follow on a phone tab left open) can't be repeated by
+            # opening its address, so after logging in they go back to the page the form was on instead.
+            back = request.path if request.method == "GET" else _page_it_came_from()
+            return redirect(url_for("auth.login", next=back))
         return view(**kwargs)
     return wrapped
+
+
+def _page_it_came_from():
+    """The page on this site a form was sent from (or Home)."""
+    from urllib.parse import urlsplit
+    came_from = urlsplit(request.referrer or "")
+    if came_from.netloc != request.host:
+        return url_for("index")
+    return safe_next(came_from.path + (f"?{came_from.query}" if came_from.query else ""))
 
 
 def csrf_token():
@@ -259,8 +271,11 @@ def validate_signup(full_name, email, password, password2, grad_year, birth_date
         born = date.fromisoformat(birth_date)
     except ValueError:
         return "Please enter a valid date of birth."
-    if not MIN_AGE <= age_on(born, now_local().date()) <= MAX_AGE:
-        return "You are not within the age range required to use this app."
+    age = age_on(born, now_local().date())
+    if age < MIN_AGE:
+        return f"You need to be {MIN_AGE} or older to use Sportive Circle."
+    if age > MAX_AGE:
+        return "Please check your date of birth."
     # netid@uw.edu and netid@u.washington.edu are the same UW mailbox: one account per person.
     same_inbox = [f"{local}@{domain}" for domain in domains]
     existing = get_db().execute(
