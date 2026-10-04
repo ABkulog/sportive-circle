@@ -1270,7 +1270,7 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .plan-meta { font-size: .88rem; color: var(--muted); margin-top: 2px; }
 .plan-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .plan-count { font-size: .9rem; }
-.feed-actions { display: flex; gap: 14px; align-items: center; justify-content: flex-end; margin-top: 10px; font-size: .85rem; }
+.feed-actions { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: flex-end; margin-top: 10px; font-size: .85rem; }
 .feed-actions form { margin: 0; }
 .feed-game-who { display: flex; gap: 8px; align-items: center; margin: 0 0 6px; font-size: .88rem; }
 @media (min-width: 700px) { .feed-photo { flex-basis: 70%; } }
@@ -1321,6 +1321,8 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .reply-actions form { margin: 0; }
 .reply-form { display: flex; gap: 8px; align-items: flex-end; }
 .reply-form textarea { flex: 1; min-width: 0; }
+.reply-form { flex-wrap: wrap; }
+.reply-form .post-as { flex: 1 1 100%; min-width: 0; margin: 0; }
 .feed-card.is-news { border-left: 4px solid var(--gold); }
 .news-logo { background: var(--purple); }
 .news-title { display: block; margin-top: 10px; font-weight: 700; font-size: 1.02rem; color: var(--text); overflow-wrap: anywhere; }
@@ -1365,7 +1367,7 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .club-links .chip:hover { text-decoration: none; }
 .chip-follow { background: var(--purple); color: var(--on-accent); box-shadow: none; cursor: pointer; }
 .post-as { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: .88rem; font-weight: 600; }
-.post-as select { width: auto; flex: 1 1 auto; min-width: 0; }
+.post-as select { width: auto; flex: 1 1 auto; min-width: 0; max-width: 100%; text-overflow: ellipsis; }
 .club-feed { display: grid; gap: 12px; margin-top: 12px; }
 
 /* ------------------------------------------------------------------ Feed, cleaner */
@@ -1375,7 +1377,7 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .composer-top textarea { flex: 1 1 auto; min-width: 0; margin: 0; }
 .composer-more { margin-top: 10px; }
 .composer-hint { margin: 6px 0 0; font-size: .82rem; }
-.composer.is-collapsible:not(.is-open) { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.composer.is-collapsible:not(.is-open) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
 .composer.is-collapsible:not(.is-open) .composer-more,
 .composer.is-collapsible:not(.is-open) .composer-rules { display: none; }
 .composer.is-collapsible:not(.is-open) textarea { min-height: 44px; height: 44px; resize: none; }
@@ -1404,3 +1406,7 @@ html:has([data-pull-refresh]), html:has([data-pull-refresh]) body { overscroll-b
   font-size: .88rem; box-shadow: 0 4px 14px rgb(0 0 0 / .18); opacity: 0; pointer-events: none; transition: opacity .15s; }
 .pull-refresh.is-on { opacity: 1; }
 .pull-refresh.is-ready, .pull-refresh.is-loading { background: var(--purple); color: var(--on-accent); }
+@media (max-width: 360px) {  /* the smallest phones: the one-line post box's button without its icon */
+  .composer.is-collapsible:not(.is-open) .post-button { padding: 10px 14px; }
+  .composer.is-collapsible:not(.is-open) .post-button .icon { display: none; }
+}

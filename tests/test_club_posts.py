@@ -143,3 +143,12 @@ def test_new_games_sit_together_in_one_row(accounts, client, app):
     accounts.signup(email="fan@uw.edu", sports=("soccer",))
     feed = client.get("/feed").data.decode()
     assert feed.count('class="card feed-card feed-games"') == 1 and feed.count('class="games-tile"') == 3
+
+
+def test_feed_rows_fit_the_smallest_phones(client):
+    """Bot run 1: at 320px the one-line post box pushed Post 7px off screen, Report + Delete on a club post did
+    the same, and "Reply as" made a post's page 472px wide. (Checked in a browser; these rules keep it fixed.)"""
+    css = client.get("/static/style.css").data.decode()
+    assert "grid-template-columns: minmax(0, 1fr) auto" in css                      # the one-line post box
+    assert ".feed-actions { display: flex; flex-wrap: wrap;" in css                  # 🔥 Reply … Report Delete
+    assert ".reply-form .post-as { flex: 1 1 100%; min-width: 0;" in css            # Reply as
