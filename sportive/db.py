@@ -35,7 +35,11 @@ def close_db(exception=None):
 ADDED_COLUMNS = [
     ("posts", "club_id", "INTEGER REFERENCES clubs(id) ON DELETE CASCADE"),  # posted by an officer as the club
     ("post_replies", "club_id", "INTEGER REFERENCES clubs(id) ON DELETE CASCADE"),  # replied as the club
-    ("events", "try_it", "INTEGER NOT NULL DEFAULT 0"),  # a club's try-it-out session: new people welcome
+    ("events", "try_it", "INTEGER NOT NULL DEFAULT 0"),
+    # Off campus: exactly where (a dropped pin, coordinates from a pasted Google / Apple Maps link, an address)
+    ("events", "place_lat", "REAL"),
+    ("events", "place_lng", "REAL"),
+    ("events", "place_address", "TEXT NOT NULL DEFAULT ''"),  # a club's try-it-out session: new people welcome
     ("direct_messages", "deleted", "INTEGER NOT NULL DEFAULT 0"),  # 1 = its sender deleted it for everyone
     ("event_messages", "deleted", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "verify_sent_at", "TEXT"),

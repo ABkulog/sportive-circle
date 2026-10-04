@@ -1,8 +1,9 @@
 """Feed, event create/edit/cancel, RSVPs, 'Need players' quick posts, and My events."""
 import logging
+import re
 import secrets
 from datetime import datetime, time, timedelta, timezone
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
@@ -172,16 +173,115 @@ def place_map(location):
     }
 
 
-def game_pins(games):
-    """Play's map: one pin per place, with that place's games on it (places with no single spot are left out)."""
+# ------------------------------------------------------------ off campus: exactly where
+
+MAPS_HOSTS = ("maps.apple.com", "google.com", "www.google.com", "maps.google.com", "goo.gl", "maps.app.goo.gl")
+# Coordinates in the links Google Maps and Apple Maps share: ".../@47.66,-122.31,17z", "...!3d47.66!4d-122.31",
+# "?q=47.66,-122.31" / "ll=" / "daddr=" ..., or typed as "47.66, -122.31"
+COORDS_IN_TEXT = [re.compile(p) for p in (
+    r"@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)",
+    r"!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)",
+    r"[?&](?:q|ll|sll|daddr|destination|query|center|coordinate)=(-?\d{1,2}\.\d+)(?:,|%2C)\s*(-?\d{1,3}\.\d+)",
+    r"^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$")]
+
+
+def read_spot(form):
+    """An off-campus game's exact spot: (lat, lng, address-or-maps-link, error). A dropped pin ("47.66,-122.31")
+    wins; otherwise coordinates are read from a pasted Google / Apple Maps link, or the text is kept as an address.
+    Short share links (maps.app.goo.gl/...) have no coordinates in them: they're kept and opened as they are."""
+    pin = (form.get("pin") or "").strip()
+    text = one_line(form.get("place_address"))[:300]
+    lat = lng = None
+    if pin:
+        found = re.fullmatch(r"(-?\d{1,2}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)", pin)
+        if not found:
+            return None, None, "", "That pin didn't work. Drop it again."
+        lat, lng = float(found.group(1)), float(found.group(2))
+    elif text:
+        for pattern in COORDS_IN_TEXT:
+            found = pattern.search(text)
+            if found:
+                lat, lng = float(found.group(1)), float(found.group(2))
+                break
+    if lat is not None and not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return None, None, "", "That spot isn't on the map. Drop the pin again."
+    if text.lower().startswith(("http://", "https://")):
+        host = (urlparse(text).hostname or "").lower()
+        if host not in MAPS_HOSTS:
+            return None, None, "", "Paste a Google Maps or Apple Maps link, or type the address."
+    return (round(lat, 6) if lat is not None else None, round(lng, 6) if lng is not None else None, text, None)
+
+
+def event_place(event):
+    """Where a game is, for its page and the map: a campus place's pin, or an off-campus game's own pin, link or
+    address, with Google Maps and Apple Maps directions. None when there's nothing to point at."""
+    if event["location"] != OFF_CAMPUS:
+        return place_map(event["location"])
+    lat, lng = event["place_lat"], event["place_lng"]
+    text = event["place_address"] or ""
+    is_link = text.lower().startswith(("http://", "https://"))
+    name = text if text and not is_link else "Off campus"
+    if lat is not None:
+        destination = f"{lat},{lng}"
+        return {"name": name, "lat": lat, "lng": lng,
+                "google": f"https://www.google.com/maps/dir/?api=1&destination={destination}&travelmode=walking",
+                "apple": f"https://maps.apple.com/?daddr={destination}&dirflg=w"}
+    if is_link:  # a short share link: open it in whichever app made it
+        return {"name": name, "lat": None, "lng": None, "google": text, "apple": text, "link_only": True}
+    if text:
+        return {"name": text, "lat": None, "lng": None,
+                "google": f"https://www.google.com/maps/dir/?api=1&destination={quote(text)}",
+                "apple": f"https://maps.apple.com/?daddr={quote(text)}"}
+    return None
+
+
+LIVE_SOON = timedelta(hours=1)       # Play's live map: games starting within an hour...
+LIVE_AFTER = timedelta(minutes=10)   # ...going on now, or ended in the last 10 minutes
+
+
+def live_games(now):
+    """What's happening around now, for Play's live map (like Snap Map): starting within an hour, going on, or
+    ended in the last 10 minutes. Same rules as the list: no blocked hosts, only games open to you, members-only
+    for members, private ones only for their players and invited friends."""
+    return query_events(
+        ["e.cancelled = 0", "e.starts_at <= :soon", "e.ends_at >= :ended", NOT_BLOCKED, games_open_to_me(),
+         MEMBERS_ONLY_FOR_MEMBERS,
+         "(e.is_private = 0 OR EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"
+         " OR EXISTS (SELECT 1 FROM invites i WHERE i.event_id = e.id AND i.guest_id = :me AND i.status = 'pending'))"],
+        {"soon": to_db(now + LIVE_SOON), "ended": to_db(now - LIVE_AFTER)}, limit=60)
+
+
+def live_status(event, now):
+    """("live" | "soon" | "ended", "Live" / "in 20 min" / "Ended")."""
+    starts, ends = from_db(event["starts_at"]), from_db(event["ends_at"])
+    if ends <= now:
+        return "ended", "Ended"
+    if starts <= now:
+        return "live", "Live"
+    return "soon", f"in {max(1, round((starts - now).total_seconds() / 60))} min"
+
+
+def game_pins(games, now=None):
+    """Play's live map: one bubble per place (a sport emoji, and how many games), with that place's games on it.
+    Places with no single spot are left out; an off-campus game with a dropped pin gets its own bubble."""
+    now = now or now_local()
     pins = {}
     for e in games:
         coords = LOCATION_COORDS.get(e["location"])
+        key, name = e["location"], e["location"]
+        if e["location"] == OFF_CAMPUS and e["place_lat"] is not None and not e["members_only"]:
+            coords = (e["place_lat"], e["place_lng"])  # an off-campus game's own pin
+            key = name = e["place_address"] if e["place_address"] and "://" not in e["place_address"] else "Off campus"
+            key = f"{key}@{coords}"
         if not coords:
             continue
-        pin = pins.setdefault(e["location"], {"name": e["location"], "lat": coords[0], "lng": coords[1], "games": []})
+        state, label = live_status(e, now)
+        pin = pins.setdefault(key, {"name": name, "lat": coords[0], "lng": coords[1], "games": [],
+                                    "emoji": SPORT_EMOJI[e["sport"]], "state": state, "label": label})
+        if ["ended", "soon", "live"].index(state) > ["ended", "soon", "live"].index(pin["state"]):
+            pin.update(state=state, label=label, emoji=SPORT_EMOJI[e["sport"]])  # the liveliest game shows
         if len(pin["games"]) < 6:
-            pin["games"].append({"title": f"{SPORT_EMOJI[e['sport']]} {event_title(e)}", "when": fmt_when(e["starts_at"]),
+            pin["games"].append({"title": f"{SPORT_EMOJI[e['sport']]} {event_title(e)}", "when": label,
                                  "url": url_for("events.detail", event_id=e["id"])})
     return list(pins.values())
 
@@ -212,12 +312,13 @@ def insert_event(data, reserve=()):
     cur = db.execute(
         """INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level,
                                max_players, extra_players, note, is_quick, club_id, is_private, password, team_size,
-                               open_to, members_only, try_it)
+                               open_to, members_only, try_it, place_lat, place_lng, place_address)
            VALUES (:host_id, :title, :sport, :location, :starts_at, :ends_at, :skill_level,
                    :max_players, :extra_players, :note, :is_quick, :club_id, :is_private, :password, :team_size,
-                   :open_to, :members_only, :try_it)""",
+                   :open_to, :members_only, :try_it, :place_lat, :place_lng, :place_address)""",
         {"host_id": g.user["id"], "extra_players": 0, "is_quick": 0, "club_id": None, "is_private": 0,
-         "password": "", "team_size": None, "open_to": "everyone", "members_only": 0, "try_it": 0, **data},
+         "password": "", "team_size": None, "open_to": "everyone", "members_only": 0, "try_it": 0,
+         "place_lat": None, "place_lng": None, "place_address": "", **data},
     )
     # The host is automatically going to their own event (on team 1 in a team vs team game).
     db.execute("INSERT INTO rsvps (event_id, user_id, created_at, team) VALUES (?, ?, ?, ?)",
@@ -403,8 +504,7 @@ def feed():
         )
         if spots_left(e) != 0 or e["i_am_going"] or e["i_am_invited"]
     ]
-    shown = {e["id"] for e in need_players}
-    events = [e for e in events if e["id"] not in shown]
+    # (the live map above the list shows what's on soon, so these games stay in the list too: no separate strip)
 
     up_next = query_events(
         ["e.cancelled = 0", "e.ends_at >= :now", "e.starts_at <= :soon",
@@ -418,7 +518,7 @@ def feed():
                            month_name=now.strftime("%B"), more_page=more_page, capped=capped,
                            hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now, viewer=g.user["id"]),
                            texts_card=show_texts_card(),
-                           map_pins=game_pins(list(events) + [e for e in need_players if e["id"] not in {x["id"] for x in events}]))
+                           map_pins=game_pins(live_games(now), now))
 
 
 def show_texts_card():
@@ -448,8 +548,14 @@ def read_event_form(form, event=None):
         return None, "Please choose a location."
     if location not in SPORT_LOCATIONS[sport]:
         return None, f"{SPORTS[sport]} can't be played at {location}. Choose another place."
-    if location == OFF_CAMPUS and not note:
-        return None, "Off campus: add where in the note, so people can find you."
+    place_lat = place_lng = None
+    place_address = ""
+    if location == OFF_CAMPUS:
+        place_lat, place_lng, place_address, error = read_spot(form)
+        if error:
+            return None, error
+        if not note and not place_address and place_lat is None:
+            return None, "Off campus: drop a pin, add the address, or say where in the note, so people can find you."
     if skill_level not in SKILL_LEVELS:
         return None, "Please choose a skill level."
     title = title or default_title(sport, location)
@@ -503,6 +609,7 @@ def read_event_form(form, event=None):
         "starts_at": to_db(starts), "ends_at": to_db(ends), "max_players": max_players,
         "extra_players": extra_players, "note": note,
         "is_private": is_private, "password": password, "team_size": team_size, "open_to": open_to,
+        "place_lat": place_lat, "place_lng": place_lng, "place_address": place_address,
     }, None
 
 
@@ -754,7 +861,8 @@ def edit(event_id):
                 f"""UPDATE events SET revision = revision + 1, title = :title, sport = :sport, location = :location,
                        starts_at = :starts_at, ends_at = :ends_at, skill_level = :skill_level,
                        max_players = :max_players, note = :note, is_private = :is_private, password = :password,
-                       open_to = :open_to, members_only = :members_only
+                       open_to = :open_to, members_only = :members_only,
+                       place_lat = :place_lat, place_lng = :place_lng, place_address = :place_address
                    WHERE id = :id AND cancelled = 0 AND (:max_players IS NULL OR :max_players >= (
                        SELECT e.extra_players + {HELD} + (SELECT COUNT(*) FROM rsvps r WHERE r.event_id = e.id)
                        FROM events e WHERE e.id = :id))""",
@@ -794,6 +902,8 @@ def edit(event_id):
             "players": event["max_players"] or "", "no_limit": "" if event["max_players"] else "1",
             "is_private": "1" if event["is_private"] else ("members" if event["members_only"] else ""),
             "password": event["password"], "open_to": event["open_to"],
+            "place_address": event["place_address"],
+            "pin": f"{event['place_lat']},{event['place_lng']}" if event["place_lat"] is not None else "",
         })
         form.setlist("levels", level_list(event["skill_level"]))
     return render_template("events/form.html", form=form, event=event, min_start="")
@@ -990,8 +1100,10 @@ def quick():
             error = "Please choose a location."
         elif location not in SPORT_LOCATIONS[sport]:
             error = f"{SPORTS[sport]} can't be played at {location}. Choose another place."
-        elif location == OFF_CAMPUS and not note:
-            error = "Off campus: add where in the note, so people can find you."
+        elif location == OFF_CAMPUS and read_spot(form)[3]:
+            error = read_spot(form)[3]
+        elif location == OFF_CAMPUS and not note and not read_spot(form)[2] and read_spot(form)[0] is None:
+            error = "Off campus: drop a pin, add the address, or say where in the note, so people can find you."
         elif skill_level not in SKILL_LEVELS:
             error = "Please choose a skill level."
         elif starts_in is None or duration is None:
@@ -1036,6 +1148,8 @@ def quick():
                 "skill_level": skill_level, "starts_at": to_db(starts), "ends_at": to_db(ends),
                 "max_players": max_players, "extra_players": extra, "note": note, "is_quick": 1,
                 "is_private": is_private, "password": password, "team_size": team_size, "open_to": open_to,
+                **(dict(zip(("place_lat", "place_lng", "place_address"), read_spot(form)[:3]))
+                   if location == OFF_CAMPUS else {}),
             }, reserve)
             announce_new_game(get_event(event_id))
             flash(created_message(is_private, reserve, "Posted! It's at the top of everyone's feed."), "celebrate")

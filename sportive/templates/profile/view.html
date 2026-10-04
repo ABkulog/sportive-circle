@@ -58,10 +58,9 @@
     {# What used to crowd the sidebar: here, one tap from Profile #}
     <nav class="profile-menu" aria-label="Your account">
       <a href="{{ url_for('social.friends') }}">{{ icon('friends') }}<span>Friends</span>{% set fr = tab_badges().friends %}{% if fr %}<span class="count-dot">{{ fr }}</span>{% endif %}</a>
-      <a href="{{ url_for('settings.home') }}">{{ icon('sliders') }}<span>Settings</span></a>
+      <a href="{{ url_for('settings.home') }}">{{ icon('sliders') }}<span>Settings</span>{% if is_admin() and waiting %}<span class="count-dot">{{ waiting }}</span>{% endif %}</a>
       <a href="{{ url_for('faq') }}">{{ icon('help') }}<span>Help</span></a>
-      {% if is_admin() %}{% set waiting = open_report_count() + pending_club_count() + tab_badges().admin %}
-        <a href="{{ url_for('moderation.admin_home') }}">{{ icon('shield') }}<span>Admin</span>{% if waiting %}<span class="count-dot">{{ waiting }}</span>{% endif %}</a>{% endif %}
+      {% if is_admin() %}{% set waiting = open_report_count() + pending_club_count() + tab_badges().admin %}{% endif %}
       <form method="post" action="{{ url_for('auth.logout') }}" data-confirm="Log out of Sportive Circle?">
         {{ csrf_field() }}<button class="link-button">{{ icon('logout') }}<span>Log out</span></button>
       </form>

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import select, who_can_join, format_field, players_block, open_to_field, place_check %}
+{% from "_macros.html" import select, who_can_join, format_field, players_block, open_to_field, place_check, spot_field %}
 {% block title %}{{ 'Edit event' if event else 'New event' }}{% endblock %}
 {% block content %}
 <a class="back-link" href="{{ url_for('events.detail', event_id=event.id) if event else (url_for('clubs.view', club_id=club.id) if club else url_for('events.feed')) }}" data-back>← Back</a>
@@ -54,6 +54,7 @@
         <small class="muted place-tip" data-place-tip></small>
     <small class="muted place-hours" data-place-hours aria-live="polite"></small>
     </label>
+    {{ spot_field(form) }}
     <div class="row">
       <label class="field"><span>Starts</span>
         <input name="starts_at" type="datetime-local" value="{{ form.get('starts_at', '') }}" {% if min_start %}min="{{ min_start }}"{% endif %} required></label>
@@ -94,6 +95,7 @@
 <script type="application/json" id="sport-rules">{{ SPORT_RULES|tojson }}</script>
 <script type="application/json" id="place-hours">{{ place_hours()|tojson }}</script>
 <script src="{{ url_for('static', filename='forms.js') }}" defer></script>
+<script src="{{ url_for('static', filename='spot.js') }}" defer></script>
 <script src="{{ url_for('static', filename='wizard.js') }}" defer></script>
 {% endblock %}
 

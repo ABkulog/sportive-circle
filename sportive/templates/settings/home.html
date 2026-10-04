@@ -5,6 +5,10 @@
 <h1 class="page-title">Settings</h1>
 
 <nav class="settings-list" aria-label="Settings">
+  {% if is_admin() %}{# only for admins, tucked in here (it isn't part of the app for everyone else) #}
+    {% set waiting = open_report_count() + pending_club_count() + tab_badges().admin %}
+    <a class="settings-row" href="{{ url_for('moderation.admin_home') }}"><span>🛡️ Admin <small class="muted">{{ waiting ~ ' waiting' if waiting else 'reports, clubs, clean up' }}</small></span>{% if waiting %}<span class="count-dot">{{ waiting }}</span>{% else %}<span aria-hidden="true">›</span>{% endif %}</a>
+  {% endif %}
   <a class="settings-row" href="{{ url_for('notifications.notification_settings') }}"><span>Notifications <small class="muted">what you hear about</small></span><span aria-hidden="true">›</span></a>
   {% if sms_available() %}
     <a class="settings-row" href="{{ url_for('settings.texts') }}"><span>Texts <small class="muted">{{ 'on · ' ~ pretty_phone(g.user.phone) if g.user.phone_verified and g.user.sms_updates else ('off' if g.user.phone_verified else 'get updates by text') }}</small></span><span aria-hidden="true">›</span></a>

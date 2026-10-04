@@ -3,7 +3,7 @@
 {% block title %}{{ event_title(event) }}{% endblock %}
 {# A members-only game's place is for members, players and invited friends (the club page hides it too). #}
 {% set place_hidden = event.members_only and not inside %}
-{% set place = none if place_hidden else place_map(event.location) %}
+{% set place = none if place_hidden else event_place(event) %}
 {% block head %}
   {% if place and place.lat %}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
@@ -216,11 +216,18 @@
                data-lat="{{ place.lat }}" data-lng="{{ place.lng }}" data-name="{{ place.name }}"></div>
           <div class="map-actions">
             <button type="button" class="btn btn-small btn-ghost" id="locate-me">Where am I?</button>
+            <a class="btn btn-small btn-ghost" href="{{ place.google }}" target="_blank" rel="noopener">Google Maps</a>
             <a class="btn btn-small btn-ghost" href="{{ place.apple }}" target="_blank" rel="noopener">Apple Maps</a>
           </div>
           <p class="muted map-status" id="map-status" aria-live="polite"></p>
         </div>
       </details>
+    {% elif place %}
+      {# Off campus with an address or a maps link, no pin: open it in either maps app #}
+      <p class="map-links"><span>📍 {{ place.name if not place.link_only else 'Off campus' }}</span>
+        {% if place.link_only %}<a class="btn btn-small btn-ghost" href="{{ place.google }}" target="_blank" rel="noopener nofollow">Open the map</a>
+        {% else %}<a class="btn btn-small btn-ghost" href="{{ place.google }}" target="_blank" rel="noopener">Google Maps</a>
+          <a class="btn btn-small btn-ghost" href="{{ place.apple }}" target="_blank" rel="noopener">Apple Maps</a>{% endif %}</p>
     {% elif event.location.startswith('Off campus') and not place_hidden %}
       <p class="muted">Off campus: the address is in the note.</p>
     {% endif %}

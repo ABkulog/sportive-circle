@@ -314,11 +314,21 @@ def test_admin_cleans_up_keyboard_mashing(accounts, client, app):
     assert client.get("/admin/cleanup").status_code == 404
 
 
-def test_play_has_a_map_of_where_games_are(accounts, client):
+def test_play_has_a_live_map_of_whats_on_now(accounts, client):
+    """Like Snap Map: games starting within an hour, going on, or ended in the last 10, as sport bubbles."""
     accounts.signup(email="host@uw.edu", sports=("soccer",))
-    client.post("/events/new", data={"title": "Pickup", "sport": "soccer", "location": "Denny Field", "players": "10",
-                                     "starts_at": form_time(timedelta(days=1)),
-                                     "ends_at": form_time(timedelta(days=1, hours=1)), "note": ""})
+    for title, place, start in (("Soon", "Denny Field", timedelta(minutes=20)),
+                                ("Later", "Husky Track", timedelta(hours=3))):
+        client.post("/events/new", data={"title": title, "sport": "soccer", "location": place, "players": "10",
+                                         "starts_at": form_time(start), "ends_at": form_time(start + timedelta(hours=1)),
+                                         "note": ""})
     play = client.get("/").data.decode()
     assert 'id="play-map"' in play and '"name": "Denny Field"' in play and "playmap.js" in play
-    assert "Clubs for you" not in play
+    assert '"state": "soon"' in play and '"Husky Track"' not in play               # 3 hours away: not on the map
+    assert "1 place with games now" in play and "Clubs for you" not in play
+
+
+def test_cleanup_rows_keep_their_text_readable(client):
+    """The checkbox took the whole row (global input width), squeezing each item into a one-letter column."""
+    css = client.get("/static/style.css").data.decode()
+    assert '.cleanup-row input[type="checkbox"] { width: 20px;' in css and ".cleanup-row > span { flex: 1 1 auto;" in css

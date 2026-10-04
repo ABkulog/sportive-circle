@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import home_tabs, icon, club_logo, avatar, open_to_field, place_check %}
+{% from "_macros.html" import home_tabs, icon, club_logo, avatar, open_to_field, place_check, spot_field %}
 {% from "feed/_cards.html" import feed_item %}
 {% block title %}{{ '#' ~ SPORTS[sport] if sport else "Feed" }}{% endblock %}
 {% block content %}
@@ -73,6 +73,7 @@
           {% for place in LOCATIONS %}<option value="{{ place }}">{{ place }}</option>{% endfor %}</select>
         <small class="muted place-tip" data-place-tip></small>
         <small class="muted place-hours" data-place-hours aria-live="polite"></small></label>
+      <div class="plan-spot">{{ spot_field({}) }}</div>
       <label class="field"><span>People you need</span><input type="number" name="spots" min="1" max="50" value="2" inputmode="numeric"></label>
       <label class="field"><span>Level</span>
         <select name="skill_level">{% for level in SKILL_LEVELS %}<option {% if level == 'All levels' %}selected{% endif %}>{{ level }}</option>{% endfor %}</select></label>
@@ -124,4 +125,5 @@
 <script type="application/json" id="sport-rules">{{ SPORT_RULES|tojson }}</script>
 <script type="application/json" id="place-hours">{{ place_hours()|tojson }}</script>
 <script src="{{ url_for('static', filename='forms.js') }}" defer></script>
+<script src="{{ url_for('static', filename='spot.js') }}" defer></script>
 {% endblock %}

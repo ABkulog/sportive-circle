@@ -286,11 +286,12 @@ def test_quick_post_counts_existing_players(accounts, client):
     page = client.get(f"/events/{event_id_from(response)}").data
     assert b"Need 2 more for Soccer" in page
     assert b"1 going of 3" in page
-    assert "<strong>Up next</strong>" in client.get("/").data.decode()   # the poster sees their own game once
+    play = client.get("/").data.decode()
+    assert '"state": "soon"' in play and "Need 2 more for Soccer" in play          # on the live map and the list
     accounts.logout()
     accounts.signup(email="someone.else@uw.edu")
     home = client.get("/").data.decode()
-    assert 'aria-label="Happening soon"' in home and "<strong>Need 2</strong>" in home   # everyone else: "Need 2"
+    assert '"state": "soon"' in home and "Need 2 more for Soccer" in home       # everyone else sees it too
 
 
 # ------------------------------------------------------------------ security
@@ -608,7 +609,7 @@ def test_up_next_banner(accounts, client):
     client.post("/events/new", data=event_form(title="Soon game", starts_at=form_time(timedelta(minutes=45)),
                                                ends_at=form_time(timedelta(hours=2))))
     page = client.get("/").data
-    assert b"Up next" in page and b"Soon game" in page
+    assert b'"state": "soon"' in page and b"Soon game" in page                    # on the live map
 
 
 def _reminder_setup(accounts, client, app, joined_minutes_before):
@@ -1040,7 +1041,7 @@ def test_off_campus_and_online_have_no_map(accounts, client):
     assert b"the address is in the note" in off and b"Rattlesnake Ledge lot" in off
     no_note = client.post("/events/new", data=event_form(title="Hike 2", sport="hiking", location="Off campus (see note)"),
                           follow_redirects=True).data
-    assert b"Off campus: add where in the note" in no_note
+    assert b"Off campus: drop a pin, add the address, or say where in the note" in no_note
 
 
 def test_this_month_filter(accounts, client, app, monkeypatch):
@@ -2715,13 +2716,13 @@ def test_filtering_the_feed_keeps_need_players_posts_in_the_results(accounts, cl
                                        "starts_in": "15", "duration": "60", "players": "4"})
     accounts.logout()
     accounts.signup(email="player@uw.edu")
-    unfiltered = client.get("/?scope=all").data.decode()
-    assert 'id="soon-title"' in unfiltered
+    unfiltered = client.get("/?scope=all").data.decode()       # on the live map and in the list
+    assert '"state": "soon"' in unfiltered and unfiltered.count('class="card event-card') == 1
     filtered = client.get("/?scope=all&sport=soccer").data.decode()
-    assert 'id="soon-title"' not in filtered and "No games yet" not in filtered
+    assert filtered.count('class="card event-card') == 1 and "No games yet" not in filtered
 
 
-def test_need_players_strip_drops_games_well_under_way(accounts, client, app):
+def test_a_game_under_way_shows_live_on_the_map(accounts, client, app):
     from sportive.timeutil import to_db
     accounts.signup(email="host@uw.edu")
     client.post("/need-players", data={"sport": "soccer", "location": "Denny Field", "skill_level": "All levels",
@@ -2732,10 +2733,10 @@ def test_need_players_strip_drops_games_well_under_way(accounts, client, app):
         db.execute("UPDATE events SET starts_at = ?, ends_at = ?",
                    (to_db(now - timedelta(hours=1)), to_db(now + timedelta(minutes=10))))
         db.commit()
-    assert 'id="soon-title"' in client.get("/?scope=all").data.decode()  # the host can still find it
+    assert '"state": "live"' in client.get("/?scope=all").data.decode()  # going on now: "Live" on the map
     accounts.logout()
     accounts.signup(email="player@uw.edu")
-    assert 'id="soon-title"' not in client.get("/?scope=all").data.decode()
+    assert '"label": "Live"' in client.get("/?scope=all").data.decode()
 
 
 def test_feed_shows_more_games_a_page_at_a_time(accounts, client, monkeypatch):
@@ -3187,15 +3188,14 @@ def test_admins_are_only_notified_about_topics_3_people_mention(accounts, client
                 client.post("/suggestions", data={"kind": "idea", "body": "more pickleball times"})
         accounts.logout()
         accounts.login(email="boss@uw.edu")
-        page = client.get(f"/u/{_user_id(app, 'boss@uw.edu')}").data.decode()  # the number is on Admin (on Profile)
+        page = client.get("/settings").data.decode()   # the number is on Admin (in Settings)
         shield = re.search(r'href="/admin">.*?</a>', page, re.S).group(0)
         assert ('<span class="count-dot">1</span>' in shield) == (i == 2), i   # quiet until the third person
         accounts.logout()
     accounts.login(email="boss@uw.edu")
     admin_page = client.get("/admin/suggestions").data.decode()
     assert "<strong>badminton</strong> · 3 people" in admin_page and "<strong>pickleball</strong>" not in admin_page
-    shield = re.search(r'href="/admin">.*?</a>', client.get(f"/u/{_user_id(app, 'boss@uw.edu')}").data.decode(),
-                       re.S).group(0)
+    shield = re.search(r'href="/admin">.*?</a>', client.get("/settings").data.decode(), re.S).group(0)
     assert "count-dot" not in shield                                                            # seen: no more
     topic_page = client.get("/admin/suggestions?topic=badminton").data.decode()
     assert "Can we get badminton" in topic_page and "more pickleball" not in topic_page
@@ -7044,7 +7044,7 @@ def test_pasted_social_links_become_usernames(accounts, client, app):
 def test_one_admin_tab_with_everything(accounts, client, app):
     accounts.signup(email="boss@uw.edu", name="Boss Husky")
     app.config["ADMIN_EMAILS"] = "boss@uw.edu"
-    home = client.get(f"/u/{_user_id(app, 'boss@uw.edu')}").data.decode()   # Admin is on your Profile
+    home = client.get("/settings").data.decode()   # Admin is tucked into Settings (admins only)
     assert 'href="/admin"' in home and ">Reports</span>" not in home and ">Club requests</span>" not in home
     page = client.get("/admin").data.decode()
     for part in ("Reports", "Club requests", "UW Rec reservations", "Suggestions"):
