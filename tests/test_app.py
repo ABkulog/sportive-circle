@@ -55,10 +55,13 @@ def test_signup_rejects_mismatched_passwords(client):
     assert b"Passwords do not match." in response.data
 
 
-def test_signup_rejects_too_young(accounts):
-    young = (now_local().date() - timedelta(days=365 * 10)).isoformat()
-    response = accounts.signup(birth_date=young, verify=False)
-    assert b"age range" in response.data
+def test_signup_is_18_and_over(accounts, client):
+    today = now_local().date()
+    seventeen = today.replace(year=today.year - 18, day=1) + timedelta(days=40)   # turns 18 in a month or so
+    assert b"You need to be 18 or older" in accounts.signup(birth_date=seventeen.isoformat(), verify=False).data
+    eighteen = today.replace(year=today.year - 18, day=1) - timedelta(days=1)
+    assert b"18 or older" not in accounts.signup(email="adult@uw.edu", birth_date=eighteen.isoformat(), verify=False).data
+    assert f'max="{today.year - 18}-' in client.get("/signup").data.decode()          # the date picker stops at 18
 
 
 def test_signup_verify_and_login(accounts, client, app):

@@ -55,7 +55,6 @@ database rules (no game over its limit, every club has an owner who is an office
 
 - Deleting an account also removes that person's messages and the blocks against them, so they could sign up
   again clean. Keep messages and blocks instead?
-- Minimum age is 15 (`MIN_AGE` in `auth.py`), so 15-17-year-olds can message adults.
 - "Game changed / canceled" and club emails can't be switched off (they link to Settings).
 - Fencing in Red Square was added on the owner's word; not confirmed with the fencing club.
 
