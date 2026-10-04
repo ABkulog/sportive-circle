@@ -129,24 +129,6 @@
   </article>
 {% endmacro %}
 
-{% macro games_strip(item) %}
-  {# New games people posted, together in one swipeable row (finding and filtering games is the Play tab's job) #}
-  <section class="card feed-card feed-games" id="games-{{ item.games[0].event.id }}" data-swap aria-labelledby="games-strip-{{ item.games[0].event.id }}">
-    <header class="games-strip-head">
-      <h2 class="home-section-title" id="games-strip-{{ item.games[0].event.id }}">🏟️ New games</h2>
-      <a class="small" href="{{ url_for('events.feed') }}">All games on Play →</a>
-    </header>
-    <ul class="games-row">
-      {% for game in item.games %}
-        {% set e = game.event %}
-        <li class="games-tile">
-          <a class="games-host" href="{{ url_for('profile.view', user_id=e.host_id) }}">{{ avatar(e.host_id, e.host_name, e.host_avatar, 24) }}<span>{{ e.host_name }} posted a game · {{ game.at|ago }}</span></a>
-          {{ plan_box(e) }}
-        </li>
-      {% endfor %}
-    </ul>
-  </section>
-{% endmacro %}
 
 {% macro news_card(item) %}
   {# A headline from GoHuskies.com: tapping it opens the story there. #}
@@ -162,5 +144,5 @@
   {% if item.kind == 'post' %}{{ post_card(item, photos) }}
   {% elif item.kind == 'club_post' %}{{ club_post_card(item) }}
   {% elif item.kind == 'news' %}{{ news_card(item) }}
-  {% elif item.kind == 'games' %}{{ games_strip(item) }}{% endif %}
+  {% endif %}
 {% endmacro %}

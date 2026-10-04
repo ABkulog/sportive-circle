@@ -133,7 +133,7 @@ def test_a_plan_follows_every_game_rule(accounts, client, app):
     assert 'id="sport-rules"' in feed and "Heads up: check you can use the" in feed and "data-pull-refresh" in feed
 
 
-def test_new_games_sit_together_in_one_row(accounts, client, app):
+def test_the_feed_is_only_posts_games_are_on_play(accounts, client, app):
     accounts.signup(email="host@uw.edu", sports=("soccer",))
     for n in range(3):
         client.post("/events/new", data={"title": f"Pickup {n}", "sport": "soccer", "location": "Denny Field",
@@ -142,7 +142,8 @@ def test_new_games_sit_together_in_one_row(accounts, client, app):
     accounts.logout()
     accounts.signup(email="fan@uw.edu", sports=("soccer",))
     feed = client.get("/feed").data.decode()
-    assert feed.count('class="card feed-card feed-games"') == 1 and feed.count('class="games-tile"') == 3
+    assert "Pickup 0" not in feed and "feed-games" not in feed
+    assert "Pickup 0" in client.get("/").data.decode()
 
 
 def test_feed_rows_fit_the_smallest_phones(client):
@@ -227,3 +228,12 @@ def test_the_post_box_never_touches_the_first_post(client):
     css = client.get("/static/style.css").data.decode()
     assert ".composer, .update-composer, .clubs-for-you { margin-bottom: 12px; }" in css
     assert "#feed-list > :first-child { margin-top: 0; }" in css
+
+
+def test_the_open_post_box_closes_on_a_tap_elsewhere_or_scrolling_away(client):
+    """Opened, the post box took half the screen with no way back: a tap outside it or scrolling it out of sight
+    closes it to one line again (what you wrote stays). Photos and text in posts are smaller, to fit more."""
+    js = client.get("/static/app.js").data.decode()
+    assert 'document.addEventListener("pointerdown"' in js and "IntersectionObserver" in js
+    css = client.get("/static/style.css").data.decode()
+    assert ".feed-photos.is-single .feed-photo, .feed-photos.is-single .feed-photo img, .feed-video { max-height: 340px; }" in css

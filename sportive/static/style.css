@@ -1440,3 +1440,18 @@ body.has-app-nav .home-tabs { position: sticky; top: 60px; z-index: 20; backgrou
    on top of the first post when it wasn't the New games row, which has its own margin) */
 .composer, .update-composer, .clubs-for-you { margin-bottom: 12px; }
 #feed-list > :first-child { margin-top: 0; }
+/* Denser feed (more on a screen, still calm): smaller photos and text, tighter cards */
+.feed-card { padding: 12px 14px; }
+.feed-body { font-size: .95rem; line-height: 1.45; margin-top: 8px; }
+.feed-who strong { font-size: .95rem; }
+.feed-who small { font-size: .8rem; }
+.feed-photos { margin: 8px -14px 0; padding: 0 14px; }
+.feed-photo { flex-basis: 72%; aspect-ratio: 1 / 1; max-height: 340px; }
+.feed-photos.is-single .feed-photo { max-height: 380px; }
+.feed-photos.is-single .feed-photo img { max-height: 380px; }
+.feed-video { max-height: 380px; }
+.feed-actions { margin-top: 8px; }
+@media (min-width: 700px) { .feed-photo { flex-basis: 55%; } }
+.feed-card .inline-replies { margin: 10px -14px -12px; padding: 10px 14px 12px; }
+@media (min-width: 700px) { .feed-photo { flex-basis: 45%; max-height: 300px; } }
+.feed-photos.is-single .feed-photo, .feed-photos.is-single .feed-photo img, .feed-video { max-height: 340px; }
