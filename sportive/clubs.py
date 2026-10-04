@@ -506,7 +506,9 @@ def edit(club_id):
             return _club_form_page(form, club, None, unchanged=True)
         if error is None:
             # Changing who the club *is* (or fixing a rejected one) sends it back for review.
-            identity_changed = any(data[key] != club[key] for key in ("name", "club_kind"))
+            # Capitals and spaces don't count ("Uw tennis club" -> "UW Tennis Club" stays live).
+            identity_changed = (_same_name(data["name"]) != _same_name(club["name"])
+                                or data["club_kind"] != club["club_kind"])
             status = "pending" if identity_changed or club["status"] == "rejected" else club["status"]
             db = get_db()
             db.execute(f"UPDATE clubs SET {', '.join(f + ' = :' + f for f in FIELDS)}, status = :status,"
@@ -554,6 +556,11 @@ def hand_club_games_to_the_club(user_id, club_id=None):
                          WHERE host_id = :me AND club_id IS NOT NULL AND cancelled = 0 AND ends_at >= :now
                            AND (:club IS NULL OR club_id = :club) AND EXISTS ({other_officer})""",
                      {"me": user_id, "club": club_id, "now": to_db(now_local())})
+
+
+def _same_name(name):
+    """A club name compared without capitals or extra spaces."""
+    return " ".join(name.split()).casefold()
 
 
 def _dm(sender_id, recipient_id, body):
