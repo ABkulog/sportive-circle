@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import event_card, avatar %}
+{% from "_macros.html" import event_card, avatar, club_logo %}
 {% block title %}{{ user.full_name }}{% endblock %}
 {% block content %}
 {% set me = user.id == g.user.id %}
@@ -113,6 +113,25 @@
   </div>
   {% endif %}
 </section>
+
+{% if not blocked and (clubs or me) %}
+<section class="band" aria-labelledby="profile-clubs">
+  <div class="section-head">
+    <h2 id="profile-clubs">Clubs</h2>
+    {% if me %}<a href="{{ url_for('clubs.directory') }}">Find clubs</a>{% endif %}
+  </div>
+  {% if clubs %}
+    <ul class="profile-clubs">
+      {% for c in clubs %}
+        <li><a href="{{ url_for('clubs.view', club_id=c.id) }}">{{ club_logo(c, 32) }}<span>{{ c.name }}</span>
+          {% if c.role == 'officer' %}<span class="badge badge-purple">Officer</span>{% endif %}</a></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">You're not in a club yet. Clubs you join show up here.</p>
+  {% endif %}
+</section>
+{% endif %}
 
 {% if showcase or me %}
 <section class="band">

@@ -7,7 +7,7 @@ from flask import (Blueprint, Response, abort, flash, g, redirect, render_templa
 from werkzeug.datastructures import MultiDict
 from werkzeug.security import check_password_hash
 
-from .clubs import hand_club_games_to_the_club
+from .clubs import clubs_of, hand_club_games_to_the_club
 from .auth import MAX_NAME_LENGTH, check_current_password, end_other_sessions, hash_password, login_required, password_problem, safe_next
 from .constants import SPORTS
 from .db import get_db, set_user_sports, user_sports
@@ -210,7 +210,8 @@ def view(user_id):
                            hosting=hosting, show_email=show_email, socials=person_socials(user), genders=GENDERS,
                            is_tester=TESTER.key in earned_badges(user_id),
                            showcase=[] if blocked else showcase(user_id), earned=earned_badges(user_id), rarity=rarity(),
-                           is_retired=is_retired, relation=relation, blocked=blocked)
+                           is_retired=is_retired, relation=relation, blocked=blocked,
+                           clubs=[] if blocked else clubs_of(user_id))
 
 
 @bp.route("/admin/users/<int:user_id>/tester/<action>", methods=("POST",))
