@@ -439,3 +439,25 @@ CREATE TABLE IF NOT EXISTS change_alerts (
 CREATE INDEX IF NOT EXISTS idx_change_alerts ON change_alerts(event_id, user_id, sent_at);
 -- Games by host (profiles, "posted a game" limits, the hourly posting limit).
 CREATE INDEX IF NOT EXISTS idx_events_host ON events(host_id, created_at);
+
+-- ---------------------------------------------------------------- the feed
+-- What students post on the feed: a sport tag, words and/or up to 10 photos. A "plan" post ("hiking Mt Si
+-- tomorrow, need 2") is a real game behind the scenes (event_id), so "I'm in" gives it a headcount and a chat.
+CREATE TABLE IF NOT EXISTS posts (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    author_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    sport      TEXT NOT NULL,                       -- the sport tag (constants.SPORTS key)
+    body       TEXT NOT NULL DEFAULT '',
+    event_id   INTEGER REFERENCES events(id) ON DELETE SET NULL,  -- a plan post's game
+    created_at TEXT NOT NULL                        -- Seattle time
+);
+CREATE INDEX IF NOT EXISTS idx_posts_sport ON posts(sport, id);
+CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_id, id);
+
+-- A post's photos, in order (resized, hidden info removed: photos.make_chat_photo).
+CREATE TABLE IF NOT EXISTS post_photos (
+    post_id  INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,                      -- 1 to 10
+    image    BLOB NOT NULL,
+    PRIMARY KEY (post_id, position)
+);

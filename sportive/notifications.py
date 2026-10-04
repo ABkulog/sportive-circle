@@ -33,6 +33,7 @@ KINDS = [
     Kind("friend_games", "🆕", "New games from friends and your clubs", "bell", "everyone"),
     Kind("game_chat", "💬", "Your games' group chats", "bell", "everyone"),
     Kind("need_players", "⚡", "Need players posts for your sports", "bell", "everyone"),
+    Kind("feed_posts", "🔥", "New posts in your sports on the feed", "home", "everyone"),
     Kind("badges", "🏅", "Badges you earn", "bell", "everyone"),
     Kind("account", "👤", "Tips about your account", "bell", "everyone"),
     Kind("messages", "✉️", "Direct messages", "messages", "everyone"),
@@ -42,7 +43,7 @@ KINDS = [
     Kind("club_review", "🏛️", "Your club's review (approved or sent back)", "bell", "officers"),
     Kind("suggestion_trends", "💡", "Suggestion topics 3+ people bring up", "admin", "admins"),
 ]
-PLACE_NAMES = {"bell": "In the bell", "messages": "On the messages icon", "friends": "On the friends icon",
+PLACE_NAMES = {"bell": "In the bell", "home": "On the Home tab", "messages": "On the messages icon", "friends": "On the friends icon",
                "clubs": "On the Clubs tab", "admin": "On the admin icon"}
 NOTICE_KINDS = ("invites", "game_updates", "friend_games", "account", "club_review")  # saved as notices (the rest are counted)
 NOTICE_DAYS = 30  # the bell shows notices from the last month
@@ -90,6 +91,8 @@ def _latest(kind):
         return db.execute("SELECT COALESCE(MAX(id), 0) FROM events WHERE is_quick = 1").fetchone()[0]
     if kind == "club_updates":
         return db.execute("SELECT COALESCE(MAX(id), 0) FROM club_posts").fetchone()[0]
+    if kind == "feed_posts":
+        return db.execute("SELECT COALESCE(MAX(id), 0) FROM posts").fetchone()[0]
     return to_db(now_local())  # badges: by time
 
 
@@ -105,7 +108,7 @@ def mark_seen(kind):
 def start_markers(user_id):
     """For a brand-new account: everything that exists right now counts as already seen, and
     anything posted from now on is new."""
-    for kind in ("need_players", "club_updates", "badges"):
+    for kind in ("need_players", "club_updates", "feed_posts", "badges"):
         _set_marker(user_id, kind, _latest(kind))
 
 
@@ -187,6 +190,17 @@ def _count(kind, me):
                   AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ? AND b.blocked_id = e.host_id)
                                                           OR (b.blocker_id = e.host_id AND b.blocked_id = ?))""",
             (now, me, int(_since(me, kind)), me, *sports, me, me, me)).fetchone()[0]
+    if kind == "feed_posts":  # new posts by other people in my sports (the dot on Home)
+        sports = user_sports(me)
+        if not sports:
+            return 0
+        marks = ", ".join("?" for _ in sports)
+        return db.execute(
+            f"""SELECT COUNT(*) FROM posts p JOIN users u ON u.id = p.author_id
+                WHERE p.id > ? AND p.author_id != ? AND u.suspended = 0 AND p.sport IN ({marks})
+                  AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ? AND b.blocked_id = p.author_id)
+                                                          OR (b.blocker_id = p.author_id AND b.blocked_id = ?))""",
+            (int(_since(me, kind)), me, *sports, me, me)).fetchone()[0]
     if kind == "club_updates":
         return db.execute(
             """SELECT COUNT(*) FROM club_posts p JOIN clubs c ON c.id = p.club_id

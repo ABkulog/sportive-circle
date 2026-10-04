@@ -24,6 +24,10 @@ def terms():
     return render_template("pages/terms.html")
 
 
+def community_rules():
+    return render_template("pages/rules.html")
+
+
 @login_required
 def create_menu():
     return render_template("pages/create.html", officer_clubs=officer_clubs(g.user["id"]))
@@ -100,6 +104,7 @@ def register(app):
     app.add_url_rule("/faq", "faq", faq)
     app.add_url_rule("/privacy", "privacy", privacy)
     app.add_url_rule("/terms", "terms", terms)
+    app.add_url_rule("/rules", "community_rules", community_rules)
     app.add_url_rule("/create", "create_menu", create_menu)
     app.add_url_rule("/favicon.ico", "favicon", favicon)
     app.add_url_rule("/robots.txt", "robots", robots)

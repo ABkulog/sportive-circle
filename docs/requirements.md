@@ -111,6 +111,17 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 Ranks, props, vouches, tryout spots and +1s were removed after the first tester session ("ranks should go
 until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 
+### The feed (FEED)
+
+| ID | Requirement | Priority | Status |
+|---|---|---|---|
+| FR-FEED-1 | Home opens on the **Feed**: posts, club updates and club events, and newly posted games for the sports you picked, newest first (your own posts always show). **Games** and **My events** are the next tabs. | Must | ✅ |
+| FR-FEED-2 | Every post has a sport tag. Tapping a tag (or a sport chip at the top) shows that sport only, like a channel; anyone can open any sport's channel. | Must | ✅ |
+| FR-FEED-3 | A post has words (up to 1000 characters) and/or up to 10 photos, which are shrunk and stripped of hidden data (like GPS) and only shown to people logged in who can see the post. Up to 10 posts an hour. | Must | ✅ |
+| FR-FEED-4 | "Make it a plan" (when, how long, where, how many people) turns a post into a real game behind the scenes, checked like any game (the place fits the sport, it's open then, it's in the future, within 60 days). The post shows the headcount and an **I'm in** button; the game gets the usual chat and reminders and isn't shown a second time in the feed. | Must | ✅ |
+| FR-FEED-5 | Posts by people you blocked (or who blocked you) and by suspended people never show. Anyone can report a post (admins see it as "Feed post", with a link to it); the author or an admin can delete it, with its photos. Deleting a plan's post keeps its game. | Must | ✅ |
+| FR-FEED-6 | Club posts in the feed show the club (logo, name, ✓) and a **+ Follow** button for clubs you don't follow yet, which keeps you on the feed. A Community rules page ("athletic, not thirsty") is linked from the composer. | Must | ✅ |
+
 ### Clubs (CLUB)
 
 | ID | Requirement | Priority | Status |

@@ -664,8 +664,9 @@ def asked_for_photo(world):
 
 @then("they can open the feed")
 def can_open_feed(world):
-    response = world.client.get("/")
-    assert response.status_code == 200 and "For you" in response.get_data(as_text=True)
+    for page, words in (("/feed", "Make it a plan"), ("/", "Upcoming games")):     # the feed, and the games list
+        response = world.client.get(page)
+        assert response.status_code == 200 and words in response.get_data(as_text=True), page
 
 
 @then(parsers.parse('"{name}" can log in with the password "{password}"'))

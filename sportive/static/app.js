@@ -540,4 +540,22 @@
   document.addEventListener("submit", (event) => {
     event.target.querySelectorAll(".password-wrap input").forEach((input) => { input.type = "password"; });
   }, true);
+
+  // <input type="file" data-max-files="10">: say how many photos are picked, and stop at the limit
+  // (the server checks too). The count shows in the form's [data-picked] line.
+  document.addEventListener("change", (event) => {
+    const input = event.target;
+    if (!input.matches || !input.matches("input[type=file][data-max-files]")) return;
+    const max = Number(input.dataset.maxFiles);
+    const line = input.form && input.form.querySelector("[data-picked]");
+    if (input.files.length > max) {
+      alert(`You can add up to ${max} photos to a post.`);
+      input.value = "";
+    }
+    if (line) {
+      const count = input.files.length;
+      line.hidden = count === 0;
+      line.textContent = count === 1 ? "1 photo added" : `${count} photos added`;
+    }
+  });
 })();

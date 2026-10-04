@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% from "feed/_cards.html" import feed_item %}
+{% block title %}{{ item.post.full_name }} on Sportive Circle{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('posts.feed') }}" data-back>← Feed</a>
+<h1 class="visually-hidden">Post by {{ item.post.full_name }}</h1>
+{{ feed_item(item, photos) }}
+{% endblock %}

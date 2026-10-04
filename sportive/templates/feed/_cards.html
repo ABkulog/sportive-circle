@@ -1,0 +1,99 @@
+{% from "_macros.html" import avatar, club_logo, event_card, icon %}
+
+{# The game behind a plan post or a club event post: when, where, how many, and "I'm in". #}
+{% macro plan_box(e) %}
+  {% set left = spots_left(e) %}
+  <div class="plan-box">
+    <a class="plan-title" href="{{ url_for('events.detail', event_id=e.id) }}">{{ SPORT_EMOJI[e.sport] }} {{ event_title(e) }}</a>
+    <div class="plan-meta">{{ e.starts_at|when }} · {{ e.location }}</div>
+    <div class="plan-row">
+      <span class="plan-count"><strong>{{ e.going_count + e.extra_players }}</strong>{% if e.max_players %}/{{ e.max_players }}{% endif %} going</span>
+      {% if e.cancelled %}<span class="badge badge-danger">Canceled</span>
+      {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Your plan</span>
+      {% elif e.i_am_going %}<span class="badge badge-success">You're in</span>
+      {% elif can_quick_join(e) %}
+        <form method="post" action="{{ url_for('events.join', event_id=e.id) }}" {% if join_confirm(e) %}data-confirm="{{ join_confirm(e) }}"{% endif %}>
+          {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.full_path }}">
+          <button class="btn btn-small">I'm in</button>
+        </form>
+      {% elif left == 0 %}<span class="badge badge-muted">Full</span>
+      {% else %}<a class="btn btn-small btn-ghost" href="{{ url_for('events.detail', event_id=e.id) }}">See it</a>{% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro sport_tag(sport) %}<a class="sport-tag" href="{{ url_for('posts.feed', sport=sport) }}">#{{ SPORTS[sport].split(' / ')[0]|lower|replace(' ', '') }}</a>{% endmacro %}
+
+{% macro post_card(item, photos) %}
+  {% set p = item.post %}
+  <article class="card feed-card" id="post-{{ p.id }}">
+    <header class="feed-head">
+      <a class="feed-who" href="{{ url_for('profile.view', user_id=p.author_id) }}">
+        {{ avatar(p.author_id, p.full_name, p.avatar_updated, 40) }}
+        <span><strong>{{ p.full_name }}</strong><small class="muted">{{ p.created_at|ago }}</small></span>
+      </a>
+      {{ sport_tag(p.sport) }}
+    </header>
+    {% if p.body %}<p class="feed-body">{{ p.body }}</p>{% endif %}
+    {% set shots = photos.get(p.id, []) %}
+    {% if shots %}
+      <div class="feed-photos {% if shots|length == 1 %}is-single{% endif %}" {% if shots|length > 1 %}aria-label="{{ shots|length }} photos, swipe to see them"{% endif %}>
+        {% for n in shots %}
+          <a href="{{ url_for('posts.photo', post_id=p.id, position=n) }}" class="feed-photo">
+            <img src="{{ url_for('posts.photo', post_id=p.id, position=n) }}" alt="Photo {{ n }} of {{ shots|length }} from {{ p.full_name }}" loading="lazy">
+            {% if shots|length > 1 %}<span class="photo-count">{{ n }}/{{ shots|length }}</span>{% endif %}
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if item.event %}{{ plan_box(item.event) }}{% endif %}
+    <footer class="feed-actions">
+      {% if p.author_id != g.user.id %}<a class="link-button" href="{{ url_for('moderation.report', target_type='post', target_id=p.id) }}">Report</a>{% endif %}
+      {% if p.author_id == g.user.id or is_admin() %}
+        <form method="post" action="{{ url_for('posts.delete', post_id=p.id) }}" data-confirm="Delete this post?">
+          {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.full_path }}">
+          <button class="link-button danger-link">Delete</button>
+        </form>
+      {% endif %}
+    </footer>
+  </article>
+{% endmacro %}
+
+{% macro club_post_card(item) %}
+  {% set p = item.club_post %}
+  <article class="card feed-card is-club">
+    <header class="feed-head">
+      <a class="feed-who" href="{{ url_for('clubs.view', club_id=p.club_id) }}">
+        {{ club_logo(p, 40, logo=p.club_logo or '', club_id=p.club_id) }}
+        <span><strong>{{ p.club_name }} <span class="verified-check" title="Verified UW club">✓</span></strong>
+          <small class="muted">Club · {{ p.created_at|ago }}</small></span>
+      </a>
+      {{ sport_tag(p.sport) }}
+    </header>
+    <p class="feed-body">{{ p.body }}</p>
+    {% if item.event %}{{ plan_box(item.event) }}{% endif %}
+    {% if not p.my_role %}
+      <footer class="feed-actions">
+        <form method="post" action="{{ url_for('clubs.follow', club_id=p.club_id) }}">
+          {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.full_path }}">
+          <button class="btn btn-small btn-ghost">+ Follow</button>
+        </form>
+      </footer>
+    {% endif %}
+  </article>
+{% endmacro %}
+
+{% macro game_card(item) %}
+  {% set e = item.event %}
+  <div class="feed-game">
+    <p class="feed-game-who muted">{{ avatar(e.host_id, e.host_name, e.host_avatar, 24) }}
+      <span><strong>{{ e.host_name.split()[0] }}</strong> posted a game · {{ item.at|ago }}</span></p>
+    {{ event_card(e) }}
+  </div>
+{% endmacro %}
+
+{% macro feed_item(item, photos) %}
+  {% if item.kind == 'post' %}{{ post_card(item, photos) }}
+  {% elif item.kind == 'club_post' %}{{ club_post_card(item) }}
+  {% else %}{{ game_card(item) }}{% endif %}
+{% endmacro %}

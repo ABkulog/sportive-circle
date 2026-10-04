@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Community rules{% endblock %}
+{% block content %}
+<article class="card form-card legal">
+  <p class="eyebrow">Community rules</p>
+  <h1>Athletic, not thirsty</h1>
+  <p>The feed is for the sports side of campus life. Post your plans, PRs, questions, recaps and photos from the
+    court, the trail and the gym. Keep it something your teammates, your club and your coach would be glad to see.</p>
+
+  <h2>Post</h2>
+  <ul>
+    <li>Plans ("hiking Mt Si tomorrow, have a car, need 2"), progress and PRs, questions, game recaps and photos.</li>
+    <li>Tag the right sport, so it reaches the people who play it.</li>
+    <li>Gym and progress photos are welcome. Celebrate the work, not the body.</li>
+  </ul>
+
+  <h2>Don't post</h2>
+  <ul>
+    <li>Sexual or suggestive content, nudity, or photos taken to show off a body rather than a lift, a run or a game.</li>
+    <li>Rating, ranking or commenting on how people look. Ever.</li>
+    <li>Photos of other people who didn't agree to be posted.</li>
+    <li>Harassment, hate, threats, spam, or selling things.</li>
+  </ul>
+
+  <h2>If you see something</h2>
+  <p>Tap <strong>Report</strong> on the post or the profile. Reports go to our team, and the person never finds out who
+    reported them. We remove posts and suspend accounts that break these rules, and the
+    <a href="{{ url_for('terms') }}">Terms</a> apply everywhere on Sportive Circle.</p>
+  <p>Sportive Circle is for UW students 18 and older.</p>
+</article>
+{% endblock %}

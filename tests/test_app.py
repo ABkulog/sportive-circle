@@ -1690,9 +1690,9 @@ def test_same_sections_everywhere(accounts, client):
     for label in ("Home", "Clubs", "Create", "Profile", "Messages", "Friends", "FAQ"):
         assert f'<span class="tab-label">{label}<' in page, label
     assert '<span class="tab-label">News<' not in page                       # one thing: playing
-    assert 'class="tab is-active" href="/" aria-current="page"' in page      # Home is highlighted
+    assert 'class="tab is-active" href="/feed" aria-current="page"' in page  # Home (the feed) is highlighted
     assert 'aria-label="FAQ"' in page                                       # ❓ in the top bar opens the FAQ
-    assert "For you" in page and "My events" in page                        # Home tabs
+    assert ">Feed <" in page and ">Games<" in page and "My events" in page  # Home tabs
     menu = client.get("/create").data.decode()
     assert "Need players" in menu and "New event" in menu and "Register your club" in menu
 
@@ -5337,7 +5337,8 @@ def test_each_notification_shows_in_one_place(accounts, client, app):
     assert places["invites"] == "bell" and places["club_updates"] == "clubs"
     accounts.signup()
     settings = client.get("/settings/notifications").data.decode()
-    assert settings.count('class="switch"') == 10         # club requests (officers) and trends (admins) hidden
+    assert settings.count('class="switch"') == 11         # club requests (officers) and trends (admins) hidden
+    assert "On the Home tab" in settings and "New posts in your sports" in settings
     assert settings.count("In the bell") == 1 and "On the messages icon" in settings   # one heading per place
 
 
