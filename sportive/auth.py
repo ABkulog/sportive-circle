@@ -43,9 +43,21 @@ def login_required(view):
     @functools.wraps(view)
     def wrapped(**kwargs):
         if g.user is None:
-            return redirect(url_for("auth.login", next=request.path))
+            # A form sent after the login ended (e.g. Follow on a phone tab left open) can't be repeated by
+            # opening its address, so after logging in they go back to the page the form was on instead.
+            back = request.path if request.method == "GET" else _page_it_came_from()
+            return redirect(url_for("auth.login", next=back))
         return view(**kwargs)
     return wrapped
+
+
+def _page_it_came_from():
+    """The page on this site a form was sent from (or Home)."""
+    from urllib.parse import urlsplit
+    came_from = urlsplit(request.referrer or "")
+    if came_from.netloc != request.host:
+        return url_for("index")
+    return safe_next(came_from.path + (f"?{came_from.query}" if came_from.query else ""))
 
 
 def csrf_token():

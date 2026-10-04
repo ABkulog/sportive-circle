@@ -6195,6 +6195,21 @@ def test_fixing_capitals_in_a_club_name_keeps_it_live(accounts, client, app):
         assert get_db().execute("SELECT status FROM clubs WHERE id = ?", (club,)).fetchone()[0] == "pending"
 
 
+def test_follow_after_the_login_ended_goes_back_to_the_club(accounts, client, app):
+    _people(accounts, app, "Maya", "Sam")
+    club = _club_with_officer(accounts, client, app)                          # ends logged out
+    sent = client.post(f"/clubs/{club}/follow", headers={"Referer": f"http://localhost/clubs/{club}"})
+    assert sent.status_code == 302 and f"next=/clubs/{club}" in sent.headers["Location"]
+    assert "follow" not in sent.headers["Location"]                              # not the form's address (a 405)
+    page = client.post(f"/login?next=/clubs/{club}", data={"email": "sam@uw.edu", "password": "purple-and-gold"},
+                       follow_redirects=True)
+    assert page.status_code == 200 and CLUB["name"] in page.data.decode()
+    # A form sent from another website goes to Home instead
+    accounts.logout()
+    elsewhere = client.post(f"/clubs/{club}/follow", headers={"Referer": "https://evil.example/clubs/1"})
+    assert elsewhere.headers["Location"] == "/login?next=/"
+
+
 def test_forms_have_back_buttons(accounts, client, app):
     _people(accounts, app, "Maya")
     club = _club_with_officer(accounts, client, app)
