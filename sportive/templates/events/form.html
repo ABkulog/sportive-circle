@@ -47,6 +47,7 @@
         {% for loc in LOCATIONS %}<option {% if form.get('location') == loc %}selected{% endif %}>{{ loc }}</option>{% endfor %}
       </select>
         <small class="muted place-tip" data-place-tip></small>
+    <small class="muted place-hours" data-place-hours aria-live="polite"></small>
     </label>
     <div class="row">
       <label class="field"><span>Starts</span>
@@ -86,6 +87,7 @@
   </form>
 </div>
 <script type="application/json" id="sport-rules">{{ SPORT_RULES|tojson }}</script>
+<script type="application/json" id="place-hours">{{ place_hours()|tojson }}</script>
 <script src="{{ url_for('static', filename='forms.js') }}" defer></script>
 <script src="{{ url_for('static', filename='wizard.js') }}" defer></script>
 {% endblock %}

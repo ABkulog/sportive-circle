@@ -367,8 +367,8 @@ def what_you_would_lose(user_id):
 
 SOLE_OFFICER = """SELECT c.id, c.name FROM clubs c JOIN club_members m ON m.club_id = c.id
            WHERE m.user_id = ? AND m.role = 'officer'
-             AND (SELECT COUNT(*) FROM club_members o JOIN users ou ON ou.id = o.user_id  -- suspended officers can't lead
-                  WHERE o.club_id = c.id AND o.role = 'officer' AND ou.suspended = 0) <= 1
+             AND (SELECT COUNT(*) FROM club_members o JOIN users ou ON ou.id = o.user_id
+                  WHERE o.club_id = c.id AND o.role = 'officer' AND {}) <= 1
              AND {} (c.status = 'approved' AND EXISTS (SELECT 1 FROM club_members o WHERE o.club_id = c.id
                                                         AND o.role != 'officer'))"""
 
@@ -376,13 +376,15 @@ SOLE_OFFICER = """SELECT c.id, c.name FROM clubs c JOIN club_members m ON m.club
 def clubs_only_i_lead(user_id):
     """Live clubs with anyone else in them (members, followers, people asking to join) where this person is the
     only officer: the club would be left without a leader, so they hand it over first."""
-    return get_db().execute(SOLE_OFFICER.format(""), (user_id,)).fetchall()
+    # (A suspended officer can't lead, so they don't count as someone to hand it to.)
+    return get_db().execute(SOLE_OFFICER.format("ou.suspended = 0", ""), (user_id,)).fetchall()
 
 
 def clubs_that_go_with_me(user_id):
     """Clubs only this person runs that nobody else is in yet (still pending, rejected, or no members).
     There's no one to hand them to, so they're deleted with the account instead of blocking it."""
-    return get_db().execute(SOLE_OFFICER.format("NOT"), (user_id,)).fetchall()
+    # (A suspended officer still counts here: if they're let back in, their club should still be there.)
+    return get_db().execute(SOLE_OFFICER.format("1", "NOT"), (user_id,)).fetchall()
 
 
 def keep_games_other_people_played(user_id):
@@ -421,19 +423,30 @@ def delete_account():
     if problem is not None:
         flash(f"{problem or 'That password isn’t right.'} Your account was not deleted.", "error")
         return redirect(url_for("profile.delete_account"))
-    # Games they host disappear with the account, so warn everyone who joined (like canceling would).
-    for event in query_events(["e.host_id = :me", "e.cancelled = 0", "e.ends_at >= :now"],
-                              {"now": to_db(now_local())}):
-        tell_players_it_was_cancelled(event, page_stays=False)
+    # Step down from every club first, in one locked step, checking again that each still has another officer:
+    # two officers deleting their accounts at the same moment can't both go and leave a club with none.
     db = get_db()
+    db.commit()
+    db.execute("BEGIN IMMEDIATE")
+    sole_officer = clubs_only_i_lead(g.user["id"])
+    if sole_officer:
+        db.rollback()
+        flash(f"You're the only officer of {sole_officer[0]['name']}. Make someone else an officer first.", "error")
+        return redirect(url_for("profile.delete_account"))
     for club in clubs_that_go_with_me(g.user["id"]):
         db.execute("DELETE FROM clubs WHERE id = ?", (club["id"],))
+    db.execute("UPDATE club_members SET role = 'member' WHERE user_id = ? AND role = 'officer'", (g.user["id"],))
     # Clubs they own go to the officer who's been there longest (otherwise nobody could ever be made owner again).
     db.execute("""UPDATE clubs SET created_by = (
                       SELECT m.user_id FROM club_members m JOIN users u ON u.id = m.user_id
                       WHERE m.club_id = clubs.id AND m.role = 'officer' AND m.user_id != :me AND u.suspended = 0
                       ORDER BY m.joined_at, m.user_id LIMIT 1)
                   WHERE created_by = :me""", {"me": g.user["id"]})
+    db.commit()
+    # Games they host disappear with the account, so warn everyone who joined (like canceling would).
+    for event in query_events(["e.host_id = :me", "e.cancelled = 0", "e.ends_at >= :now"],
+                              {"now": to_db(now_local())}):
+        tell_players_it_was_cancelled(event, page_stays=False)  # (marks a club event's post "Canceled:" too)
     keep_games_other_people_played(g.user["id"])
     # Games still hosted by this account are deleted with it: older notices linking to them would 404.
     for row in db.execute("SELECT id FROM events WHERE host_id = ?", (g.user["id"],)).fetchall():

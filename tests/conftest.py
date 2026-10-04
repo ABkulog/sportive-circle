@@ -16,6 +16,9 @@ def app(tmp_path):
         "SECRET_KEY": "test",
         "CSRF_ENABLED": False,
         "PASSWORD_HASH_METHOD": "pbkdf2:sha256:1000",  # fast hashing for tests only
+        # Games in tests start "tomorrow at this time", whatever time the tests run: opening hours have their own
+        # tests (they turn this back on), so the rest don't fail at night.
+        "CHECK_PLACE_HOURS": False,
     })
 
 
