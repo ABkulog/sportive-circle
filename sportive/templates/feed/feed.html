@@ -7,14 +7,17 @@
 {% if not sport %}<p class="hello muted">Hey, {{ g.user.full_name.split()[0] }} 👋</p>{% endif %}
 <h1 class="page-title">{{ SPORT_EMOJI[sport] ~ ' ' ~ SPORTS[sport] if sport else "What's happening" }}</h1>
 
-{# Sports as channels: everything from your sports, or tap one to see just that sport. #}
-<nav class="sport-channels" aria-label="Sports">
-  <a class="chip {% if not sport %}is-on{% endif %}" href="{{ url_for('posts.feed') }}" {% if not sport %}aria-current="page"{% endif %}>All</a>
-  {% for s in my_sports %}
-    <a class="chip {% if sport == s %}is-on{% endif %}" href="{{ url_for('posts.feed', sport=s) }}" {% if sport == s %}aria-current="page"{% endif %}>{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</a>
-  {% endfor %}
-  {% if sport and sport not in my_sports %}<a class="chip is-on" aria-current="page" href="{{ url_for('posts.feed', sport=sport) }}">{{ SPORT_EMOJI[sport] }} {{ SPORTS[sport] }}</a>{% endif %}
-</nav>
+{# Which sport: one picker instead of a row of chips to scroll sideways. "All my sports" is everything from the
+   sports you picked; one sport shows just that sport's channel (#running). #}
+<form method="get" action="{{ url_for('posts.feed') }}" class="sport-filter" data-auto-submit>
+  <label for="sport-filter" class="visually-hidden">Show</label>
+  <select id="sport-filter" name="sport">
+    <option value="">All my sports</option>
+    {% if my_sports %}<optgroup label="Your sports">{% for s in my_sports %}<option value="{{ s }}" {% if sport == s %}selected{% endif %}>{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</option>{% endfor %}</optgroup>{% endif %}
+    <optgroup label="Other sports">{% for key, label in SPORTS.items() if key not in my_sports %}<option value="{{ key }}" {% if sport == key %}selected{% endif %}>{{ SPORT_EMOJI[key] }} {{ label }}</option>{% endfor %}</optgroup>
+  </select>
+  <noscript><button class="btn btn-small btn-ghost">Show</button></noscript>
+</form>
 
 {# The post box: one line until you tap it, then the sport, photos, video and "make it a plan" open up. #}
 <form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="card composer" data-composer data-sport-form>
@@ -24,7 +27,7 @@
     {{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 40) }}
     <label class="visually-hidden" for="post-body">Your post</label>
     <textarea id="post-body" name="body" rows="2" maxlength="{{ max_body }}"
-              placeholder="Who's down? Post something…"></textarea>
+              placeholder="Who's down?"></textarea>
   </div>
   <div class="composer-more">
     {% if post_as %}{# club officers can post as themselves or as their club #}

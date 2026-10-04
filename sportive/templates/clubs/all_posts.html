@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "_macros.html" import clubs_tabs %}
+{% from "feed/_cards.html" import feed_item %}
+{% block title %}All clubs{% endblock %}
+{% block content %}
+{{ clubs_tabs('all') }}
+<h1 class="page-title">All clubs</h1>
+<p class="muted page-lead">What every verified UW club is posting. Follow the ones you like and they're in My clubs.</p>
+<div class="stack feed" data-pull-refresh>
+  {% for item in items %}
+    {{ feed_item(item, photos) }}
+  {% else %}
+    <div class="card empty">
+      <p><strong>No club posts yet.</strong></p>
+      <p class="muted"><a href="{{ url_for('clubs.directory') }}">Find a club</a> and follow it.</p>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

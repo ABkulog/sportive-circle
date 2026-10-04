@@ -57,7 +57,7 @@ def test_officers_see_who_is_waiting_on_my_clubs(accounts, client, app):
     accounts.logout()
     accounts.login(email="officer@uw.edu")
     assert "1 waiting</span>" in client.get("/clubs/updates").data.decode()
-    assert "All clubs</a>" not in client.get("/clubs").data.decode()          # Find a club is only for finding
+    assert 'href="/clubs/feed"' in client.get("/clubs").data.decode()          # tabs: All clubs, My clubs, Find a club
 
 
 def test_profiles_show_posts(accounts, client, app):

@@ -1,10 +1,11 @@
 {% macro icon(name) %}<svg class="icon" aria-hidden="true"><use href="#i-{{ name }}"/></svg>{% endmacro %}
 {% macro clubs_tabs(active) %}
   <nav class="home-tabs" aria-label="Clubs">
-    <a href="{{ url_for('clubs.directory') }}" {% if active == 'find' %}class="is-on" aria-current="page"{% endif %}>Find clubs</a>
     {% if g.user %}{% set new_updates = notice_counts().get('club_updates', 0) if active != 'updates' else 0 %}
+      <a href="{{ url_for('clubs.all_posts') }}" {% if active == 'all' %}class="is-on" aria-current="page"{% endif %}>All clubs</a>
       {# The Clubs tab's number is mostly new updates: show it here too, so it's clear where to tap. #}
       <a href="{{ url_for('clubs.updates') }}" {% if active == 'updates' %}class="is-on" aria-current="page"{% endif %}>My clubs{% if new_updates %} <span class="count-dot">{{ new_updates }}</span>{% endif %}</a>{% endif %}
+    <a href="{{ url_for('clubs.directory') }}" {% if active == 'find' %}class="is-on" aria-current="page"{% endif %}>Find a club</a>
   </nav>
 {% endmacro %}
 {% macro home_tabs(active) %}

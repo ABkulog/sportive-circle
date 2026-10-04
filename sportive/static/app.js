@@ -644,4 +644,52 @@
       }
     });
   }
+
+  // 🔥, replies, + Follow, I'm in and Delete on feed cards happen in place: the form is sent in the background
+  // and only its card (or the replies) is swapped for the fresh one from the page the server answers with, so
+  // nothing reloads or jumps. Messages ("Following UW Run Club") show as a toast. Without JavaScript, or if
+  // anything goes wrong, the form simply sends the normal way.
+  function toast(messages) {
+    messages.forEach((flash) => {
+      const note = document.createElement("div");
+      note.className = `${flash.className} toast`;
+      note.setAttribute("role", flash.getAttribute("role") || "status");
+      note.textContent = flash.textContent;
+      document.body.appendChild(note);
+      setTimeout(() => note.classList.add("is-leaving"), 3200);
+      setTimeout(() => note.remove(), 3700);
+    });
+  }
+  document.addEventListener("submit", async (event) => {
+    const form = event.target;
+    if (event.defaultPrevented || !form.matches || !form.matches("form[data-inplace]")) return;
+    const box = form.closest("[data-swap][id]");
+    if (!box || !window.fetch || !window.DOMParser) return;
+    event.preventDefault();
+    const fallback = () => { delete form.dataset.sending; form.submit(); };
+    let response;
+    try {
+      response = await fetch(form.action, { method: "POST", body: new FormData(form), credentials: "same-origin" });
+    } catch (error) { fallback(); return; }
+    if (!response.ok || response.redirected && new URL(response.url).pathname === "/login") { fallback(); return; }
+    const page = new DOMParser().parseFromString(await response.text(), "text/html");
+    toast([...page.querySelectorAll("main > .flash")]);
+    const fresh = page.getElementById(box.id);
+    if (form.dataset.inplace === "remove") {
+      if (/^\/posts\/\d+$/.test(location.pathname)) { location.assign(response.url); return; }  // its own page
+      box.classList.add("is-leaving");
+      setTimeout(() => box.remove(), 250);
+    } else if (fresh) {
+      box.replaceWith(fresh);
+    } else {
+      location.assign(response.url);  // it went somewhere else (e.g. a game's page): follow it
+    }
+  });
+
+  // <form data-auto-submit>: picking an option shows it right away (the feed's sport picker).
+  document.querySelectorAll("form[data-auto-submit] select").forEach((select) => {
+    select.addEventListener("change", () => {
+      if (select.form.requestSubmit) select.form.requestSubmit(); else select.form.submit();
+    });
+  });
 })();

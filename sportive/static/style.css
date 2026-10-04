@@ -1410,3 +1410,21 @@ html:has([data-pull-refresh]), html:has([data-pull-refresh]) body { overscroll-b
   .composer.is-collapsible:not(.is-open) .post-button { padding: 10px 14px; }
   .composer.is-collapsible:not(.is-open) .post-button .icon { display: none; }
 }
+/* Messages after an in-place action (🔥, Follow, a reply): a toast at the bottom that fades away */
+.toast { position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  z-index: 70; max-width: min(92vw, 420px); margin: 0; box-shadow: 0 6px 20px rgb(0 0 0 / .2); transition: opacity .4s; }
+.toast.is-leaving { opacity: 0; }
+.feed-card { transition: opacity .25s; }
+.feed-card.is-leaving { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .toast, .feed-card { transition: none; } }
+/* Calmer cards: Follow in the top corner, one line to a club's events and info, Report/Delete behind ⋯ */
+.head-follow { margin: 0; flex: none; }
+.head-follow .btn { min-height: 32px; padding: 4px 14px; border-radius: 999px; }
+.club-line { display: inline-block; margin-top: 10px; font-size: .88rem; font-weight: 600; }
+.card-more > summary { background: transparent; padding: 4px 10px; color: var(--muted); font-size: 1.1rem; line-height: 1; min-height: 32px; display: flex; align-items: center; }
+.card-more .more-menu-panel { top: auto; bottom: calc(100% + 6px); }
+/* The feed's sport picker: one tidy control instead of a sideways row of chips */
+.sport-filter { margin: 0 0 12px; }
+.sport-filter select { width: auto; max-width: 100%; min-height: 40px; padding: 6px 36px 6px 14px; border-radius: 999px;
+  font-weight: 700; background-color: var(--control); }
+.composer.is-collapsible:not(.is-open) textarea { overflow: hidden; white-space: nowrap; }

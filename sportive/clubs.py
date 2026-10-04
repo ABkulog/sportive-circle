@@ -956,6 +956,16 @@ def officers(club_id):
 
 # --------------------------------------------------------- updates feed
 
+@bp.route("/clubs/feed")
+@login_required
+def all_posts():
+    """All clubs: what every verified club posts (their posts, updates and events), newest first. The Clubs tab
+    opens here; My clubs is the same for just your clubs, and Find a club is the list."""
+    from .posts import my_clubs_items  # (posts.py imports this module)
+    items, photos = my_clubs_items(all_clubs=True)
+    return render_template("clubs/all_posts.html", items=items, photos=photos)
+
+
 @bp.route("/clubs/updates", methods=("GET", "POST"))
 @login_required
 def updates():

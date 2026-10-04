@@ -213,12 +213,12 @@ def club_post_items(club_id, limit=20):
     return items, photos_of([row["id"] for row in rows])
 
 
-def my_clubs_items(limit=60):
+def my_clubs_items(limit=60, all_clubs=False):
     """My clubs: what the clubs I'm in or follow posted, newest first: their feed posts (photos, 🔥, replies) and
-    their updates and event posts, as feed items with photos."""
+    their updates and event posts, as feed items with photos. all_clubs: every verified club's (All clubs)."""
     me = g.user["id"]
     db = get_db()
-    mine = "EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me)"
+    mine = "1" if all_clubs else "EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me)"
     items = [{"kind": "post", "at": row["created_at"], "post": row} for row in db.execute(
         f"""SELECT {POST_FIELDS}, {POST_COUNTS} FROM {POST_FROM}
             WHERE p.club_id IS NOT NULL AND {mine} AND {POST_VISIBLE}
