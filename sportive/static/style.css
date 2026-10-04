@@ -1306,3 +1306,20 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .profile-clubs a:hover { text-decoration: none; }
 .profile-clubs span:not(.badge) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hello { margin: 0 0 2px; font-size: .95rem; }
+.feed-actions { justify-content: flex-start; }
+.feed-actions-spacer { flex: 1; }
+.react-button { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--text); font: inherit; font-size: .88rem; cursor: pointer; min-height: 32px; }
+.react-button:hover { text-decoration: none; background: var(--control); }
+.react-button.is-on { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--bg)); }
+.like-form { margin: 0; }
+.replies { margin-top: 12px; }
+.reply-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 12px; }
+.reply { display: flex; gap: 10px; align-items: flex-start; }
+.reply-body { min-width: 0; flex: 1; }
+.reply-body p { margin: 0; }
+.reply-who { font-weight: 700; color: var(--text); }
+.reply-actions { display: flex; gap: 12px; font-size: .82rem; margin-top: 2px; }
+.reply-actions form { margin: 0; }
+.reply-form { display: flex; gap: 8px; align-items: flex-end; }
+.reply-form textarea { flex: 1; min-width: 0; }

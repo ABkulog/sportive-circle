@@ -5405,7 +5405,7 @@ def test_each_notification_shows_in_one_place(accounts, client, app):
     assert places["invites"] == "bell" and places["club_updates"] == "clubs"
     accounts.signup()
     settings = client.get("/settings/notifications").data.decode()
-    assert settings.count('class="switch"') == 11         # club requests (officers) and trends (admins) hidden
+    assert settings.count('class="switch"') == 12         # club requests (officers) and trends (admins) hidden
     assert "On the Home tab" in settings and "New posts in your sports" in settings
     assert settings.count("In the bell") == 1 and "On the messages icon" in settings   # one heading per place
 

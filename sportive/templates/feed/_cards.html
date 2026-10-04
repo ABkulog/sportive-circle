@@ -48,6 +48,13 @@
     {% endif %}
     {% if item.event %}{{ plan_box(item.event) }}{% endif %}
     <footer class="feed-actions">
+      <form method="post" action="{{ url_for('posts.like', post_id=p.id) }}" class="like-form">
+        {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.full_path }}#post-{{ p.id }}">
+        <button class="react-button {% if p.i_liked %}is-on{% endif %}" aria-pressed="{{ 'true' if p.i_liked else 'false' }}"
+                aria-label="{{ 'Unlike' if p.i_liked else 'Like' }}{% if p.like_count %}, {{ p.like_count }} so far{% endif %}">🔥 <span>{{ p.like_count or '' }}</span></button>
+      </form>
+      <a class="react-button" href="{{ url_for('posts.view', post_id=p.id) }}#replies" aria-label="Replies{% if p.reply_count %}, {{ p.reply_count }}{% endif %}">💬 <span>{{ p.reply_count or 'Reply' }}</span></a>
+      <span class="feed-actions-spacer"></span>
       {% if p.author_id != g.user.id %}<a class="link-button" href="{{ url_for('moderation.report', target_type='post', target_id=p.id) }}">Report</a>{% endif %}
       {% if p.author_id == g.user.id or is_admin() %}
         <form method="post" action="{{ url_for('posts.delete', post_id=p.id) }}" data-confirm="Delete this post?">

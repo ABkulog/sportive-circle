@@ -461,3 +461,21 @@ CREATE TABLE IF NOT EXISTS post_photos (
     image    BLOB NOT NULL,
     PRIMARY KEY (post_id, position)
 );
+
+-- Replies under a feed post (newest last, like a thread).
+CREATE TABLE IF NOT EXISTS post_replies (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id    INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    author_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body       TEXT NOT NULL,
+    created_at TEXT NOT NULL                        -- Seattle time
+);
+CREATE INDEX IF NOT EXISTS idx_post_replies ON post_replies(post_id, id);
+
+-- 🔥 on a feed post: one per person.
+CREATE TABLE IF NOT EXISTS post_likes (
+    post_id    INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (post_id, user_id)
+);

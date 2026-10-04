@@ -115,6 +115,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
+| FR-FEED-8 | Posts have 🔥 (one per person, tap again to take it back) and replies (up to 500 characters, 30 an hour), shown under the post on its own page; the feed shows both counts. The author gets one bell notice per post for 🔥 and one for replies, updated as more come in. Replies can be reported; the reply's author, the post's author or an admin can delete it. Replies from blocked or suspended people are hidden and not counted. | Must | ✅ |
 | FR-FEED-7 | One job per page: **Feed** (what's happening; new games are short announcements there), **Play** ("Find a game": every game with filters), **My events** (your schedule); **Find a club** (finding) and **My clubs** (your clubs, with officers' waiting-to-join counts). Page titles say each page's job. | Must | ✅ |
 | FR-FEED-1 | Home opens on the **Feed**: posts, club updates and club events, and newly posted games for the sports you picked, newest first (your own posts always show). **Games** and **My events** are the next tabs. | Must | ✅ |
 | FR-FEED-2 | Every post has a sport tag. Tapping a tag (or a sport chip at the top) shows that sport only, like a channel; anyone can open any sport's channel. | Must | ✅ |

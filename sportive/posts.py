@@ -9,7 +9,7 @@ from datetime import timedelta
 
 from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, url_for
 
-from .auth import login_required
+from .auth import login_required, safe_next
 from .clubs import MEMBER_ROLES
 from .constants import LOCATIONS, OFF_CAMPUS, SPORT_LOCATIONS, SPORTS
 from .db import get_db, user_sports
@@ -19,6 +19,7 @@ from .friendgames import announce_new_game
 from .moderation import is_admin
 from .photos import make_chat_photo
 from .placehours import closed_message
+from .social import is_blocked_between
 from .textutil import multi_line
 from .timeutil import add_real, exists_in_seattle, from_sqlite_utc, now_local, parse_form, to_db
 
@@ -38,6 +39,20 @@ MAX_PLAN_SPOTS = 50
 POST_VISIBLE = """u.suspended = 0 AND NOT EXISTS (SELECT 1 FROM blocks b
                      WHERE (b.blocker_id = :me AND b.blocked_id = p.author_id)
                         OR (b.blocker_id = p.author_id AND b.blocked_id = :me))"""
+
+
+# Replies whose author I can see (not suspended, no block either way), as SQL on post_replies r / users ru.
+REPLY_VISIBLE = """ru.suspended = 0 AND NOT EXISTS (SELECT 1 FROM blocks b
+                      WHERE (b.blocker_id = :me AND b.blocked_id = r.author_id)
+                         OR (b.blocker_id = r.author_id AND b.blocked_id = :me))"""
+POST_COUNTS = f"""(SELECT COUNT(*) FROM post_photos ph WHERE ph.post_id = p.id) AS photo_count,
+                  (SELECT COUNT(*) FROM post_likes l JOIN users lu ON lu.id = l.user_id
+                   WHERE l.post_id = p.id AND lu.suspended = 0) AS like_count,
+                  EXISTS (SELECT 1 FROM post_likes l WHERE l.post_id = p.id AND l.user_id = :me) AS i_liked,
+                  (SELECT COUNT(*) FROM post_replies r JOIN users ru ON ru.id = r.author_id
+                   WHERE r.post_id = p.id AND {REPLY_VISIBLE}) AS reply_count"""
+MAX_REPLY = 500
+REPLIES_PER_HOUR = 30
 
 
 def _sports_clause(column, sports, params):
@@ -72,8 +87,7 @@ def feed_items(sport=None, before=None, limit=PAGE):
     in_sports = _sports_clause("p.sport", sports, params)
     mine = "" if sport else " OR p.author_id = :me"
     for row in db.execute(
-            f"""SELECT p.*, u.full_name, u.avatar_updated,
-                       (SELECT COUNT(*) FROM post_photos ph WHERE ph.post_id = p.id) AS photo_count
+            f"""SELECT p.*, u.full_name, u.avatar_updated, {POST_COUNTS}
                 FROM posts p JOIN users u ON u.id = p.author_id
                 WHERE ({in_sports}{mine}) AND {POST_VISIBLE} AND p.created_at < :before
                 ORDER BY p.created_at DESC, p.id DESC LIMIT :limit""", params).fetchall():
@@ -149,8 +163,7 @@ def feed():
 def get_post(post_id):
     """A post the person logged in can see (or 404)."""
     post = get_db().execute(
-        f"""SELECT p.*, u.full_name, u.avatar_updated,
-                   (SELECT COUNT(*) FROM post_photos ph WHERE ph.post_id = p.id) AS photo_count
+        f"""SELECT p.*, u.full_name, u.avatar_updated, {POST_COUNTS}
             FROM posts p JOIN users u ON u.id = p.author_id WHERE p.id = :id AND {POST_VISIBLE}""",
         {"id": post_id, "me": g.user["id"]}).fetchone()
     if post is None:
@@ -164,9 +177,87 @@ def view(post_id):
     """One post on its own page (for links from notifications, reports and sharing)."""
     post = get_post(post_id)
     event = _events_by_id([post["event_id"]]).get(post["event_id"]) if post["event_id"] else None
+    replies = get_db().execute(
+        f"""SELECT r.*, ru.full_name, ru.avatar_updated FROM post_replies r JOIN users ru ON ru.id = r.author_id
+            WHERE r.post_id = :id AND {REPLY_VISIBLE} ORDER BY r.id""", {"id": post_id, "me": g.user["id"]}).fetchall()
     return render_template("feed/post.html", item={"kind": "post", "at": post["created_at"], "post": post,
                                                    "event": event},
-                           photos=photos_of([post_id]))
+                           photos=photos_of([post_id]), replies=replies, max_reply=MAX_REPLY)
+
+
+def _can_interact(post):
+    """Replying and 🔥 aren't for blocked pairs (get_post already hides the post from them)."""
+    return post["author_id"] == g.user["id"] or not is_blocked_between(g.user["id"], post["author_id"])
+
+
+def _tell_author(post, text, key):
+    """A notice in the post author's bell (one per post and kind, replaced as more come in)."""
+    if post["author_id"] != g.user["id"]:
+        from .notifications import notify  # (notifications.py is loaded after this module)
+        notify(post["author_id"], "post_activity", text, url_for("posts.view", post_id=post["id"]), key=key)
+
+
+@bp.route("/posts/<int:post_id>/like", methods=("POST",))
+@login_required
+def like(post_id):
+    """🔥 a post, or take it back (a second tap)."""
+    post = get_post(post_id)
+    if not _can_interact(post):
+        abort(403)
+    db = get_db()
+    me = g.user["id"]
+    if db.execute("DELETE FROM post_likes WHERE post_id = ? AND user_id = ?", (post_id, me)).rowcount == 0:
+        db.execute("INSERT INTO post_likes (post_id, user_id, created_at) VALUES (?, ?, ?)",
+                   (post_id, me, to_db(now_local())))
+        count = db.execute("SELECT COUNT(*) FROM post_likes WHERE post_id = ?", (post_id,)).fetchone()[0]
+        first = g.user["full_name"].split()[0]
+        others = f" and {count - 1} other{'s' if count > 2 else ''}" if count > 1 else ""
+        _tell_author(post, f"🔥 {first}{others} liked your post.", f"likes:{post_id}")
+    db.commit()
+    back = request.form.get("next") or ""
+    return redirect(back if back.startswith(("/feed", "/posts/")) and safe_next(back) == back
+                    else url_for("posts.view", post_id=post_id))
+
+
+@bp.route("/posts/<int:post_id>/replies", methods=("POST",))
+@login_required
+def reply(post_id):
+    post = get_post(post_id)
+    if not _can_interact(post):
+        abort(403)
+    body = multi_line(request.form.get("body"))
+    db = get_db()
+    back = url_for("posts.view", post_id=post_id) + "#replies"
+    if not body or len(body) > MAX_REPLY:
+        flash(f"Replies are 1 to {MAX_REPLY} characters.", "error")
+        return redirect(back)
+    recent = db.execute("SELECT COUNT(*) FROM post_replies WHERE author_id = ? AND created_at >= ?",
+                        (g.user["id"], to_db(now_local() - timedelta(hours=1)))).fetchone()[0]
+    if recent >= REPLIES_PER_HOUR:
+        flash(f"You can reply up to {REPLIES_PER_HOUR} times an hour. Try again in a bit.", "error")
+        return redirect(back)
+    db.execute("INSERT INTO post_replies (post_id, author_id, body, created_at) VALUES (?, ?, ?, ?)",
+               (post_id, g.user["id"], body, to_db(now_local())))
+    preview = body if len(body) <= 60 else body[:57] + "…"
+    _tell_author(post, f"💬 {g.user['full_name'].split()[0]} replied to your post: “{preview}”", f"replies:{post_id}")
+    db.commit()
+    return redirect(back)
+
+
+@bp.route("/replies/<int:reply_id>/delete", methods=("POST",))
+@login_required
+def delete_reply(reply_id):
+    """Your own reply, a reply on your post, or (admins) any reply."""
+    row = get_db().execute("""SELECT r.author_id, r.post_id, p.author_id AS post_author FROM post_replies r
+                              JOIN posts p ON p.id = r.post_id WHERE r.id = ?""", (reply_id,)).fetchone()
+    if row is None:
+        abort(404)
+    if g.user["id"] not in (row["author_id"], row["post_author"]) and not is_admin():
+        abort(403)
+    get_db().execute("DELETE FROM post_replies WHERE id = ?", (reply_id,))
+    get_db().commit()
+    flash("Reply deleted.", "info")
+    return redirect(url_for("posts.view", post_id=row["post_id"]) + "#replies")
 
 
 @bp.route("/posts/<int:post_id>/photos/<int:position>")

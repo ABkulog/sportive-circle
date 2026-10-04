@@ -36,6 +36,7 @@ KINDS = [
     Kind("feed_posts", "🔥", "New posts in your sports on the feed", "home", "everyone"),
     Kind("badges", "🏅", "Badges you earn", "bell", "everyone"),
     Kind("account", "👤", "Tips about your account", "bell", "everyone"),
+    Kind("post_activity", "💬", "Replies and 🔥 on your posts", "bell", "everyone"),
     Kind("messages", "✉️", "Direct messages", "messages", "everyone"),
     Kind("friend_requests", "👥", "Friend requests", "friends", "everyone"),
     Kind("club_updates", "📣", "Updates from your clubs", "clubs", "everyone"),
@@ -45,7 +46,7 @@ KINDS = [
 ]
 PLACE_NAMES = {"bell": "In the bell", "home": "On the Home tab", "messages": "On the messages icon", "friends": "On the friends icon",
                "clubs": "On the Clubs tab", "admin": "On the admin icon"}
-NOTICE_KINDS = ("invites", "game_updates", "friend_games", "account", "club_review")  # saved as notices (the rest are counted)
+NOTICE_KINDS = ("invites", "game_updates", "friend_games", "account", "club_review", "post_activity")  # saved as notices (the rest are counted)
 NOTICE_DAYS = 30  # the bell shows notices from the last month
 KIND_BY_KEY = {kind.key: kind for kind in KINDS}
 TABS = ("home", "clubs", "profile", "messages", "friends", "admin")
