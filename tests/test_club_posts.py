@@ -167,7 +167,7 @@ def test_reacting_happens_in_place(accounts, client, app):
     with app.app_context():
         post_id = get_db().execute("SELECT id FROM posts WHERE club_id IS NULL").fetchone()[0]
     page = client.get(f"/posts/{post_id}").data.decode()
-    assert 'id="replies" data-swap' in page and 'class="reply-form" data-inplace' in page
+    assert f'id="replies-{post_id}" data-swap' in page and 'class="reply-form" data-inplace' in page
     js = client.get("/static/app.js").data.decode()
     assert "form[data-inplace]" in js and "replaceWith(fresh)" in js
 
@@ -201,3 +201,23 @@ def test_home_and_club_tabs_stay_under_the_header(client):
     """Scrolled a little, the sticky purple header covered Feed / Play / My events, so the tab row looked empty."""
     css = client.get("/static/style.css").data.decode()
     assert "body.has-app-nav .home-tabs { position: sticky; top: 60px;" in css
+
+
+
+def test_posting_and_opening_replies_stay_on_the_page(accounts, client, app):
+    """Posting from the post box and 💬 reloaded the page or left it: now the post box refreshes just the list
+    under it, and 💬 opens the replies inside the card (app.js)."""
+    accounts.signup(email="officer@uw.edu", sports=("running",))
+    club = approved_club(app, "officer@uw.edu")
+    post(client, body="Hello")
+    with app.app_context():
+        post_id = get_db().execute("SELECT id FROM posts").fetchone()[0]
+    feed = client.get("/feed").data.decode()
+    assert 'data-inplace data-swap-target="#feed-list"' in feed and 'id="feed-list"' in feed
+    assert f'data-replies="replies-{post_id}"' in feed
+    assert 'data-swap-target="#feed-list"' in client.get("/clubs/updates").data.decode()
+    assert 'data-swap-target="#club-posts-list"' in client.get(f"/clubs/{club}").data.decode()
+    reply = client.post(f"/posts/{post_id}/replies", data={"body": "Hi"})
+    assert reply.headers["Location"].endswith(f"#replies-{post_id}")
+    js = client.get("/static/app.js").data.decode()
+    assert "a[data-replies]" in js and "form.dataset.swapTarget" in js

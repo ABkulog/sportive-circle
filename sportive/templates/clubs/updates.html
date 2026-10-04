@@ -30,7 +30,7 @@
 
 {% if my_officer_clubs %}
   {# Officers post as their club, to everyone's feed (and here): words, photos, 🔥 and replies #}
-  <form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="card update-composer">
+  <form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="card update-composer" data-inplace data-swap-target="#feed-list">
     {{ csrf_field() }}<input type="hidden" name="from_my_clubs" value="1">
     <label class="field"><span>✏️ Post an update</span>
       <textarea name="body" rows="3" maxlength="1000"
@@ -52,7 +52,7 @@
   </form>
 {% endif %}
 
-<div class="stack feed" data-pull-refresh>
+<div class="stack feed" id="feed-list" data-pull-refresh>
   {% for item in items %}
     {{ feed_item(item, photos) }}
   {% else %}

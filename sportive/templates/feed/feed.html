@@ -20,7 +20,7 @@
 </form>
 
 {# The post box: one line until you tap it, then the sport, photos, video and "make it a plan" open up. #}
-<form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="card composer" data-composer data-sport-form>
+<form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="card composer" data-composer data-sport-form data-inplace data-swap-target="#feed-list">
   {{ csrf_field() }}
   {% if sport %}<input type="hidden" name="channel" value="{{ sport }}">{% endif %}
   <div class="composer-top">
@@ -92,7 +92,7 @@
   </section>
 {% endif %}
 
-<div class="stack feed" data-pull-refresh>
+<div class="stack feed" id="feed-list" data-pull-refresh>
   {% for item in items %}
     {{ feed_item(item, photos) }}
   {% else %}

@@ -180,7 +180,7 @@
       <p class="muted">You can post updates once the club is verified.</p>
     {% elif role == 'officer' %}
       {# Posts as the club, to everyone's feed: words, photos, 🔥 and replies, like anyone's post #}
-      <form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="form club-post-form">
+      <form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="form club-post-form" data-inplace data-swap-target="#club-posts-list">
         {{ csrf_field() }}
         <input type="hidden" name="as_club" value="{{ club.id }}"><input type="hidden" name="from_club" value="1">
         <input type="hidden" name="sport" value="{{ club.sport }}">
@@ -193,6 +193,7 @@
         <p class="composer-picked muted" data-picked hidden></p>
       </form>
     {% endif %}
+    <div id="club-posts-list">
     {% if feed_posts %}
       <div class="feed club-feed">
         {% for item in feed_posts %}{{ post_card(item, feed_photos) }}{% endfor %}
@@ -213,6 +214,7 @@
         {% if not feed_posts %}<li class="muted">No posts yet.</li>{% endif %}
       {% endfor %}
     </ul>
+    </div>
   </section>
 
   {# Events #}

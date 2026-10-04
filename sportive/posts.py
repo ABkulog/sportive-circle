@@ -373,7 +373,7 @@ def reply(post_id):
         abort(403)
     body = multi_line(request.form.get("body"))
     db = get_db()
-    back = url_for("posts.view", post_id=post_id) + "#replies"
+    back = url_for("posts.view", post_id=post_id) + f"#replies-{post_id}"
     club = None
     if request.form.get("as_club", "").isdigit():  # an officer replying as their club
         club = next((c for c in officer_clubs(g.user["id"]) if c["id"] == int(request.form["as_club"])), None)
@@ -412,7 +412,7 @@ def delete_reply(reply_id):
     get_db().execute("DELETE FROM post_replies WHERE id = ?", (reply_id,))
     get_db().commit()
     flash("Reply deleted.", "info")
-    return redirect(url_for("posts.view", post_id=row["post_id"]) + "#replies")
+    return redirect(url_for("posts.view", post_id=row["post_id"]) + f"#replies-{row['post_id']}")
 
 
 @bp.route("/posts/<int:post_id>/video")
