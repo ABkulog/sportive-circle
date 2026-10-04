@@ -976,6 +976,11 @@ REVIEW_DECISIONS = {
 }
 
 
+def _denied_suffix(club_id):
+    """Added to a denied club's name. Club names are unique, so this frees the name for the real club."""
+    return f" (denied #{club_id})"
+
+
 @bp.route("/admin/clubs/<int:club_id>/<decision>", methods=("POST",))
 @login_required
 def review(club_id, decision):
@@ -999,6 +1004,12 @@ def review(club_id, decision):
         if not moved(new_status, note if decision == "remove" else club["review_note"]):
             flash("That club already moved on. Here's where it is now.", "info")
             return back
+        if decision == "deny":   # free the name, so a squatter can't keep the real club from registering
+            db.execute("UPDATE clubs SET name = ? WHERE id = ?", (club["name"] + _denied_suffix(club_id), club_id))
+        elif decision == "restore" and club["name"].endswith(_denied_suffix(club_id)):
+            original = club["name"][:-len(_denied_suffix(club_id))]
+            if not db.execute("SELECT 1 FROM clubs WHERE name = ? COLLATE NOCASE", (original,)).fetchone():
+                db.execute("UPDATE clubs SET name = ? WHERE id = ?", (original, club_id))
         db.commit()
         if decision == "deny":
             from .events import query_events, tell_players_it_was_cancelled  # events.py imports this module

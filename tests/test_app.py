@@ -2145,6 +2145,45 @@ def test_only_officer_cant_delete_account(accounts, client, app):
         assert get_db().execute("SELECT COUNT(*) FROM users WHERE email = 'captain@uw.edu'").fetchone()[0] == 1
 
 
+def test_denied_club_frees_its_name_for_the_real_club(accounts, client, app):
+    # Someone grabs the real club's name before its officers sign up: denying it as spam frees the name.
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="squatter@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    squat = _club_id(app, CLUB["name"])
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    client.post(f"/admin/clubs/{squat}/deny")
+    assert CLUB["name"] in client.get("/admin/clubs?status=denied").data.decode()   # still findable by the admin
+    accounts.logout()
+    accounts.signup(email="captain@uw.edu")
+    page = client.post("/clubs/new", data=CLUB, follow_redirects=True).data.decode()
+    assert "already on Sportive Circle" not in page
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT COUNT(*) FROM clubs WHERE name = ? AND status = 'pending'", (CLUB["name"],)).fetchone()[0] == 1
+        assert db.execute("SELECT name FROM clubs WHERE id = ?", (squat,)).fetchone()[0] == f"{CLUB['name']} (denied #{squat})"
+    # Restoring the denied one while the real club has the name keeps the marked name
+    accounts.logout()
+    accounts.login(email="admin@uw.edu")
+    client.post(f"/admin/clubs/{squat}/restore")
+    with app.app_context():
+        assert get_db().execute("SELECT name FROM clubs WHERE id = ?", (squat,)).fetchone()[0].endswith(f"(denied #{squat})")
+
+
+def test_restored_club_gets_its_name_back(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="captain@uw.edu")
+    client.post("/clubs/new", data=CLUB)
+    club = _club_id(app, CLUB["name"])
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    client.post(f"/admin/clubs/{club}/deny")
+    client.post(f"/admin/clubs/{club}/restore")                  # the denial was a mistake
+    with app.app_context():
+        assert tuple(get_db().execute("SELECT name, status FROM clubs WHERE id = ?", (club,)).fetchone()) == (CLUB["name"], "pending")
+
+
 def test_make_officer_only_reports_success_when_it_worked(accounts, client, app):
     club = _approved_club(accounts, client, app)
     accounts.signup(email="fan@uw.edu")
