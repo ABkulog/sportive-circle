@@ -6195,6 +6195,18 @@ def test_fixing_capitals_in_a_club_name_keeps_it_live(accounts, client, app):
         assert get_db().execute("SELECT status FROM clubs WHERE id = ?", (club,)).fetchone()[0] == "pending"
 
 
+def test_free_filter_finds_every_way_of_writing_free(accounts, client, app):
+    _people(accounts, app, "Maya")
+    club = _club_with_officer(accounts, client, app)
+    for dues, free in [("Free!", True), ("$0", True), ("None", True), ("No dues", True), ("free (shirt optional)", True),
+                       ("0", True), ("$40/quarter", False), ("Free first quarter, then $40", False)]:
+        with app.app_context():
+            get_db().execute("UPDATE clubs SET dues = ? WHERE id = ?", (dues, club))
+            get_db().commit()
+        listed = f'href="/clubs/{club}"' in client.get("/clubs?easy=free").data.decode()
+        assert listed == free, dues
+
+
 def test_forms_have_back_buttons(accounts, client, app):
     _people(accounts, app, "Maya")
     club = _club_with_officer(accounts, client, app)
