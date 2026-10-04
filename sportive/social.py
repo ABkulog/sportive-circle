@@ -240,9 +240,15 @@ def event_chat_unread():
     return g.chat_unread
 
 
+DELETED_TEXT = "🚫 Message deleted"
+
+
 def message_json(row, me, kind):
     """kind: 'dm' or 'event_message' (for the report link)."""
-    return {
+    if row["deleted"]:  # what's left of a message its sender deleted: no words, photo, game card or report link
+        return {**message_json({**dict(row), "deleted": 0, "photo_id": None, "game_title": None}, me, kind),
+                "deleted": True, "body": DELETED_TEXT, "report": None, "game": None}
+    return {"deleted": False,
         "id": row["id"],
         "mine": row["sender_id"] == me,
         "name": row["full_name"],
@@ -602,6 +608,38 @@ def with_reactions(messages, kind, me, other_or_event, start=None):
     return messages, {str(mid): found[mid] for mid in found}
 
 
+def deleted_ids(table, where, args, start):
+    """Ids of deleted messages from `start` on, so open chats can blank them out too (polls send this)."""
+    return [row[0] for row in get_db().execute(
+        f"SELECT id FROM {table} m WHERE deleted = 1 AND id >= ? AND {where}", (start, *args)).fetchall()]
+
+
+@bp.route("/chat/delete", methods=("POST",))
+@login_required
+def delete_message():
+    """Delete one of your own messages for everyone: its words and photo are gone and it shows as deleted."""
+    kind = request.form.get("kind")
+    message_id = request.form.get("id", type=int)
+    table = {"dm": "direct_messages", "game": "event_messages"}.get(kind)
+    if table is None or not message_id:
+        abort(400)
+    db = get_db()
+    message = db.execute(f"SELECT * FROM {table} WHERE id = ?", (message_id,)).fetchone()
+    if message is None or message["sender_id"] != g.user["id"]:
+        abort(404)
+    db.execute(f"UPDATE {table} SET body = ?, photo_id = NULL, event_id = NULL, deleted = 1 WHERE id = ?"
+               if kind == "dm" else f"UPDATE {table} SET body = ?, photo_id = NULL, deleted = 1 WHERE id = ?",
+               (DELETED_TEXT, message_id))
+    if message["photo_id"]:
+        db.execute("DELETE FROM chat_photos WHERE id = ?", (message["photo_id"],))
+    db.execute("DELETE FROM message_reactions WHERE kind = ? AND message_id = ?", (kind, message_id))
+    db.commit()
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify(id=message_id, deleted=True, body=DELETED_TEXT)
+    return redirect(url_for("social.thread", user_id=message["recipient_id"]) if kind == "dm"
+                    else url_for("social.event_chat", event_id=message["event_id"]))
+
+
 @bp.route("/chat/react", methods=("POST",))
 @login_required
 def react():
@@ -718,7 +756,10 @@ def thread_poll(user_id):
     _mark_read(me, user_id)
     messages, reactions = with_reactions([message_json(r, me, 'dm') for r in rows], "dm", me, user_id,
                                          start=request.args.get("from", 0, type=int))
-    return jsonify(messages=messages, status=dm_status(me, user_id), reactions=reactions)
+    start = request.args.get("from", 0, type=int)
+    gone = deleted_ids("direct_messages", "((sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?))",
+                       (me, user_id, user_id, me), start) if start else []
+    return jsonify(messages=messages, status=dm_status(me, user_id), reactions=reactions, deleted=gone)
 
 
 # -------------------------------------------------------------- event chat
@@ -793,7 +834,9 @@ def event_chat_poll(event_id):
     _mark_chat_seen(event_id, rows)
     messages, reactions = with_reactions([message_json(r, g.user["id"], 'event_message') for r in rows], "game",
                                          g.user["id"], event_id, start=request.args.get("from", 0, type=int))
-    return jsonify(messages=messages, status=group_status(event_id, g.user["id"]), reactions=reactions)
+    start = request.args.get("from", 0, type=int)
+    gone = deleted_ids("event_messages", "event_id = ?", (event_id,), start) if start else []
+    return jsonify(messages=messages, status=group_status(event_id, g.user["id"]), reactions=reactions, deleted=gone)
 
 
 @bp.route("/chat-photos/<int:photo_id>")

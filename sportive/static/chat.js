@@ -60,7 +60,8 @@
     const sameGroup = previous && previous.dataset.sender === String(message.sender)
       && previous.dataset.day === message.day && list.lastElementChild === previous;
     if (sameGroup) previous.classList.add("is-grouped");  // its photo and time move to this new last one
-    const item = el("li", "chat-msg" + (message.mine ? " is-mine" : "") + (sameGroup ? "" : " starts-group"));
+    const item = el("li", "chat-msg" + (message.mine ? " is-mine" : "") + (message.deleted ? " is-deleted" : "")
+                    + (sameGroup ? "" : " starts-group"));
     item.dataset.id = message.id;
     item.dataset.sender = message.sender;
     item.dataset.time = message.time;
@@ -303,6 +304,29 @@
     item.dataset.reactions = "";
     showReactions(item, reactions);
   });
+  // Delete for everyone: the bubble keeps its place and says it was deleted (the other side sees it on its next check).
+  function markDeleted(item, text) {
+    if (!item || item.classList.contains("is-deleted")) return;
+    item.classList.add("is-deleted");
+    const bubble = item.querySelector(".chat-bubble");
+    bubble.classList.remove("is-photo");
+    bubble.querySelectorAll(".chat-photo, .chat-game, :scope > p, .chat-more").forEach((part) => part.remove());
+    bubble.insertBefore(el("p", "", text || "🚫 Message deleted"), bubble.querySelector(".chat-meta"));
+    item.dataset.reactions = "[]";
+    showReactions(item, []);
+  }
+  async function deleteMessage(item) {
+    if (!item || !item.dataset.id || !confirm("Delete this message for everyone?")) return;
+    const data = new FormData();
+    data.append("csrf_token", csrf());
+    data.append("kind", box.dataset.kind === "dm" ? "dm" : "game");
+    data.append("id", item.dataset.id);
+    try {
+      const response = await fetch(box.dataset.deleteUrl, { method: "POST", body: data,
+                                                            headers: { Accept: "application/json" } });
+      if (response.ok) markDeleted(item, (await response.json()).body);
+    } catch (error) { /* offline: nothing changes */ }
+  }
   async function react(item, emoji) {
     if (!item || !item.dataset.id) return;
     const data = new FormData();
@@ -373,7 +397,7 @@
     });
     const actions = el("div", "chat-menu-actions");
     const text = item.querySelector(".chat-bubble > p");
-    if (text && navigator.clipboard) {
+    if (text && navigator.clipboard && !item.classList.contains("is-deleted")) {
       const copy = el("button", "", "Copy");
       copy.type = "button";
       copy.addEventListener("click", () => { navigator.clipboard.writeText(text.textContent).catch(() => {}); closeMenu(true); });
@@ -384,6 +408,12 @@
       const link = el("a", "is-danger", "Report");
       link.href = report.href;
       actions.appendChild(link);
+    }
+    if (item.classList.contains("is-mine") && !item.classList.contains("is-deleted") && box.dataset.deleteUrl) {
+      const remove = el("button", "is-danger", "Delete");
+      remove.type = "button";
+      remove.addEventListener("click", () => { closeMenu(true); deleteMessage(item); });
+      actions.appendChild(remove);
     }
     menu.replaceChildren(emojis);
     if (actions.children.length) menu.appendChild(actions);
@@ -533,6 +563,7 @@
       if (!response.ok) return;
       const answer = await response.json();
       const { status, reactions } = answer;
+      (answer.deleted || []).forEach((id) => markDeleted(list.querySelector(`.chat-msg[data-id="${id}"]`)));
       const messages = answer.messages.filter((m) => m.id > lastId && !list.querySelector(`.chat-msg[data-id="${m.id}"]`));
       if (reactions) {  // reactions change on old messages too: bring every message up to date
         list.querySelectorAll(".chat-msg").forEach((item) => showReactions(item, reactions[item.dataset.id] || []));

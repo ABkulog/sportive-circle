@@ -6,14 +6,14 @@
    (chat.js keeps this up to date as new messages arrive). #}
 {% macro chat_box(messages, poll_url, action, can_send, placeholder, empty_text, draft='', kind='game', status=None) %}
   <div class="chat card{% if not messages %} is-empty{% endif %}" data-poll-url="{{ poll_url }}" data-kind="{{ kind }}"
-       data-react-url="{{ url_for('social.react') }}"
+       data-react-url="{{ url_for('social.react') }}" data-delete-url="{{ url_for('social.delete_message') }}"
        data-last-id="{{ messages[-1].id if messages else 0 }}">
     <ol class="chat-messages" id="chat-messages" aria-live="polite">
       {% set day = namespace(label=None) %}
       {% for m in messages %}
         {% set prev, nxt = loop.previtem, loop.nextitem %}
         {% if m.day != day.label %}{% set day.label = m.day %}<li class="chat-day"><span>{{ m.day }}</span></li>{% endif %}
-        <li class="chat-msg{% if m.mine %} is-mine{% endif %}
+        <li class="chat-msg{% if m.mine %} is-mine{% endif %}{% if m.deleted %} is-deleted{% endif %}
                    {%- if not prev or prev.sender != m.sender or prev.day != m.day %} starts-group{% endif %}
                    {%- if nxt and nxt.sender == m.sender and nxt.day == m.day %} is-grouped{% endif %}"
             data-id="{{ m.id }}" data-sender="{{ m.sender }}" data-day="{{ m.day }}" data-time="{{ m.time }}"
