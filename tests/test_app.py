@@ -4389,9 +4389,13 @@ def test_club_posts_stay_true_however_a_game_ends_or_changes(accounts, client, a
     accounts.signup(email="admin@uw.edu", name="Ad Min")
     app.config["ADMIN_EMAILS"] = "admin@uw.edu"
     client.post(f"/admin/users/{member}/suspend")
-    with app.app_context():
-        assert get_db().execute("SELECT body FROM club_posts WHERE event_id = ?", (single,)).fetchone()[0] \
-            .startswith("Canceled: New event: Open night")
+    with app.app_context():   # another officer (the captain) takes the game over, so it isn't canceled
+        db = get_db()
+        assert db.execute("SELECT body FROM club_posts WHERE event_id = ?", (single,)).fetchone()[0] \
+            .startswith("New event: Open night")
+        assert db.execute("SELECT cancelled FROM events WHERE id = ?", (single,)).fetchone()[0] == 0
+    # (A suspension that does cancel a club game marks its post "Canceled:": see
+    # test_club_events_with_no_other_officer_are_still_canceled_on_suspension.)
 
 
 def test_announcements_texts_and_emails_round_21(accounts, client, app, monkeypatch):
@@ -6213,6 +6217,68 @@ def test_club_owner_adds_and_removes_officers(accounts, client, app):
     with app.app_context():
         roles = dict(get_db().execute("SELECT user_id, role FROM club_members WHERE club_id = ?", (club,)).fetchall())
     assert roles[ids["Sam"]] == "member" and roles[ids["Maya"]] == "officer"
+
+
+def _weekly_run_by_second_officer(accounts, client, app):
+    """Maya owns the club; Sam, another officer, posts a 3-week run. Returns (ids, club). Ends logged out."""
+    ids = _people(accounts, app, "Maya", "Sam", "Admin")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Maya")
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Sam"], "action": "add"})
+    _as(accounts, "Sam")
+    client.post("/events/new", data={**event_form(title="Tuesday Run", sport="spikeball", location="The Quad"),
+                                     "club": club, "repeat": "3"})
+    accounts.logout()
+    return ids, club
+
+
+def _runs(app):
+    with app.app_context():
+        return [tuple(row) for row in get_db().execute(
+            "SELECT host_id, cancelled FROM events WHERE title = 'Tuesday Run' ORDER BY starts_at").fetchall()]
+
+
+def test_club_events_go_to_the_owner_when_their_officer_steps_down(accounts, client, app):
+    ids, club = _weekly_run_by_second_officer(accounts, client, app)
+    assert _runs(app) == [(ids["Sam"], 0)] * 3
+    _as(accounts, "Maya")
+    client.post(f"/clubs/{club}/officers", data={"user": ids["Sam"], "action": "remove"})
+    assert _runs(app) == [(ids["Maya"], 0)] * 3                     # the club's runs go on, run by the owner
+    _as(accounts, "Sam")                                             # and Sam is a player who can leave
+    with app.app_context():
+        first = get_db().execute("SELECT id FROM events WHERE title = 'Tuesday Run' ORDER BY starts_at").fetchone()[0]
+    page = client.post(f"/events/{first}/leave", follow_redirects=True).data.decode()
+    assert "You left" in page and "You&#39;re the host" not in page
+
+
+def test_club_events_stay_when_their_officer_deletes_their_account(accounts, client, app):
+    ids, club = _weekly_run_by_second_officer(accounts, client, app)
+    _as(accounts, "Sam")
+    client.post("/profile/delete", data={"password": "purple-and-gold", "confirm": "DELETE"})
+    assert _runs(app) == [(ids["Maya"], 0)] * 3                     # not deleted, not canceled
+
+
+def test_club_events_stay_when_their_officer_is_suspended(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    ids, club = _weekly_run_by_second_officer(accounts, client, app)
+    _as(accounts, "Admin")
+    client.post(f"/admin/users/{ids['Sam']}/suspend")
+    assert _runs(app) == [(ids["Maya"], 0)] * 3
+
+
+def test_club_events_with_no_other_officer_are_still_canceled_on_suspension(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    ids = _people(accounts, app, "Maya", "Admin")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Maya")
+    client.post("/events/new", data={**event_form(title="Tuesday Run", sport="spikeball", location="The Quad"),
+                                     "club": club})
+    _as(accounts, "Admin")
+    client.post(f"/admin/users/{ids['Maya']}/suspend")
+    assert _runs(app) == [(ids["Maya"], 1)]                          # nobody to hand it to: canceled, as before
+    with app.app_context():
+        assert get_db().execute("SELECT body FROM club_posts WHERE club_id = ? AND body LIKE '%Tuesday Run%'",
+                                (club,)).fetchone()[0].startswith("Canceled: ")
 
 
 def test_fixing_capitals_in_a_club_name_keeps_it_live(accounts, client, app):
