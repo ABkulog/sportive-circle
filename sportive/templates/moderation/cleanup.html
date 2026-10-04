@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Clean up test data{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('moderation.admin_home') }}">← Admin</a>
+<h1 class="page-title">Clean up test data</h1>
+<p class="muted">{% if everything %}Everything on the app. Tick what to delete.{% else %}Things that look like keyboard mashing ("ajsghd").
+  Tick what to delete; nothing goes without a tick.{% endif %}
+  <a href="{{ url_for('cleanup.cleanup', all=None if everything else '1') }}">{{ 'Only junk-looking' if everything else 'Show everything' }}</a></p>
+<form method="post" class="form cleanup-form" data-confirm="Delete everything you ticked? This can't be undone.">
+  {{ csrf_field() }}
+  {% set labels = {'posts': 'Posts', 'replies': 'Replies', 'clubs': 'Clubs (with their posts and games)', 'club_posts': 'Club updates'} %}
+  {% for kind, rows in found.items() %}
+    <fieldset class="cleanup-group">
+      <legend>{{ labels[kind] }} ({{ rows|length }})</legend>
+      {% for row in rows %}
+        <label class="cleanup-row"><input type="checkbox" name="{{ kind }}" value="{{ row.id }}" {% if not everything %}checked{% endif %}>
+          <span><strong>{{ row.name or row.club_name or row.full_name }}</strong>
+            {% if row.body or row.description %}<span class="muted"> · {{ (row.body or row.description)|truncate(90) }}</span>{% endif %}
+            <small class="muted"> · {{ row.created_at }}</small></span></label>
+      {% else %}
+        <p class="muted">None.</p>
+      {% endfor %}
+    </fieldset>
+  {% endfor %}
+  <button class="btn btn-danger">Delete ticked</button>
+</form>
+{% endblock %}

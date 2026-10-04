@@ -1913,10 +1913,10 @@ def test_clubs_featured_on_landing_and_home(accounts, client, app):
     accounts.logout()
     assert "Verified UW clubs" in client.get("/").data.decode() and "UW Spikeball Club" in client.get("/").data.decode()
     accounts.signup(email="fan@uw.edu", sports=("spikeball",))
-    home = client.get("/").data.decode()
+    home = client.get("/feed").data.decode()                        # Clubs for you: on the feed (Play is games)
     assert "Clubs for you" in home and "UW Spikeball Club" in home
     client.post(f"/clubs/{_club_id(app)}/join")
-    assert "Clubs for you" not in client.get("/").data.decode()     # already joined
+    assert "Clubs for you" not in client.get("/feed").data.decode()     # already joined
 
 
 def test_joining_a_club_jumps_to_how_to_join(accounts, client, app):
@@ -2747,10 +2747,10 @@ def test_feed_shows_more_games_a_page_at_a_time(accounts, client, monkeypatch):
                                                    starts_at=form_time(timedelta(days=i + 1)),
                                                    ends_at=form_time(timedelta(days=i + 1, hours=1))))
     first = client.get("/?scope=all&sport=basketball").data.decode()
-    assert first.count("Run number") == 2 and "Show more games" in first
+    assert first.count('class="card event-card') == 2 and "Show more games" in first
     assert "page=2" in first and "sport=basketball" in first.split("Show more games")[0].rsplit("href=", 1)[1]
     second = client.get("/?scope=all&sport=basketball&page=2").data.decode()
-    assert second.count("Run number") == 3 and "Show more games" not in second
+    assert second.count('class="card event-card') == 3 and "Show more games" not in second
     assert client.get("/?scope=all&page=abc").status_code == 200
 
 

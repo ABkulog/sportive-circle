@@ -43,10 +43,10 @@
   <article class="card feed-card {% if p.club_id %}is-club{% endif %}" id="post-{{ p.id }}" data-swap>
     {% if p.club_id %}
       {% set name %}{{ p.club_name }} {{ verified_badge() }}{% endset %}
-      {{ card_head(url_for('clubs.view', club_id=p.club_id), club_logo(p, 40, logo=p.club_logo or '', club_id=p.club_id),
+      {{ card_head(url_for('clubs.view', club_id=p.club_id), club_logo(p, 36, logo=p.club_logo or '', club_id=p.club_id),
                    name, 'Club · ' ~ (p.created_at|ago), p.sport, follow_button(p.club_id, item)) }}
     {% else %}
-      {{ card_head(url_for('profile.view', user_id=p.author_id), avatar(p.author_id, p.full_name, p.avatar_updated, 40),
+      {{ card_head(url_for('profile.view', user_id=p.author_id), avatar(p.author_id, p.full_name, p.avatar_updated, 36),
                    p.full_name, p.created_at|ago, p.sport) }}
     {% endif %}
     {% if p.body %}<p class="feed-body">{{ p.body }}</p>{% endif %}
@@ -122,7 +122,7 @@
   {% else %}
   <article class="card feed-card is-club" id="club-post-{{ p.id }}" data-swap>
     {% set name %}{{ p.club_name }} {{ verified_badge() }}{% endset %}
-    {{ card_head(url_for('clubs.view', club_id=p.club_id), club_logo(p, 40, logo=p.club_logo or '', club_id=p.club_id),
+    {{ card_head(url_for('clubs.view', club_id=p.club_id), club_logo(p, 36, logo=p.club_logo or '', club_id=p.club_id),
                  name, 'Club · ' ~ (p.created_at|ago), p.sport, follow_button(p.club_id, {'my_role': p.my_role})) }}
     <p class="feed-body">{{ p.body }}</p>
     {% if item.event %}{{ plan_box(item.event) }}{% endif %}

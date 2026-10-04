@@ -1487,3 +1487,45 @@ body.has-app-nav .home-tabs { position: sticky; top: 60px; z-index: 20; backgrou
   background: var(--control); color: var(--text); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
 .quick-chip:hover { background: var(--accent-soft); }
 .feed-filters select:last-of-type { flex: 0 0 auto; width: auto; }
+/* Search (clubs and people) */
+.search-box { display: flex; gap: 8px; margin: 0 0 16px; }
+.search-box input { flex: 1; min-width: 0; border-radius: 999px; padding-left: 16px; }
+.result-list { list-style: none; padding: 0; margin: 0 0 18px; display: grid; gap: 4px; }
+.result { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 12px; color: var(--text); }
+.result:hover { background: var(--control); text-decoration: none; }
+.result > span { min-width: 0; }
+.result strong, .result small { display: block; overflow-wrap: anywhere; }
+/* Admin → Clean up test data */
+.cleanup-group { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin: 0 0 12px; }
+.cleanup-group legend { font-weight: 700; padding: 0 6px; }
+.cleanup-row { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; overflow-wrap: anywhere; }
+.cleanup-row input { margin-top: 4px; flex: none; }
+/* Play's map */
+.play-map { height: 220px; border-radius: 14px; margin: 0 0 12px; border: 1px solid var(--line); z-index: 0; }
+.map-game { display: block; margin-top: 4px; font-size: .85rem; }
+.leaflet-tooltip.map-count { background: var(--purple); color: #fff; border: 0; border-radius: 999px; padding: 0 6px;
+  font-weight: 800; font-size: .72rem; box-shadow: none; }
+.leaflet-tooltip.map-count::before { display: none; }
+/* The feed's chips: All · My clubs · your sports · More ▾ (wrap onto a second line instead of scrolling sideways) */
+.feed-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; align-items: center; }
+.feed-chips .chip { min-height: 34px; font-weight: 600; white-space: nowrap; }
+.feed-chips .chip:hover { text-decoration: none; }
+.chip-more { margin: 0; }
+.chip-more select.chip { width: auto; padding: 6px 12px; appearance: none; -webkit-appearance: none; cursor: pointer; font: inherit; font-weight: 600; font-size: .88rem; }
+/* Compact posts, round 2: more posts per screen */
+.feed-card { padding: 10px 12px; }
+.feed-head { gap: 8px; }
+.feed-body { font-size: .92rem; line-height: 1.4; margin-top: 6px; }
+.feed-photos { margin: 6px -12px 0; padding: 0 12px; }
+.feed-photo { flex-basis: 62%; aspect-ratio: 1 / 1; max-height: 230px; }
+@media (min-width: 700px) { .feed-photo { flex-basis: 38%; max-height: 240px; } }
+.feed-photos.is-single .feed-photo, .feed-photos.is-single .feed-photo img, .feed-video { max-height: 260px; }
+.feed-actions { margin-top: 6px; }
+.feed-actions .react-button { min-height: 30px; padding: 2px 10px; font-size: .82rem; }
+.plan-box { margin-top: 8px; padding: 10px; }
+.feed-card .inline-replies { margin: 8px -12px -10px; padding: 8px 12px 10px; }
+.feed-chips { flex-wrap: wrap; }
+.feed-chips .chip { flex: none; }
+.chip-more { flex: 0 1 auto; min-width: 0; }
+.chip-more select.chip { width: auto !important; max-width: 110px; min-width: 0; text-overflow: ellipsis; }
+@media (max-width: 360px) { .feed-chips .chip { padding: 6px 10px; } }

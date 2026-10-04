@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar, club_logo, icon, verified_badge %}
+{% block title %}{{ 'Search: ' ~ q if q else 'Search' }}{% endblock %}
+{% block content %}
+<h1 class="visually-hidden">Search</h1>
+<form method="get" action="{{ url_for('search.search') }}" class="search-box" role="search">
+  <label for="search-q" class="visually-hidden">Search clubs and people</label>
+  <input id="search-q" type="search" name="q" value="{{ q }}" placeholder="Search clubs and people" autocomplete="off" {% if not q %}autofocus{% endif %}>
+  <button class="btn btn-small">Search</button>
+</form>
+
+{% if too_short %}
+  <p class="muted">Type at least 2 letters.</p>
+{% elif q %}
+  <section aria-labelledby="club-results">
+    <h2 class="section-title" id="club-results">Clubs</h2>
+    {% if clubs %}
+      <ul class="result-list">
+        {% for c in clubs %}
+          <li><a class="result" href="{{ url_for('clubs.view', club_id=c.id) }}">{{ club_logo(c, 40) }}
+            <span><strong>{{ c.name }} {{ verified_badge() }}</strong>
+              <small class="muted">{{ SPORTS[c.sport] }} · {{ c.member_count }} member{{ 's' if c.member_count != 1 }}{% if c.my_role %} · {{ {'officer': 'Officer', 'member': 'Member', 'follower': 'Following'}.get(c.my_role, 'Asked to join') }}{% endif %}</small></span></a></li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">No clubs match "{{ q }}". <a href="{{ url_for('clubs.directory') }}">See every club</a></p>
+    {% endif %}
+  </section>
+  <section aria-labelledby="people-results">
+    <h2 class="section-title" id="people-results">People</h2>
+    {% if people %}
+      <ul class="result-list">
+        {% for p in people %}
+          <li><a class="result" href="{{ url_for('profile.view', user_id=p.id) }}">{{ avatar(p.id, p.full_name, p.avatar_updated, 40) }}
+            <span><strong>{{ p.full_name }}</strong>
+              <small class="muted">{{ ('Class of ' ~ p.grad_year) if p.grad_year else 'Husky' }}{% if p.played %} · You've played together{% elif p.mutual %} · {{ p.mutual }} mutual friend{{ 's' if p.mutual != 1 }}{% endif %}</small></span></a></li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">No one matches "{{ q }}".</p>
+    {% endif %}
+  </section>
+{% else %}
+  <p class="muted">Find a club to follow, or a friend. <a href="{{ url_for('clubs.directory') }}">See every club →</a></p>
+{% endif %}
+{% endblock %}

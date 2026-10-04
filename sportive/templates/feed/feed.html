@@ -4,23 +4,29 @@
 {% block title %}{{ '#' ~ SPORTS[sport] if sport else "Feed" }}{% endblock %}
 {% block content %}
 {{ home_tabs('posts') }}
-{# Like Twitter: no big title, just what to show (two menus) and the post box. #}
-<h1 class="visually-hidden">{{ SPORTS[sport] ~ ' feed' if sport else 'Feed' }}</h1>
-<form method="get" action="{{ url_for('posts.feed') }}" class="feed-filters" data-auto-submit>
-  <label for="sport-filter" class="visually-hidden">Sport</label>
-  <select id="sport-filter" name="sport">
-    <option value="">All my sports</option>
-    {% if my_sports %}<optgroup label="Your sports">{% for s in my_sports %}<option value="{{ s }}" {% if sport == s %}selected{% endif %}>{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</option>{% endfor %}</optgroup>{% endif %}
-    <optgroup label="Other sports">{% for key, label in SPORTS.items() if key not in my_sports %}<option value="{{ key }}" {% if sport == key %}selected{% endif %}>{{ SPORT_EMOJI[key] }} {{ label }}</option>{% endfor %}</optgroup>
-  </select>
-  <label for="show-filter" class="visually-hidden">From</label>
-  <select id="show-filter" name="show">
-    <option value="">Everyone</option>
-    <option value="clubs" {% if show == 'clubs' %}selected{% endif %}>All clubs</option>
-    <option value="myclubs" {% if show == 'myclubs' %}selected{% endif %}>My clubs</option>
-  </select>
-  <noscript><button class="btn btn-small btn-ghost">Show</button></noscript>
-</form>
+{# Like Twitter: no big title. One row of chips, one choice at a time: everything, your clubs, or one sport. #}
+<h1 class="visually-hidden">{{ SPORTS[sport] ~ ' feed' if sport else ('My clubs' if show == 'myclubs' else 'Feed') }}</h1>
+{% set shown_sports = my_sports[:2] %}{# two fit on one line on a phone; the rest are in More ▾ #}
+<nav class="feed-chips" aria-label="Show">
+  {% set all_on = not sport and show != 'myclubs' %}{# (the old All clubs link lands here too: club posts are in All) #}
+  <a class="chip {% if all_on %}is-on{% endif %}" href="{{ url_for('posts.feed') }}" {% if all_on %}aria-current="page"{% endif %}>All</a>
+  <a class="chip {% if show == 'myclubs' %}is-on{% endif %}" href="{{ url_for('posts.feed', show='myclubs') }}" {% if show == 'myclubs' %}aria-current="page"{% endif %}>My clubs</a>
+  {% for s in shown_sports %}
+    <a class="chip {% if sport == s and not show %}is-on{% endif %}" href="{{ url_for('posts.feed', sport=s) }}" {% if sport == s and not show %}aria-current="page"{% endif %}>{{ SPORT_EMOJI[s] }} {{ SPORTS[s].split(' / ')[0] }}</a>
+  {% endfor %}
+  {% if sport and sport not in shown_sports %}
+    <a class="chip is-on" href="{{ url_for('posts.feed', sport=sport) }}" aria-current="page">{{ SPORT_EMOJI[sport] }} {{ SPORTS[sport].split(' / ')[0] }}</a>
+  {% endif %}
+  <form method="get" action="{{ url_for('posts.feed') }}" class="chip-more" data-auto-submit>
+    <label for="more-sports" class="visually-hidden">Another sport</label>
+    <select id="more-sports" name="sport" class="chip">
+      <option value="">More ▾</option>
+      {% if my_sports[2:] %}<optgroup label="Your sports">{% for key in my_sports[2:] %}<option value="{{ key }}">{{ SPORT_EMOJI[key] }} {{ SPORTS[key] }}</option>{% endfor %}</optgroup>{% endif %}
+      <optgroup label="All sports">{% for key, label in SPORTS.items() if key not in my_sports %}<option value="{{ key }}">{{ SPORT_EMOJI[key] }} {{ label }}</option>{% endfor %}</optgroup>
+    </select>
+    <noscript><button class="btn btn-small btn-ghost">Show</button></noscript>
+  </form>
+</nav>
 {% if show %}<p class="muted small feed-find-club"><a href="{{ url_for('clubs.directory') }}">Find a club to follow →</a>{% if show == 'myclubs' %} · <a href="{{ url_for('clubs.updates') }}">Manage my clubs</a>{% endif %}</p>{% endif %}
 
 {# The post box: one line until you tap it, then the sport, photos, video and "make it a plan" open up. #}
