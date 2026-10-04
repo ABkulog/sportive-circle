@@ -198,12 +198,12 @@ def insert_event(data, reserve=()):
     cur = db.execute(
         """INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level,
                                max_players, extra_players, note, is_quick, club_id, is_private, password, team_size,
-                               open_to, members_only)
+                               open_to, members_only, try_it)
            VALUES (:host_id, :title, :sport, :location, :starts_at, :ends_at, :skill_level,
                    :max_players, :extra_players, :note, :is_quick, :club_id, :is_private, :password, :team_size,
-                   :open_to, :members_only)""",
+                   :open_to, :members_only, :try_it)""",
         {"host_id": g.user["id"], "extra_players": 0, "is_quick": 0, "club_id": None, "is_private": 0,
-         "password": "", "team_size": None, "open_to": "everyone", "members_only": 0, **data},
+         "password": "", "team_size": None, "open_to": "everyone", "members_only": 0, "try_it": 0, **data},
     )
     # The host is automatically going to their own event (on team 1 in a team vs team game).
     db.execute("INSERT INTO rsvps (event_id, user_id, created_at, team) VALUES (?, ?, ?, ?)",
@@ -586,8 +586,11 @@ def create():
         if error is None and club is not None:
             # Club events: any mix of levels; they can be for members only, and repeat weekly (practices).
             data.update(club_id=club["id"], skill_level=club_levels(form),
-                        members_only=1 if form.get("is_private") == "members" else 0)
-            if not 1 <= repeat <= MAX_REPEAT_WEEKS:
+                        members_only=1 if form.get("is_private") == "members" else 0,
+                        try_it=1 if form.get("try_it") else 0)
+            if data["try_it"] and (data["members_only"] or data["is_private"]):
+                error = "A try-it-out session is for new people, so it has to be open to everyone."
+            elif not 1 <= repeat <= MAX_REPEAT_WEEKS:
                 error = f"A club event can repeat for up to {MAX_REPEAT_WEEKS} weeks."
             elif from_db(data["starts_at"]) + timedelta(weeks=repeat - 1) > now_local() + timedelta(days=MAX_DAYS_AHEAD):
                 error = "The last week would be more than a year away. Repeat for fewer weeks."
@@ -689,13 +692,14 @@ def club_event_text(data, repeat):
     if data.get("is_private"):  # private: only invited people and password holders get the details
         return ("New private events." if repeat > 1 else "New private event.") + " Invited people: see your invites."
     when = fmt_when(data["starts_at"])
+    welcome = "👋 Try it out, new people welcome! " if data.get("try_it") else ""
     if repeat > 1:
         starts = from_db(data["starts_at"])
         text = (f"New: {data['title']}, every {starts.strftime('%A')} at {fmt_clock(data['starts_at'])} "
                 f"for {repeat} weeks, starting {when} · {data['location']}")
     else:
         text = f"New event: {data['title']} · {when} · {data['location']}"
-    return text
+    return welcome + text
 
 
 def club_for_new_event(club_id):

@@ -33,6 +33,7 @@ def close_db(exception=None):
 # To add a column later: put it in schema.sql AND append it here.
 # (Columns and tables of removed features, like ranks, stay in older databases unused; nothing reads them.)
 ADDED_COLUMNS = [
+    ("events", "try_it", "INTEGER NOT NULL DEFAULT 0"),  # a club's try-it-out session: new people welcome
     ("direct_messages", "deleted", "INTEGER NOT NULL DEFAULT 0"),  # 1 = its sender deleted it for everyone
     ("event_messages", "deleted", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "verify_sent_at", "TEXT"),

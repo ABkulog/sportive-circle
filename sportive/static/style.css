@@ -1328,3 +1328,15 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .news-title { display: block; margin-top: 10px; font-weight: 700; font-size: 1.02rem; color: var(--text); overflow-wrap: anywhere; }
 .news-source { margin: 6px 0 0; }
 .chat-msg.is-deleted .chat-bubble > p { font-style: italic; opacity: .8; }
+.plan-welcome { margin: 6px 0 0; font-size: .85rem; font-weight: 600; color: var(--gold-ink); }
+.friends-line { margin: 8px 0 0; font-size: .88rem; font-weight: 600; color: var(--purple); }
+.officer-week { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; margin: 12px 0 0; padding: 10px 12px;
+  border-radius: 12px; background: var(--accent-soft); font-size: .88rem; }
+.officer-week small { flex-basis: 100%; }
+.clubs-for-you .home-section-title { margin-top: 0; }
+.pick-row { list-style: none; margin: 10px 0 0; padding: 0; display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; }
+.pick-row::-webkit-scrollbar { display: none; }
+.pick { flex: none; width: 112px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.pick a { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text); font-size: .82rem; font-weight: 600; }
+.pick a span { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.pick form { margin: 0; }

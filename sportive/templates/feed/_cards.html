@@ -6,6 +6,7 @@
   <div class="plan-box">
     <a class="plan-title" href="{{ url_for('events.detail', event_id=e.id) }}">{{ SPORT_EMOJI[e.sport] }} {{ event_title(e) }}</a>
     <div class="plan-meta">{{ e.starts_at|when }} · {{ e.location }}</div>
+    {% if e.try_it %}<p class="plan-welcome">👋 Try-it-out session: new people welcome</p>{% endif %}
     <div class="plan-row">
       <span class="plan-count"><strong>{{ e.going_count + e.extra_players }}</strong>{% if e.max_players %}/{{ e.max_players }}{% endif %} going</span>
       {% if e.cancelled %}<span class="badge badge-danger">Canceled</span>
@@ -79,6 +80,7 @@
     </header>
     <p class="feed-body">{{ p.body }}</p>
     {% if item.event %}{{ plan_box(item.event) }}{% endif %}
+    {% if item.friends %}<p class="friends-line">👥 {{ item.friends }}</p>{% endif %}
     {% if not p.my_role %}
       <footer class="feed-actions">
         <form method="post" action="{{ url_for('clubs.follow', club_id=p.club_id) }}">

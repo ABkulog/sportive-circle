@@ -139,6 +139,7 @@
       <div class="event-meta">{{ e.location }}</div>
       <div class="badges">
         {% if e.club_name %}<span class="badge badge-club">🏛️ {{ e.club_name }}</span>{% endif %}
+        {% if e.try_it %}<span class="badge badge-gold">👋 New people welcome</span>{% endif %}
         {% if e.is_private %}<span class="badge">🔒 Private</span>{% endif %}
         {% if e.team_size %}<span class="badge">{{ e.team_size }}v{{ e.team_size }} teams</span>{% endif %}
         {% if e.members_only %}<span class="badge">Members only</span>{% endif %}
