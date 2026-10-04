@@ -36,6 +36,10 @@
       {{ sport_tag(p.sport) }}
     </header>
     {% if p.body %}<p class="feed-body">{{ p.body }}</p>{% endif %}
+    {% if p.has_video %}
+      <video class="feed-video" src="{{ url_for('posts.video', post_id=p.id) }}" controls playsinline preload="metadata"
+             aria-label="Video from {{ p.full_name }}"></video>
+    {% endif %}
     {% set shots = photos.get(p.id, []) %}
     {% if shots %}
       <div class="feed-photos {% if shots|length == 1 %}is-single{% endif %}" {% if shots|length > 1 %}aria-label="{{ shots|length }} photos, swipe to see them"{% endif %}>

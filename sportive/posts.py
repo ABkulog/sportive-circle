@@ -7,7 +7,9 @@ sports you picked. Tapping a sport tag shows just that sport (its "channel").
 """
 from datetime import timedelta
 
-from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, url_for
+import os
+
+from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, send_file, url_for
 
 from .auth import login_required, safe_next
 from .clubs import MEMBER_ROLES
@@ -21,6 +23,7 @@ from .photos import make_chat_photo
 from .placehours import closed_message
 from .social import is_blocked_between
 from .textutil import multi_line
+from .videos import MAX_SECONDS, VideoError, check_and_save, path_of, remove_files
 from .timeutil import add_real, exists_in_seattle, from_sqlite_utc, now_local, parse_form, to_db
 
 bp = Blueprint("posts", __name__)
@@ -46,6 +49,7 @@ REPLY_VISIBLE = """ru.suspended = 0 AND NOT EXISTS (SELECT 1 FROM blocks b
                       WHERE (b.blocker_id = :me AND b.blocked_id = r.author_id)
                          OR (b.blocker_id = r.author_id AND b.blocked_id = :me))"""
 POST_COUNTS = f"""(SELECT COUNT(*) FROM post_photos ph WHERE ph.post_id = p.id) AS photo_count,
+                  EXISTS (SELECT 1 FROM post_videos pv WHERE pv.post_id = p.id) AS has_video,
                   (SELECT COUNT(*) FROM post_likes l JOIN users lu ON lu.id = l.user_id
                    WHERE l.post_id = p.id AND lu.suspended = 0) AS like_count,
                   EXISTS (SELECT 1 FROM post_likes l WHERE l.post_id = p.id AND l.user_id = :me) AS i_liked,
@@ -167,6 +171,7 @@ def feed():
     return render_template("feed/feed.html", items=items, older=older, sport=sport, my_sports=user_sports(g.user["id"]),
                            photos=photos_of([i["post"]["id"] for i in items if i["kind"] == "post"]),
                            durations=PLAN_DURATIONS, max_photos=MAX_PHOTOS, max_body=MAX_BODY, form={},
+                           max_seconds=MAX_SECONDS,
                            member_roles=MEMBER_ROLES, club_picks=club_picks)
 
 
@@ -270,6 +275,20 @@ def delete_reply(reply_id):
     return redirect(url_for("posts.view", post_id=row["post_id"]) + "#replies")
 
 
+@bp.route("/posts/<int:post_id>/video")
+@login_required
+def video(post_id):
+    """A post's video, for people who can see the post (byte ranges work, so phones can seek and stream)."""
+    get_post(post_id)
+    row = get_db().execute("SELECT filename FROM post_videos WHERE post_id = ?", (post_id,)).fetchone()
+    path = path_of(row["filename"]) if row else None
+    if not path or not os.path.exists(path):
+        abort(404)
+    response = send_file(path, mimetype="video/mp4", conditional=True, max_age=31536000)
+    response.headers["Cache-Control"] = "private, max-age=31536000, immutable"
+    return response
+
+
 @bp.route("/posts/<int:post_id>/photos/<int:position>")
 @login_required
 def photo(post_id, position):
@@ -349,8 +368,12 @@ def create():
         error = f"Posts can be up to {MAX_BODY} characters."
     if error is None:
         jpegs, error = _read_photos()
-    if error is None and not body and not jpegs:
-        error = "Write something or add a photo."
+    video_upload = request.files.get("video")
+    video_upload = video_upload if video_upload and video_upload.filename else None
+    if error is None and video_upload and jpegs:
+        error = "Post photos or a video, not both."
+    if error is None and not body and not jpegs and not video_upload:
+        error = "Write something, or add a photo or a video."
     db = get_db()
     if error is None:
         recent = db.execute("SELECT COUNT(*) FROM posts WHERE author_id = ? AND created_at >= ?",
@@ -362,6 +385,12 @@ def create():
         plan, error = _read_plan(form, sport, body)
         if error is None:
             error = posting_too_fast(1)
+    video = None
+    if error is None and video_upload:
+        try:
+            video = check_and_save(video_upload)
+        except VideoError as problem:
+            error = str(problem)
     if error is not None:
         flash(error, "error")
         return redirect(back)
@@ -370,6 +399,9 @@ def create():
                      (g.user["id"], sport, body, event_id, to_db(now_local())))
     for position, jpeg in enumerate(jpegs, start=1):
         db.execute("INSERT INTO post_photos (post_id, position, image) VALUES (?, ?, ?)", (cur.lastrowid, position, jpeg))
+    if video:
+        db.execute("INSERT INTO post_videos (post_id, filename, size, seconds) VALUES (?, ?, ?, ?)",
+                   (cur.lastrowid, *video))
     db.commit()
     if event_id:
         from .events import get_event  # (the game with its host's name, for the "Maya posted" notices)
@@ -388,8 +420,10 @@ def delete(post_id):
     if post["author_id"] != g.user["id"] and not is_admin():
         abort(403)
     db = get_db()
+    files = [row[0] for row in db.execute("SELECT filename FROM post_videos WHERE post_id = ?", (post_id,))]
     db.execute("DELETE FROM posts WHERE id = ?", (post_id,))
     db.commit()
+    remove_files(files)
     flash("Post deleted." + (" The plan's game is still on: cancel it from its page if it's off."
                              if post["event_id"] and post["author_id"] == g.user["id"] else ""), "info")
     return redirect(request.form.get("next") if (request.form.get("next") or "").startswith("/feed")

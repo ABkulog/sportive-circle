@@ -479,3 +479,11 @@ CREATE TABLE IF NOT EXISTS post_likes (
     created_at TEXT NOT NULL,
     PRIMARY KEY (post_id, user_id)
 );
+
+-- A post's video (one per post, up to a minute): a file in the videos folder next to the database (videos.py).
+CREATE TABLE IF NOT EXISTS post_videos (
+    post_id  INTEGER PRIMARY KEY REFERENCES posts(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    size     INTEGER NOT NULL,                      -- bytes, for the space quota
+    seconds  REAL NOT NULL
+);
