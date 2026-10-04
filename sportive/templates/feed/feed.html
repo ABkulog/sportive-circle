@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import home_tabs, icon, club_logo %}
+{% from "_macros.html" import home_tabs, icon, club_logo, avatar, open_to_field, place_check %}
 {% from "feed/_cards.html" import feed_item %}
 {% block title %}{{ '#' ~ SPORTS[sport] if sport else "Feed: what's happening" }}{% endblock %}
 {% block content %}
@@ -9,44 +9,65 @@
 
 {# Sports as channels: everything from your sports, or tap one to see just that sport. #}
 <nav class="sport-channels" aria-label="Sports">
-  <a class="chip {% if not sport %}is-on{% endif %}" href="{{ url_for('posts.feed') }}" {% if not sport %}aria-current="page"{% endif %}>My sports</a>
+  <a class="chip {% if not sport %}is-on{% endif %}" href="{{ url_for('posts.feed') }}" {% if not sport %}aria-current="page"{% endif %}>All</a>
   {% for s in my_sports %}
     <a class="chip {% if sport == s %}is-on{% endif %}" href="{{ url_for('posts.feed', sport=s) }}" {% if sport == s %}aria-current="page"{% endif %}>{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</a>
   {% endfor %}
   {% if sport and sport not in my_sports %}<a class="chip is-on" aria-current="page" href="{{ url_for('posts.feed', sport=sport) }}">{{ SPORT_EMOJI[sport] }} {{ SPORTS[sport] }}</a>{% endif %}
 </nav>
 
-<form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="card composer" data-composer>
+{# The post box: one line until you tap it, then the sport, photos, video and "make it a plan" open up. #}
+<form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="card composer" data-composer data-sport-form>
   {{ csrf_field() }}
   {% if sport %}<input type="hidden" name="channel" value="{{ sport }}">{% endif %}
-  <label class="visually-hidden" for="post-body">Your post</label>
-  <textarea id="post-body" name="body" rows="2" maxlength="{{ max_body }}"
-            placeholder="Who's down? A PR, a question, a plan…"></textarea>
-  <div class="composer-row">
-    <select name="sport" aria-label="Sport tag" required>
-      <option value="">Tag a sport</option>
-      {% if my_sports %}<optgroup label="Your sports">{% for key in my_sports %}<option value="{{ key }}" {% if key == (sport or (my_sports[0] if my_sports|length == 1 else '')) %}selected{% endif %}>{{ SPORTS[key] }}</option>{% endfor %}</optgroup>{% endif %}
-      <optgroup label="All sports">{% for key, label in SPORTS.items() if key not in my_sports %}<option value="{{ key }}" {% if key == sport %}selected{% endif %}>{{ label }}</option>{% endfor %}</optgroup>
-    </select>
-    <label class="btn btn-ghost btn-small composer-photos" title="Add up to {{ max_photos }} photos">{{ icon('camera') }}<span>Photos</span>
-      <input type="file" name="photos" accept="image/*" multiple data-max-files="{{ max_photos }}" class="visually-hidden"></label>
-    <label class="btn btn-ghost btn-small composer-photos" title="Add a video, up to 1 minute">🎬<span>Video</span>
-      <input type="file" name="video" accept="video/mp4,video/quicktime,video/*" data-max-seconds="{{ max_seconds }}" class="visually-hidden"></label>
+  <div class="composer-top">
+    {{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 40) }}
+    <label class="visually-hidden" for="post-body">Your post</label>
+    <textarea id="post-body" name="body" rows="2" maxlength="{{ max_body }}"
+              placeholder="Who's down? Post something…"></textarea>
   </div>
-  <p class="composer-picked muted" data-picked hidden></p>
-  <label class="toggle plan-toggle"><input type="checkbox" name="plan" value="1"><span>📅 Make it a plan (people tap <strong>I'm in</strong>)</span></label>
-  <fieldset class="plan-fields">
-    <legend class="visually-hidden">Plan details</legend>
-    <label class="field"><span>When</span><input type="datetime-local" name="starts_at"></label>
-    <label class="field"><span>How long</span>
-      <select name="duration">{% for minutes, label in durations %}<option value="{{ minutes }}" {% if minutes == 120 %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-    <label class="field"><span>Where</span>
-      <select name="location"><option value="">Pick a place</option>
-        {% for place in LOCATIONS %}<option value="{{ place }}">{{ place }}</option>{% endfor %}</select></label>
-    <label class="field"><span>People you need</span><input type="number" name="spots" min="1" max="50" value="2" inputmode="numeric"></label>
-  </fieldset>
+  <div class="composer-more">
+    {% if post_as %}{# club officers can post as themselves or as their club #}
+      <label class="post-as"><span>Post as</span>
+        <select name="as_club">
+          <option value="">{{ g.user.full_name }}</option>
+          {% for c in post_as %}<option value="{{ c.id }}" {% if c.id == as_club %}selected{% endif %}>{{ c.name }} ✓ (club)</option>{% endfor %}
+        </select></label>
+    {% endif %}
+    <div class="composer-row">
+      <select name="sport" aria-label="Sport tag" aria-describedby="sport-hint" required data-sport-pick>
+        <option value="">Tag a sport</option>
+        {% if my_sports %}<optgroup label="Your sports">{% for key in my_sports %}<option value="{{ key }}" {% if key == (sport or (my_sports[0] if my_sports|length == 1 else '')) %}selected{% endif %}>{{ SPORTS[key] }}</option>{% endfor %}</optgroup>{% endif %}
+        <optgroup label="All sports">{% for key, label in SPORTS.items() if key not in my_sports %}<option value="{{ key }}" {% if key == sport %}selected{% endif %}>{{ label }}</option>{% endfor %}</optgroup>
+      </select>
+      <label class="btn btn-ghost btn-small composer-photos" title="Add up to {{ max_photos }} photos">{{ icon('camera') }}<span>Photos</span>
+        <input type="file" name="photos" accept="image/*" multiple data-max-files="{{ max_photos }}" class="visually-hidden"></label>
+      <label class="btn btn-ghost btn-small composer-photos" title="Add a video, up to 1 minute">🎬<span>Video</span>
+        <input type="file" name="video" accept="video/mp4,video/quicktime,video/*" data-max-seconds="{{ max_seconds }}" class="visually-hidden"></label>
+    </div>
+    <p class="composer-hint muted" id="sport-hint" data-sport-hint>Everyone who plays that sport sees it, and it's in that sport's channel.</p>
+    <p class="composer-picked muted" data-picked hidden></p>
+    <label class="toggle plan-toggle"><input type="checkbox" name="plan" value="1"><span>📅 Make it a plan (people tap <strong>I'm in</strong>)</span></label>
+    {# A plan is a real game: the same places (only the ones for that sport), hours and choices as Create a game #}
+    <fieldset class="plan-fields">
+      <legend class="visually-hidden">Plan details</legend>
+      <label class="field"><span>When</span><input type="datetime-local" name="starts_at" min="{{ min_start }}"></label>
+      <label class="field"><span>How long</span>
+        <select name="duration">{% for minutes, label in durations %}<option value="{{ minutes }}" {% if minutes == 120 %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="field plan-where"><span>Where</span>
+        <select name="location"><option value="">Pick a place</option>
+          {% for place in LOCATIONS %}<option value="{{ place }}">{{ place }}</option>{% endfor %}</select>
+        <small class="muted place-tip" data-place-tip></small>
+        <small class="muted place-hours" data-place-hours aria-live="polite"></small></label>
+      <label class="field"><span>People you need</span><input type="number" name="spots" min="1" max="50" value="2" inputmode="numeric"></label>
+      <label class="field"><span>Level</span>
+        <select name="skill_level">{% for level in SKILL_LEVELS %}<option {% if level == 'All levels' %}selected{% endif %}>{{ level }}</option>{% endfor %}</select></label>
+      {{ open_to_field({}) }}
+      <div class="plan-check">{{ place_check(sport or '') }}</div>
+    </fieldset>
+  </div>
   <div class="composer-row composer-send">
-    <a class="muted small" href="{{ url_for('community_rules') }}">Community rules</a>
+    <a class="muted small composer-rules" href="{{ url_for('community_rules') }}">Community rules</a>
     <button class="btn post-button">Post {{ icon("send") }}</button>
   </div>
 </form>
@@ -68,7 +89,7 @@
   </section>
 {% endif %}
 
-<div class="stack feed">
+<div class="stack feed" data-pull-refresh>
   {% for item in items %}
     {{ feed_item(item, photos) }}
   {% else %}
@@ -81,4 +102,7 @@
 {% if older %}
   <p class="more"><a class="btn btn-ghost" href="{{ url_for('posts.feed', sport=sport, before=older) }}">Show older</a></p>
 {% endif %}
+<script type="application/json" id="sport-rules">{{ SPORT_RULES|tojson }}</script>
+<script type="application/json" id="place-hours">{{ place_hours()|tojson }}</script>
+<script src="{{ url_for('static', filename='forms.js') }}" defer></script>
 {% endblock %}

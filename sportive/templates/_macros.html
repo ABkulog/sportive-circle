@@ -195,6 +195,11 @@
   {%- endif -%}
 {% endmacro %}
 
+{% macro verified_badge(label=False) %}
+  {#- The verified club mark: a purple seal with a check, like the blue check elsewhere. label=True adds the words. -#}
+  <span class="verified-badge" title="Verified UW club"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="seal" d="M12 1.5l2.4 1.9 3-.4 1.1 2.8 2.8 1.1-.4 3 1.9 2.4-1.9 2.4.4 3-2.8 1.1-1.1 2.8-3-.4L12 22.5l-2.4-1.9-3 .4-1.1-2.8-2.8-1.1.4-3L1.2 12l1.9-2.4-.4-3 2.8-1.1L6.6 3l3 .4z"/><path class="tick" d="M7.5 12.3l3 3 6-6.3" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>{% if label %}<span>Verified club</span>{% else %}<span class="visually-hidden">Verified club</span>{% endif %}</span>
+{%- endmacro %}
+
 {% macro badge_tile(b, earned, rarity, is_retired, pick=None) %}
   {# pick = None (just show) or True/False (a checkbox for the showcase, checked or not) #}
   {% set retired = is_retired(b) %}

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import clubs_tabs, avatar, club_logo, event_card %}
+{% from "feed/_cards.html" import feed_item %}
 {% block title %}My clubs{% endblock %}
 {% block content %}
 {{ clubs_tabs('updates') }}
@@ -28,38 +29,32 @@
 {% endif %}
 
 {% if my_officer_clubs %}
-  <form method="post" class="card update-composer">
-    {{ csrf_field() }}
+  {# Officers post as their club, to everyone's feed (and here): words, photos, 🔥 and replies #}
+  <form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="card update-composer">
+    {{ csrf_field() }}<input type="hidden" name="from_my_clubs" value="1">
     <label class="field"><span>✏️ Post an update</span>
-      <textarea name="body" rows="3" maxlength="1000" required
+      <textarea name="body" rows="3" maxlength="1000"
                 placeholder="Practice moved to the Quad this week! Bring water. 💧"></textarea></label>
+    <p class="composer-picked muted" data-picked hidden></p>
     <div class="composer-row">
       {% if my_officer_clubs|length == 1 %}
-        <input type="hidden" name="club" value="{{ my_officer_clubs[0].id }}">
+        <input type="hidden" name="as_club" value="{{ my_officer_clubs[0].id }}">
         <span class="muted">Posting as {{ SPORT_EMOJI[my_officer_clubs[0].sport] }} <strong>{{ my_officer_clubs[0].name }}</strong></span>
       {% else %}
-        <select name="club" aria-label="Which club" required>
+        <select name="as_club" aria-label="Which club" required>
           {% for c in my_officer_clubs %}<option value="{{ c.id }}">{{ SPORT_EMOJI[c.sport] }} {{ c.name }}</option>{% endfor %}
         </select>
       {% endif %}
+      <label class="btn btn-ghost btn-small composer-photos" title="Add up to {{ max_photos }} photos">📷<span>Photos</span>
+        <input type="file" name="photos" accept="image/*" multiple data-max-files="{{ max_photos }}" class="visually-hidden"></label>
       <button class="btn">Post</button>
     </div>
   </form>
 {% endif %}
 
-<div class="stack">
-  {% for p in posts %}
-    <article class="card club-update">
-      <header class="club-update-head">
-        <a class="club-update-club" href="{{ url_for('clubs.view', club_id=p.club_id) }}">
-          {{ club_logo(p, 36, logo=p.club_logo or '', club_id=p.club_id) }}
-          <span><strong>{{ p.club_name }}</strong>
-            <small class="muted">{{ p.full_name or 'An officer' }}{% if p.author_role == 'officer' %} · Officer{% endif %} · {{ p.created_at|when }}</small></span>
-        </a>
-      </header>
-      <p class="club-update-body">{{ p.body }}</p>
-      {% if p.event_id %}<a class="btn btn-small btn-ghost" href="{{ url_for('events.detail', event_id=p.event_id) }}">See the event</a>{% endif %}
-    </article>
+<div class="stack feed" data-pull-refresh>
+  {% for item in items %}
+    {{ feed_item(item, photos) }}
   {% else %}
     <div class="card empty">
       {% if following %}

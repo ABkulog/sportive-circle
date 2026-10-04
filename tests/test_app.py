@@ -1582,7 +1582,7 @@ def test_clubs_are_open_to_everyone(accounts, client, app):
     directory = client.get("/clubs").data.decode()          # no account needed
     assert "UW Spikeball Club" in directory and "1 member" in directory
     page = client.get(f"/clubs/{club}").data.decode()
-    assert "Casual roundnet" in page and "✓</span> Verified</span>" in page and "Sign up to join" in page
+    assert "Casual roundnet" in page and "Verified club</span>" in page and "Sign up to join" in page
     assert "No experience needed" in page and "Come to any Tuesday practice!" in page and "@uwspikeball" in page
     assert "Cap Tain" not in page                             # member names need an account
 
