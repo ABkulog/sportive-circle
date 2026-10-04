@@ -1,7 +1,7 @@
 """Notifications: the 🔔 bell, and numbers on the icons.
 
 Everything new shows up in exactly ONE place, so nothing is counted twice:
-- on its own icon when it has a home there: messages (✉️), friend requests (👥), club updates (Clubs tab);
+- on its own tab when it has a home there: messages (Messages), friend requests and club updates (Profile);
 - in the bell for everything else: invites, changes to your games, game chats, Need players posts, badges.
 
 Each kind can be switched on or off in Settings -> Notifications. Nothing is pushed or emailed from here.
@@ -44,8 +44,8 @@ KINDS = [
     Kind("club_review", "🏛️", "Your club's review (approved or sent back)", "bell", "officers"),
     Kind("suggestion_trends", "💡", "Suggestion topics 3+ people bring up", "admin", "admins"),
 ]
-PLACE_NAMES = {"bell": "In the bell", "home": "On the Home tab", "messages": "On the messages icon", "friends": "On the friends icon",
-               "clubs": "On the Clubs tab", "admin": "On the admin icon"}
+PLACE_NAMES = {"bell": "In the bell", "home": "On the Home tab", "messages": "On the Messages tab", "friends": "On the Profile tab",
+               "clubs": "On the Profile tab", "admin": "On the Profile tab"}
 NOTICE_KINDS = ("invites", "game_updates", "friend_games", "account", "club_review", "post_activity")  # saved as notices (the rest are counted)
 NOTICE_DAYS = 30  # the bell shows notices from the last month
 KIND_BY_KEY = {kind.key: kind for kind in KINDS}

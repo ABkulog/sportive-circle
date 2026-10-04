@@ -58,6 +58,11 @@ POST_COUNTS = f"""(SELECT COUNT(*) FROM post_photos ph WHERE ph.post_id = p.id) 
 # A post and its author, and the club when an officer posted it as the club
 POST_FROM = """posts p JOIN users u ON u.id = p.author_id LEFT JOIN clubs c ON c.id = p.club_id"""
 POST_FIELDS = "p.*, u.full_name, u.avatar_updated, c.name AS club_name, c.logo_updated AS club_logo"
+# Canceled games are clutter in a feed: a plan post or club event post whose game was canceled isn't shown there
+# (its page still says it's canceled, for the people who were going).
+NOT_CANCELED = "NOT EXISTS (SELECT 1 FROM events ce WHERE ce.id = p.event_id AND ce.cancelled = 1)"
+CLUB_POST_NOT_CANCELED = """cp.body NOT LIKE 'Canceled: %'
+    AND NOT EXISTS (SELECT 1 FROM events ce WHERE ce.id = cp.event_id AND ce.cancelled = 1)"""
 MAX_REPLY = 500
 REPLIES_PER_HOUR = 30
 
@@ -109,7 +114,7 @@ def feed_items(sport=None, before=None, limit=PAGE):
     for row in db.execute(
             f"""SELECT {POST_FIELDS}, {POST_COUNTS}
                 FROM {POST_FROM}
-                WHERE ({in_sports}{mine}) AND {POST_VISIBLE} AND p.created_at <= :before
+                WHERE ({in_sports}{mine}) AND {POST_VISIBLE} AND p.created_at <= :before AND {NOT_CANCELED}
                 ORDER BY p.created_at DESC, p.id DESC LIMIT :limit""", params).fetchall():
         items.append({"kind": "post", "at": row["created_at"], "post": row})
 
@@ -122,6 +127,7 @@ def feed_items(sport=None, before=None, limit=PAGE):
                        (SELECT m.role FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me) AS my_role
                 FROM club_posts cp JOIN clubs c ON c.id = cp.club_id
                 WHERE c.status = 'approved' AND ({club_sports}{mine}) AND cp.created_at <= :before
+                  AND {CLUB_POST_NOT_CANCELED}
                 ORDER BY cp.created_at DESC, cp.id DESC LIMIT :limit""", params).fetchall():
         items.append({"kind": "club_post", "at": row["created_at"], "club_post": row})
 
@@ -187,21 +193,24 @@ def club_post_items(club_id, limit=20):
     return items, photos_of([row["id"] for row in rows])
 
 
-def my_clubs_items(limit=60, all_clubs=False):
+def my_clubs_items(limit=60, all_clubs=False, sport=None):
     """My clubs: what the clubs I'm in or follow posted, newest first: their feed posts (photos, 🔥, replies) and
     their updates and event posts, as feed items with photos. all_clubs: every verified club's (All clubs)."""
     me = g.user["id"]
     db = get_db()
     mine = "1" if all_clubs else "EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me)"
+    if sport:  # one sport's clubs (the feed's sport picker)
+        mine += " AND c.sport = :sport"
     items = [{"kind": "post", "at": row["created_at"], "post": row} for row in db.execute(
         f"""SELECT {POST_FIELDS}, {POST_COUNTS} FROM {POST_FROM}
-            WHERE p.club_id IS NOT NULL AND {mine} AND {POST_VISIBLE}
-            ORDER BY p.created_at DESC, p.id DESC LIMIT :limit""", {"me": me, "limit": limit})]
+            WHERE p.club_id IS NOT NULL AND {mine} AND {POST_VISIBLE} AND {NOT_CANCELED}
+            ORDER BY p.created_at DESC, p.id DESC LIMIT :limit""", {"me": me, "limit": limit, "sport": sport})]
     items += [{"kind": "club_post", "at": row["created_at"], "club_post": row} for row in db.execute(
         f"""SELECT cp.*, c.name AS club_name, c.sport, c.logo_updated AS club_logo,
                    (SELECT m.role FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me) AS my_role
             FROM club_posts cp JOIN clubs c ON c.id = cp.club_id
-            WHERE c.status = 'approved' AND {mine} ORDER BY cp.id DESC LIMIT :limit""", {"me": me, "limit": limit})]
+            WHERE c.status = 'approved' AND {mine} AND {CLUB_POST_NOT_CANCELED} ORDER BY cp.id DESC LIMIT :limit""", {"me": me, "limit": limit,
+                                                                                        "sport": sport})]
     items.sort(key=_order, reverse=True)
     items = items[:limit]
     events = _events_by_id([(i.get("post") or i.get("club_post"))["event_id"] for i in items
@@ -243,15 +252,22 @@ def feed():
     sport = sport if sport in SPORTS else None
     before = request.args.get("before", "")
     before = before if len(before.split("|")[0]) == 16 and before[:4].isdigit() else None
-    items, older = feed_items(sport, before)
+    show = request.args.get("show", "")
+    show = show if show in ("clubs", "myclubs") else ""
+    if show:  # the clubs menu: just what clubs post (all of them, or the ones you're in or follow)
+        items, photos = my_clubs_items(all_clubs=show == "clubs", sport=sport)
+        older = None
+    else:
+        items, older = feed_items(sport, before)
+        photos = photos_of([i["post"]["id"] for i in items if i["kind"] == "post"])
     from .clubs import suggested_clubs  # "Clubs for you" until you follow one: clubs fill the feed
     in_a_club = get_db().execute("SELECT 1 FROM club_members WHERE user_id = ?", (g.user["id"],)).fetchone()
     club_picks = [] if in_a_club or before else suggested_clubs(g.user["id"], user_sports(g.user["id"]), limit=6)
-    if not sport and not before:
+    if not sport and not before and not show:
         from .notifications import mark_seen  # (notifications.py is loaded after this module)
         mark_seen("feed_posts")  # the new-posts number on Home is cleared once you've seen the top of your feed
     return render_template("feed/feed.html", items=items, older=older, sport=sport, my_sports=user_sports(g.user["id"]),
-                           photos=photos_of([i["post"]["id"] for i in items if i["kind"] == "post"]),
+                           photos=photos, show=show,
                            durations=PLAN_DURATIONS, max_photos=MAX_PHOTOS, max_body=MAX_BODY, form={},
                            max_seconds=MAX_SECONDS, post_as=officer_clubs(g.user["id"]),
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"),
@@ -452,8 +468,9 @@ def _read_plan(form, sport, body):
         return None, f"Plans can be up to {PLAN_DAYS_AHEAD} days ahead."
     if not exists_in_seattle(starts):
         return None, "That time doesn't exist (the clocks skip it). Pick another time."
-    first_line = body.split("\n", 1)[0].strip()
-    title = (first_line[:57] + "…") if len(first_line) > 60 else (first_line or "")
+    # The game is named from the sport and place ("Basketball at the IMA"), so the card under the post doesn't
+    # repeat what the post says.
+    title = ""
     game = MultiDict({"title": title, "sport": sport, "location": form["location"],
                       "skill_level": form.get("skill_level") or "All levels", "open_to": form.get("open_to") or "everyone",
                       "starts_at": form["starts_at"], "note": body[:500],
@@ -472,7 +489,8 @@ def create():
     form = request.form
     sport = form.get("sport", "")
     body = multi_line(form.get("body"))
-    back = url_for("posts.feed", sport=form.get("channel") or None)
+    back = url_for("posts.feed", sport=form.get("channel") or None,
+                   show=form.get("show") if form.get("show") in ("clubs", "myclubs") else None)
     error = None
     jpegs = []
     club = None

@@ -618,6 +618,15 @@
       hint.textContent = `#${name.toLowerCase().replace(/\s+/g, "")}: everyone who plays ${name} sees it, and it's in the ${name} channel.`;
     };
     if (pick && hint) { pick.addEventListener("change", say); say(); }
+    // 🏀 Plan a game under the one-line box: open it with "Make it a plan" ticked
+    form.querySelector("[data-open-plan]")?.addEventListener("click", () => {
+      open();
+      const plan = form.querySelector('input[name="plan"]');
+      if (plan) { plan.checked = true; plan.dispatchEvent(new Event("change", { bubbles: true })); }
+      form.querySelector("textarea")?.focus();
+    });
+    // Create → Post (/feed#post): open the post box ready to type
+    if (location.hash === "#post") { open(); form.querySelector("textarea")?.focus(); }
   });
 
   // Pull to refresh on the feed (and My clubs): pull down from the very top and let go to load what's new.

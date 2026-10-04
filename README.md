@@ -17,7 +17,8 @@ It is a student project, not an official University of Washington service.
 - **Make it a plan**: "hiking Mt Si tomorrow, need 2" becomes a real game with a headcount and an **I'm in** button.
 - **🔥 and replies**, with one bell notice per post; report and delete on posts and replies; community rules
   ("athletic, not thirsty"). 18+ only.
-- **Play** finds a game (filters), **My events** is your schedule: one job per page.
+- Five places, like Twitter: **Home** (the feed), **Play** (find a game), **Create**, **Messages**, **Profile**
+  (your posts, clubs, games and badges, plus Friends, Settings, Help and Log out).
 
 
 **Playing**

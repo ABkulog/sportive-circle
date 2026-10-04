@@ -49,12 +49,9 @@
     <div class="topbar-inner {% if app_nav and is_admin() %}five-icons{% endif %}">
       <a class="brand" href="{{ url_for('index') }}" aria-label="Sportive Circle home"><img src="{{ url_for('static', filename='icon.svg') }}" alt="" width="28" height="28"><span>Sportive<span class="brand-accent">Circle</span></span></a>
       {% if app_nav %}
+        {# Phones: just the bell up here; everything else is in the 5 tabs at the bottom (and Profile). #}
         <nav class="top-icons" aria-label="Shortcuts">
-          {% if is_admin() %}{% set open_reports = open_report_count() + pending_club_count() + nav_badges.admin %}<a href="{{ url_for('moderation.admin_home') }}" aria-label="Admin{% if open_reports %}, {{ open_reports }} new{% endif %}" title="Admin">{{ icon('shield') }}{% if open_reports %}<span class="count-dot">{{ open_reports }}</span>{% endif %}</a>{% endif %}
-          <a href="{{ url_for('faq') }}" aria-label="FAQ" title="FAQ">{{ icon('help') }}</a>
           {% set bell = bell_count() %}<a class="bell-link" href="{{ url_for('notifications.bell') }}" aria-label="Notifications{% if bell %}, {{ bell }} new{% endif %}" title="Notifications">{{ icon('bell') }}{% if bell %}<span class="count-dot">{{ badge_text(bell) }}</span>{% endif %}</a>
-          <a href="{{ url_for('social.friends') }}" aria-label="Friends{% if nav_badges.friends %}, {{ nav_badges.friends }} new{% endif %}" title="Friends">{{ icon('friends') }}{% if nav_badges.friends %}<span class="count-dot">{{ badge_text(nav_badges.friends) }}</span>{% endif %}</a>
-          <a href="{{ url_for('social.inbox') }}" aria-label="Messages{% if nav_badges.messages %}, {{ nav_badges.messages }} unread{% endif %}" title="Messages">{{ icon('send') }}{% if nav_badges.messages %}<span class="count-dot">{{ badge_text(nav_badges.messages) }}</span>{% endif %}</a>
         </nav>
       {% elif g.user %}
         {# Still setting up (no profile picture yet). #}
@@ -81,25 +78,18 @@
     {# The same 5 sections everywhere: a bottom tab bar on phones/tablets, a sidebar on laptops. #}
     <nav class="appnav" aria-label="Main">
       <a class="brand side-only" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='icon.svg') }}" alt="" width="28" height="28"><span>Sportive<span class="brand-accent">Circle</span></span></a>
-      {{ tab(url_for('posts.feed'), 'home', 'Home', ep in ('events.feed', 'index', 'events.my_events', 'events.detail') or ep.startswith('posts.'), nav_badges.home) }}
-      {{ tab(url_for('clubs.all_posts') if g.user else url_for('clubs.directory'), 'clubs', 'Clubs', ep.startswith('clubs.') and ep not in ('clubs.create', 'clubs.review_queue'), nav_badges.clubs) }}
+      {# Like Twitter / Instagram: 5 places. Friends, Settings, Help, Admin and Log out live on your Profile. #}
+      {% set profile_area = ep.startswith('profile.') or ep.startswith('settings.') or ep in ('notifications.notification_settings', 'social.friends', 'faq', 'how_it_works', 'events.my_events', 'clubs.updates')
+                            or ep.startswith('moderation.admin') or ep in ('clubs.review_queue', 'feedback.admin_suggestions', 'placecheck.admin_rec') %}
+      {{ tab(url_for('posts.feed'), 'home', 'Home', ep.startswith('posts.'), nav_badges.home) }}
+      {{ tab(url_for('events.feed'), 'map', 'Play', ep in ('events.feed', 'index', 'events.detail', 'events.map_view')) }}
       {{ tab(url_for('create_menu'), 'plus', 'Create', ep in ('create_menu', 'events.create', 'events.quick', 'clubs.create')) }}
-      {{ tab(url_for('profile.view', user_id=g.user.id), 'user', 'Profile', (ep.startswith('profile.') or ep.startswith('settings.') or ep == 'notifications.notification_settings') and (ep != 'profile.view' or request.view_args.get('user_id') == g.user.id), nav_badges.profile) }}
+      {{ tab(url_for('social.inbox'), 'send', 'Messages', ep in ('social.inbox', 'social.thread'), nav_badges.messages) }}
+      {{ tab(url_for('profile.view', user_id=g.user.id), 'user', 'Profile',
+             profile_area and (ep != 'profile.view' or request.view_args.get('user_id') == g.user.id),
+             nav_badges.profile + nav_badges.friends + nav_badges.clubs + nav_badges.admin) }}
       <div class="side-only side-extra">
         {{ tab(url_for('notifications.bell'), 'bell', 'Notifications', ep == 'notifications.bell', bell_count(), extra_class='bell-link') }}
-        {{ tab(url_for('social.inbox'), 'send', 'Messages', ep == 'social.inbox' or ep == 'social.thread', nav_badges.messages) }}
-        {{ tab(url_for('social.friends'), 'friends', 'Friends', ep == 'social.friends', nav_badges.friends) }}
-        {{ tab(url_for('faq'), 'help', 'FAQ', ep in ('faq', 'how_it_works')) }}
-        {{ tab(url_for('settings.home'), 'sliders', 'Settings', ep.startswith('settings.') or ep == 'notifications.notification_settings') }}
-        {% if is_admin() %}{# one tab for all admin pages (the Admin page links to each) #}
-          {{ tab(url_for('moderation.admin_home'), 'shield', 'Admin',
-                 ep.startswith('moderation.admin') or ep in ('clubs.review_queue', 'feedback.admin_suggestions',
-                                                             'placecheck.admin_rec'),
-                 open_report_count() + pending_club_count() + nav_badges.admin) }}
-        {% endif %}
-        <form method="post" action="{{ url_for('auth.logout') }}" data-confirm="Log out of Sportive Circle?" class="side-logout">
-          {{ csrf_field() }}<button class="tab"><span class="tab-icon">{{ icon('logout') }}</span><span class="tab-label">Log out</span></button>
-        </form>
       </div>
     </nav>
   {% endif %}

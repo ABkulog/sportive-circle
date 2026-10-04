@@ -38,21 +38,21 @@ Feature: Notifications
     Then "Jordan" has 1 on the Bell icon
 
   @FR-NOTIF-1
-  Scenario: Club updates show on the Clubs tab until you read them
+  Scenario: Club updates show on the Profile tab until you read them
     Given "Riley" is a Husky
     And "Riley" runs the approved club "UW Spikeball Club"
     And "Maya" follows "UW Spikeball Club"
     When "Riley" posts the club update "Practice moved to the Quad"
-    Then "Maya" has 1 on the Clubs tab
+    Then "Maya" has 1 on the Profile tab
     When "Maya" opens Club updates
-    Then "Maya" has 0 on the Clubs tab
+    Then "Maya" has 0 on the Profile tab
 
   @FR-NOTIF-1
-  Scenario: Officers see people waiting to join on the Clubs tab
+  Scenario: Officers see people waiting to join on the Profile tab
     Given "Riley" is a Husky
     And "Riley" runs the approved club "UW Spikeball Club"
     When "Jordan" asks to join "UW Spikeball Club"
-    Then "Riley" has 1 on the Clubs tab
+    Then "Riley" has 1 on the Profile tab
 
   @FR-NOTIF-3
   Scenario: New Need players posts show in the bell
@@ -67,4 +67,4 @@ Feature: Notifications
     And "Riley" posts the club update "Welcome, everyone!"
     And "Sam" is a Husky
     When "Sam" follows "UW Spikeball Club"
-    Then "Sam" has 0 on the Clubs tab
+    Then "Sam" has 0 on the Profile tab

@@ -9,8 +9,8 @@
   <form method="post" class="form" data-autosave>
     {{ csrf_field() }}
     {# One heading per place things show up, instead of repeating "Shows on the bell" on every row. #}
-    {% for place, heading in places.items() %}
-      {% set here = kinds|selectattr('place', 'equalto', place)|list %}
+    {% for heading in places.values()|unique %}
+      {% set here = kinds|selectattr('place', 'in', places|dictsort|selectattr(1, 'equalto', heading)|map(attribute=0)|list)|list %}
       {% if here %}
         <h2 class="switch-heading">{{ heading }}</h2>
         <ul class="switch-list">

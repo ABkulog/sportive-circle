@@ -25,7 +25,7 @@ def test_a_newly_approved_club_is_announced_once_to_its_sport(accounts, client, 
     accounts.logout()
     accounts.signup(email="runner@uw.edu", sports=("running",))
     feed = client.get("/feed").data.decode()
-    assert feed.count("🆕 UW Run Club just joined Sportive Circle!") == 1 and "Weekly runs, all paces." in feed
+    assert feed.count('class="card feed-card feed-mini"') == 1 and "joined Sportive Circle" in feed  # one short line
 
 
 def test_clubs_for_you_until_you_follow_one(accounts, client, app):
