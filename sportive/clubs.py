@@ -540,6 +540,22 @@ ACTIVE_OFFICERS = """SELECT COUNT(*) FROM club_members m JOIN users u ON u.id = 
 WAITING_ROLES = ("requested", "tryout")
 
 
+def hand_club_games_to_the_club(user_id, club_id=None):
+    """Club events belong to the club: when their host stops being an officer (steps down, leaves, is suspended
+    or deletes their account), its upcoming events go to another active officer, the owner first, instead of
+    being canceled or stuck with someone who can't run them. They stay in as a player and can leave like anyone.
+    With no other active officer the events stay as they are. The caller commits."""
+    other_officer = """SELECT m.user_id FROM club_members m JOIN users u ON u.id = m.user_id
+                         JOIN clubs c ON c.id = m.club_id
+                       WHERE m.club_id = events.club_id AND m.role = 'officer' AND m.user_id != :me
+                         AND u.suspended = 0
+                       ORDER BY m.user_id = c.created_by DESC, m.joined_at, m.user_id LIMIT 1"""
+    get_db().execute(f"""UPDATE events SET host_id = ({other_officer})
+                         WHERE host_id = :me AND club_id IS NOT NULL AND cancelled = 0 AND ends_at >= :now
+                           AND (:club IS NULL OR club_id = :club) AND EXISTS ({other_officer})""",
+                     {"me": user_id, "club": club_id, "now": to_db(now_local())})
+
+
 def _dm(sender_id, recipient_id, body):
     """A direct message about club membership (officers and applicants can always talk)."""
     db = get_db()
@@ -666,6 +682,7 @@ def decide(club_id, user_id, decision):
         flash("Declined. They still follow the club.", "info")
     elif decision == "remove" and row["role"] == "member":
         db.execute("DELETE FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, user_id))
+        hand_club_games_to_the_club(user_id, club_id)
         _leave_members_only_games(club_id, user_id)
         flash("Removed from the club.", "info")
     db.commit()
@@ -707,6 +724,7 @@ def leave(club_id):
               + " You still follow the club.", "info")
     elif role is not None:
         db.execute("DELETE FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, g.user["id"]))
+        hand_club_games_to_the_club(g.user["id"], club_id)
         _leave_members_only_games(club_id, g.user["id"])
         db.commit()
         flash("Unfollowed." if role == "follower" else "You left the club.", "info")
@@ -812,6 +830,7 @@ def officers(club_id):
                 else:
                     db.execute("UPDATE club_members SET role = 'member' WHERE club_id = ? AND user_id = ? "
                                "AND role = 'officer'", (club_id, user_id))
+                    hand_club_games_to_the_club(user_id, club_id)
                     flash(f"{first} is a member now, not an officer.", "success")
         db.commit()
         return redirect(url_for("clubs.officers", club_id=club_id))
