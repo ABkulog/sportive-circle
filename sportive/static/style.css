@@ -1436,3 +1436,7 @@ body.has-app-nav .home-tabs { position: sticky; top: 60px; z-index: 20; backgrou
 .feed-card .inline-replies { margin: 12px -16px -14px; padding: 12px 16px 14px; border: 0; border-top: 1px solid var(--line);
   border-radius: 0 0 var(--radius, 14px) var(--radius, 14px); box-shadow: none; background: transparent; }
 .feed-card .inline-replies .section-title { font-size: .9rem; margin: 0 0 8px; }
+/* The post box, Clubs for you and the posts under them: the same 12px gap as between posts (the post box sat right
+   on top of the first post when it wasn't the New games row, which has its own margin) */
+.composer, .update-composer, .clubs-for-you { margin-bottom: 12px; }
+#feed-list > :first-child { margin-top: 0; }

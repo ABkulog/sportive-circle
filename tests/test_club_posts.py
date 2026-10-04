@@ -221,3 +221,9 @@ def test_posting_and_opening_replies_stay_on_the_page(accounts, client, app):
     assert reply.headers["Location"].endswith(f"#replies-{post_id}")
     js = client.get("/static/app.js").data.decode()
     assert "a[data-replies]" in js and "form.dataset.swapTarget" in js
+
+
+def test_the_post_box_never_touches_the_first_post(client):
+    css = client.get("/static/style.css").data.decode()
+    assert ".composer, .update-composer, .clubs-for-you { margin-bottom: 12px; }" in css
+    assert "#feed-list > :first-child { margin-top: 0; }" in css
