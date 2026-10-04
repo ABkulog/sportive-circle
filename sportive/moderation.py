@@ -237,6 +237,8 @@ def suspend(user_id, action):
         db.execute("BEGIN IMMEDIATE")  # read their games and cancel them in one go: an officer canceling one of
         # them at the same moment can't make its players hear about it twice
         db.execute("UPDATE users SET suspended = 1 WHERE id = ?", (user_id,))
+        from .clubs import hand_club_games_to_the_club
+        hand_club_games_to_the_club(user_id)  # their clubs' games go on with another officer, not canceled
         hosted = query_events(["e.host_id = :host", "e.cancelled = 0", "e.ends_at >= :now"],
                               {"host": user_id, "now": now}, on_hold=True, limit=100000)  # club games on hold too
         # Clubs where they're the only officer left: someone has to take over (an admin can add one).
