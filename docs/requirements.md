@@ -34,7 +34,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-AUTH-4 | Log in with email + password. 10 wrong passwords in a row lock the account for 15 minutes. | Must | ✅ |
 | FR-AUTH-5 | "Forgot password?" emails a code to set a new password, and never reveals whether an email has an account. | Must | ✅ |
 | FR-AUTH-6 | Logged-in users can change their password (current password required). | Must | ✅ |
-| FR-AUTH-7 | Users can delete their account after an "Are you sure?" page, typing DELETE, and their password. A club's only officer must hand over first. | Must | ✅ |
+| FR-AUTH-7 | Users can delete their account after an "Are you sure?" page, typing DELETE, and their password. A club's only officer must hand over first, also when an admin has taken the club off the list for a re-check (its members are still in it). | Must | ✅ |
 | FR-AUTH-8 | Suspended accounts can't log in. | Must | ✅ |
 | FR-AUTH-9 | Sign-up forgives going back: a problem shows on a normal page (typed details kept, passwords not), so the phone's Back button works; going back to fix details with the same email keeps the code already sent; the code page has "Wrong email? Fix it". Changing your password cancels any pending reset code. | Must | ✅ |
 

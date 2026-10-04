@@ -369,19 +369,19 @@ SOLE_OFFICER = """SELECT c.id, c.name FROM clubs c JOIN club_members m ON m.club
            WHERE m.user_id = ? AND m.role = 'officer'
              AND (SELECT COUNT(*) FROM club_members o JOIN users ou ON ou.id = o.user_id
                   WHERE o.club_id = c.id AND o.role = 'officer' AND {}) <= 1
-             AND {} (c.status = 'approved' AND EXISTS (SELECT 1 FROM club_members o WHERE o.club_id = c.id
-                                                        AND o.role != 'officer'))"""
+             AND {} EXISTS (SELECT 1 FROM club_members o WHERE o.club_id = c.id AND o.role != 'officer')"""
+# (Whatever the club's status: a live club an admin took off the list for a re-check still has its members.)
 
 
 def clubs_only_i_lead(user_id):
-    """Live clubs with anyone else in them (members, followers, people asking to join) where this person is the
+    """Clubs with anyone else in them (members, followers, people asking to join) where this person is the
     only officer: the club would be left without a leader, so they hand it over first."""
     # (A suspended officer can't lead, so they don't count as someone to hand it to.)
     return get_db().execute(SOLE_OFFICER.format("ou.suspended = 0", ""), (user_id,)).fetchall()
 
 
 def clubs_that_go_with_me(user_id):
-    """Clubs only this person runs that nobody else is in yet (still pending, rejected, or no members).
+    """Clubs only this person runs that nobody else is in (a new request, or no members yet).
     There's no one to hand them to, so they're deleted with the account instead of blocking it."""
     # (A suspended officer still counts here: if they're let back in, their club should still be there.)
     return get_db().execute(SOLE_OFFICER.format("1", "NOT"), (user_id,)).fetchall()
