@@ -558,4 +558,32 @@
       line.textContent = count === 1 ? "1 photo added" : `${count} photos added`;
     }
   });
+
+  // <input type="file" data-max-seconds="60">: a video longer than that is refused before it's uploaded
+  // (the server checks too), and the form's [data-picked] line says how long it is.
+  document.addEventListener("change", (event) => {
+    const input = event.target;
+    if (!input.matches || !input.matches("input[type=file][data-max-seconds]") || !input.files.length) return;
+    const max = Number(input.dataset.maxSeconds);
+    const line = input.form && input.form.querySelector("[data-picked]");
+    const probe = document.createElement("video");
+    probe.preload = "metadata";
+    const url = URL.createObjectURL(input.files[0]);
+    probe.addEventListener("loadedmetadata", () => {
+      URL.revokeObjectURL(url);
+      const seconds = Math.round(probe.duration);
+      if (probe.duration > max + 0.5) {
+        alert(`Videos can be up to 1 minute. This one is ${seconds} seconds: trim it first.`);
+        input.value = "";
+        if (line) line.hidden = true;
+        return;
+      }
+      if (line) {
+        line.hidden = false;
+        line.textContent = `Video added (${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")})`;
+      }
+    });
+    probe.addEventListener("error", () => URL.revokeObjectURL(url));  // the server will say what's wrong
+    probe.src = url;
+  });
 })();

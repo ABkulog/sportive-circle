@@ -58,7 +58,7 @@ def test_posts_reach_people_who_play_that_sport(accounts, client, app):
 def test_a_post_needs_a_sport_and_something_to_say(accounts, client):
     accounts.signup()
     assert "Tag your post with a sport." in post(client, sport="", body="hi").data.decode()
-    assert "Write something or add a photo." in post(client, body="   ").data.decode()
+    assert "Write something, or add a photo or a video." in post(client, body="   ").data.decode()
     assert "up to 1000 characters" in post(client, body="x" * 1001).data.decode()
 
 

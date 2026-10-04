@@ -10,7 +10,7 @@ services:
     plan: starter            # a paid plan is needed for the disk that keeps the database
     region: oregon           # closest to Seattle
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn wsgi:app --workers 2 --timeout 60 --bind 0.0.0.0:$PORT
+    startCommand: gunicorn wsgi:app --workers 2 --timeout 180 --bind 0.0.0.0:$PORT  # 180 s: a 1-minute video upload on a slow phone connection
     healthCheckPath: /how-it-works
     disk:
       name: data

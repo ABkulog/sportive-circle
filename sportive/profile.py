@@ -445,6 +445,9 @@ def delete_account():
                       ORDER BY m.joined_at, m.user_id LIMIT 1)
                   WHERE created_by = :me""", {"me": g.user["id"]})
     hand_club_games_to_the_club(g.user["id"])  # the club's upcoming games go on with another officer
+    from .videos import remove_files  # their posts go with the account (cascade): their video files too
+    video_files = [row[0] for row in db.execute(
+        "SELECT v.filename FROM post_videos v JOIN posts p ON p.id = v.post_id WHERE p.author_id = ?", (g.user["id"],))]
     db.commit()
     # Games they host disappear with the account, so warn everyone who joined (like canceling would).
     for event in query_events(["e.host_id = :me", "e.cancelled = 0", "e.ends_at >= :now"],
@@ -466,6 +469,7 @@ def delete_account():
     db.execute("DELETE FROM email_codes WHERE inbox = ?", (g.user["email"].split("@")[0],))
     db.execute("DELETE FROM users WHERE id = ?", (g.user["id"],))
     db.commit()
+    remove_files(video_files)
     session.clear()
     flash("Your account was deleted.", "info")
     return redirect(url_for("index"))

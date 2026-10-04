@@ -29,6 +29,8 @@
     </select>
     <label class="btn btn-ghost btn-small composer-photos" title="Add up to {{ max_photos }} photos">{{ icon('camera') }}<span>Photos</span>
       <input type="file" name="photos" accept="image/*" multiple data-max-files="{{ max_photos }}" class="visually-hidden"></label>
+    <label class="btn btn-ghost btn-small composer-photos" title="Add a video, up to 1 minute">🎬<span>Video</span>
+      <input type="file" name="video" accept="video/mp4,video/quicktime,video/*" data-max-seconds="{{ max_seconds }}" class="visually-hidden"></label>
   </div>
   <p class="composer-picked muted" data-picked hidden></p>
   <label class="toggle plan-toggle"><input type="checkbox" name="plan" value="1"><span>📅 Make it a plan (people tap <strong>I'm in</strong>)</span></label>
