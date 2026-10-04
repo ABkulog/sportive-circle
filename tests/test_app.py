@@ -6176,6 +6176,25 @@ def test_club_owner_adds_and_removes_officers(accounts, client, app):
     assert roles[ids["Sam"]] == "member" and roles[ids["Maya"]] == "officer"
 
 
+def test_fixing_capitals_in_a_club_name_keeps_it_live(accounts, client, app):
+    _people(accounts, app, "Maya")
+    club = _club_with_officer(accounts, client, app)
+    _as(accounts, "Maya")
+    assert "sends it back for a quick check" in client.get(f"/clubs/{club}/edit").data.decode()   # warned first
+    page = client.post(f"/clubs/{club}/edit", data={**CLUB, "name": "uw  SPIKEBALL club"},
+                       follow_redirects=True).data.decode()
+    assert "Club updated." in page and "check it again" not in page
+    with app.app_context():
+        assert tuple(get_db().execute("SELECT name, status FROM clubs WHERE id = ?", (club,)).fetchone()) \
+            == ("uw SPIKEBALL club", "approved")      # (extra spaces are tidied on save)
+    accounts.logout()
+    assert client.get(f"/clubs/{club}").status_code == 200                # still public, so printed QR codes work
+    _as(accounts, "Maya")
+    client.post(f"/clubs/{club}/edit", data={**CLUB, "name": "UW Roundnet Club"})   # a real new name: re-checked
+    with app.app_context():
+        assert get_db().execute("SELECT status FROM clubs WHERE id = ?", (club,)).fetchone()[0] == "pending"
+
+
 def test_forms_have_back_buttons(accounts, client, app):
     _people(accounts, app, "Maya")
     club = _club_with_officer(accounts, client, app)
