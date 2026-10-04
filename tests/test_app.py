@@ -5546,7 +5546,7 @@ def test_help_bubble_can_be_closed(accounts, client):
     for page in ("/login", "/signup", "/faq"):  # not on sign-up screens or the help page itself
         assert "data-help-bubble" not in client.get(page).data.decode()
     accounts.signup()
-    assert "data-help-bubble" in client.get("/clubs").data.decode()
+    assert "data-help-bubble" not in client.get("/").data.decode()   # logged in: the ? in the top bar, nothing covering games
 
 
 def test_admin_pages_have_no_help_bubble_and_say_to_check_socials(accounts, client, app):

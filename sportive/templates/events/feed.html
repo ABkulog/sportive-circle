@@ -89,8 +89,10 @@
 </form>
 {% if filters.scope == 'interests' and my_sports %}
   {# "My sports" = the sports on your profile: say which ones are showing, and how to change them. #}
+  {# (a few by name; with many, just how many, so the list never pushes the games off the screen) #}
   <p class="scope-hint muted">Showing
-    {%- for sport in my_sports %} {{ SPORTS[sport] }}{{ ',' if not loop.last }}{% endfor %} ·
+    {%- if my_sports|length > 3 %} your {{ my_sports|length }} sports
+    {%- else %}{% for sport in my_sports %} {{ SPORTS[sport] }}{{ ',' if not loop.last }}{% endfor %}{% endif %} ·
     <a href="{{ url_for('profile.edit_sports') }}">Change sports</a></p>
 {% endif %}
 

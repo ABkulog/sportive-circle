@@ -18,7 +18,7 @@ def test_a_club_post_reaches_everyone_not_only_followers(accounts, client, app):
     accounts.signup(email="hooper@uw.edu", sports=("basketball",))   # doesn't follow it, doesn't run
     feed = client.get("/feed").data.decode()
     assert "Saturday long run, all paces" in feed and "Verified club" in feed
-    assert f"/clubs/{club}#events" in feed and f"/clubs/{club}#about" in feed and "+ Follow" in feed
+    assert f"/clubs/{club}#events" in feed and "Events &amp; info" in feed and 'class="head-follow"' in feed
     assert "Photo 1 of 2 from UW Run Club" in feed                     # the club's name, not the officer's
     assert "Saturday long run" not in client.get("/feed?sport=basketball").data.decode()  # other sports' channels
     assert "Saturday long run" in client.get(f"/clubs/{club}").data.decode()            # and on the club's page
@@ -152,3 +152,52 @@ def test_feed_rows_fit_the_smallest_phones(client):
     assert "grid-template-columns: minmax(0, 1fr) auto" in css                      # the one-line post box
     assert ".feed-actions { display: flex; flex-wrap: wrap;" in css                  # 🔥 Reply … Report Delete
     assert ".reply-form .post-as { flex: 1 1 100%; min-width: 0;" in css            # Reply as
+
+
+def test_reacting_happens_in_place(accounts, client, app):
+    """🔥, replies, Follow, I'm in and Delete send in the background and swap just their card (app.js), so the
+    page never reloads; Report and Delete sit behind a ⋯ menu."""
+    accounts.signup(email="officer@uw.edu", sports=("running",))
+    club = approved_club(app, "officer@uw.edu")
+    post(client, as_club=str(club), body="Club run")
+    post(client, body="My own run")
+    feed = client.get("/feed").data.decode()
+    assert 'class="like-form" data-inplace' in feed and 'data-inplace="remove"' in feed
+    assert feed.count("data-swap") >= 2 and 'class="more-menu card-more"' in feed
+    with app.app_context():
+        post_id = get_db().execute("SELECT id FROM posts WHERE club_id IS NULL").fetchone()[0]
+    page = client.get(f"/posts/{post_id}").data.decode()
+    assert 'id="replies" data-swap' in page and 'class="reply-form" data-inplace' in page
+    js = client.get("/static/app.js").data.decode()
+    assert "form[data-inplace]" in js and "replaceWith(fresh)" in js
+
+
+def test_all_clubs_feed_and_a_tidy_feed_top(accounts, client, app):
+    accounts.signup(email="officer@uw.edu", sports=("tennis",))
+    club = approved_club(app, "officer@uw.edu", name="UW Tennis Club", sport="tennis")
+    post(client, as_club=str(club), sport="tennis", body="Ladder night")
+    client.post(f"/clubs/{club}/posts", data={"body": "Courts booked"})
+    accounts.logout()
+    accounts.signup(email="runner@uw.edu", sports=("running",))
+    everything = client.get("/clubs/feed").data.decode()                        # All clubs: every verified club
+    assert "Ladder night" in everything and "Courts booked" in everything and ">All clubs<" in everything
+    assert "Ladder night" not in client.get("/clubs/updates").data.decode()       # My clubs: only clubs you follow
+    client.post(f"/clubs/{club}/follow")
+    assert "Ladder night" in client.get("/clubs/updates").data.decode()
+    feed = client.get("/feed").data.decode()
+    assert 'href="/clubs/feed"' in feed                                           # the Clubs tab opens All clubs
+    assert 'class="sport-filter"' in feed and "All my sports" in feed and "sport-channels" not in feed
+    assert "data-help-bubble" not in feed and 'placeholder="Who\'s down?"' in feed
+
+
+def test_play_says_how_many_sports_instead_of_listing_fifty(accounts, client):
+    """Someone who picked every sport got a paragraph of sport names above the games."""
+    accounts.signup(email="all@uw.edu", sports=("running", "tennis", "soccer", "hiking", "basketball"))
+    page = client.get("/").data.decode()
+    assert "Showing your 5 sports" in page and "Change sports" in page
+
+
+def test_home_and_club_tabs_stay_under_the_header(client):
+    """Scrolled a little, the sticky purple header covered Feed / Play / My events, so the tab row looked empty."""
+    css = client.get("/static/style.css").data.decode()
+    assert "body.has-app-nav .home-tabs { position: sticky; top: 60px;" in css

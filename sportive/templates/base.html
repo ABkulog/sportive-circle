@@ -82,7 +82,7 @@
     <nav class="appnav" aria-label="Main">
       <a class="brand side-only" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='icon.svg') }}" alt="" width="28" height="28"><span>Sportive<span class="brand-accent">Circle</span></span></a>
       {{ tab(url_for('posts.feed'), 'home', 'Home', ep in ('events.feed', 'index', 'events.my_events', 'events.detail') or ep.startswith('posts.'), nav_badges.home) }}
-      {{ tab(url_for('clubs.directory'), 'clubs', 'Clubs', ep.startswith('clubs.') and ep not in ('clubs.create', 'clubs.review_queue'), nav_badges.clubs) }}
+      {{ tab(url_for('clubs.all_posts') if g.user else url_for('clubs.directory'), 'clubs', 'Clubs', ep.startswith('clubs.') and ep not in ('clubs.create', 'clubs.review_queue'), nav_badges.clubs) }}
       {{ tab(url_for('create_menu'), 'plus', 'Create', ep in ('create_menu', 'events.create', 'events.quick', 'clubs.create')) }}
       {{ tab(url_for('profile.view', user_id=g.user.id), 'user', 'Profile', (ep.startswith('profile.') or ep.startswith('settings.') or ep == 'notifications.notification_settings') and (ep != 'profile.view' or request.view_args.get('user_id') == g.user.id), nav_badges.profile) }}
       <div class="side-only side-extra">
@@ -111,10 +111,11 @@
     {% block content %}{% endblock %}
   </main>
 
-  {# "Help?" bubble in the corner; its × hides it for good on this device (app.js). Not on sign-up/log-in
+  {# "Help?" bubble in the corner, for visitors only (logged in, the ? is in the top bar, and the bubble covered
+     posts and games on phones); its × hides it for good on this device (app.js). Not on sign-up/log-in
      screens or the help pages themselves, and never over a chat's message box (hide-tabs pages). #}
-  {% if not ep.startswith('auth.') and ep not in ('faq', 'how_it_works') and '.admin' not in ep
-        and ep not in ('clubs.review_queue',) %}
+  {% if not g.user and not ep.startswith('auth.') and ep not in ('faq', 'how_it_works') and '.admin' not in ep
+        and ep not in ('clubs.review_queue', 'posts.feed', 'posts.view', 'clubs.updates', 'clubs.all_posts') %}
     <div class="help-bubble" data-help-bubble hidden>
       <a href="{{ url_for('faq') }}">{{ icon('help') }}<span>Help?</span></a>
       <button type="button" class="help-close" data-help-close aria-label="Close the help button">&times;</button>

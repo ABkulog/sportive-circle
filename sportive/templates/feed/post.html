@@ -7,7 +7,7 @@
 <h1 class="visually-hidden">Post by {{ item.post.club_name if item.post.club_id else item.post.full_name }}</h1>
 {{ feed_item(item, photos) }}
 
-<section class="card replies" id="replies" aria-labelledby="replies-title">
+<section class="card replies" id="replies" data-swap aria-labelledby="replies-title">
   <h2 id="replies-title" class="section-title">{{ replies|length }} repl{{ 'y' if replies|length == 1 else 'ies' }}</h2>
   <ul class="reply-list">
     {% for r in replies %}
@@ -29,7 +29,7 @@
           <div class="reply-actions">
             {% if r.author_id != g.user.id %}<a class="link-button" href="{{ url_for('moderation.report', target_type='reply', target_id=r.id) }}">Report</a>{% endif %}
             {% if r.author_id == g.user.id or r.i_run_its_club or can_delete_post %}
-              <form method="post" action="{{ url_for('posts.delete_reply', reply_id=r.id) }}" data-confirm="Delete this reply?">
+              <form method="post" action="{{ url_for('posts.delete_reply', reply_id=r.id) }}" data-confirm="Delete this reply?" data-inplace>
                 {{ csrf_field() }}<button class="link-button danger-link">Delete</button></form>
             {% endif %}
           </div>
@@ -39,7 +39,7 @@
       <li class="muted">No replies yet. Be the first.</li>
     {% endfor %}
   </ul>
-  <form method="post" action="{{ url_for('posts.reply', post_id=item.post.id) }}" class="reply-form">
+  <form method="post" action="{{ url_for('posts.reply', post_id=item.post.id) }}" class="reply-form" data-inplace>
     {{ csrf_field() }}
     {% if post_as %}
       <label class="post-as"><span>Reply as</span>
