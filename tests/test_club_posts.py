@@ -18,12 +18,12 @@ def test_a_club_post_reaches_everyone_not_only_followers(accounts, client, app):
     accounts.signup(email="hooper@uw.edu", sports=("basketball",))   # doesn't follow it, doesn't run
     feed = client.get("/feed").data.decode()
     assert "Saturday long run, all paces" in feed and "Verified club" in feed
-    assert f"/clubs/{club}#events" in feed and "Events &amp; info" in feed and 'class="head-follow"' in feed
+    assert f'href="/clubs/{club}"' in feed and 'class="head-follow"' in feed and "Events &amp; info" not in feed
     assert "Photo 1 of 2 from UW Run Club" in feed                     # the club's name, not the officer's
     assert "Saturday long run" not in client.get("/feed?sport=basketball").data.decode()  # other sports' channels
     assert "Saturday long run" in client.get(f"/clubs/{club}").data.decode()            # and on the club's page
     officer = user_id(app, "officer@uw.edu")
-    assert "Saturday long run" not in client.get(f"/users/{officer}").data.decode()     # the club's, not personal
+    assert "Saturday long run" not in client.get(f"/u/{officer}").data.decode()     # the club's, not personal
 
 
 def test_only_officers_post_as_a_club_and_any_officer_can_delete(accounts, client, app):
@@ -52,7 +52,7 @@ def test_a_club_plan_is_a_club_event_and_posting_from_the_club_page(accounts, cl
     post(client, as_club=str(club), body="Track night", plan="1", starts_at=form_time(timedelta(days=2)),
          duration="60", location="Husky Track", spots="10")
     with app.app_context():
-        assert get_db().execute("SELECT club_id FROM events WHERE title = 'Track night'").fetchone()[0] == club
+        assert get_db().execute("SELECT club_id FROM events WHERE note = 'Track night'").fetchone()[0] == club
     assert "Track night" in client.get(f"/clubs/{club}").data.decode()
     response = client.post("/posts/new", data={"as_club": str(club), "from_club": "1", "body": "From the page"},
                            content_type="multipart/form-data")
@@ -77,7 +77,7 @@ def test_every_verified_clubs_updates_reach_the_whole_feed(accounts, client, app
     accounts.logout()
     accounts.signup(email="runner@uw.edu", sports=("running",))
     feed = client.get("/feed").data.decode()
-    assert "Ladder results are up" in feed and f"/clubs/{club}#events" in feed
+    assert "Ladder results are up" in feed and f'href="/clubs/{club}"' in feed
 
 
 def test_clubs_reply_as_the_club_and_their_posts_take_replies(accounts, client, app):
@@ -180,15 +180,15 @@ def test_all_clubs_feed_and_a_tidy_feed_top(accounts, client, app):
     client.post(f"/clubs/{club}/posts", data={"body": "Courts booked"})
     accounts.logout()
     accounts.signup(email="runner@uw.edu", sports=("running",))
-    everything = client.get("/clubs/feed").data.decode()                        # All clubs: every verified club
+    everything = client.get("/feed?show=clubs").data.decode()                   # All clubs: every verified club
     assert "Ladder night" in everything and "Courts booked" in everything and ">All clubs<" in everything
     assert "Ladder night" not in client.get("/clubs/updates").data.decode()       # My clubs: only clubs you follow
     client.post(f"/clubs/{club}/follow")
     assert "Ladder night" in client.get("/clubs/updates").data.decode()
     feed = client.get("/feed").data.decode()
-    assert 'href="/clubs/feed"' in feed                                           # the Clubs tab opens All clubs
-    assert 'class="sport-filter"' in feed and "All my sports" in feed and "sport-channels" not in feed
-    assert "data-help-bubble" not in feed and 'placeholder="Who\'s down?"' in feed
+    assert 'value="clubs"' in feed                                                # All clubs: in the feed's menu
+    assert 'class="feed-filters"' in feed and "All my sports" in feed and "sport-channels" not in feed
+    assert "data-help-bubble" not in feed and 'placeholder="What\'s happening?"' in feed
 
 
 def test_play_says_how_many_sports_instead_of_listing_fifty(accounts, client):
@@ -237,3 +237,45 @@ def test_the_open_post_box_closes_on_a_tap_elsewhere_or_scrolling_away(client):
     assert 'document.addEventListener("pointerdown"' in js and "IntersectionObserver" in js
     css = client.get("/static/style.css").data.decode()
     assert ".feed-photos.is-single .feed-photo, .feed-photos.is-single .feed-photo img, .feed-video { max-height: 340px; }" in css
+
+
+def test_feed_like_twitter_clubs_menu_and_profile_posts_first(accounts, client, app):
+    accounts.signup(email="officer@uw.edu", sports=("tennis",))
+    club = approved_club(app, "officer@uw.edu", name="UW Tennis Club", sport="tennis")
+    post(client, as_club=str(club), sport="tennis", body="Ladder night")
+    accounts.logout()
+    accounts.signup(email="maya@uw.edu", name="Maya Chen", sports=("running",))
+    post(client, body="Morning 10K")
+    feed = client.get("/feed").data.decode()
+    assert 'id="show-filter"' in feed and ">My clubs</option>" in feed and "What's happening?" in feed
+    assert 'class="page-title"' not in feed and "Hey, Maya" not in feed                 # no big title
+    clubs = client.get("/feed?show=clubs").data.decode()
+    assert "Ladder night" in clubs and "Morning 10K" not in clubs                         # All clubs: only clubs
+    assert "Ladder night" not in client.get("/feed?show=myclubs").data.decode()           # not following it
+    assert "Ladder night" not in client.get("/feed?show=clubs&sport=running").data.decode()
+    back = client.post("/posts/new", data={"sport": "running", "body": "x", "show": "clubs"},
+                       content_type="multipart/form-data")
+    assert back.headers["Location"].endswith("/feed?show=clubs")
+    maya = user_id(app, "maya@uw.edu")
+    profile = client.get(f"/u/{maya}").data.decode()
+    assert profile.index('data-tab-button="posts"') < profile.index('data-tab-button="games"')
+    assert "Morning 10K" in profile
+
+
+def test_one_card_pattern_no_canceled_games_and_quick_buttons(accounts, client, app):
+    """Every card looks the same, canceled games leave the feed, a plan's game doesn't repeat the post, and the
+    one-line post box offers 📷 Photo and 🏀 Plan a game. Create has one way to make each thing."""
+    accounts.signup(email="maya@uw.edu", sports=("basketball",))
+    post(client, sport="basketball", body="who's down", plan="1", starts_at=form_time(timedelta(days=1)),
+         duration="60", location="IMA (Intramural Activities Building)", spots="3")
+    with app.app_context():
+        game = get_db().execute("SELECT id, title FROM events").fetchone()
+    assert game["title"] == "Basketball at the IMA"
+    feed = client.get("/feed").data.decode()
+    assert "who&#39;s down" in feed and "data-open-plan" in feed and 'for="post-photos"' in feed
+    client.post(f"/events/{game['id']}/cancel")
+    assert "who&#39;s down" not in client.get("/feed").data.decode()
+    menu = client.get("/create").data.decode()
+    assert ">Post<" in menu and ">Game<" in menu and "Need players" in menu and "Register your club" in menu
+    css = client.get("/static/style.css").data.decode()
+    assert ".feed-card.is-club { box-shadow: none; }" in css and "object-fit: cover; border-radius: 12px" in css

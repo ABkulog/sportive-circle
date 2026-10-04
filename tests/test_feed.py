@@ -88,7 +88,7 @@ def test_a_plan_post_is_a_real_game_people_can_join(accounts, client, app):
         db = get_db()
         event = db.execute("SELECT * FROM events").fetchone()
         assert db.execute("SELECT event_id FROM posts").fetchone()[0] == event["id"]
-    assert event["title"] == "Hiking Mt Si tomorrow, have a car, need 2 more" and event["max_players"] == 3
+    assert event["title"] == "Hiking off campus" and event["max_players"] == 3       # named, not the post repeated
     assert "Hiking Mt Si" in event["note"]
     accounts.logout()
     accounts.signup(email="sam@uw.edu", sports=("hiking",))
@@ -194,7 +194,7 @@ def test_club_posts_and_new_games_fill_the_feed(accounts, client, app):
 def test_feed_is_home_and_has_rules(accounts, client):
     accounts.signup()
     home = client.get("/feed").data.decode()
-    assert 'class="tab is-active" href="/feed"' in home and ">Feed <" in home and ">Play<" in home
+    assert 'class="tab is-active" href="/feed"' in home and ">Play<" in home
     assert "Make it a plan" in home and 'href="/rules"' in home and 'data-max-files="10"' in home
     rules = client.get("/rules").data.decode()
     assert "Athletic, not thirsty" in rules and "18 and older" in rules
@@ -226,7 +226,6 @@ def test_home_shows_how_many_new_posts_until_you_open_the_feed(accounts, client)
     as_user(accounts, "me@uw.edu")
     games = client.get("/").data.decode()
     assert re.search(r'href="/feed"[^>]*>.*?<span class="count-dot">2</span>', games, re.S)  # on the Home tab
-    assert "LIVE" in games
     client.get("/feed")                                                    # seen
     assert '<span class="count-dot">2</span>' not in client.get("/").data.decode()
 

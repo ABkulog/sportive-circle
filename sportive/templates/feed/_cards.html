@@ -66,7 +66,6 @@
       </div>
     {% endif %}
     {% if item.event %}{{ plan_box(item.event) }}{% endif %}
-    {% if p.club_id %}{{ club_links(p.club_id, item) }}{% endif %}
     <footer class="feed-actions">
       <form method="post" action="{{ url_for('posts.like', post_id=p.id) }}" class="like-form" data-inplace>
         {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.full_path }}#post-{{ p.id }}">
@@ -92,11 +91,6 @@
   {%- endif -%}
 {% endmacro %}
 
-{% macro club_links(club_id, item) %}
-  {% if not item.on_club_page %}
-    <a class="club-line" href="{{ url_for('clubs.view', club_id=club_id) }}#events">📅 {% if item.club_events %}{{ item.club_events }} event{{ 's' if item.club_events != 1 }} coming up · {% endif %}Events &amp; info →</a>
-  {% endif %}
-{% endmacro %}
 
 {# Report and Delete: in a ⋯ menu, so each card shows just 🔥 and Reply #}
 {% macro more_menu(report_url=None, delete_url=None, what='post') %}
@@ -118,6 +112,14 @@
 
 {% macro club_post_card(item) %}
   {% set p = item.club_post %}
+  {% if p.body.startswith('🆕') %}
+    {# A new club: one short line, not a full card #}
+    <article class="card feed-card feed-mini" id="club-post-{{ p.id }}" data-swap>
+      <a class="feed-mini-link" href="{{ url_for('clubs.view', club_id=p.club_id) }}">{{ club_logo(p, 28, logo=p.club_logo or '', club_id=p.club_id) }}
+        <span>🆕 <strong>{{ p.club_name }}</strong> {{ verified_badge() }} joined Sportive Circle <small class="muted">· {{ p.created_at|ago }}</small></span></a>
+      {{ follow_button(p.club_id, {'my_role': p.my_role}) }}
+    </article>
+  {% else %}
   <article class="card feed-card is-club" id="club-post-{{ p.id }}" data-swap>
     {% set name %}{{ p.club_name }} {{ verified_badge() }}{% endset %}
     {{ card_head(url_for('clubs.view', club_id=p.club_id), club_logo(p, 40, logo=p.club_logo or '', club_id=p.club_id),
@@ -125,8 +127,9 @@
     <p class="feed-body">{{ p.body }}</p>
     {% if item.event %}{{ plan_box(item.event) }}{% endif %}
     {% if item.friends %}<p class="friends-line">👥 {{ item.friends }}</p>{% endif %}
-    {{ club_links(p.club_id, {'my_role': p.my_role}) }}
+
   </article>
+  {% endif %}
 {% endmacro %}
 
 

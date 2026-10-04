@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import event_card, avatar, club_logo %}
+{% from "_macros.html" import event_card, avatar, club_logo, icon %}
 {% from "feed/_cards.html" import feed_item %}
 {% block title %}{{ user.full_name }}{% endblock %}
 {% block content %}
@@ -54,8 +54,18 @@
   {% if me %}
     <div class="profile-buttons">
       <a class="btn btn-ghost" href="{{ url_for('profile.edit') }}">Edit profile</a>
-      <a class="btn btn-ghost" href="{{ url_for('settings.home') }}">Settings</a>
     </div>
+    {# What used to crowd the sidebar: here, one tap from Profile #}
+    <nav class="profile-menu" aria-label="Your account">
+      <a href="{{ url_for('social.friends') }}">{{ icon('friends') }}<span>Friends</span>{% set fr = tab_badges().friends %}{% if fr %}<span class="count-dot">{{ fr }}</span>{% endif %}</a>
+      <a href="{{ url_for('settings.home') }}">{{ icon('sliders') }}<span>Settings</span></a>
+      <a href="{{ url_for('faq') }}">{{ icon('help') }}<span>Help</span></a>
+      {% if is_admin() %}{% set waiting = open_report_count() + pending_club_count() + tab_badges().admin %}
+        <a href="{{ url_for('moderation.admin_home') }}">{{ icon('shield') }}<span>Admin</span>{% if waiting %}<span class="count-dot">{{ waiting }}</span>{% endif %}</a>{% endif %}
+      <form method="post" action="{{ url_for('auth.logout') }}" data-confirm="Log out of Sportive Circle?">
+        {{ csrf_field() }}<button class="link-button">{{ icon('logout') }}<span>Log out</span></button>
+      </form>
+    </nav>
   {% elif relation.i_blocked %}
     <div class="profile-buttons">
       <form method="post" action="{{ url_for('social.unblock', user_id=user.id) }}">
@@ -108,71 +118,77 @@
   {% endif %}
 
   {% if not blocked %}{# blocked either way: just the name and photo #}
+  {# A few sports, then "+12 more" (someone with 50 sports pushed everything else off the screen) #}
   <div class="badges profile-sports">
-    {% for s in sports %}<span class="chip">{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</span>
+    {% for s in sports[:4] %}<span class="chip">{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</span>
     {% else %}<span class="muted">{% if me %}<a href="{{ url_for('profile.edit_sports') }}">Pick your sports</a>{% else %}No sports picked yet.{% endif %}</span>{% endfor %}
+    {% if sports|length > 4 %}<span class="chip muted" title="{% for s in sports[4:] %}{{ SPORTS[s] }}{{ ', ' if not loop.last }}{% endfor %}">+{{ sports|length - 4 }} more</span>{% endif %}
   </div>
   {% endif %}
 </section>
 
 {% if not blocked %}
-<section class="band" aria-labelledby="profile-posts">
-  <div class="section-head">
-    <h2 id="profile-posts">Posts</h2>
-    {% if me %}<a href="{{ url_for('posts.feed') }}">New post</a>{% endif %}
-  </div>
-  {% if post_items %}
-    <div class="stack feed">{% for item in post_items %}{{ feed_item(item, post_photos) }}{% endfor %}</div>
-  {% else %}
-    <p class="muted">{{ "You haven't posted yet. Share a PR, a plan or a question on the feed." if me else "No posts yet." }}</p>
-  {% endif %}
-</section>
-{% endif %}
+{# Like a Twitter profile: Posts first, and the rest one tap away #}
+<div class="tabs profile-tabs" data-tabs>
+  <nav class="home-tabs tab-list" role="tablist" aria-label="Profile sections">
+    <button type="button" role="tab" data-tab-button="posts">Posts</button>
+    {% if clubs or me %}<button type="button" role="tab" data-tab-button="clubs">Clubs{% if clubs %} · {{ clubs|length }}{% endif %}</button>{% endif %}
+    <button type="button" role="tab" data-tab-button="games">Games</button>
+    {% if showcase or me %}<button type="button" role="tab" data-tab-button="badges">Badges</button>{% endif %}
+  </nav>
 
-{% if not blocked and (clubs or me) %}
-<section class="band" aria-labelledby="profile-clubs">
-  <div class="section-head">
-    <h2 id="profile-clubs">Clubs</h2>
-    {% if me %}<a href="{{ url_for('clubs.directory') }}">Find clubs</a>{% endif %}
-  </div>
-  {% if clubs %}
-    <ul class="profile-clubs">
-      {% for c in clubs %}
-        <li><a href="{{ url_for('clubs.view', club_id=c.id) }}">{{ club_logo(c, 32) }}<span>{{ c.name }}</span>
-          {% if c.role == 'officer' %}<span class="badge badge-purple">Officer</span>{% endif %}</a></li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p class="muted">You're not in a club yet. Clubs you join show up here.</p>
-  {% endif %}
-</section>
-{% endif %}
+  <section class="tab-panel" data-tab-panel="posts" id="profile-posts" role="tabpanel">
+    <h2 class="visually-hidden">Posts</h2>
+    {% if post_items %}
+      <div class="stack feed">{% for item in post_items %}{{ feed_item(item, post_photos) }}{% endfor %}</div>
+    {% else %}
+      <p class="muted">{{ "You haven't posted yet. Share a PR, a plan or a question on the feed." if me else "No posts yet." }}
+        {% if me %}<a href="{{ url_for('posts.feed') }}">Post something →</a>{% endif %}</p>
+    {% endif %}
+  </section>
 
-{% if showcase or me %}
-<section class="band">
-  <div class="section-head">
-    <h2>Badges</h2>
-    {% if me %}<a href="{{ url_for('profile.badge_locker') }}">All {{ earned|length }} · choose 3</a>{% endif %}
-  </div>
-  {% if showcase %}
-    <ul class="showcase-row" aria-label="Badge showcase">
-      {% for b in showcase %}
-        <li class="showcase-badge {% if b.until %}is-limited{% endif %}" title="{{ b.how }}">
-          <span class="showcase-emoji" aria-hidden="true">{{ b.emoji }}</span><strong>{{ b.name }}</strong></li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p class="muted">None yet. Play a game to earn your first.</p>
+  {% if clubs or me %}
+  <section class="tab-panel" data-tab-panel="clubs" id="profile-clubs" role="tabpanel">
+    <h2 class="visually-hidden">Clubs</h2>
+    {% if clubs %}
+      <ul class="profile-clubs">
+        {% for c in clubs %}
+          <li><a href="{{ url_for('clubs.view', club_id=c.id) }}">{{ club_logo(c, 32) }}<span>{{ c.name }}</span>
+            {% if c.role == 'officer' %}<span class="badge badge-purple">Officer</span>{% endif %}</a></li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">You're not in a club yet. Clubs you join show up here.</p>
+    {% endif %}
+    {% if me %}<p class="profile-links"><a href="{{ url_for('clubs.updates') }}">My clubs{% set cb = tab_badges().clubs %}{% if cb %} <span class="count-dot">{{ cb }}</span>{% endif %}</a> · <a href="{{ url_for('clubs.directory') }}">Find a club</a></p>{% endif %}
+  </section>
   {% endif %}
-</section>
-{% endif %}
 
-{% if not blocked %}
-<section class="band">
-  <h2 class="section-title">{{ 'Games you host' if me else 'Games ' ~ user.full_name.split()[0] ~ ' hosts' }}</h2>
-  <div class="stack">
-    {% for e in hosting %}{{ event_card(e) }}{% else %}<p class="muted">Nothing coming up.</p>{% endfor %}
-  </div>
-</section>
+  <section class="tab-panel" data-tab-panel="games" id="profile-games" role="tabpanel">
+    <h2 class="visually-hidden">{{ 'Games you host' if me else 'Games ' ~ user.full_name.split()[0] ~ ' hosts' }}</h2>
+    <div class="stack">
+      {% for e in hosting %}{{ event_card(e) }}{% else %}<p class="muted">Nothing coming up.</p>{% endfor %}
+    </div>
+    {% if me %}<p class="profile-links"><a href="{{ url_for('events.my_events') }}">All your games (joined and hosted) →</a></p>{% endif %}
+  </section>
+
+  {% if showcase or me %}
+  <section class="tab-panel" data-tab-panel="badges" id="profile-badges" role="tabpanel">
+    <h2 class="visually-hidden">Badges</h2>
+    {% if showcase %}
+      <ul class="showcase-row" aria-label="Badge showcase">
+        {% for b in showcase %}
+          <li class="showcase-badge {% if b.until %}is-limited{% endif %}" title="{{ b.how }}">
+            <span class="showcase-emoji" aria-hidden="true">{{ b.emoji }}</span><strong>{{ b.name }}</strong></li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">None yet. Play a game to earn your first.</p>
+    {% endif %}
+    {% if me %}<p><a href="{{ url_for('profile.badge_locker') }}">All {{ earned|length }} badges · choose 3</a></p>{% endif %}
+  </section>
+  {% endif %}
+</div>
+<script src="{{ url_for('static', filename='tabs.js') }}" defer></script>
 {% endif %}
 {% endblock %}

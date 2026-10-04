@@ -2,23 +2,20 @@
 {% block title %}Create{% endblock %}
 {% block content %}
 <h1 class="page-title">Create</h1>
+{# One way to make each thing: a post (words, photos, a quick plan) goes on the feed; a game gets its own page. #}
 <div class="create-grid">
-  <a class="card create-option create-gold" href="{{ url_for('events.quick') }}">
-    <span class="create-emoji" aria-hidden="true">⚡</span>
-    <strong>Need players</strong>
-    <span class="muted">Short a few people right now</span>
+  <a class="card create-option create-gold" href="{{ url_for('posts.feed') }}#post">
+    <span class="create-emoji" aria-hidden="true">✏️</span>
+    <strong>Post</strong>
+    <span class="muted">A PR, a photo, a question, or "who's down?"</span>
   </a>
   <a class="card create-option" href="{{ url_for('events.create') }}">
     <span class="create-emoji" aria-hidden="true">📅</span>
-    <strong>New event</strong>
-    <span class="muted">Plan one for later</span>
-  </a>
-  <a class="card create-option" href="{{ url_for('clubs.create') }}">
-    <span class="create-emoji" aria-hidden="true">🏛️</span>
-    <strong>Register your club</strong>
-    <span class="muted">For club officers</span>
+    <strong>Game</strong>
+    <span class="muted">Pick the place and time, people join</span>
   </a>
 </div>
+<p class="create-more muted">Short a few people right now? <a href="{{ url_for('events.quick') }}">Need players ⚡</a></p>
 {% if officer_clubs %}
   <section class="band">
     <h2>Event for your club</h2>
@@ -32,4 +29,5 @@
     </ul>
   </section>
 {% endif %}
+<p class="create-more muted">Run a club? <a href="{{ url_for('clubs.create') }}">Register your club</a></p>
 {% endblock %}

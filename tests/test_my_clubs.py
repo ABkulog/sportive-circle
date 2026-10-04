@@ -43,7 +43,7 @@ def test_profiles_show_the_clubs_someone_is_in(accounts, client, app):
     accounts.logout()
     accounts.signup(email="loner@uw.edu", sports=("running",))
     mine = client.get(f"/u/{user_id(app, 'loner@uw.edu')}").data.decode()
-    assert "You're not in a club yet" in mine and "Find clubs" in mine
+    assert "You're not in a club yet" in mine and "Find a club" in mine
     client.post(f"/block/{user_id(app, 'officer@uw.edu')}")
     assert "UW Run Club" not in client.get(f"/u/{user_id(app, 'officer@uw.edu')}").data.decode()   # blocked: hidden
 
@@ -57,7 +57,7 @@ def test_officers_see_who_is_waiting_on_my_clubs(accounts, client, app):
     accounts.logout()
     accounts.login(email="officer@uw.edu")
     assert "1 waiting</span>" in client.get("/clubs/updates").data.decode()
-    assert 'href="/clubs/feed"' in client.get("/clubs").data.decode()          # tabs: All clubs, My clubs, Find a club
+    assert client.get("/clubs/feed").headers["Location"] == "/feed?show=clubs"   # All clubs is the feed's clubs menu
 
 
 def test_profiles_show_posts(accounts, client, app):

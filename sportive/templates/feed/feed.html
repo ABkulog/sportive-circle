@@ -1,33 +1,38 @@
 {% extends "base.html" %}
 {% from "_macros.html" import home_tabs, icon, club_logo, avatar, open_to_field, place_check %}
 {% from "feed/_cards.html" import feed_item %}
-{% block title %}{{ '#' ~ SPORTS[sport] if sport else "Feed: what's happening" }}{% endblock %}
+{% block title %}{{ '#' ~ SPORTS[sport] if sport else "Feed" }}{% endblock %}
 {% block content %}
 {{ home_tabs('posts') }}
-{% if not sport %}<p class="hello muted">Hey, {{ g.user.full_name.split()[0] }} 👋</p>{% endif %}
-<h1 class="page-title">{{ SPORT_EMOJI[sport] ~ ' ' ~ SPORTS[sport] if sport else "What's happening" }}</h1>
-
-{# Which sport: one picker instead of a row of chips to scroll sideways. "All my sports" is everything from the
-   sports you picked; one sport shows just that sport's channel (#running). #}
-<form method="get" action="{{ url_for('posts.feed') }}" class="sport-filter" data-auto-submit>
-  <label for="sport-filter" class="visually-hidden">Show</label>
+{# Like Twitter: no big title, just what to show (two menus) and the post box. #}
+<h1 class="visually-hidden">{{ SPORTS[sport] ~ ' feed' if sport else 'Feed' }}</h1>
+<form method="get" action="{{ url_for('posts.feed') }}" class="feed-filters" data-auto-submit>
+  <label for="sport-filter" class="visually-hidden">Sport</label>
   <select id="sport-filter" name="sport">
     <option value="">All my sports</option>
     {% if my_sports %}<optgroup label="Your sports">{% for s in my_sports %}<option value="{{ s }}" {% if sport == s %}selected{% endif %}>{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</option>{% endfor %}</optgroup>{% endif %}
     <optgroup label="Other sports">{% for key, label in SPORTS.items() if key not in my_sports %}<option value="{{ key }}" {% if sport == key %}selected{% endif %}>{{ SPORT_EMOJI[key] }} {{ label }}</option>{% endfor %}</optgroup>
   </select>
+  <label for="show-filter" class="visually-hidden">From</label>
+  <select id="show-filter" name="show">
+    <option value="">Everyone</option>
+    <option value="clubs" {% if show == 'clubs' %}selected{% endif %}>All clubs</option>
+    <option value="myclubs" {% if show == 'myclubs' %}selected{% endif %}>My clubs</option>
+  </select>
   <noscript><button class="btn btn-small btn-ghost">Show</button></noscript>
 </form>
+{% if show %}<p class="muted small feed-find-club"><a href="{{ url_for('clubs.directory') }}">Find a club to follow →</a>{% if show == 'myclubs' %} · <a href="{{ url_for('clubs.updates') }}">Manage my clubs</a>{% endif %}</p>{% endif %}
 
 {# The post box: one line until you tap it, then the sport, photos, video and "make it a plan" open up. #}
 <form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="card composer" data-composer data-sport-form data-inplace data-swap-target="#feed-list">
   {{ csrf_field() }}
   {% if sport %}<input type="hidden" name="channel" value="{{ sport }}">{% endif %}
+  {% if show %}<input type="hidden" name="show" value="{{ show }}">{% endif %}
   <div class="composer-top">
     {{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 40) }}
     <label class="visually-hidden" for="post-body">Your post</label>
     <textarea id="post-body" name="body" rows="2" maxlength="{{ max_body }}"
-              placeholder="Who's down?"></textarea>
+              placeholder="What's happening?"></textarea>
   </div>
   <div class="composer-more">
     {% if post_as %}{# club officers can post as themselves or as their club #}
@@ -44,7 +49,7 @@
         <optgroup label="All sports">{% for key, label in SPORTS.items() if key not in my_sports %}<option value="{{ key }}" {% if key == sport %}selected{% endif %}>{{ label }}</option>{% endfor %}</optgroup>
       </select>
       <label class="btn btn-ghost btn-small composer-photos" title="Add up to {{ max_photos }} photos">{{ icon('camera') }}<span>Photos</span>
-        <input type="file" name="photos" accept="image/*" multiple data-max-files="{{ max_photos }}" class="visually-hidden"></label>
+        <input type="file" name="photos" id="post-photos" accept="image/*" multiple data-max-files="{{ max_photos }}" class="visually-hidden"></label>
       <label class="btn btn-ghost btn-small composer-photos" title="Add a video, up to 1 minute">🎬<span>Video</span>
         <input type="file" name="video" accept="video/mp4,video/quicktime,video/*" data-max-seconds="{{ max_seconds }}" class="visually-hidden"></label>
     </div>
@@ -72,6 +77,11 @@
   <div class="composer-row composer-send">
     <a class="muted small composer-rules" href="{{ url_for('community_rules') }}">Community rules</a>
     <button class="btn post-button">Post {{ icon("send") }}</button>
+  </div>
+  {# Under the one-line box: you can do more than words #}
+  <div class="composer-quick">
+    <label class="quick-chip" for="post-photos">📷 Photo</label>
+    <button type="button" class="quick-chip" data-open-plan>🏀 Plan a game</button>
   </div>
 </form>
 

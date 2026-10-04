@@ -1333,10 +1333,10 @@ def test_dm_rules_and_unread(accounts, client, app):
     accounts.logout()
     accounts.login(email="a@uw.edu")
     feed = client.get("/").data
-    assert b'Messages, 1 unread' in feed
+    assert b'Messages<span class="visually-hidden"> (1 new)' in feed                # on the Messages tab
     thread = client.get(f"/messages/{b}").data
     assert b"gg today!" in thread and b"<script>alert(1)</script>" not in thread   # escaped
-    assert b"Messages, 1 unread" not in client.get("/").data                    # read now
+    assert b'Messages<span class="visually-hidden"> (1 new)' not in client.get("/").data   # read now
     client.post(f"/messages/{b}", data={"body": "gg!"})
     new = client.get(f"/messages/{b}/poll?after=0").get_json()["messages"]
     assert [m["body"] for m in new][-1] == "gg!" and new[-1]["mine"] is True
@@ -1690,14 +1690,15 @@ def test_a_removed_clubs_events_go_on_hold(accounts, client, app):
 def test_same_sections_everywhere(accounts, client):
     accounts.signup()
     page = client.get("/").data.decode()
-    for label in ("Home", "Clubs", "Create", "Profile", "Messages", "Friends", "FAQ"):
+    # Like Twitter / Instagram: 5 places, one level (no second row of tabs); the rest is on your Profile
+    for label in ("Home", "Play", "Create", "Messages", "Profile"):
         assert f'<span class="tab-label">{label}<' in page, label
-    assert '<span class="tab-label">News<' not in page                       # one thing: playing
-    assert 'class="tab is-active" href="/feed" aria-current="page"' in page  # Home (the feed) is highlighted
-    assert 'aria-label="FAQ"' in page                                       # ❓ in the top bar opens the FAQ
-    assert ">Feed <" in page and ">Play<" in page and "My events" in page   # Home tabs
-    menu = client.get("/create").data.decode()
-    assert "Need players" in menu and "New event" in menu and "Register your club" in menu
+    for gone in ("Clubs", "Friends", "FAQ", "Settings", "News"):
+        assert f'<span class="tab-label">{gone}<' not in page, gone
+    assert 'class="tab is-active" href="/" aria-current="page"' in page     # Play is highlighted on Play
+    assert ">My events<" not in page and 'class="home-tabs"' not in page
+    feed = client.get("/feed").data.decode()
+    assert 'class="tab is-active" href="/feed" aria-current="page"' in feed     # Home (the feed)
 
 
 def test_visitors_get_simple_menu(client):
@@ -3186,14 +3187,15 @@ def test_admins_are_only_notified_about_topics_3_people_mention(accounts, client
                 client.post("/suggestions", data={"kind": "idea", "body": "more pickleball times"})
         accounts.logout()
         accounts.login(email="boss@uw.edu")
-        page = client.get("/faq").data.decode()   # the number is on the admin (shield) icon
-        shield = re.search(r'title="Admin">.*?</a>', page, re.S).group(0)
+        page = client.get(f"/u/{_user_id(app, 'boss@uw.edu')}").data.decode()  # the number is on Admin (on Profile)
+        shield = re.search(r'href="/admin">.*?</a>', page, re.S).group(0)
         assert ('<span class="count-dot">1</span>' in shield) == (i == 2), i   # quiet until the third person
         accounts.logout()
     accounts.login(email="boss@uw.edu")
     admin_page = client.get("/admin/suggestions").data.decode()
     assert "<strong>badminton</strong> · 3 people" in admin_page and "<strong>pickleball</strong>" not in admin_page
-    shield = re.search(r'title="Admin">.*?</a>', client.get("/faq").data.decode(), re.S).group(0)
+    shield = re.search(r'href="/admin">.*?</a>', client.get(f"/u/{_user_id(app, 'boss@uw.edu')}").data.decode(),
+                       re.S).group(0)
     assert "count-dot" not in shield                                                            # seen: no more
     topic_page = client.get("/admin/suggestions?topic=badminton").data.decode()
     assert "Can we get badminton" in topic_page and "more pickleball" not in topic_page
@@ -3263,9 +3265,9 @@ def test_real_email_has_text_and_html_parts(app, monkeypatch):
     assert timeouts and all(timeouts)  # a stuck mail server can't hang the page forever
 
 
-def test_every_log_out_button_asks_first(accounts, client):
+def test_every_log_out_button_asks_first(accounts, client, app):
     accounts.signup()
-    for path in ("/", "/profile/edit", "/how-it-works"):
+    for path in (f"/u/{_user_id(app, 'dubs@uw.edu')}", "/settings"):   # Log out is on your Profile and in Settings
         page = client.get(path).data.decode()
         forms = re.findall(r'<form[^>]*action="/logout"[^>]*>', page)
         assert forms and all('data-confirm="Log out of Sportive Circle?"' in form for form in forms), path
@@ -5362,7 +5364,7 @@ def test_public_address_is_our_domain_on_render(tmp_path, monkeypatch):
 def test_settings_page_is_separate_from_edit_profile(accounts, client, app):
     accounts.signup()
     me = _user_id(app, "dubs@uw.edu")
-    assert ">Settings</a>" in client.get(f"/u/{me}").data.decode()
+    assert "<span>Settings</span></a>" in client.get(f"/u/{me}").data.decode()
     page = client.get("/settings").data.decode()
     for part in ("Notifications", "Change password", "Look", "Email me an hour before", "Log out",
                  "Delete my account"):
@@ -5407,7 +5409,8 @@ def test_each_notification_shows_in_one_place(accounts, client, app):
     settings = client.get("/settings/notifications").data.decode()
     assert settings.count('class="switch"') == 12         # club requests (officers) and trends (admins) hidden
     assert "On the Home tab" in settings and "New posts in your sports" in settings
-    assert settings.count("In the bell") == 1 and "On the messages icon" in settings   # one heading per place
+    assert settings.count("In the bell") == 1 and "On the Messages tab" in settings   # one heading per place
+    assert settings.count("On the Profile tab") == 1      # friend requests and club updates: one heading
 
 
 def _invite_path(page):
@@ -7041,7 +7044,7 @@ def test_pasted_social_links_become_usernames(accounts, client, app):
 def test_one_admin_tab_with_everything(accounts, client, app):
     accounts.signup(email="boss@uw.edu", name="Boss Husky")
     app.config["ADMIN_EMAILS"] = "boss@uw.edu"
-    home = client.get("/").data.decode()
+    home = client.get(f"/u/{_user_id(app, 'boss@uw.edu')}").data.decode()   # Admin is on your Profile
     assert 'href="/admin"' in home and ">Reports</span>" not in home and ">Club requests</span>" not in home
     page = client.get("/admin").data.decode()
     for part in ("Reports", "Club requests", "UW Rec reservations", "Suggestions"):

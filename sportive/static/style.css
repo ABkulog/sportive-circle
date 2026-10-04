@@ -1455,3 +1455,35 @@ body.has-app-nav .home-tabs { position: sticky; top: 60px; z-index: 20; backgrou
 .feed-card .inline-replies { margin: 10px -14px -12px; padding: 10px 14px 12px; }
 @media (min-width: 700px) { .feed-photo { flex-basis: 45%; max-height: 300px; } }
 .feed-photos.is-single .feed-photo, .feed-photos.is-single .feed-photo img, .feed-video { max-height: 340px; }
+/* The feed's two menus, side by side: which sport, and from whom (Everyone / All clubs / My clubs) */
+.feed-filters { display: flex; gap: 8px; margin: 0 0 12px; }
+.feed-filters select { flex: 1 1 0; min-width: 0; width: auto; min-height: 40px; padding: 6px 32px 6px 14px; border-radius: 999px;
+  font-weight: 700; background-color: var(--control); text-overflow: ellipsis; }
+.feed-filters select:last-of-type { flex: 0 1 150px; }
+/* Your profile's menu (Friends, Settings, Help, Admin, Log out: they used to fill the sidebar) */
+.profile-menu { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.profile-menu a, .profile-menu .link-button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; min-height: 36px;
+  border-radius: 999px; background: var(--control); color: var(--text); font-weight: 600; font-size: .88rem; position: relative; }
+.profile-menu a:hover { text-decoration: none; }
+.profile-menu form { margin: 0; }
+.profile-menu .icon { width: 16px; height: 16px; }
+.profile-menu .count-dot { position: static; margin-left: 2px; }
+.profile-links { margin-top: 10px; font-weight: 600; }
+.feed-find-club { margin: -4px 0 10px; }
+.create-more { margin: 14px 0 0; }
+/* Every card the same: avatar, name, time, #sport, content, reactions. Clubs just have the verified mark. */
+.feed-card.is-club { box-shadow: none; }
+.feed-mini { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+.feed-mini-link { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; color: var(--text); font-size: .9rem; }
+.feed-mini-link:hover { text-decoration: none; }
+.feed-mini-link > span { min-width: 0; overflow-wrap: anywhere; }
+/* Photos fill the card's width (no bars at the sides), rounded, never taller than 340px */
+.feed-photos.is-single .feed-photo { background: none; aspect-ratio: auto; }
+.feed-photos.is-single .feed-photo img { width: 100%; height: auto; max-height: 340px; object-fit: cover; border-radius: 12px; }
+/* 📷 Photo · 🏀 Plan a game under the one-line post box */
+.composer-quick { display: none; }
+.composer.is-collapsible:not(.is-open) .composer-quick { display: flex; gap: 8px; grid-column: 1 / -1; margin-top: -2px; }
+.quick-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; min-height: 32px; border-radius: 999px; border: 0;
+  background: var(--control); color: var(--text); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.quick-chip:hover { background: var(--accent-soft); }
+.feed-filters select:last-of-type { flex: 0 0 auto; width: auto; }
