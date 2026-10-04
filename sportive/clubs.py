@@ -265,7 +265,7 @@ def directory():
     if "beginner" in easy:
         where.append("c.experience = 'none'")
     if "free" in easy:
-        where.append("(c.dues = '' OR LOWER(c.dues) = 'free')")
+        where.append(FREE_DUES)
     if "no_tryouts" in easy:
         where.append("c.joining = 'open'")
     clubs = get_db().execute(
@@ -540,6 +540,11 @@ MEMBER_ROLES = ("member", "officer")
 ACTIVE_OFFICERS = """SELECT COUNT(*) FROM club_members m JOIN users u ON u.id = m.user_id
                      WHERE m.club_id = ? AND m.role = 'officer' AND u.suspended = 0"""
 WAITING_ROLES = ("requested", "tryout")
+# Dues officers typed that mean free: "Free", "Free!", "free (shirt optional)", "$0", "None", "No dues", blank.
+# ("Free first quarter, then $40" has a price in it, so it isn't.)
+FREE_DUES = """(TRIM(c.dues) = '' OR LOWER(TRIM(c.dues)) IN ('0', '$0', '0$', '$0.00', 'none', 'no', 'no dues', 'n/a', 'na')
+               OR ((LOWER(TRIM(c.dues)) LIKE 'free%' OR LOWER(TRIM(c.dues)) LIKE 'no dues%')
+                   AND c.dues NOT GLOB '*[1-9]*'))"""
 
 
 def hand_club_games_to_the_club(user_id, club_id=None):
