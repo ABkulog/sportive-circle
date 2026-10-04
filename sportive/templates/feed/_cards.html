@@ -1,4 +1,4 @@
-{% from "_macros.html" import avatar, club_logo %}
+{% from "_macros.html" import avatar, club_logo, verified_badge %}
 
 {# The game behind a plan post or a club event post: when, where, how many, and "I'm in". #}
 {% macro plan_box(e) %}
@@ -25,33 +25,47 @@
 
 {% macro sport_tag(sport) %}<a class="sport-tag" href="{{ url_for('posts.feed', sport=sport) }}">#{{ SPORTS[sport].split(' / ')[0]|lower|replace(' ', '') }}</a>{% endmacro %}
 
+{# A card's top line: picture, name, and when · #sport (the sport tag is its own link, not inside the name's). #}
+{% macro card_head(href, pic, name, meta, sport=None) %}
+  <header class="feed-head">
+    {% if href %}<a class="feed-pic" href="{{ href }}" tabindex="-1" aria-hidden="true">{{ pic }}</a>{% else %}<span class="feed-pic">{{ pic }}</span>{% endif %}
+    <div class="feed-who">
+      {% if href %}<a class="feed-name" href="{{ href }}"><strong>{{ name }}</strong></a>{% else %}<strong class="feed-name">{{ name }}</strong>{% endif %}
+      <small class="muted">{{ meta }}{% if sport %} · {{ sport_tag(sport) }}{% endif %}</small>
+    </div>
+  </header>
+{% endmacro %}
+
 {% macro post_card(item, photos) %}
   {% set p = item.post %}
-  <article class="card feed-card" id="post-{{ p.id }}">
-    <header class="feed-head">
-      <a class="feed-who" href="{{ url_for('profile.view', user_id=p.author_id) }}">
-        {{ avatar(p.author_id, p.full_name, p.avatar_updated, 40) }}
-        <span><strong>{{ p.full_name }}</strong><small class="muted">{{ p.created_at|ago }}</small></span>
-      </a>
-      {{ sport_tag(p.sport) }}
-    </header>
+  {% set who = p.club_name if p.club_id else p.full_name %}
+  <article class="card feed-card {% if p.club_id %}is-club{% endif %}" id="post-{{ p.id }}">
+    {% if p.club_id %}
+      {% set name %}{{ p.club_name }} {{ verified_badge() }}{% endset %}
+      {{ card_head(url_for('clubs.view', club_id=p.club_id), club_logo(p, 40, logo=p.club_logo or '', club_id=p.club_id),
+                   name, 'Club · ' ~ (p.created_at|ago), p.sport) }}
+    {% else %}
+      {{ card_head(url_for('profile.view', user_id=p.author_id), avatar(p.author_id, p.full_name, p.avatar_updated, 40),
+                   p.full_name, p.created_at|ago, p.sport) }}
+    {% endif %}
     {% if p.body %}<p class="feed-body">{{ p.body }}</p>{% endif %}
     {% if p.has_video %}
       <video class="feed-video" src="{{ url_for('posts.video', post_id=p.id) }}" controls playsinline preload="metadata"
-             aria-label="Video from {{ p.full_name }}"></video>
+             aria-label="Video from {{ who }}"></video>
     {% endif %}
     {% set shots = photos.get(p.id, []) %}
     {% if shots %}
       <div class="feed-photos {% if shots|length == 1 %}is-single{% endif %}" {% if shots|length > 1 %}aria-label="{{ shots|length }} photos, swipe to see them"{% endif %}>
         {% for n in shots %}
           <div class="feed-photo">
-            <img src="{{ url_for('posts.photo', post_id=p.id, position=n) }}" alt="Photo {{ n }} of {{ shots|length }} from {{ p.full_name }}" loading="lazy">
+            <img src="{{ url_for('posts.photo', post_id=p.id, position=n) }}" alt="Photo {{ n }} of {{ shots|length }} from {{ who }}" loading="lazy">
             {% if shots|length > 1 %}<span class="photo-count">{{ n }}/{{ shots|length }}</span>{% endif %}
           </div>
         {% endfor %}
       </div>
     {% endif %}
     {% if item.event %}{{ plan_box(item.event) }}{% endif %}
+    {% if p.club_id %}{{ club_links(p.club_id, item) }}{% endif %}
     <footer class="feed-actions">
       <form method="post" action="{{ url_for('posts.like', post_id=p.id) }}" class="like-form">
         {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.full_path }}#post-{{ p.id }}">
@@ -61,7 +75,7 @@
       <a class="react-button" href="{{ url_for('posts.view', post_id=p.id) }}#replies" aria-label="Replies{% if p.reply_count %}, {{ p.reply_count }}{% endif %}">💬 <span>{{ p.reply_count or 'Reply' }}</span></a>
       <span class="feed-actions-spacer"></span>
       {% if p.author_id != g.user.id %}<a class="link-button" href="{{ url_for('moderation.report', target_type='post', target_id=p.id) }}">Report</a>{% endif %}
-      {% if p.author_id == g.user.id or is_admin() %}
+      {% if p.author_id == g.user.id or is_admin() or (p.club_id and item.my_role == 'officer') %}
         <form method="post" action="{{ url_for('posts.delete', post_id=p.id) }}" data-confirm="Delete this post?">
           {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.full_path }}">
           <button class="link-button danger-link">Delete</button>
@@ -71,56 +85,57 @@
   </article>
 {% endmacro %}
 
+{# Under a club's post: the way to its events and its info, and + Follow for people who don't follow it yet. #}
+{% macro club_links(club_id, item) %}
+  <nav class="club-links" aria-label="This club">
+    <a class="chip" href="{{ url_for('clubs.view', club_id=club_id) }}#events">📅 Events{% if item.club_events %} · {{ item.club_events }}{% endif %}</a>
+    <a class="chip" href="{{ url_for('clubs.view', club_id=club_id) }}#about">ℹ️ Info &amp; joining</a>
+    {% if not item.my_role and not item.on_club_page %}
+      <form method="post" action="{{ url_for('clubs.follow', club_id=club_id) }}">
+        {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.full_path }}">
+        <button class="chip chip-follow">+ Follow</button>
+      </form>
+    {% endif %}
+  </nav>
+{% endmacro %}
+
 {% macro club_post_card(item) %}
   {% set p = item.club_post %}
   <article class="card feed-card is-club">
-    <header class="feed-head">
-      <a class="feed-who" href="{{ url_for('clubs.view', club_id=p.club_id) }}">
-        {{ club_logo(p, 40, logo=p.club_logo or '', club_id=p.club_id) }}
-        <span><strong>{{ p.club_name }} <span class="verified-check" title="Verified UW club">✓</span></strong>
-          <small class="muted">Club · {{ p.created_at|ago }}</small></span>
-      </a>
-      {{ sport_tag(p.sport) }}
-    </header>
+    {% set name %}{{ p.club_name }} {{ verified_badge() }}{% endset %}
+    {{ card_head(url_for('clubs.view', club_id=p.club_id), club_logo(p, 40, logo=p.club_logo or '', club_id=p.club_id),
+                 name, 'Club · ' ~ (p.created_at|ago), p.sport) }}
     <p class="feed-body">{{ p.body }}</p>
     {% if item.event %}{{ plan_box(item.event) }}{% endif %}
     {% if item.friends %}<p class="friends-line">👥 {{ item.friends }}</p>{% endif %}
-    {% if not p.my_role %}
-      <footer class="feed-actions">
-        <form method="post" action="{{ url_for('clubs.follow', club_id=p.club_id) }}">
-          {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.full_path }}">
-          <button class="btn btn-small btn-ghost">+ Follow</button>
-        </form>
-      </footer>
-    {% endif %}
+    {{ club_links(p.club_id, {'my_role': p.my_role}) }}
   </article>
 {% endmacro %}
 
-{% macro game_card(item) %}
-  {# A short announcement: finding and filtering games is what the Play tab is for. #}
-  {% set e = item.event %}
-  <article class="card feed-card feed-game">
-    <header class="feed-head">
-      <a class="feed-who" href="{{ url_for('profile.view', user_id=e.host_id) }}">
-        {{ avatar(e.host_id, e.host_name, e.host_avatar, 40) }}
-        <span><strong>{{ e.host_name }}</strong><small class="muted">posted a game · {{ item.at|ago }}</small></span>
-      </a>
-      {{ sport_tag(e.sport) }}
+{% macro games_strip(item) %}
+  {# New games people posted, together in one swipeable row (finding and filtering games is the Play tab's job) #}
+  <section class="card feed-card feed-games" aria-labelledby="games-strip-{{ item.games[0].event.id }}">
+    <header class="games-strip-head">
+      <h2 class="home-section-title" id="games-strip-{{ item.games[0].event.id }}">🏟️ New games</h2>
+      <a class="small" href="{{ url_for('events.feed') }}">All games on Play →</a>
     </header>
-    {{ plan_box(e) }}
-  </article>
+    <ul class="games-row">
+      {% for game in item.games %}
+        {% set e = game.event %}
+        <li class="games-tile">
+          <a class="games-host" href="{{ url_for('profile.view', user_id=e.host_id) }}">{{ avatar(e.host_id, e.host_name, e.host_avatar, 24) }}<span>{{ e.host_name }} posted a game · {{ game.at|ago }}</span></a>
+          {{ plan_box(e) }}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
 {% endmacro %}
 
 {% macro news_card(item) %}
   {# A headline from GoHuskies.com: tapping it opens the story there. #}
   <article class="card feed-card is-news">
-    <header class="feed-head">
-      <span class="feed-who">
-        <span class="club-emoji news-logo" style="--size: 40px" aria-hidden="true">{{ item.emoji }}</span>
-        <span><strong>Husky {{ item.team }}</strong><small class="muted">News · {{ item.at|ago }}</small></span>
-      </span>
-      {% if item.sport %}{{ sport_tag(item.sport) }}{% endif %}
-    </header>
+    {% set logo %}<span class="club-emoji news-logo" style="--size: 40px" aria-hidden="true">{{ item.emoji }}</span>{% endset %}
+    {{ card_head(None, logo, 'Husky ' ~ item.team, 'News · ' ~ (item.at|ago), item.sport) }}
     <a class="news-title" href="{{ item.story.link }}" target="_blank" rel="noopener">{{ item.story.title }}</a>
     <p class="muted small news-source">GoHuskies.com ↗</p>
   </article>
@@ -130,5 +145,5 @@
   {% if item.kind == 'post' %}{{ post_card(item, photos) }}
   {% elif item.kind == 'club_post' %}{{ club_post_card(item) }}
   {% elif item.kind == 'news' %}{{ news_card(item) }}
-  {% else %}{{ game_card(item) }}{% endif %}
+  {% elif item.kind == 'games' %}{{ games_strip(item) }}{% endif %}
 {% endmacro %}

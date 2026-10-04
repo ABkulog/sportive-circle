@@ -586,4 +586,62 @@
     probe.addEventListener("error", () => URL.revokeObjectURL(url));  // the server will say what's wrong
     probe.src = url;
   });
+
+  // The feed's post box is one line until you tap into it; then the sport, photos, video and plan open up.
+  // (Without JavaScript it's simply all open.) The line under the sport says who will see the post.
+  document.querySelectorAll("[data-composer]").forEach((form) => {
+    form.classList.add("is-collapsible");
+    const open = () => form.classList.add("is-open");
+    form.addEventListener("focusin", open);
+    form.addEventListener("click", open);
+    const pick = form.querySelector("[data-sport-pick]");
+    const hint = form.querySelector("[data-sport-hint]");
+    const say = () => {
+      const option = pick.options[pick.selectedIndex];
+      if (!pick.value) { hint.textContent = "Pick a sport: everyone who plays it sees your post."; return; }
+      const name = option.textContent.split(" / ")[0];
+      hint.textContent = `#${name.toLowerCase().replace(/\s+/g, "")}: everyone who plays ${name} sees it, and it's in the ${name} channel.`;
+    };
+    if (pick && hint) { pick.addEventListener("change", say); say(); }
+  });
+
+  // Pull to refresh on the feed (and My clubs): pull down from the very top and let go to load what's new.
+  // Phones' own pull-to-refresh is off on these pages (style.css), so there's one, and it works in the
+  // home-screen app too. A post you're still typing is never thrown away.
+  const pullPage = document.querySelector("[data-pull-refresh]");
+  if (pullPage) {
+    const NEED = 70;
+    const bar = document.createElement("div");
+    bar.className = "pull-refresh";
+    bar.setAttribute("aria-hidden", "true");
+    document.body.appendChild(bar);
+    let startY = null;
+    let pulled = 0;
+    const typing = () => [...document.querySelectorAll("[data-composer] textarea")].some((box) => box.value.trim());
+    const reset = () => { bar.style.setProperty("--pull", "0px"); bar.classList.remove("is-on", "is-ready"); };
+    window.addEventListener("touchstart", (event) => {
+      startY = window.scrollY <= 0 && event.touches.length === 1 && !typing() ? event.touches[0].clientY : null;
+      pulled = 0;
+    }, { passive: true });
+    window.addEventListener("touchmove", (event) => {
+      if (startY === null) return;
+      if (window.scrollY > 0) { startY = null; reset(); return; }
+      pulled = Math.max(0, event.touches[0].clientY - startY);
+      bar.style.setProperty("--pull", `${Math.min(pulled, 120) * 0.6}px`);
+      bar.classList.toggle("is-on", pulled > 8);
+      bar.classList.toggle("is-ready", pulled > NEED);
+      bar.textContent = pulled > NEED ? "↻ Let go to refresh" : "↓ Pull to refresh";
+    }, { passive: true });
+    window.addEventListener("touchend", () => {
+      if (startY === null) return;
+      startY = null;
+      if (pulled > NEED) {
+        bar.textContent = "Refreshing…";
+        bar.classList.add("is-loading");
+        window.location.reload();
+      } else {
+        reset();
+      }
+    });
+  }
 })();

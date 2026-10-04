@@ -389,7 +389,14 @@ def view(club_id):
     members_only_hidden = 0 if shown["member"] else db.execute(
         f"SELECT COUNT(*) FROM events e WHERE {upcoming} AND e.members_only = 1", shown).fetchone()[0]
     me = g.user["id"] if g.get("user") else None
+    feed_posts, feed_photos = [], {}
+    if me and club["status"] == "approved":  # what the club posted to the feed (photos, video, 🔥, replies)
+        from .posts import club_post_items  # (posts.py imports this module)
+        feed_posts, feed_photos = club_post_items(club_id)
+        for item in feed_posts:
+            item["on_club_page"] = True
     return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
+                           feed_posts=feed_posts, feed_photos=feed_photos, max_photos=10,
                            friends_line=friends_line(club_id, me) if me and role not in MEMBER_ROLES else None,
                            week=officer_week(club_id) if role == "officer" and club["status"] == "approved" else None,
                            members_only_hidden=members_only_hidden,
@@ -661,7 +668,7 @@ def follow(club_id):
     if cur.rowcount:
         flash(f"Following {club['name']}. Their updates show up in Clubs.", "success")
     back = request.form.get("next") or ""
-    if back.startswith("/feed") and safe_next(back) == back:  # "+ Follow" on a feed card: stay on the feed
+    if back.startswith(("/feed", "/posts/")) and safe_next(back) == back:  # "+ Follow" on a feed card: stay there
         return redirect(back)
     return redirect(url_for("clubs.view", club_id=club_id))
 
@@ -970,15 +977,8 @@ def updates():
             db.commit()
             flash("Posted. Your followers will see it.", "success")
         return redirect(url_for("clubs.updates"))
-    posts = db.execute(
-        """SELECT p.*, c.name AS club_name, c.sport, c.logo_updated AS club_logo,
-                  CASE WHEN u.suspended = 1 THEN NULL ELSE u.full_name END AS full_name,
-                  CASE WHEN u.suspended = 1 THEN NULL ELSE u.avatar_updated END AS avatar_updated,
-                  (SELECT m2.role FROM club_members m2 WHERE m2.club_id = c.id AND m2.user_id = u.id) AS author_role
-           FROM club_posts p JOIN clubs c ON c.id = p.club_id LEFT JOIN users u ON u.id = p.author_id
-           WHERE c.status = 'approved'
-             AND EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = ?)
-           ORDER BY p.id DESC LIMIT 100""", (me,)).fetchall()
+    from .posts import MAX_PHOTOS, my_clubs_items  # (posts.py imports this module)
+    items, photos = my_clubs_items()
     following = db.execute("SELECT COUNT(*) FROM club_members WHERE user_id = ?", (me,)).fetchone()[0]
     my_clubs = db.execute(
         """SELECT c.id, c.name, c.sport, c.logo_updated, m.role,
@@ -994,7 +994,8 @@ def updates():
          SHOWN_UNLESS_FULL, "EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = e.club_id AND m.user_id = :me)"],
         {"now": to_db(now_local())}, limit=6)
     mark_seen("club_updates")
-    return render_template("clubs/updates.html", posts=posts, my_officer_clubs=my_officer_clubs,
+    return render_template("clubs/updates.html", items=items, photos=photos, max_photos=MAX_PHOTOS,
+                           my_officer_clubs=my_officer_clubs,
                            following=following, my_clubs=my_clubs, coming_up=coming_up,
                            suggestions=[] if following else suggested_clubs(me, user_sports(me), limit=6))
 

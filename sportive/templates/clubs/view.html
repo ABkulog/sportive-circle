@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% from "_macros.html" import avatar, icon, club_logo %}
+{% from "_macros.html" import avatar, icon, club_logo, verified_badge %}
+{% from "feed/_cards.html" import post_card %}
 {% block title %}{{ club.name }}{% endblock %}
 {% block description %}{{ (club.description or club.name ~ ' on Sportive Circle, for UW Huskies.')|replace('\r', ' ')|replace('\n', ' ')|truncate(200) }}{% endblock %}
 {% block content %}
@@ -24,7 +25,7 @@
     </div>
     <div class="club-profile-main">
       <h1>{{ club.name }}</h1>
-      <p class="club-sub">{% if club.status == 'approved' %}<span class="verified"><span class="check" aria-hidden="true">✓</span> Verified</span> · {% endif %}{{ SPORTS[club.sport] }} · {{ focus.get(club.focus, '') }}</p>
+      <p class="club-sub">{% if club.status == 'approved' %}{{ verified_badge(label=True) }} · {% endif %}{{ SPORTS[club.sport] }} · {{ focus.get(club.focus, '') }}</p>
     </div>
   </div>
   <ul class="stat-row" aria-label="Club stats">
@@ -114,7 +115,7 @@
 <div class="tabs" data-tabs>
   <nav class="home-tabs tab-list" role="tablist" aria-label="Club sections">
     <button type="button" role="tab" data-tab-button="about">About</button>
-    <button type="button" role="tab" data-tab-button="updates">Updates{% if posts %} · {{ posts|length }}{% endif %}</button>
+    <button type="button" role="tab" data-tab-button="updates">Posts{% if posts or feed_posts %} · {{ posts|length + feed_posts|length }}{% endif %}</button>
     <button type="button" role="tab" data-tab-button="events">Events{% if events %} · {{ events|length }}{% endif %}</button>
     <button type="button" role="tab" data-tab-button="members">Members{% if can_decide and requests %} <span class="count-dot">{{ requests|length }}</span>{% endif %}</button>
   </nav>
@@ -178,11 +179,24 @@
     {% if role == 'officer' and club.status != 'approved' %}
       <p class="muted">You can post updates once the club is verified.</p>
     {% elif role == 'officer' %}
-      <form method="post" action="{{ url_for('clubs.post', club_id=club.id) }}" class="form club-post-form">
+      {# Posts as the club, to everyone's feed: words, photos, 🔥 and replies, like anyone's post #}
+      <form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="form club-post-form">
         {{ csrf_field() }}
-        <textarea name="body" rows="2" maxlength="1000" placeholder="Post an update…" required aria-label="Update"></textarea>
-        <button class="btn btn-small">Post</button>
+        <input type="hidden" name="as_club" value="{{ club.id }}"><input type="hidden" name="from_club" value="1">
+        <input type="hidden" name="sport" value="{{ club.sport }}">
+        <textarea name="body" rows="2" maxlength="1000" placeholder="Post as {{ club.name }}: everyone sees it in their feed" aria-label="Post as {{ club.name }}"></textarea>
+        <div class="composer-row">
+          <label class="btn btn-ghost btn-small composer-photos" title="Add up to {{ max_photos }} photos">{{ icon('camera') }}<span>Photos</span>
+            <input type="file" name="photos" accept="image/*" multiple data-max-files="{{ max_photos }}" class="visually-hidden"></label>
+          <button class="btn btn-small">Post</button>
+        </div>
+        <p class="composer-picked muted" data-picked hidden></p>
       </form>
+    {% endif %}
+    {% if feed_posts %}
+      <div class="feed club-feed">
+        {% for item in feed_posts %}{{ post_card(item, feed_photos) }}{% endfor %}
+      </div>
     {% endif %}
     <ul class="club-posts">
       {% for p in posts %}
@@ -196,7 +210,7 @@
           {% endif %}
         </li>
       {% else %}
-        <li class="muted">No updates yet.</li>
+        {% if not feed_posts %}<li class="muted">No posts yet.</li>{% endif %}
       {% endfor %}
     </ul>
   </section>

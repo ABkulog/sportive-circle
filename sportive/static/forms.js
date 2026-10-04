@@ -209,6 +209,11 @@
 
   function times() {
     if (startsAt && endsAt) return [startsAt.value, endsAt.value];
+    if (startsAt && duration) {  // a plan in a feed post: a start and "How long"
+      const start = Date.parse(startsAt.value + "Z");
+      if (Number.isNaN(start)) return [null, null];
+      return [startsAt.value, new Date(start + Number(duration.value) * 60000).toISOString().slice(0, 16)];
+    }
     if (!startsIn || !duration) return [null, null];
     const start = new Date(Date.now() + Number(startsIn.value) * 60000);
     return [local(start), local(new Date(start.getTime() + Number(duration.value) * 60000))];

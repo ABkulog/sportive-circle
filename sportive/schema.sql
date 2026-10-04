@@ -449,7 +449,8 @@ CREATE TABLE IF NOT EXISTS posts (
     sport      TEXT NOT NULL,                       -- the sport tag (constants.SPORTS key)
     body       TEXT NOT NULL DEFAULT '',
     event_id   INTEGER REFERENCES events(id) ON DELETE SET NULL,  -- a plan post's game
-    created_at TEXT NOT NULL                        -- Seattle time
+    created_at TEXT NOT NULL,                       -- Seattle time
+    club_id    INTEGER REFERENCES clubs(id) ON DELETE CASCADE      -- posted by an officer as the club
 );
 CREATE INDEX IF NOT EXISTS idx_posts_sport ON posts(sport, id);
 CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_id, id);
@@ -468,7 +469,8 @@ CREATE TABLE IF NOT EXISTS post_replies (
     post_id    INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     author_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     body       TEXT NOT NULL,
-    created_at TEXT NOT NULL                        -- Seattle time
+    created_at TEXT NOT NULL,                       -- Seattle time
+    club_id    INTEGER REFERENCES clubs(id) ON DELETE CASCADE      -- an officer replied as the club
 );
 CREATE INDEX IF NOT EXISTS idx_post_replies ON post_replies(post_id, id);
 

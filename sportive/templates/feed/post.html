@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% from "feed/_cards.html" import feed_item %}
-{% from "_macros.html" import avatar %}
-{% block title %}{{ item.post.full_name }} on Sportive Circle{% endblock %}
+{% from "_macros.html" import avatar, club_logo, verified_badge %}
+{% block title %}{{ item.post.club_name if item.post.club_id else item.post.full_name }} on Sportive Circle{% endblock %}
 {% block content %}
 <a class="back-link" href="{{ url_for('posts.feed') }}" data-back>← Feed</a>
-<h1 class="visually-hidden">Post by {{ item.post.full_name }}</h1>
+<h1 class="visually-hidden">Post by {{ item.post.club_name if item.post.club_id else item.post.full_name }}</h1>
 {{ feed_item(item, photos) }}
 
 <section class="card replies" id="replies" aria-labelledby="replies-title">
@@ -12,14 +12,23 @@
   <ul class="reply-list">
     {% for r in replies %}
       <li class="reply" id="reply-{{ r.id }}">
-        <a href="{{ url_for('profile.view', user_id=r.author_id) }}">{{ avatar(r.author_id, r.full_name, r.avatar_updated, 32) }}</a>
+        {% if r.club_id %}
+          <a href="{{ url_for('clubs.view', club_id=r.club_id) }}">{{ club_logo(r, 32, logo=r.club_logo or '', club_id=r.club_id, sport=r.club_sport) }}</a>
+        {% else %}
+          <a href="{{ url_for('profile.view', user_id=r.author_id) }}">{{ avatar(r.author_id, r.full_name, r.avatar_updated, 32) }}</a>
+        {% endif %}
         <div class="reply-body">
-          <p><a class="reply-who" href="{{ url_for('profile.view', user_id=r.author_id) }}">{{ r.full_name }}</a>
-            <small class="muted">· {{ r.created_at|ago }}</small></p>
+          {% if r.club_id %}
+            <p><a class="reply-who" href="{{ url_for('clubs.view', club_id=r.club_id) }}">{{ r.club_name }}</a> {{ verified_badge() }}
+              <small class="muted">· Club · {{ r.created_at|ago }}</small></p>
+          {% else %}
+            <p><a class="reply-who" href="{{ url_for('profile.view', user_id=r.author_id) }}">{{ r.full_name }}</a>
+              <small class="muted">· {{ r.created_at|ago }}</small></p>
+          {% endif %}
           <p class="feed-body">{{ r.body }}</p>
           <div class="reply-actions">
             {% if r.author_id != g.user.id %}<a class="link-button" href="{{ url_for('moderation.report', target_type='reply', target_id=r.id) }}">Report</a>{% endif %}
-            {% if r.author_id == g.user.id or item.post.author_id == g.user.id or is_admin() %}
+            {% if r.author_id == g.user.id or r.i_run_its_club or can_delete_post %}
               <form method="post" action="{{ url_for('posts.delete_reply', reply_id=r.id) }}" data-confirm="Delete this reply?">
                 {{ csrf_field() }}<button class="link-button danger-link">Delete</button></form>
             {% endif %}
@@ -32,6 +41,13 @@
   </ul>
   <form method="post" action="{{ url_for('posts.reply', post_id=item.post.id) }}" class="reply-form">
     {{ csrf_field() }}
+    {% if post_as %}
+      <label class="post-as"><span>Reply as</span>
+        <select name="as_club">
+          <option value="">{{ g.user.full_name }}</option>
+          {% for c in post_as %}<option value="{{ c.id }}" {% if c.id == item.post.club_id %}selected{% endif %}>{{ c.name }} ✓ (club)</option>{% endfor %}
+        </select></label>
+    {% endif %}
     <label class="visually-hidden" for="reply-body">Your reply</label>
     <textarea id="reply-body" name="body" rows="2" maxlength="{{ max_reply }}" placeholder="Reply…" required></textarea>
     <button class="btn">Reply</button>

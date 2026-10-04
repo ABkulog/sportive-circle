@@ -1247,15 +1247,13 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .composer:has(input[name="plan"]:checked) .plan-fields { display: grid; }
 .feed { gap: 12px; }
 .feed-card { padding: 14px 16px; }
-.feed-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-.feed-who { display: flex; gap: 10px; align-items: center; color: var(--text); min-width: 0; flex: 1 1 auto; }
-.feed-who:hover { text-decoration: none; }
-.feed-who span { min-width: 0; }
-.feed-who strong { display: block; overflow-wrap: anywhere; }
+.feed-head { display: flex; align-items: center; gap: 10px; }
+.feed-pic { flex: none; display: flex; }
+.feed-who { min-width: 0; flex: 1 1 auto; line-height: 1.3; }
+.feed-name { color: var(--text); display: block; overflow-wrap: anywhere; }
+.feed-name:hover { text-decoration: none; }
 .feed-who small { display: block; }
-.verified-check { color: var(--purple); font-size: .85em; }
-.sport-tag { flex: 0 1 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; font-size: .85rem; font-weight: 600;
-  color: var(--purple); white-space: nowrap; }
+.sport-tag { font-weight: 700; color: var(--purple); white-space: nowrap; }
 .feed-body { margin: 10px 0 0; white-space: pre-line; overflow-wrap: anywhere; }
 .feed-photos { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 10px -16px 0;
   padding: 0 16px; scrollbar-width: none; }
@@ -1272,7 +1270,7 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .plan-meta { font-size: .88rem; color: var(--muted); margin-top: 2px; }
 .plan-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .plan-count { font-size: .9rem; }
-.feed-actions { display: flex; gap: 14px; align-items: center; justify-content: flex-end; margin-top: 10px; font-size: .85rem; }
+.feed-actions { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: flex-end; margin-top: 10px; font-size: .85rem; }
 .feed-actions form { margin: 0; }
 .feed-game-who { display: flex; gap: 8px; align-items: center; margin: 0 0 6px; font-size: .88rem; }
 @media (min-width: 700px) { .feed-photo { flex-basis: 70%; } }
@@ -1323,6 +1321,8 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .reply-actions form { margin: 0; }
 .reply-form { display: flex; gap: 8px; align-items: flex-end; }
 .reply-form textarea { flex: 1; min-width: 0; }
+.reply-form { flex-wrap: wrap; }
+.reply-form .post-as { flex: 1 1 100%; min-width: 0; margin: 0; }
 .feed-card.is-news { border-left: 4px solid var(--gold); }
 .news-logo { background: var(--purple); }
 .news-title { display: block; margin-top: 10px; font-weight: 700; font-size: 1.02rem; color: var(--text); overflow-wrap: anywhere; }
@@ -1353,3 +1353,60 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 .flyer > * { max-width: 100%; min-width: 0; }
 .flyer h1, .flyer-sub, .flyer-link { overflow-wrap: anywhere; }
 @media (max-width: 360px) { .flyer h1 { font-size: 1.9rem; } .flyer-steps { font-size: 1rem; } }
+
+/* ------------------------------------------------------------------ Clubs posting to everyone */
+/* The verified club mark: a purple seal with a white check, next to the club's name everywhere it posts */
+.verified-badge { display: inline-flex; align-items: center; gap: 4px; vertical-align: -3px; color: var(--purple); font-weight: 700; font-size: .9em; }
+.verified-badge svg { width: 1.15em; height: 1.15em; flex: none; }
+.verified-badge .seal { fill: var(--purple); }
+.verified-badge .tick { stroke: var(--on-accent); }
+.feed-card.is-club { box-shadow: inset 3px 0 0 var(--purple), var(--shadow, 0 1px 2px rgb(0 0 0 / .06)); }
+.club-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.club-links form { margin: 0; }
+.club-links .chip { min-height: 34px; font-weight: 600; }
+.club-links .chip:hover { text-decoration: none; }
+.chip-follow { background: var(--purple); color: var(--on-accent); box-shadow: none; cursor: pointer; }
+.post-as { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: .88rem; font-weight: 600; }
+.post-as select { width: auto; flex: 1 1 auto; min-width: 0; max-width: 100%; text-overflow: ellipsis; }
+.club-feed { display: grid; gap: 12px; margin-top: 12px; }
+
+/* ------------------------------------------------------------------ Feed, cleaner */
+/* The post box: one line (picture, "Who's down?", Post) until it's tapped */
+.composer-top { display: flex; gap: 10px; align-items: flex-start; }
+.composer-top .avatar, .composer-top img { flex: none; }
+.composer-top textarea { flex: 1 1 auto; min-width: 0; margin: 0; }
+.composer-more { margin-top: 10px; }
+.composer-hint { margin: 6px 0 0; font-size: .82rem; }
+.composer.is-collapsible:not(.is-open) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.composer.is-collapsible:not(.is-open) .composer-more,
+.composer.is-collapsible:not(.is-open) .composer-rules { display: none; }
+.composer.is-collapsible:not(.is-open) textarea { min-height: 44px; height: 44px; resize: none; }
+.composer.is-collapsible:not(.is-open) .composer-send { margin: 0; }
+.composer.is-collapsible:not(.is-open) .post-button { padding: 10px 18px; }
+/* New games: one swipeable row instead of a card each */
+.feed-games { padding: 14px 0 12px; }
+.games-strip-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 0 16px; }
+.games-strip-head h2 { margin: 0; }
+.games-row { list-style: none; display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 10px 0 0;
+  padding: 0 16px 4px; scrollbar-width: none; }
+.games-row::-webkit-scrollbar { display: none; }
+.games-tile { flex: 0 0 82%; max-width: 320px; scroll-snap-align: start; display: flex; flex-direction: column; }
+.games-row .games-tile:only-child { flex-basis: 100%; max-width: none; }
+.games-tile .plan-box { margin-top: 6px; flex: 1; display: flex; flex-direction: column; }
+.games-tile .plan-row { margin-top: auto; padding-top: 10px; }
+.games-host { display: flex; gap: 6px; align-items: center; font-size: .8rem; color: var(--muted); min-width: 0; }
+.games-host span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.games-host:hover { text-decoration: none; }
+.plan-check, .plan-where { grid-column: 1 / -1; }
+.plan-check .place-check { margin: 0; }
+/* Pull to refresh (feed, My clubs): a pill that slides down from under the header */
+html:has([data-pull-refresh]), html:has([data-pull-refresh]) body { overscroll-behavior-y: contain; }
+.pull-refresh { --pull: 0px; position: fixed; top: 8px; left: 50%; z-index: 60; transform: translate(-50%, calc(var(--pull) - 60px));
+  padding: 8px 16px; border-radius: 999px; background: var(--surface, #fff); color: var(--purple); font-weight: 700;
+  font-size: .88rem; box-shadow: 0 4px 14px rgb(0 0 0 / .18); opacity: 0; pointer-events: none; transition: opacity .15s; }
+.pull-refresh.is-on { opacity: 1; }
+.pull-refresh.is-ready, .pull-refresh.is-loading { background: var(--purple); color: var(--on-accent); }
+@media (max-width: 360px) {  /* the smallest phones: the one-line post box's button without its icon */
+  .composer.is-collapsible:not(.is-open) .post-button { padding: 10px 14px; }
+  .composer.is-collapsible:not(.is-open) .post-button .icon { display: none; }
+}
