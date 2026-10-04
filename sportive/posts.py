@@ -475,7 +475,8 @@ def _read_plan(form, sport, body):
                       "skill_level": form.get("skill_level") or "All levels", "open_to": form.get("open_to") or "everyone",
                       "starts_at": form["starts_at"], "note": body[:500],
                       "ends_at": add_real(starts, timedelta(minutes=duration)).strftime("%Y-%m-%dT%H:%M"),
-                      "players": str(int(spots) + 1), "is_private": "0"})
+                      "players": str(int(spots) + 1), "is_private": "0",
+                      "place_address": form.get("place_address", ""), "pin": form.get("pin", "")})
     data, error = read_event_form(game)
     if error:
         return None, error

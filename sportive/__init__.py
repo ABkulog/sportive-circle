@@ -153,7 +153,7 @@ def _add_template_helpers(app):
         place_hours=placehours.hours_for_page,
         whats_on=placecheck.whats_on,
         # events
-        spots_left=events.spots_left, event_title=events.event_title, place_map=events.place_map, same_day=same_day,
+        spots_left=events.spots_left, event_title=events.event_title, place_map=events.place_map, event_place=events.event_place, same_day=same_day,
         can_quick_join=events.can_quick_join, can_party_up=parties.can_party_up,
         can_send_to_friends=parties.can_send_to_friends, join_confirm=events.join_confirm,
         invite_link=parties.invite_link,

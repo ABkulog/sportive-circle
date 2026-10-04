@@ -256,6 +256,23 @@
 {% endmacro %}
 
 
+{% macro spot_field(form) %}
+  {# Off campus only (spot.js shows it when "Off campus" is picked): exactly where, so people can get there. #}
+  <div class="spot-field" data-spot>
+    <label class="field"><span>📍 Where exactly? <em>(an address, or paste a Google / Apple Maps link)</em></span>
+      <input name="place_address" maxlength="300" value="{{ form.get('place_address', '') }}" autocomplete="street-address"
+             placeholder="e.g. Green Lake Park, or a maps link"></label>
+    <input type="hidden" name="pin" value="{{ form.get('pin', '') }}" data-pin>
+    <div class="spot-buttons">
+      <button type="button" class="btn btn-small btn-ghost" data-drop-pin>📍 Drop a pin</button>
+      <button type="button" class="btn btn-small btn-ghost" data-my-spot>Use my location</button>
+      <button type="button" class="link-button" data-clear-pin hidden>Remove pin</button>
+    </div>
+    <p class="muted small" data-pin-status aria-live="polite">{% if form.get('pin') %}📍 Pin dropped.{% endif %}</p>
+    <div class="spot-map" data-spot-map hidden></div>
+  </div>
+{% endmacro %}
+
 {% macro install_tip(title='Put it on your home screen') %}
   {# "Put it on your home screen" (app.js decides): Android/Chrome gets a one-tap Install button (the browser's own
      prompt); iPhone Safari gets the two steps, since Apple lets only the person add it. Hidden everywhere else, once

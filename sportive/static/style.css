@@ -1529,3 +1529,35 @@ body.has-app-nav .home-tabs { position: sticky; top: 60px; z-index: 20; backgrou
 .chip-more { flex: 0 1 auto; min-width: 0; }
 .chip-more select.chip { width: auto !important; max-width: 110px; min-width: 0; text-overflow: ellipsis; }
 @media (max-width: 360px) { .feed-chips .chip { padding: 6px 10px; } }
+/* Off campus: 📍 Where exactly? (spot.js) */
+.spot-field { display: grid; gap: 8px; margin: 4px 0 8px; grid-column: 1 / -1; }
+.spot-field .field { margin: 0; }
+.spot-buttons { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.spot-field [data-pin-status] { margin: 0; }
+.spot-map { height: 240px; border-radius: 12px; border: 1px solid var(--line); z-index: 0; }
+.plan-spot { grid-column: 1 / -1; }
+.map-links { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; overflow-wrap: anywhere; }
+/* Play's live map (like Snap Map): a quiet grey map, bright sport bubbles */
+.live-map-wrap { margin: 0 0 14px; }
+.live-map-wrap .play-map { height: 260px; margin: 0; }
+.play-map .leaflet-tile-pane { filter: grayscale(1) brightness(1.08) contrast(.85); }
+.live-map-note { margin: 6px 2px 0; font-size: .85rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: live-pulse 1.6s ease-in-out infinite; }
+.live-icon { background: none; border: 0; }
+.live-bubble { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 64px; }
+.live-emoji { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem;
+  background: #fff; box-shadow: 0 3px 10px rgb(0 0 0 / .25); border: 3px solid var(--purple); }
+.live-label { padding: 1px 7px; border-radius: 999px; background: var(--purple); color: #fff; font-size: .68rem; font-weight: 800;
+  white-space: nowrap; box-shadow: 0 2px 6px rgb(0 0 0 / .2); }
+.live-bubble.is-live .live-emoji { border-color: var(--danger); animation: live-ring 1.8s ease-out infinite; }
+.live-bubble.is-live .live-label { background: var(--danger); }
+.live-bubble.is-soon .live-emoji { border-color: var(--purple); }
+.live-bubble.is-ended { opacity: .6; }
+.live-bubble.is-ended .live-emoji { border-color: #999; }
+.live-bubble.is-ended .live-label { background: #777; }
+@keyframes live-ring { 0% { box-shadow: 0 0 0 0 rgb(220 38 38 / .5), 0 3px 10px rgb(0 0 0 / .25); }
+  100% { box-shadow: 0 0 0 14px rgb(220 38 38 / 0), 0 3px 10px rgb(0 0 0 / .25); } }
+@media (prefers-reduced-motion: reduce) { .live-bubble.is-live .live-emoji, .live-dot { animation: none; } }
+/* Clean up: the checkbox was stretched full width by the global input style, squeezing the text into a column */
+.cleanup-row input[type="checkbox"] { width: 20px; height: 20px; min-width: 20px; flex: 0 0 20px; margin: 2px 0 0; }
+.cleanup-row > span { flex: 1 1 auto; min-width: 0; }

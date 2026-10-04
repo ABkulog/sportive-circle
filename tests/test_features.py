@@ -815,11 +815,8 @@ def tab_number(world, name, label):
 
 @then(parsers.re(r'"(?P<name>[^"]+)" has (?P<n>\d+) on the (?P<label>\w+) (?:tab|icon)'))
 def has_tab_number(world, name, n, label):
-    if label == "Admin":  # Admin on your Profile (reports + trending suggestion topics)
-        client = world.person(name).client
-        nav = client.get("/how-it-works").get_data(as_text=True)
-        profile = re.search(r'href="(/u/\d+)"', nav[nav.index('<nav class="appnav"'):]).group(1)
-        page = client.get(profile).get_data(as_text=True)
+    if label == "Admin":  # Admin, tucked into Settings (reports + trending suggestion topics)
+        page = world.person(name).client.get("/settings").get_data(as_text=True)  # Admin is in Settings
         match = re.search(r'href="/admin">.*?(?:<span class="count-dot">(\d+)</span>)?</a>', page, re.S)
         assert match, "no admin icon"
         assert int(match.group(1) or 0) == int(n)

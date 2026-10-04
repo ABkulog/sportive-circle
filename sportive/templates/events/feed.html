@@ -2,15 +2,13 @@
 {% from "_macros.html" import event_card, avatar, home_tabs, icon, club_logo, install_tip %}
 {% block title %}Play: find a game{% endblock %}
 {% block head %}
-  {% if map_pins %}
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
-          integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3w=="
-          crossorigin="anonymous" referrerpolicy="no-referrer">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"
-            integrity="sha512-BwHfrr4c9kmRkLw6iXFdzcdWV/PGkVgiIyIWLLlTSXzWQzxuSg4DiQUCpauz/EWjgk5TYQqX/kvn9pG1NpYfqg=="
-            crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
-    <script src="{{ url_for('static', filename='playmap.js') }}" defer></script>
-  {% endif %}
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
+        integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3w=="
+        crossorigin="anonymous" referrerpolicy="no-referrer">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"
+          integrity="sha512-BwHfrr4c9kmRkLw6iXFdzcdWV/PGkVgiIyIWLLlTSXzWQzxuSg4DiQUCpauz/EWjgk5TYQqX/kvn9pG1NpYfqg=="
+          crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+  <script src="{{ url_for('static', filename='playmap.js') }}" defer></script>
 {% endblock %}
 {% block content %}
 {{ home_tabs('feed') }}
@@ -36,28 +34,15 @@
   </section>
 {% endif %}
 
-{# "Now" row, like Instagram Stories: what's happening soon, one swipe away. #}
-{% if up_next or need_players %}
-<section class="band home-section" aria-labelledby="soon-title">
-  <h2 class="home-section-title" id="soon-title">Happening soon</h2>
-  <nav class="now-row" id="now" aria-label="Happening soon">
-    {% if up_next %}
-      <a class="now-tile is-mine" href="{{ url_for('events.detail', event_id=up_next.id) }}" aria-label="Up next: {{ event_title(up_next) }}, {{ up_next.starts_at|relative }}">
-        <span class="now-ring" aria-hidden="true">{{ SPORT_EMOJI[up_next.sport] }}</span>
-        <strong>Up next</strong>
-        <small>{{ up_next.starts_at|relative }}</small>
-      </a>
-    {% endif %}
-    {% for e in need_players if not up_next or e.id != up_next.id %}
-      <a class="now-tile" href="{{ url_for('events.detail', event_id=e.id) }}" aria-label="{{ event_title(e) }}, {{ e.starts_at|relative }}">
-        <span class="now-ring" aria-hidden="true">{{ SPORT_EMOJI[e.sport] }}</span>
-        <strong>{% set left = spots_left(e) %}{% if e.team_size %}{{ e.team_size }}v{{ e.team_size }}{% elif left %}Need {{ left }}{% else %}{{ SPORTS[e.sport] }}{% endif %}</strong>
-        <small>{{ e.starts_at|relative }}</small>
-      </a>
-    {% endfor %}
-  </nav>
+{# The live map, like Snap Map: what's on right now (starting within an hour, going on, ended in the last 10 min) #}
+<section class="live-map-wrap" aria-labelledby="live-title">
+  <h2 class="visually-hidden" id="live-title">Happening now</h2>
+  <div class="play-map" id="play-map" role="img" aria-label="Live map: {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games now"></div>
+  <p class="live-map-note">{% if map_pins %}<span class="live-dot" aria-hidden="true"></span> {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games now · tap a bubble{% else %}Nothing on right now. Games starting within an hour show up here.{% endif %}</p>
+  <script type="application/json" id="play-pins">{{ map_pins|tojson }}</script>
 </section>
-{% endif %}
+
+
 
 <section class="band home-section" aria-labelledby="games-title">
 <h2 class="home-section-title" id="games-title">{{ 'Full games' if filters.scope == 'full' else 'Upcoming games' }}</h2>
@@ -111,11 +96,6 @@
   <p class="muted"><a href="{{ url_for('profile.edit_sports') }}">Pick your sports</a> to see games for you.</p>
 {% endif %}
 
-{% if map_pins %}
-  {# Play is the map and the games: a pin per place, tap one to see its games #}
-  <div class="play-map" id="play-map" role="img" aria-label="Map of where games are coming up"></div>
-  <script type="application/json" id="play-pins">{{ map_pins|tojson }}</script>
-{% endif %}
 <div class="stack">
   {% for e in events %}
     {{ event_card(e) }}
@@ -126,8 +106,6 @@
         <p><a href="{{ url_for('events.feed', scope=filters.scope) }}">Clear filters</a> or start one yourself.</p>
       {% elif filters.scope == 'full' %}
         <p><strong>No full games right now.</strong></p>
-      {% elif need_players or up_next %}
-        <p><strong>Nothing else coming up.</strong> The games above are happening soon, or start your own.</p>
       {% elif filters.scope == 'interests' %}
         <p><strong>No games for your sports yet.</strong></p>
         <p><a href="{{ url_for('events.feed', scope='all') }}">See all sports</a> or start one yourself.</p>

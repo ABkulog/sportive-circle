@@ -6,6 +6,25 @@ on every merge, so `main` is the live site.
 
 #Don't diss Vincent
 
+## Design rules: plain and simple (the owner's standing rule, always)
+It should feel like an actual social app (Twitter / Instagram), not a school portal. Before adding anything, check it
+against these; when in doubt, leave it out or remove something.
+- **5 places only**: Home (the feed), Play (live map + games), Create (+), Messages, Profile. Bottom tab bar on
+  phones, sidebar on laptops. The 🔔 bell (and 🔍 search) sit in the top corner. Never add a sixth tab.
+- **Everything else lives inside Profile**: Friends, Settings, Help/FAQ, Log out; your clubs and your games are
+  Profile tabs. **Admin** shows only for admins, tucked into Settings.
+- **One level of navigation.** No second row of tabs under a tab, no page that is a second feed. Clubs are
+  accounts you follow, found through search; their posts are in the feed.
+- **Phones first.** Design and check at 390px (and 320px) before laptop.
+- **Every post looks the same**: avatar, name, time, #sport, content, 🔥 / Reply. Clubs only add the verified
+  mark. No special borders or extra lines. Automatic posts are one short line. Canceled things leave the feed.
+- **Say things once**: no caption and card repeating the same words, no titles that repeat what's on the page.
+- **Photos fill the card's width**, rounded, with a max height; posts stay compact so several fit on a screen.
+- **The top of a page is short**: no greetings or big titles before the content; one row of chips at most.
+- **Things happen in place**: reacting, replying, following and posting never reload the page.
+- **One way to do each thing**: if something can be made in one place, don't add a second place to make it.
+- **No fake content**: clean test junk with Admin → Clean up test data; never seed made-up people or posts.
+
 ## How changes ship
 
 - Never push to `main`. Make a branch, open a pull request, wait for the GitHub "Tests" check (Python 3.9 and
