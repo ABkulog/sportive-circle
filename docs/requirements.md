@@ -31,7 +31,7 @@ requirements). Every requirement has an ID. The Gherkin scenarios in
 | FR-AUTH-1 | Only `@uw.edu` or `@u.washington.edu` emails can sign up. | Must | ✅ |
 | FR-AUTH-2 | New accounts must confirm their email with a 6-digit code (expires in 15 min, max 5 wrong tries, 60 s between resends). | Must | ✅ |
 | FR-AUTH-3 | Users must be 15 or older (checked from date of birth). | Must | ✅ |
-| FR-AUTH-4 | Log in with email + password. 10 wrong passwords in a row lock the account for 15 minutes. | Must | ✅ |
+| FR-AUTH-4 | Log in with email + password. 10 wrong passwords in a row lock the account for 15 minutes. A button tapped after the login ended (Follow, Join…) sends you to log in and then back to the page it was on. | Must | ✅ |
 | FR-AUTH-5 | "Forgot password?" emails a code to set a new password, and never reveals whether an email has an account. | Must | ✅ |
 | FR-AUTH-6 | Logged-in users can change their password (current password required). | Must | ✅ |
 | FR-AUTH-7 | Users can delete their account after an "Are you sure?" page, typing DELETE, and their password. A club's only officer must hand over first. | Must | ✅ |
