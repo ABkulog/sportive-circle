@@ -1,10 +1,21 @@
 {% extends "base.html" %}
 {% from "_macros.html" import event_card, avatar, home_tabs, icon, club_logo, install_tip %}
 {% block title %}Play: find a game{% endblock %}
+{% block head %}
+  {% if map_pins %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
+          integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3w=="
+          crossorigin="anonymous" referrerpolicy="no-referrer">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"
+            integrity="sha512-BwHfrr4c9kmRkLw6iXFdzcdWV/PGkVgiIyIWLLlTSXzWQzxuSg4DiQUCpauz/EWjgk5TYQqX/kvn9pG1NpYfqg=="
+            crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+    <script src="{{ url_for('static', filename='playmap.js') }}" defer></script>
+  {% endif %}
+{% endblock %}
 {% block content %}
 {{ home_tabs('feed') }}
 <p class="hello muted">{{ hello }}</p>
-<h1 class="page-title">Find a game</h1>
+<h1 class="visually-hidden">Find a game</h1>
 
 {{ install_tip() }}
 {% if texts_card %}
@@ -100,6 +111,11 @@
   <p class="muted"><a href="{{ url_for('profile.edit_sports') }}">Pick your sports</a> to see games for you.</p>
 {% endif %}
 
+{% if map_pins %}
+  {# Play is the map and the games: a pin per place, tap one to see its games #}
+  <div class="play-map" id="play-map" role="img" aria-label="Map of where games are coming up"></div>
+  <script type="application/json" id="play-pins">{{ map_pins|tojson }}</script>
+{% endif %}
 <div class="stack">
   {% for e in events %}
     {{ event_card(e) }}
@@ -129,20 +145,7 @@
 {% endif %}
 </section>
 
-{% if club_picks %}
-  <section class="club-picks band">
-    <h2 class="home-section-title">Clubs for you</h2>
-    <div class="club-strip">
-      {% for c in club_picks %}
-        <a class="card club-card" href="{{ url_for('clubs.view', club_id=c.id) }}">
-          {{ club_logo(c) }}
-          <strong class="club-name">{{ c.name }}</strong>
-          <small class="muted"><span class="verified"><span class="check" aria-hidden="true">✓</span> Verified</span> · {{ c.member_count }} members</small>
-        </a>
-      {% endfor %}
-    </div>
-  </section>
-{% endif %}
+
 
 {% if top_dawgs %}
   <section class="top-dawgs band">

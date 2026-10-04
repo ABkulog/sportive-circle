@@ -9,10 +9,10 @@ from werkzeug.datastructures import MultiDict
 
 from .auth import login_required, safe_next
 from .badges import sync_badges
-from .clubs import featured_clubs, suggested_clubs
+from .clubs import featured_clubs
 from .constants import (DEFAULT_MAX_HOURS, DEFAULT_PLAYERS, LOCATION_COORDS, OFF_CAMPUS, OPEN_TO_GENDERS, OPEN_TO_LABELS, OPEN_TO_PHRASE,
                         STATED_GENDERS, LOCATIONS, QUICK_DURATIONS, QUICK_START_OPTIONS,
-                        SKILL_LEVELS, CLUB_LEVELS, SPORT_LOCATIONS, SPORT_MAX_HOURS, MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
+                        SKILL_LEVELS, CLUB_LEVELS, SPORT_EMOJI, SPORT_LOCATIONS, SPORT_MAX_HOURS, MAX_PLAYERS, SPORT_TEAM_SIZES, SPORTS)
 from .db import get_db, user_sports
 from .invites import (HELD, MAX_PARTY, count_wrong_password, held_spots, hold_minutes_left, hold_spots,
                       holds_for_others, invited_too_often, my_invite, now_param, pending_invites, requested_invites, team_counts, too_many_password_tries)
@@ -170,6 +170,20 @@ def place_map(location):
         "google": f"https://www.google.com/maps/dir/?api=1&destination={destination}&travelmode=walking",
         "apple": f"https://maps.apple.com/?daddr={destination}&dirflg=w",
     }
+
+
+def game_pins(games):
+    """Play's map: one pin per place, with that place's games on it (places with no single spot are left out)."""
+    pins = {}
+    for e in games:
+        coords = LOCATION_COORDS.get(e["location"])
+        if not coords:
+            continue
+        pin = pins.setdefault(e["location"], {"name": e["location"], "lat": coords[0], "lng": coords[1], "games": []})
+        if len(pin["games"]) < 6:
+            pin["games"].append({"title": f"{SPORT_EMOJI[e['sport']]} {event_title(e)}", "when": fmt_when(e["starts_at"]),
+                                 "url": url_for("events.detail", event_id=e["id"])})
+    return list(pins.values())
 
 
 MAX_GAMES_PER_HOUR = 60  # games one person can post in an hour (five 12-week practices fit): stops bell spam
@@ -403,7 +417,8 @@ def feed():
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
                            month_name=now.strftime("%B"), more_page=more_page, capped=capped,
                            hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now, viewer=g.user["id"]),
-                           club_picks=suggested_clubs(g.user["id"], my_sports), texts_card=show_texts_card())
+                           texts_card=show_texts_card(),
+                           map_pins=game_pins(list(events) + [e for e in need_players if e["id"] not in {x["id"] for x in events}]))
 
 
 def show_texts_card():

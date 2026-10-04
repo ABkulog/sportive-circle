@@ -51,6 +51,7 @@
       {% if app_nav %}
         {# Phones: just the bell up here; everything else is in the 5 tabs at the bottom (and Profile). #}
         <nav class="top-icons" aria-label="Shortcuts">
+          <a href="{{ url_for('search.search') }}" aria-label="Search clubs and people" title="Search">{{ icon('search') }}</a>
           {% set bell = bell_count() %}<a class="bell-link" href="{{ url_for('notifications.bell') }}" aria-label="Notifications{% if bell %}, {{ bell }} new{% endif %}" title="Notifications">{{ icon('bell') }}{% if bell %}<span class="count-dot">{{ badge_text(bell) }}</span>{% endif %}</a>
         </nav>
       {% elif g.user %}
@@ -89,6 +90,7 @@
              profile_area and (ep != 'profile.view' or request.view_args.get('user_id') == g.user.id),
              nav_badges.profile + nav_badges.friends + nav_badges.clubs + nav_badges.admin) }}
       <div class="side-only side-extra">
+        {{ tab(url_for('search.search'), 'search', 'Search', ep == 'search.search') }}
         {{ tab(url_for('notifications.bell'), 'bell', 'Notifications', ep == 'notifications.bell', bell_count(), extra_class='bell-link') }}
       </div>
     </nav>

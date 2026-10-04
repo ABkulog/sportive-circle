@@ -181,13 +181,13 @@ def test_all_clubs_feed_and_a_tidy_feed_top(accounts, client, app):
     accounts.logout()
     accounts.signup(email="runner@uw.edu", sports=("running",))
     everything = client.get("/feed?show=clubs").data.decode()                   # All clubs: every verified club
-    assert "Ladder night" in everything and "Courts booked" in everything and ">All clubs<" in everything
+    assert "Ladder night" in everything and "Courts booked" in everything
     assert "Ladder night" not in client.get("/clubs/updates").data.decode()       # My clubs: only clubs you follow
     client.post(f"/clubs/{club}/follow")
     assert "Ladder night" in client.get("/clubs/updates").data.decode()
     feed = client.get("/feed").data.decode()
-    assert 'value="clubs"' in feed                                                # All clubs: in the feed's menu
-    assert 'class="feed-filters"' in feed and "All my sports" in feed and "sport-channels" not in feed
+    assert 'href="/feed?show=myclubs"' in feed                                   # My clubs: a chip on the feed
+    assert 'class="feed-chips"' in feed and ">All<" in feed and "More ▾" in feed and "sport-channels" not in feed
     assert "data-help-bubble" not in feed and 'placeholder="What\'s happening?"' in feed
 
 
@@ -247,7 +247,7 @@ def test_feed_like_twitter_clubs_menu_and_profile_posts_first(accounts, client, 
     accounts.signup(email="maya@uw.edu", name="Maya Chen", sports=("running",))
     post(client, body="Morning 10K")
     feed = client.get("/feed").data.decode()
-    assert 'id="show-filter"' in feed and ">My clubs</option>" in feed and "What's happening?" in feed
+    assert 'href="/feed?show=myclubs"' in feed and "What's happening?" in feed           # one row of chips
     assert 'class="page-title"' not in feed and "Hey, Maya" not in feed                 # no big title
     clubs = client.get("/feed?show=clubs").data.decode()
     assert "Ladder night" in clubs and "Morning 10K" not in clubs                         # All clubs: only clubs
@@ -279,3 +279,46 @@ def test_one_card_pattern_no_canceled_games_and_quick_buttons(accounts, client, 
     assert ">Post<" in menu and ">Game<" in menu and "Need players" in menu and "Register your club" in menu
     css = client.get("/static/style.css").data.decode()
     assert ".feed-card.is-club { box-shadow: none; }" in css and "object-fit: cover; border-radius: 12px" in css
+
+
+def test_search_finds_clubs_and_people(accounts, client, app):
+    accounts.signup(email="officer@uw.edu", name="Riley Park", sports=("tennis",))
+    approved_club(app, "officer@uw.edu", name="UW Tennis Club", sport="tennis")
+    accounts.logout()
+    accounts.signup(email="maya@uw.edu", sports=("running",))
+    page = client.get("/search?q=tennis").data.decode()
+    assert "UW Tennis Club" in page and "Verified club" in page
+    assert "Riley Park" in client.get("/search?q=riley").data.decode()
+    assert "Type at least 2 letters" in client.get("/search?q=r").data.decode()
+    assert 'href="/search"' in client.get("/feed").data.decode()                   # 🔍 everywhere
+
+
+def test_admin_cleans_up_keyboard_mashing(accounts, client, app):
+    app.config["ADMIN_EMAILS"] = "boss@uw.edu"
+    accounts.signup(email="boss@uw.edu", sports=("running",))
+    post(client, body="askdgkahjslhdkljashdkljashkjdhas")
+    post(client, body="Sunrise 10K, who's in?")
+    club = approved_club(app, "boss@uw.edu", name="ajsghd")
+    page = client.get("/admin/cleanup").data.decode()
+    assert "askdgkahjslhd" in page and "ajsghd" in page and "Sunrise 10K" not in page
+    assert "Sunrise 10K" in client.get("/admin/cleanup?all=1").data.decode()
+    with app.app_context():
+        junk = get_db().execute("SELECT id FROM posts WHERE body LIKE 'askdg%'").fetchone()[0]
+    client.post("/admin/cleanup", data={"posts": [str(junk)], "clubs": [str(club)]})
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT body FROM posts").fetchall()[0][0] == "Sunrise 10K, who's in?"
+        assert db.execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == 0
+    accounts.logout()
+    accounts.signup(email="normal@uw.edu")
+    assert client.get("/admin/cleanup").status_code == 404
+
+
+def test_play_has_a_map_of_where_games_are(accounts, client):
+    accounts.signup(email="host@uw.edu", sports=("soccer",))
+    client.post("/events/new", data={"title": "Pickup", "sport": "soccer", "location": "Denny Field", "players": "10",
+                                     "starts_at": form_time(timedelta(days=1)),
+                                     "ends_at": form_time(timedelta(days=1, hours=1)), "note": ""})
+    play = client.get("/").data.decode()
+    assert 'id="play-map"' in play and '"name": "Denny Field"' in play and "playmap.js" in play
+    assert "Clubs for you" not in play

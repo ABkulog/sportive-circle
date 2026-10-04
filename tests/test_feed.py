@@ -197,7 +197,7 @@ def test_feed_is_home_and_has_rules(accounts, client):
     assert 'class="tab is-active" href="/feed"' in home and ">Play<" in home
     assert "Make it a plan" in home and 'href="/rules"' in home and 'data-max-files="10"' in home
     rules = client.get("/rules").data.decode()
-    assert "Athletic, not thirsty" in rules and "18 and older" in rules
+    assert "physique and progress photos are welcome" in rules and "Nudity or sexual content" in rules and "18 and older" in rules
 
 
 def test_older_posts_page_by_page(accounts, client, app):

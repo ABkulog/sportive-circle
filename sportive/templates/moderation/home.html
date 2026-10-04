@@ -16,6 +16,9 @@
   <a class="card create-option" href="{{ url_for('feedback.admin_suggestions') }}">
     <span class="create-emoji" aria-hidden="true">💡</span><strong>Suggestions</strong>
     <span class="muted">{{ trending ~ ' trending' if trending else 'Ideas people sent' }}</span></a>
+  <a class="card create-option" href="{{ url_for('cleanup.cleanup') }}">
+    <span class="create-emoji" aria-hidden="true">🧹</span><strong>Clean up test data</strong>
+    <span class="muted">Wipe junk posts and clubs before people see them</span></a>
   <a class="card create-option" href="{{ url_for('flyer') }}">
     <span class="create-emoji" aria-hidden="true">🖨️</span><strong>Flyer</strong>
     <span class="muted">Print a QR code flyer for the app</span></a>
