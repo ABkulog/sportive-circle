@@ -10,7 +10,7 @@
     <div class="plan-row">
       <span class="plan-count"><strong>{{ e.going_count + e.extra_players }}</strong>{% if e.max_players %}/{{ e.max_players }}{% endif %} going</span>
       {% if e.cancelled %}<span class="badge badge-danger">Canceled</span>
-      {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Your plan</span>
+      {% elif e.host_id == g.user.id %}<span class="badge badge-purple">Hosting</span>
       {% elif e.i_am_going %}<span class="badge badge-success">You're in</span>
       {% elif can_quick_join(e) %}
         <form method="post" action="{{ url_for('events.join', event_id=e.id) }}" {% if join_confirm(e) %}data-confirm="{{ join_confirm(e) }}"{% endif %}>
@@ -44,10 +44,10 @@
     {% if shots %}
       <div class="feed-photos {% if shots|length == 1 %}is-single{% endif %}" {% if shots|length > 1 %}aria-label="{{ shots|length }} photos, swipe to see them"{% endif %}>
         {% for n in shots %}
-          <a href="{{ url_for('posts.photo', post_id=p.id, position=n) }}" class="feed-photo">
+          <div class="feed-photo">
             <img src="{{ url_for('posts.photo', post_id=p.id, position=n) }}" alt="Photo {{ n }} of {{ shots|length }} from {{ p.full_name }}" loading="lazy">
             {% if shots|length > 1 %}<span class="photo-count">{{ n }}/{{ shots|length }}</span>{% endif %}
-          </a>
+          </div>
         {% endfor %}
       </div>
     {% endif %}

@@ -25,7 +25,8 @@
   <div class="composer-row">
     <select name="sport" aria-label="Sport tag" required>
       <option value="">Tag a sport</option>
-      {% for key, label in SPORTS.items() %}<option value="{{ key }}" {% if key == (sport or (my_sports[0] if my_sports|length == 1 else '')) %}selected{% endif %}>{{ SPORT_EMOJI[key] }} {{ label }}</option>{% endfor %}
+      {% if my_sports %}<optgroup label="Your sports">{% for key in my_sports %}<option value="{{ key }}" {% if key == (sport or (my_sports[0] if my_sports|length == 1 else '')) %}selected{% endif %}>{{ SPORTS[key] }}</option>{% endfor %}</optgroup>{% endif %}
+      <optgroup label="All sports">{% for key, label in SPORTS.items() if key not in my_sports %}<option value="{{ key }}" {% if key == sport %}selected{% endif %}>{{ label }}</option>{% endfor %}</optgroup>
     </select>
     <label class="btn btn-ghost btn-small composer-photos" title="Add up to {{ max_photos }} photos">{{ icon('camera') }}<span>Photos</span>
       <input type="file" name="photos" accept="image/*" multiple data-max-files="{{ max_photos }}" class="visually-hidden"></label>

@@ -58,3 +58,16 @@ def test_officers_see_who_is_waiting_on_my_clubs(accounts, client, app):
     accounts.login(email="officer@uw.edu")
     assert "1 waiting</span>" in client.get("/clubs/updates").data.decode()
     assert "All clubs</a>" not in client.get("/clubs").data.decode()          # Find a club is only for finding
+
+
+def test_profiles_show_posts(accounts, client, app):
+    from test_feed import post
+    accounts.signup(email="maya@uw.edu", sports=("running",))
+    post(client, body="Track day 🏃")
+    maya = user_id(app, "maya@uw.edu")
+    assert "Track day" in client.get(f"/u/{maya}").data.decode()
+    accounts.logout()
+    accounts.signup(email="sam@uw.edu", sports=("basketball",))                  # another sport: still on her profile
+    assert "Track day" in client.get(f"/u/{maya}").data.decode()
+    client.post(f"/block/{maya}")
+    assert "Track day" not in client.get(f"/u/{maya}").data.decode()
