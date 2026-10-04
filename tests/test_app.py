@@ -6222,6 +6222,40 @@ def test_club_owner_adds_and_removes_officers(accounts, client, app):
     assert roles[ids["Sam"]] == "member" and roles[ids["Maya"]] == "officer"
 
 
+def test_waiting_club_officer_can_manage_officers_and_withdraw(accounts, client, app):
+    _people(accounts, app, "Maya", "Sam")
+    _as(accounts, "Maya")
+    client.post("/clubs/new", data=CLUB)
+    club = _club_id(app)
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Manage officers" in page and "Withdraw request" in page and "QR code for flyers will be ready" in page
+    _as(accounts, "Sam")
+    assert client.post(f"/clubs/{club}/withdraw").status_code == 403          # not the owner
+    _as(accounts, "Maya")
+    page = client.post(f"/clubs/{club}/withdraw", follow_redirects=True).data.decode()
+    assert "withdrawn" in page
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == 0
+
+
+def test_live_club_or_one_with_people_cant_be_withdrawn(accounts, client, app):
+    _people(accounts, app, "Maya", "Sam")
+    club = _club_with_officer(accounts, client, app)                        # approved
+    _as(accounts, "Maya")
+    assert "Withdraw request" not in client.get(f"/clubs/{club}").data.decode()
+    assert client.post(f"/clubs/{club}/withdraw").status_code == 403
+    _as(accounts, "Sam")
+    client.post(f"/clubs/{club}/follow")
+    with app.app_context():
+        get_db().execute("UPDATE clubs SET status = 'pending' WHERE id = ?", (club,))   # an admin took it off
+        get_db().commit()
+    _as(accounts, "Maya")
+    page = client.post(f"/clubs/{club}/withdraw", follow_redirects=True).data.decode()
+    assert "can&#39;t be withdrawn" in page
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == 1
+
+
 def _weekly_run_by_second_officer(accounts, client, app):
     """Maya owns the club; Sam, another officer, posts a 3-week run. Returns (ids, club). Ends logged out."""
     ids = _people(accounts, app, "Maya", "Sam", "Admin")

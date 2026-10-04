@@ -42,7 +42,15 @@
     {% if not g.user %}
       <a class="btn btn-block" href="{{ url_for('auth.signup', next=request.path) }}">Sign up to join</a>
     {% elif club.status != 'approved' %}
-      {% if role == 'officer' and club.status != 'denied' %}<a class="btn btn-ghost btn-block" href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit application</a>{% endif %}
+      {% if role == 'officer' and club.status != 'denied' %}<a class="btn btn-ghost btn-block" href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit application</a>
+        {% if owner %}<a class="btn btn-ghost btn-block manage-officers" href="{{ url_for('clubs.officers', club_id=club.id) }}">Manage officers</a>{% endif %}
+        <p class="muted">Your club's link and QR code for flyers will be ready on this page once it's verified.</p>
+        {% if club.created_by == g.user.id %}
+          <form method="post" action="{{ url_for('clubs.withdraw', club_id=club.id) }}" class="quiet-leave"
+                data-confirm="Withdraw the request for {{ club.name }}? It will be deleted.">
+            {{ csrf_field() }}<button class="link-button danger-link">Withdraw request</button></form>
+        {% endif %}
+      {% endif %}
     {% elif role in ('member', 'officer') %}
       <p class="going-pill club-role">✓ You're {{ 'an officer' if role == 'officer' else 'a member' }}</p>
       {% if role == 'officer' %}

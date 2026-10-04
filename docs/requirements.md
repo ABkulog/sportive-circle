@@ -134,6 +134,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-CLUB-17 | Club event posts stay true: a canceled event's post says "Canceled:", a weekly series' post keeps describing the series after edits, and private events don't push open ones off the club page. | ✅ |
 | FR-CLUB-18 | Deleting an account steps down from every club first, in one locked step, so two officers deleting at once can't leave a club with none; a club whose other officer is suspended is kept. A canceled club event's post says "Canceled:" however it was canceled (by an officer, a suspension, a denied club, a deleted account). Editing one week of a series doesn't rewrite the series' post unless who it's for changes; older series posts get their week count back. | ✅ |
 | FR-CLUB-19 | The club directory counts only games the club page shows (not private or full ones), finds clubs by sport name ("skiing"), and sorts A–Z ignoring capitals and accents. People waiting on a join request still hear about the club's new games. | ✅ |
+| FR-CLUB-20 | A club waiting for verification isn't a dead end: its page shows Manage officers (to the owner), says the link and QR code will be ready once it's verified, and the owner can withdraw the request while nobody else has joined. | Should | ✅ |
 
 ### Friends and messages (SOC)
 

@@ -708,6 +708,24 @@ def _leave_members_only_games(club_id, user_id):
                    AND event_id IN ({upcoming})""", (user_id, *args))
 
 
+@bp.route("/clubs/<int:club_id>/withdraw", methods=("POST",))
+@login_required
+def withdraw(club_id):
+    """The owner takes back a club request that isn't live yet (waiting or sent back) and nobody has joined.
+    Without this, the only officer of a waiting club couldn't get rid of it ("make someone else an officer")."""
+    club = get_club(club_id)
+    if club["status"] not in ("pending", "rejected") or club["created_by"] != g.user["id"]:
+        abort(403)
+    db = get_db()
+    if db.execute("SELECT 1 FROM club_members WHERE club_id = ? AND role != 'officer'", (club_id,)).fetchone():
+        flash("People have already joined this club, so it can't be withdrawn. An admin can help.", "error")
+        return redirect(url_for("clubs.view", club_id=club_id))
+    db.execute("DELETE FROM clubs WHERE id = ? AND status IN ('pending', 'rejected')", (club_id,))
+    db.commit()
+    flash(f"Request for {club['name']} withdrawn.", "info")
+    return redirect(url_for("clubs.directory"))
+
+
 @bp.route("/clubs/<int:club_id>/leave", methods=("POST",))
 @login_required
 def leave(club_id):
