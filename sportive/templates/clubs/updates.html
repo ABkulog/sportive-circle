@@ -12,6 +12,7 @@
         {{ club_logo(c, 56) }}
         <span class="my-club-name">{{ c.name }}</span>
         <small class="muted">{{ {'officer': 'Officer', 'member': 'Member', 'follower': 'Following'}.get(c.role, 'Asked to join') }}</small>
+        {% if c.waiting %}<span class="badge badge-gold">{{ c.waiting }} waiting</span>{% endif %}
       </a>
     {% endfor %}
     <a class="my-club my-club-more" href="{{ url_for('clubs.directory') }}"><span class="club-emoji" style="--size: 56px" aria-hidden="true">＋</span>

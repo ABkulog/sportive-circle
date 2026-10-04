@@ -1,17 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Clubs{% endblock %}
+{% block title %}Find a club{% endblock %}
 {% block content %}
 {% from "_macros.html" import clubs_tabs, club_logo %}
 {{ clubs_tabs('find') }}
-<h1 class="page-title">Clubs</h1>
+<h1 class="page-title">Find a club</h1>
 
 <form method="get" class="card filters" role="search" aria-label="Find a club">
-  {% if g.user %}
-    <div class="segmented" role="group" aria-label="Which clubs">
-      <a class="segmented-link {% if not mine %}is-on{% endif %}" href="{{ url_for('clubs.directory') }}">All clubs</a>
-      <a class="segmented-link {% if mine %}is-on{% endif %}" href="{{ url_for('clubs.directory', mine=1) }}">My clubs</a>
-    </div>
-  {% endif %}
   <div class="filter-row club-search">
     <input type="search" name="q" value="{{ q }}" placeholder="Search clubs…" aria-label="Search clubs">
     <select name="sport" aria-label="Sport" data-autosubmit>

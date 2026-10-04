@@ -10,7 +10,7 @@
 {% macro home_tabs(active) %}
   <nav class="home-tabs" aria-label="Home">
     <a href="{{ url_for('posts.feed') }}" {% if active == 'posts' %}class="is-on" aria-current="page"{% endif %}>Feed <span class="live-pill" aria-hidden="true">LIVE</span>{% if active != 'posts' %}{% set new_posts = notice_counts().get('feed_posts', 0) %}{% if new_posts %} <span class="count-dot">{{ badge_text(new_posts) }}</span><span class="visually-hidden"> ({{ new_posts }} new)</span>{% endif %}{% endif %}</a>
-    <a href="{{ url_for('events.feed') }}" {% if active == 'feed' %}class="is-on" aria-current="page"{% endif %}>Games</a>
+    <a href="{{ url_for('events.feed') }}" {% if active == 'feed' %}class="is-on" aria-current="page"{% endif %}>Play</a>
     <a href="{{ url_for('events.my_events') }}" {% if active == 'mine' %}class="is-on" aria-current="page"{% endif %}>My events</a>
   </nav>
 {% endmacro %}

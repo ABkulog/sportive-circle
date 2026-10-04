@@ -1,4 +1,4 @@
-{% from "_macros.html" import avatar, club_logo, event_card, icon %}
+{% from "_macros.html" import avatar, club_logo %}
 
 {# The game behind a plan post or a club event post: when, where, how many, and "I'm in". #}
 {% macro plan_box(e) %}
@@ -84,12 +84,18 @@
 {% endmacro %}
 
 {% macro game_card(item) %}
+  {# A short announcement: finding and filtering games is what the Play tab is for. #}
   {% set e = item.event %}
-  <div class="feed-game">
-    <p class="feed-game-who muted">{{ avatar(e.host_id, e.host_name, e.host_avatar, 24) }}
-      <span><strong>{{ e.host_name.split()[0] }}</strong> posted a game · {{ item.at|ago }}</span></p>
-    {{ event_card(e) }}
-  </div>
+  <article class="card feed-card feed-game">
+    <header class="feed-head">
+      <a class="feed-who" href="{{ url_for('profile.view', user_id=e.host_id) }}">
+        {{ avatar(e.host_id, e.host_name, e.host_avatar, 40) }}
+        <span><strong>{{ e.host_name }}</strong><small class="muted">posted a game · {{ item.at|ago }}</small></span>
+      </a>
+      {{ sport_tag(e.sport) }}
+    </header>
+    {{ plan_box(e) }}
+  </article>
 {% endmacro %}
 
 {% macro feed_item(item, photos) %}
