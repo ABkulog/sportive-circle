@@ -166,6 +166,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 | FR-SOC-8 | People search never fails on odd input (only accent marks, emoji, wildcards) and folds letters like ı and ß; friends come first, so Messages search finds a friend even among many people with the same name. Messages with only invisible characters aren't sent; photo-only chats preview as "📷 Photo"; an unsent draft (even all emoji) comes back. | Must | ✅ |
 | FR-SOC-9 | Game chats hide people blocked either way (their messages, reactions and unread counts) and suspended people's messages. | Must | ✅ |
 | FR-SOC-10 | Suspended people disappear from game player lists (past games too), club member lists, invite lists and open chats. | Must | ✅ |
+| FR-SOC-11 | Hold one of your own messages (DM or game chat) and tap **Delete** to delete it for everyone: its words, photo, game card and reactions are gone and it shows "🚫 Message deleted" in its place, for the other person too on their next check (and in the inbox preview). A report made before keeps its saved copy. | Should | ✅ |
 
 ### Notifications (NOTIF)
 
