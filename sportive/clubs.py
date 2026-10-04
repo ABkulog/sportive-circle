@@ -14,7 +14,7 @@ from datetime import timedelta
 from flask import Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
 
-from .auth import login_required
+from .auth import login_required, safe_next
 from .constants import LOCATIONS, SPORT_EMOJI, SPORTS
 from .db import get_db
 from .links import public_url
@@ -592,6 +592,9 @@ def follow(club_id):
     db.commit()
     if cur.rowcount:
         flash(f"Following {club['name']}. Their updates show up in Clubs.", "success")
+    back = request.form.get("next") or ""
+    if back.startswith("/feed") and safe_next(back) == back:  # "+ Follow" on a feed card: stay on the feed
+        return redirect(back)
     return redirect(url_for("clubs.view", club_id=club_id))
 
 

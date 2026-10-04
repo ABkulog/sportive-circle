@@ -52,13 +52,14 @@
     <article class="card report-card">
       <div class="report-head">
         <span class="badge badge-danger">{{ reasons.get(r.reason, r.reason) }}</span>
-        <span class="muted">{{ {'user': 'Profile', 'dm': 'Direct message', 'event_message': 'Event chat'}[r.target_type] }} · {{ r.created_at|when }}</span>
+        <span class="muted">{{ {'user': 'Profile', 'dm': 'Direct message', 'event_message': 'Event chat', 'post': 'Feed post'}[r.target_type] }} · {{ r.created_at|when }}</span>
       </div>
       <p><strong>Reported:</strong>
         {% if r.reported_user_id %}<a href="{{ url_for('profile.view', user_id=r.reported_user_id) }}">{{ r.reported_name }}</a>
           <span class="muted">({{ r.reported_email }})</span>{% if r.reported_suspended %} <span class="badge badge-danger">Suspended</span>{% endif %}{% else %}<span class="muted">deleted account</span>{% endif %}
         · <strong>By:</strong> {{ r.reporter_name or 'deleted account' }}</p>
       {% if r.snapshot %}<blockquote class="report-quote">{{ r.snapshot }}</blockquote>{% endif %}
+      {% if r.target_type == 'post' %}<p><a href="{{ url_for('posts.view', post_id=r.target_id) }}">Open the post</a> (you can delete it there)</p>{% endif %}
       {% if r.details %}<p class="report-details">“{{ r.details }}”</p>{% endif %}
       <div class="detail-actions">
         {% if status == 'open' %}

@@ -1230,3 +1230,61 @@ html.keyboard-open .chat-composer { padding-bottom: 10px; }
 
 /* Admin report queue: Previous / Next */
 .pager { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; justify-content: space-between; margin-top: 1rem; }
+
+/* ------------------------------------------------------------------ the feed */
+.sport-channels { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin: 0 0 14px; scrollbar-width: none; }
+.sport-channels::-webkit-scrollbar { display: none; }
+.sport-channels .chip { flex: none; white-space: nowrap; }
+.composer textarea { width: 100%; resize: vertical; min-height: 64px; }
+.composer-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.composer-row select { flex: 1 1 160px; min-width: 0; }
+.composer-photos { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.composer-picked { margin: 8px 0 0; font-size: .88rem; }
+.composer-send { justify-content: space-between; }
+.plan-toggle { margin-top: 12px; }
+.plan-fields { display: none; border: 0; padding: 0; margin: 10px 0 0; gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.composer:has(input[name="plan"]:checked) .plan-fields { display: grid; }
+.feed { gap: 12px; }
+.feed-card { padding: 14px 16px; }
+.feed-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.feed-who { display: flex; gap: 10px; align-items: center; color: var(--text); min-width: 0; flex: 1 1 auto; }
+.feed-who:hover { text-decoration: none; }
+.feed-who span { min-width: 0; }
+.feed-who strong { display: block; overflow-wrap: anywhere; }
+.feed-who small { display: block; }
+.verified-check { color: var(--purple); font-size: .85em; }
+.sport-tag { flex: 0 1 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; font-size: .85rem; font-weight: 600;
+  color: var(--purple); white-space: nowrap; }
+.feed-body { margin: 10px 0 0; white-space: pre-line; overflow-wrap: anywhere; }
+.feed-photos { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 10px -16px 0;
+  padding: 0 16px; scrollbar-width: none; }
+.feed-photos::-webkit-scrollbar { display: none; }
+.feed-photo { position: relative; flex: 0 0 86%; scroll-snap-align: center; border-radius: 12px; overflow: hidden;
+  background: var(--control); aspect-ratio: 4 / 5; }
+.feed-photos.is-single .feed-photo { flex-basis: 100%; aspect-ratio: auto; max-height: 560px; }
+.feed-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.feed-photos.is-single .feed-photo img { height: auto; max-height: 560px; object-fit: contain; }
+.photo-count { position: absolute; top: 8px; right: 8px; background: rgb(0 0 0 / .55); color: #fff; font-size: .75rem;
+  padding: 2px 8px; border-radius: 999px; }
+.plan-box { margin-top: 12px; padding: 12px; border-radius: 12px; background: var(--accent-soft); }
+.plan-title { font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
+.plan-meta { font-size: .88rem; color: var(--muted); margin-top: 2px; }
+.plan-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.plan-count { font-size: .9rem; }
+.feed-actions { display: flex; gap: 14px; align-items: center; justify-content: flex-end; margin-top: 10px; font-size: .85rem; }
+.feed-actions form { margin: 0; }
+.feed-game-who { display: flex; gap: 8px; align-items: center; margin: 0 0 6px; font-size: .88rem; }
+@media (min-width: 700px) { .feed-photo { flex-basis: 70%; } }
+.live-pill { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; padding: 1px 6px; border-radius: 999px;
+  background: var(--danger); color: #fff; font-size: .62rem; font-weight: 800; letter-spacing: .06em; vertical-align: 2px; }
+.live-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: live-pulse 1.6s ease-in-out infinite; }
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .live-pill::before { animation: none; } }
+.post-button { display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; font-size: 1.05rem; font-weight: 800;
+  letter-spacing: .02em; background: linear-gradient(135deg, var(--purple), var(--purple-strong)); color: var(--on-accent);
+  border-radius: 12px; box-shadow: 0 6px 18px rgb(75 46 131 / .35); transition: transform .12s ease, box-shadow .12s ease; }
+.post-button:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgb(75 46 131 / .45); }
+.post-button:active { transform: translateY(1px); box-shadow: 0 3px 10px rgb(75 46 131 / .35); }
+.post-button .icon { width: 18px; height: 18px; }
+@media (prefers-reduced-motion: reduce) { .post-button { transition: none; } .post-button:hover, .post-button:active { transform: none; } }
