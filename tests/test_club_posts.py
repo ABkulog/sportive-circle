@@ -510,3 +510,14 @@ def test_it_looks_like_instagram(accounts, client, app):
     assert 'class="profile-highlights"' in profile and 'href="/settings">Settings' in profile
     assert 'data-tab-button="posts" title="Posts">' in profile and "#i-grid" in profile
     assert '<button class="visually-hidden">Search</button>' in client.get("/search").data.decode()
+
+
+def test_bot_round_instagram_look_keeps_contrast(client):
+    """Bot round after the Instagram look: the landing splash and 🐾 Team used the header color, which turned
+    white (white text on white); grey text on grey boxes and the red like count were too light; Sign up was
+    hard to read in dark mode; the name gave way before the time on small phones."""
+    css = client.get("/static/style.css").data.decode()
+    assert ".husky-hero, .team-pill { background: #4b2e83; }" in css
+    assert ":root { --muted: #6b6b6b; }" in css and ':root[data-theme="dark"] { --muted: #a8a8a8; }' in css
+    assert ".nav-cta, .nav-cta:hover { background: #4b2e83; color: #fff !important; }" in css
+    assert "color: #e0245e; }" in css and ".feed-who .feed-name { flex: 0 1 auto; max-width: 68%; }" in css

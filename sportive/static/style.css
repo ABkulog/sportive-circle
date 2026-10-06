@@ -1866,3 +1866,16 @@ body.has-app-nav .topbar .brand img, .appnav .brand img { display: none; }
   .feed > .feed-card > .feed-actions .card-more { right: 0; }
 }
 .club-line { font-size: .82rem; line-height: 1.35; }
+
+/* Bot round (after the Instagram look): fixed colors where the header color used to be purple, darker greys
+   so small text reads on the grey boxes, a red that reads on white, and room for ⋯ next to the #sport tag. */
+:root { --muted: #6b6b6b; }
+.husky-hero, .team-pill { background: #4b2e83; }             /* the landing splash and 🐾 Team stay UW purple */
+.nav-cta, .nav-cta:hover { background: #4b2e83; color: #fff !important; }   /* Sign up reads in dark mode too */
+.tab-list button { color: var(--muted); }
+.feed-actions .react-button.is-on, .feed-actions .react-button.is-on:hover { color: #e0245e; }
+.feed-card .feed-head { padding-right: 46px; }
+.feed-card > .feed-actions .card-more > summary { background: none; padding: 4px 8px; min-height: 36px; }
+:root[data-theme="dark"] { --muted: #a8a8a8; }
+@media (prefers-color-scheme: dark) { :root[data-theme="system"] { --muted: #a8a8a8; } }
+.feed-who .feed-name { flex: 0 1 auto; max-width: 68%; } .feed-who small { flex: 1 1 0; }  /* the name keeps its room; the time · #sport gives way */
