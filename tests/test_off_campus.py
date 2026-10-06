@@ -54,4 +54,4 @@ def test_plans_and_need_players_take_a_pin_too(accounts, client, app):
         assert tuple(get_db().execute("SELECT place_lat, place_lng FROM events").fetchone()) == (47.68, -122.33)
     feed = client.get("/feed").data.decode()
     assert "data-drop-pin" in feed and "spot.js" in feed
-    assert "data-drop-pin" in client.get("/need-players").data.decode()
+    assert "data-drop-pin" in client.get("/events/new").data.decode()

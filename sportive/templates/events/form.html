@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% from "_macros.html" import select, who_can_join, format_field, players_block, open_to_field, place_check, spot_field %}
-{% block title %}{{ 'Edit event' if event else 'New event' }}{% endblock %}
+{% block title %}{{ 'Edit event' if event else ('New club event' if club else 'New game') }}{% endblock %}
 {% block content %}
 <a class="back-link" href="{{ url_for('events.detail', event_id=event.id) if event else (url_for('clubs.view', club_id=club.id) if club else url_for('events.feed')) }}" data-back>← Back</a>
 <div class="card form-card">
-  <h1>{{ 'Edit event' if event else 'Create event' }}</h1>
+  <h1>{{ 'Edit event' if event else ('New club event' if club else 'New game') }}</h1>
   {% if club %}<p class="club-banner">For <strong>{{ club.name }}</strong>.</p>{% endif %}
   {# Four short steps (no scrolling on a phone); without JavaScript it's one form. #}
   <form method="post" class="form" data-sport-form data-wizard data-error-field="{{ g.get('error_field', '') }}" {% if event %}data-event-id="{{ event.id }}"{% endif %} {% if event and event.team_size %}data-team-game{% endif %}>
@@ -55,6 +55,13 @@
     <small class="muted place-hours" data-place-hours aria-live="polite"></small>
     </label>
     {{ spot_field(form) }}
+    {% if not event %}{# one form for every game: a pickup game starting soon is a tap here #}
+      <div class="start-quick" role="group" aria-label="Starting soon" data-start-quick>
+        {% for minutes, label in [(0, 'Right now'), (30, 'In 30 min'), (60, 'In 1 hour')] %}
+          <button type="button" class="chip" data-start-in="{{ minutes }}" aria-pressed="false">{{ label }}</button>
+        {% endfor %}
+      </div>
+    {% endif %}
     <div class="row">
       <label class="field"><span>Starts</span>
         <input name="starts_at" type="datetime-local" value="{{ form.get('starts_at', '') }}" {% if min_start %}min="{{ min_start }}"{% endif %} required></label>

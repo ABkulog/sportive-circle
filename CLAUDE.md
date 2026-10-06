@@ -9,12 +9,15 @@ on every merge, so `main` is the live site.
 ## Design rules: plain and simple (the owner's standing rule, always)
 It should feel like an actual social app (Twitter / Instagram), not a school portal. Before adding anything, check it
 against these; when in doubt, leave it out or remove something.
-- **5 places only**: Home (the feed), Play (live map + games), Create (+), Messages, Profile. Bottom tab bar on
-  phones, sidebar on laptops. The 🔔 bell (and 🔍 search) sit in the top corner. Never add a sixth tab.
+- **Every page like Instagram**, and add no feature the owner didn't ask for. Where we lack a feature, let the
+  rest of the page fill the space; never leave it empty.
+- **5 places only**, in Instagram's spots: Home, Clubs (its 🔍), Search (its +), Play (its Reels), Profile.
+  Bottom tab bar on phones, sidebar on laptops. The 🔔 bell (its heart) and Messages sit top right. A **＋**
+  button at the bottom right opens the New post sheet. Never add a sixth tab.
 - **Everything else lives inside Profile**: Friends, Settings, Help/FAQ, Log out; your clubs and your games are
   Profile tabs. **Admin** shows only for admins, tucked into Settings.
 - **One level of navigation.** No second row of tabs under a tab, no page that is a second feed. Clubs are
-  accounts you follow, found through search; their posts are in the feed.
+  found and registered on the Clubs tab; their posts are in the feed. Games are made on Play (＋ New game).
 - **Phones first.** Design and check at 390px (and 320px) before laptop.
 - **Every post looks the same**: avatar, name, time, #sport, content, 🔥 / Reply. Clubs only add the verified
   mark. No special borders or extra lines. Automatic posts are one short line. Canceled things leave the feed.

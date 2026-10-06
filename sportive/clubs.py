@@ -310,6 +310,8 @@ def directory():
     q = request.args.get("q", "").strip()[:100]
     sport = request.args.get("sport", "")
     mine = request.args.get("mine") == "1" and g.get("user") is not None
+    my_sports = user_sports(g.user["id"]) if g.get("user") else []
+    fits = request.args.get("fits") == "1" and bool(my_sports)  # clubs for the sports on your profile
     easy = request.args.getlist("easy")  # quick filters: beginner / free / no_tryouts
     where, params = [], {"me": g.user["id"] if g.get("user") else 0}
     if mine:  # my clubs, including ones still being reviewed (those only for their officers: others can't open them)
@@ -327,6 +329,9 @@ def directory():
     if sport in SPORTS:
         where.append("c.sport = :sport")
         params["sport"] = sport
+    elif fits:
+        where.append("c.sport IN (%s)" % ", ".join(f":fit{i}" for i in range(len(my_sports))))
+        params.update({f"fit{i}": key for i, key in enumerate(my_sports)})
     if "beginner" in easy:
         where.append("c.experience = 'none'")
     if "free" in easy:
@@ -345,7 +350,8 @@ def directory():
             FROM clubs c WHERE {" AND ".join(where)}
             ORDER BY my_status IS NOT NULL DESC, member_count DESC, fold(c.name) LIMIT 200""",
         {**params, "now": to_db(now_local()), "hold_now": to_db(now_local())}).fetchall()
-    return render_template("clubs/directory.html", clubs=clubs, q=q, sport=sport, mine=mine, easy=easy)
+    return render_template("clubs/directory.html", clubs=clubs, q=q, sport=sport, mine=mine, easy=easy,
+                           fits=fits, my_sports=my_sports)
 
 
 @bp.route("/clubs/<int:club_id>")

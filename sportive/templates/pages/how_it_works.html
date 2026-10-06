@@ -4,7 +4,7 @@
 <h1 class="page-title">How it works</h1>
 
 <ol class="steps simple">
-  {% for url, text in [(url_for('events.feed'), 'Find a game'), (url_for('create_menu'), 'Start your own'),
+  {% for url, text in [(url_for('events.feed'), 'Find a game'), (url_for('events.create'), 'Start your own'),
                        (url_for('clubs.directory'), 'Join a club')] %}
     <li><a class="step" href="{{ url }}"><span class="step-number">{{ loop.index }}</span><h2>{{ text }}</h2></a></li>
   {% endfor %}

@@ -29,8 +29,14 @@
 </nav>
 {% if show %}<p class="muted small feed-find-club"><a href="{{ url_for('clubs.directory') }}">Find a club to follow →</a>{% if show == 'myclubs' %} · <a href="{{ url_for('clubs.updates') }}">Manage my clubs</a>{% endif %}</p>{% endif %}
 
-{# The post box: one line until you tap it, then the sport, photos, video and "make it a plan" open up. #}
-<form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="card composer" data-composer data-sport-form data-inplace data-swap-target="#feed-list">
+{# The ＋ button (bottom right) opens this sheet, like Instagram's create: the feed itself starts with posts. #}
+<div class="post-sheet" id="post" role="dialog" aria-modal="true" aria-labelledby="post-sheet-title">
+  <div class="post-sheet-panel">
+    <header class="post-sheet-head">
+      <h2 id="post-sheet-title">New post</h2>
+      <a href="{{ url_for('posts.feed', sport=sport, show=show or None) }}" class="post-sheet-close" aria-label="Close" data-close-post>×</a>
+    </header>
+    <form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="card composer" data-composer data-sport-form data-inplace data-swap-target="#feed-list">
   {{ csrf_field() }}
   {% if sport %}<input type="hidden" name="channel" value="{{ sport }}">{% endif %}
   {% if show %}<input type="hidden" name="show" value="{{ show }}">{% endif %}
@@ -85,12 +91,10 @@
     <a class="muted small composer-rules" href="{{ url_for('community_rules') }}">Community rules</a>
     <button class="btn post-button">Post {{ icon("send") }}</button>
   </div>
-  {# Under the one-line box: you can do more than words #}
-  <div class="composer-quick">
-    <label class="quick-chip" for="post-photos">📷 Photo</label>
-    <button type="button" class="quick-chip" data-open-plan>🏀 Plan a game</button>
-  </div>
+
 </form>
+  </div>
+</div>
 
 {% if club_picks %}
   <section class="card clubs-for-you" aria-labelledby="clubs-for-you">

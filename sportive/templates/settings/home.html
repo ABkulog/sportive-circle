@@ -64,7 +64,7 @@
     {{ csrf_field() }}
     <label class="toggle">
       <input type="checkbox" name="read_receipts" value="1" {% if g.user.read_receipts %}checked{% endif %} data-autosubmit>
-      <span>Read receipts <small class="muted">off: no "Seen" in DMs, both ways</small></span>
+      <span>Show "Seen" in messages <small class="muted">People see when you've read their message, and you see when they've read yours</small></span>
     </label>
     <noscript><button class="btn btn-small">Save</button></noscript>
   </form>

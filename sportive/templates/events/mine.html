@@ -9,7 +9,7 @@
   <h2>Hosting</h2>
   <div class="stack">
     {% for e in hosting %}{{ event_card(e) }}{% else %}
-      <p class="muted">Nothing yet. <a href="{{ url_for('create_menu') }}">Create one</a></p>
+      <p class="muted">Nothing yet. <a href="{{ url_for('events.create') }}">Start a game</a></p>
     {% endfor %}
   </div>
 </section>

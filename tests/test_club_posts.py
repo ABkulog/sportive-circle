@@ -230,11 +230,16 @@ def test_the_post_box_never_touches_the_first_post(client):
     assert "#feed-list > :first-child { margin-top: 0; }" in css
 
 
-def test_the_open_post_box_closes_on_a_tap_elsewhere_or_scrolling_away(client):
-    """Opened, the post box took half the screen with no way back: a tap outside it or scrolling it out of sight
-    closes it to one line again (what you wrote stays). Photos and text in posts are smaller, to fit more."""
+def test_the_plus_button_opens_the_post_sheet(accounts, client):
+    """Like Instagram: the feed starts with posts. The ＋ at the bottom right opens the post box as a sheet,
+    × / a tap outside / Esc closes it (what you wrote stays). Photos and text in posts are smaller, to fit more."""
+    accounts.signup(sports=("running",))
+    feed = client.get("/feed").data.decode()
+    assert 'class="post-sheet" id="post"' in feed and "data-open-post" in feed and "data-close-post" in feed
+    assert feed.index('id="post"') < feed.index('id="feed-list"')
+    assert 'href="/feed#post"' in client.get("/").data.decode()                  # ＋ on other pages too
     js = client.get("/static/app.js").data.decode()
-    assert 'document.addEventListener("pointerdown"' in js and "IntersectionObserver" in js
+    assert "[data-open-post]" in js and "closePostSheet" in js
     css = client.get("/static/style.css").data.decode()
     assert ".feed-photos.is-single .feed-photo, .feed-photos.is-single .feed-photo img, .feed-video { max-height: 340px; }" in css
 
@@ -264,7 +269,7 @@ def test_feed_like_twitter_clubs_menu_and_profile_posts_first(accounts, client, 
 
 def test_one_card_pattern_no_canceled_games_and_quick_buttons(accounts, client, app):
     """Every card looks the same, canceled games leave the feed, a plan's game doesn't repeat the post, and the
-    one-line post box offers 📷 Photo and 🏀 Plan a game. Create has one way to make each thing."""
+    post box offers photos and a plan. There's one way to make each thing."""
     accounts.signup(email="maya@uw.edu", sports=("basketball",))
     post(client, sport="basketball", body="who's down", plan="1", starts_at=form_time(timedelta(days=1)),
          duration="60", location="IMA (Intramural Activities Building)", spots="3")
@@ -272,11 +277,10 @@ def test_one_card_pattern_no_canceled_games_and_quick_buttons(accounts, client, 
         game = get_db().execute("SELECT id, title FROM events").fetchone()
     assert game["title"] == "Basketball at the IMA"
     feed = client.get("/feed").data.decode()
-    assert "who&#39;s down" in feed and "data-open-plan" in feed and 'for="post-photos"' in feed
+    assert "who&#39;s down" in feed and 'name="plan"' in feed and 'id="post-photos"' in feed
     client.post(f"/events/{game['id']}/cancel")
     assert "who&#39;s down" not in client.get("/feed").data.decode()
-    menu = client.get("/create").data.decode()
-    assert ">Post<" in menu and ">Game<" in menu and "Need players" in menu and "Register your club" in menu
+    assert client.get("/create").headers["Location"].endswith("/clubs")      # the old Create page is the Clubs tab
     css = client.get("/static/style.css").data.decode()
     assert ".feed-card.is-club { box-shadow: none; }" in css and "object-fit: cover; border-radius: 12px" in css
 
@@ -367,3 +371,31 @@ def test_request_to_join_is_one_clear_form(accounts, client, app):
     css = client.get("/static/style.css").data.decode()
     assert ".join-panel[open] > summary { display: none; }" in css
     assert ".join-actions:has(.join-panel[open]) .follow-toggle { display: none; }" in css
+
+
+def test_small_clarity_fixes(accounts, client):
+    """A map's drag never starts pull-to-refresh; "Seen" in messages is said plainly; Online is for esports."""
+    js = client.get("/static/app.js").data.decode()
+    assert 'closest(".leaflet-container, [data-spot-map], .play-map")' in js
+    accounts.signup()
+    assert "Show &#34;Seen&#34; in messages" in client.get("/settings").data.decode() or \
+        'Show "Seen" in messages' in client.get("/settings").data.decode()
+    assert ">Online (esports)</option>" in client.get("/?scope=all").data.decode()
+
+
+def test_the_clubs_tab_finds_and_registers_clubs(accounts, client, app):
+    """The Clubs tab (where Instagram's search is) is the one place for clubs: search them, see yours, find the
+    ones for the sports on your profile, and register yours. The old Create page sends people here."""
+    accounts.signup(email="officer@uw.edu", sports=("tennis",))
+    approved_club(app, "officer@uw.edu", name="UW Tennis Club", sport="tennis")
+    approved_club(app, "officer@uw.edu", name="Husky Rowing", sport="rowing")
+    accounts.logout()
+    accounts.signup(email="maya@uw.edu", sports=("tennis",))
+    page = client.get("/clubs").data.decode()
+    assert "＋ Register a club" in page and 'href="/clubs/new"' in page and 'placeholder="Search clubs"' in page
+    assert 'href="/clubs?mine=1"' in page and 'href="/clubs?fits=1"' in page and 'class="page-title"' not in page
+    assert "UW Tennis Club" in page and "Husky Rowing" in page
+    fits = client.get("/clubs?fits=1").data.decode()
+    assert "UW Tennis Club" in fits and "Husky Rowing" not in fits
+    assert client.get("/create").headers["Location"].endswith("/clubs")
+    assert '<span class="tab-label">Clubs<' in page and 'class="tab is-active" href="/clubs"' in page

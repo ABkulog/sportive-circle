@@ -49,10 +49,10 @@
     <div class="topbar-inner {% if app_nav and is_admin() %}five-icons{% endif %}">
       <a class="brand" href="{{ url_for('index') }}" aria-label="Sportive Circle home"><img src="{{ url_for('static', filename='icon.svg') }}" alt="" width="28" height="28"><span>Sportive<span class="brand-accent">Circle</span></span></a>
       {% if app_nav %}
-        {# Phones: just the bell up here; everything else is in the 5 tabs at the bottom (and Profile). #}
+        {# Like Instagram: the bell (where its heart is) and Messages up here; the 5 tabs at the bottom. #}
         <nav class="top-icons" aria-label="Shortcuts">
-          <a href="{{ url_for('search.search') }}" aria-label="Search clubs and people" title="Search">{{ icon('search') }}</a>
           {% set bell = bell_count() %}<a class="bell-link" href="{{ url_for('notifications.bell') }}" aria-label="Notifications{% if bell %}, {{ bell }} new{% endif %}" title="Notifications">{{ icon('bell') }}{% if bell %}<span class="count-dot">{{ badge_text(bell) }}</span>{% endif %}</a>
+          <a href="{{ url_for('social.inbox') }}" aria-label="Messages{% if nav_badges.messages %}, {{ nav_badges.messages }} new{% endif %}" title="Messages">{{ icon('send') }}{% if nav_badges.messages %}<span class="count-dot">{{ badge_text(nav_badges.messages) }}</span>{% endif %}</a>
         </nav>
       {% elif g.user %}
         {# Still setting up (no profile picture yet). #}
@@ -79,21 +79,28 @@
     {# The same 5 sections everywhere: a bottom tab bar on phones/tablets, a sidebar on laptops. #}
     <nav class="appnav" aria-label="Main">
       <a class="brand side-only" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='icon.svg') }}" alt="" width="28" height="28"><span>Sportive<span class="brand-accent">Circle</span></span></a>
-      {# Like Twitter / Instagram: 5 places. Friends, Settings, Help, Admin and Log out live on your Profile. #}
-      {% set profile_area = ep.startswith('profile.') or ep.startswith('settings.') or ep in ('notifications.notification_settings', 'social.friends', 'faq', 'how_it_works', 'events.my_events', 'clubs.updates')
+      {# Like Instagram: Home · Clubs (where its search is) · Search (where its + is) · Play (where Reels is) ·
+         Profile. Posting is the ＋ in the corner; Friends, Settings, Help and Log out live on your Profile. #}
+      {% set profile_area = ep.startswith('profile.') or ep.startswith('settings.') or ep in ('notifications.notification_settings', 'social.friends', 'faq', 'how_it_works', 'events.my_events')
                             or ep.startswith('moderation.admin') or ep in ('clubs.review_queue', 'feedback.admin_suggestions', 'placecheck.admin_rec') %}
       {{ tab(url_for('posts.feed'), 'home', 'Home', ep.startswith('posts.'), nav_badges.home) }}
-      {{ tab(url_for('events.feed'), 'map', 'Play', ep in ('events.feed', 'index', 'events.detail', 'events.map_view')) }}
-      {{ tab(url_for('create_menu'), 'plus', 'Create', ep in ('create_menu', 'events.create', 'events.quick', 'clubs.create')) }}
-      {{ tab(url_for('social.inbox'), 'send', 'Messages', ep in ('social.inbox', 'social.thread'), nav_badges.messages) }}
+      {{ tab(url_for('clubs.directory'), 'clubs', 'Clubs', ep in ('clubs.directory', 'clubs.view', 'clubs.create', 'clubs.edit', 'clubs.updates')) }}
+      {{ tab(url_for('search.search'), 'search', 'Search', ep == 'search.search') }}
+      {{ tab(url_for('events.feed'), 'map', 'Play', ep in ('events.feed', 'index', 'events.detail', 'events.create', 'events.quick', 'events.edit')) }}
       {{ tab(url_for('profile.view', user_id=g.user.id), 'user', 'Profile',
              profile_area and (ep != 'profile.view' or request.view_args.get('user_id') == g.user.id),
              nav_badges.profile + nav_badges.friends + nav_badges.clubs + nav_badges.admin) }}
       <div class="side-only side-extra">
-        {{ tab(url_for('search.search'), 'search', 'Search', ep == 'search.search') }}
+        {{ tab(url_for('social.inbox'), 'send', 'Messages', ep in ('social.inbox', 'social.thread'), nav_badges.messages) }}
         {{ tab(url_for('notifications.bell'), 'bell', 'Notifications', ep == 'notifications.bell', bell_count(), extra_class='bell-link') }}
       </div>
     </nav>
+    {# ＋ to post, bottom right on every page (not over a chat's message box) #}
+    {% if not ep.startswith('social.thread') and ep not in ('social.event_chat', 'posts.feed') %}
+      <a class="post-fab" href="{{ url_for('posts.feed') }}#post" aria-label="New post" title="New post">＋</a>
+    {% elif ep == 'posts.feed' %}
+      <a class="post-fab" href="#post" aria-label="New post" title="New post" data-open-post>＋</a>
+    {% endif %}
   {% endif %}
 
   <main class="page" id="main">

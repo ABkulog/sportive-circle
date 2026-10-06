@@ -1,10 +1,8 @@
 """Simple pages: How it works, FAQ, Privacy, Terms, the Create menu, and icons browsers ask for."""
 import io
 
-from flask import Response, current_app, g, redirect, render_template, request, url_for
+from flask import Response, current_app, redirect, render_template, request, url_for
 
-from .auth import login_required
-from .clubs import officer_clubs
 from .db import get_db
 
 
@@ -28,9 +26,9 @@ def community_rules():
     return render_template("pages/rules.html")
 
 
-@login_required
 def create_menu():
-    return render_template("pages/create.html", officer_clubs=officer_clubs(g.user["id"]))
+    """The old Create page: posting is the ＋ button, games are on Play, clubs are on Clubs."""
+    return redirect(url_for("clubs.directory"))
 
 
 def favicon():
