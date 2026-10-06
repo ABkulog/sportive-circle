@@ -80,7 +80,9 @@
         <small class="muted place-tip" data-place-tip></small>
         <small class="muted place-hours" data-place-hours aria-live="polite"></small></label>
       <div class="plan-spot">{{ spot_field({}) }}</div>
-      <label class="field"><span>People you need</span><input type="number" name="spots" min="1" max="50" value="2" inputmode="numeric"></label>
+      <label class="field"><span>People you need</span><input type="number" name="spots" min="1" max="50" value="2" inputmode="numeric" data-plan-spots></label>
+      {# Joining a club run or an open session: no number to fill, anyone can come #}
+      <label class="toggle no-limit"><input type="checkbox" name="no_limit" value="1" data-plan-no-limit><span>No limit: anyone can come</span></label>
       <label class="field"><span>Level</span>
         <select name="skill_level">{% for level in SKILL_LEVELS %}<option {% if level == 'All levels' %}selected{% endif %}>{{ level }}</option>{% endfor %}</select></label>
       {{ open_to_field({}) }}

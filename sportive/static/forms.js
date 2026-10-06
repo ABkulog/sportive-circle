@@ -339,3 +339,13 @@
     box.querySelectorAll("[data-start-in]").forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
   });
 })();
+
+// A plan in the post box: "No limit: anyone can come" switches off "People you need" (and it isn't sent).
+(function () {
+  const box = document.querySelector("[data-plan-no-limit]");
+  const spots = document.querySelector("[data-plan-spots]");
+  if (!box || !spots) return;
+  const update = () => { spots.disabled = box.checked; };
+  box.addEventListener("change", update);
+  update();
+})();

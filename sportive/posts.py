@@ -462,8 +462,9 @@ def _read_plan(form, sport, body):
         return None, "Pick when the plan starts."
     if form.get("location", "") not in LOCATIONS:
         return None, "Pick where you're meeting."
-    if not spots.isdigit() or not 1 <= int(spots) <= MAX_PLAN_SPOTS:
-        return None, f"How many more people do you need? (1 to {MAX_PLAN_SPOTS})"
+    no_limit = bool(form.get("no_limit"))  # "anyone can come" (a club run): no number of people needed
+    if not no_limit and (not spots.isdigit() or not 1 <= int(spots) <= MAX_PLAN_SPOTS):
+        return None, f"How many more people do you need? (1 to {MAX_PLAN_SPOTS}) Or tick No limit: anyone can come."
     if duration not in dict(PLAN_DURATIONS):
         return None, "Pick how long it is."
     if starts <= now_local():
@@ -479,7 +480,8 @@ def _read_plan(form, sport, body):
                       "skill_level": form.get("skill_level") or "All levels", "open_to": form.get("open_to") or "everyone",
                       "starts_at": form["starts_at"], "note": body[:500],
                       "ends_at": add_real(starts, timedelta(minutes=duration)).strftime("%Y-%m-%dT%H:%M"),
-                      "players": str(int(spots) + 1), "is_private": "0",
+                      "players": "" if no_limit else str(int(spots) + 1), "no_limit": "1" if no_limit else "",
+                      "is_private": "0",
                       "place_address": form.get("place_address", ""), "pin": form.get("pin", "")})
     data, error = read_event_form(game)
     if error:
