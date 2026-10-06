@@ -8,11 +8,15 @@
   if (!box || !data) return;
   if (typeof L === "undefined") { box.closest(".live-map-wrap").hidden = true; return; }
   const pins = JSON.parse(data.textContent);
-  const map = L.map(box, { scrollWheelZoom: false, zoomControl: false, attributionControl: true })
+  const wrap = box.closest("[data-live-map]");
+  // On the page it's a still preview (tap opens it full screen), so it never fights the page's scrolling.
+  const map = L.map(box, { scrollWheelZoom: false, zoomControl: false, attributionControl: true, dragging: false,
+                           touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false })
     .setView([47.6553, -122.3035], 15);  // UW
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  // Bright, clean colors (CARTO Voyager, from OpenStreetMap), like Snap Map, instead of plain grey tiles.
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    maxZoom: 19, subdomains: "abcd",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
   }).addTo(map);
 
   const bounds = [];
@@ -52,6 +56,40 @@
   }
   frame();
   requestAnimationFrame(frame);
+
+  // Full screen, like Snap Map: tap the map; ← Back, Esc or the phone's back button closes it.
+  const openButton = wrap && wrap.querySelector("[data-map-open]");
+  const backButton = wrap && wrap.querySelector("[data-map-close]");
+  const recenter = wrap && wrap.querySelector("[data-map-recenter]");
+  const handlers = ["dragging", "touchZoom", "doubleClickZoom", "scrollWheelZoom", "boxZoom", "keyboard"];
+  let pushed = false;
+  function setFull(on) {
+    if (!wrap || wrap.classList.contains("is-full") === on) return;
+    wrap.classList.toggle("is-full", on);
+    document.body.classList.toggle("map-full", on);
+    handlers.forEach((name) => map[name][on ? "enable" : "disable"]());
+    if (on) map.addControl(zoom); else map.removeControl(zoom);
+    openButton.hidden = on;
+    backButton.hidden = !on;
+    recenter.hidden = !on;
+    setTimeout(frame, 30);
+    if (on) backButton.focus(); else openButton.focus({ preventScroll: true });
+  }
+  const zoom = L.control.zoom({ position: "bottomright" });
+  if (openButton) {
+    openButton.addEventListener("click", () => {
+      history.pushState({ playMap: true }, "", "#map");
+      pushed = true;
+      setFull(true);
+    });
+    backButton.addEventListener("click", () => { if (pushed) history.back(); else setFull(false); });
+    recenter.addEventListener("click", () => map.setView([47.6553, -122.3035], 15));
+    window.addEventListener("popstate", () => { pushed = false; setFull(location.hash === "#map"); });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && wrap.classList.contains("is-full")) backButton.click();
+    });
+    if (location.hash === "#map") setFull(true);  // a shared link, or coming back to it
+  }
   window.addEventListener("load", frame, { once: true });
   if (window.ResizeObserver) {
     let width = box.clientWidth;

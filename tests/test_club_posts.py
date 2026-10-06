@@ -475,3 +475,19 @@ def test_bot_round_the_plus_button_never_covers_the_last_links(accounts, client)
     assert ".feed-find-club { margin: -4px 0 10px; display: flex; flex-wrap: wrap;" in css
     page = client.get("/feed?show=myclubs").data.decode()
     assert "Find a club to follow →</a><a " in page
+
+
+def test_play_map_opens_full_screen_like_snap_map_and_phone_posts_are_dense(accounts, client):
+    """The owner: tap the map for a full screen (with a back button), like Snap Map, with real colors; and posts
+    were still too big on a phone: there they're flat rows like Twitter (one-line name, small photos)."""
+    accounts.signup(sports=("running",))
+    play = client.get("/").data.decode()
+    assert "data-map-open" in play and "data-map-close" in play and "← Back" in play and "data-map-recenter" in play
+    js = client.get("/static/playmap.js").data.decode()
+    assert 'history.pushState({ playMap: true }, "", "#map")' in js and "popstate" in js
+    assert "dragging: false" in js and "basemaps.cartocdn.com" in js            # a still preview, colorful tiles
+    assert "https://*.basemaps.cartocdn.com" in client.get("/").headers["Content-Security-Policy"]
+    css = client.get("/static/style.css").data.decode()
+    assert ".live-map-wrap.is-full { position: fixed; inset: 0;" in css and ".play-map .leaflet-tile-pane { filter: grayscale" not in css
+    assert ".feed > .feed-card { margin: 0 -16px; padding: 9px 16px; border-width: 0 0 1px;" in css
+    assert ".feed-thumb { width: 72px; height: 72px;" in css

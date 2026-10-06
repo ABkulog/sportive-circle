@@ -1540,7 +1540,6 @@ body.has-app-nav .home-tabs { position: sticky; top: 60px; z-index: 20; backgrou
 /* Play's live map (like Snap Map): a quiet grey map, bright sport bubbles */
 .live-map-wrap { margin: 0 0 14px; }
 .live-map-wrap .play-map { height: 260px; margin: 0; }
-.play-map .leaflet-tile-pane { filter: grayscale(1) brightness(1.08) contrast(.85); }
 .live-map-note { margin: 6px 2px 0; font-size: .85rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: live-pulse 1.6s ease-in-out infinite; }
 .live-icon { background: none; border: 0; }
@@ -1561,7 +1560,6 @@ body.has-app-nav .home-tabs { position: sticky; top: 60px; z-index: 20; backgrou
 /* Clean up: the checkbox was stretched full width by the global input style, squeezing the text into a column */
 .cleanup-row input[type="checkbox"] { width: 20px; height: 20px; min-width: 20px; flex: 0 0 20px; margin: 2px 0 0; }
 .cleanup-row > span { flex: 1 1 auto; min-width: 0; }
-.live-map-wrap.is-empty .play-map { height: 150px; }  /* nothing on: a small map, the note says why */
 /* Small media (the owner's rule): photos are small squares (tap for big), a video is a small tile that plays in place */
 .feed-thumbs { display: flex; gap: 6px; margin-top: 8px; }
 .feed-thumb { position: relative; width: 92px; height: 92px; flex: none; padding: 0; border: 0; border-radius: 10px;
@@ -1650,3 +1648,45 @@ body.hide-tabs .post-fab { display: none; }  /* not over a form's own Back / Nex
 /* Room under the footer, so the ＋ button never sits on its links (or the last thing on a page) */
 body.has-app-nav .site-footer { padding-bottom: 84px; }
 @media (max-width: 999px) { body.has-app-nav .site-footer { padding-left: 74px; padding-right: 74px; } }  /* short pages: clear of ＋ */
+
+/* Play's map, like Snap Map: a big colorful preview on the page (tap to open), full screen with ← Back */
+.live-map-wrap { position: relative; margin: 0 0 14px; }
+.live-map-wrap .play-map { height: min(46vh, 360px); border-radius: 18px; border: 0; box-shadow: 0 2px 10px rgb(0 0 0 / .12); }
+.live-map-note { position: absolute; left: 10px; top: 10px; z-index: 5; margin: 0; max-width: calc(100% - 20px);
+  padding: 5px 11px; border-radius: 999px; background: rgb(255 255 255 / .94); color: #222; font-size: .8rem;
+  font-weight: 600; box-shadow: 0 2px 8px rgb(0 0 0 / .18); }
+.map-open { position: absolute; inset: 0; z-index: 4; display: flex; align-items: flex-end; justify-content: center;
+  padding: 0 0 12px; border: 0; border-radius: 18px; background: none; cursor: pointer; }
+.map-open span { padding: 7px 14px; border-radius: 999px; background: var(--purple); color: #fff; font-weight: 700;
+  font-size: .85rem; box-shadow: 0 3px 10px rgb(0 0 0 / .25); }
+.map-back, .map-recenter { position: absolute; z-index: 6; border: 0; cursor: pointer; background: #fff; color: #222;
+  box-shadow: 0 3px 12px rgb(0 0 0 / .25); font-weight: 700; }
+.map-back { left: 12px; top: calc(12px + env(safe-area-inset-top, 0px)); padding: 9px 16px; border-radius: 999px; font-size: .95rem; }
+.map-recenter { right: 12px; top: calc(12px + env(safe-area-inset-top, 0px)); width: 42px; height: 42px; border-radius: 50%; font-size: 1.2rem; }
+.live-map-wrap.is-full { position: fixed; inset: 0; z-index: 95; margin: 0; background: var(--bg); }
+.live-map-wrap.is-full .play-map { height: 100%; border-radius: 0; box-shadow: none; }
+.live-map-wrap.is-full .live-map-note { left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); }
+body.map-full { overflow: hidden; }
+body.map-full .post-fab { display: none; }
+.live-map-wrap .leaflet-control-attribution { font-size: .6rem; }
+
+/* Posts on phones, like Twitter: flat rows with a thin line between them (no boxes), the name, time and #sport
+   on one line, a smaller picture, small photo squares and plain 🔥 / 💬 (no pill borders). */
+@media (max-width: 600px) {
+  .feed { gap: 0; }
+  .feed > .feed-card { margin: 0 -16px; padding: 9px 16px; border-width: 0 0 1px; border-radius: 0; box-shadow: none; }
+  .feed > .feed-card.is-news { border-left: 0; }
+  .feed-head { gap: 8px; }
+  .feed-pic > * { --size: 30px !important; }
+  .feed-who { display: flex; align-items: baseline; gap: 5px; line-height: 1.25; }
+  .feed-name { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .92rem; }
+  .feed-who small { display: block; flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .78rem; }
+  .feed-body { margin: 3px 0 0 38px; font-size: .9rem; line-height: 1.38; }
+  .feed-thumbs, .feed-video-tile, .feed > .feed-card .plan-box { margin-left: 38px; }
+  .feed-thumbs { gap: 4px; margin-top: 6px; }
+  .feed-thumb { width: 72px; height: 72px; border-radius: 8px; }
+  .feed-actions { margin: 2px 0 0 30px; gap: 4px 10px; }
+  .feed-actions .react-button { border: 0; background: none; min-height: 30px; padding: 2px 8px; font-size: .82rem; }
+  .feed-actions .react-button.is-on { background: none; color: var(--danger); }
+}
+.live-map-wrap.is-full .live-map-note { white-space: nowrap; max-width: calc(100% - 140px); overflow: hidden; text-overflow: ellipsis; }

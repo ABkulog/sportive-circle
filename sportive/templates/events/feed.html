@@ -34,10 +34,15 @@
 {% endif %}
 
 {# The live map, like Snap Map: what's on right now (starting within an hour, going on, ended in the last 10 min) #}
-<section class="live-map-wrap {% if not map_pins %}is-empty{% endif %}" aria-labelledby="live-title">
+{# Tap the map and it opens full screen (like Snap Map): drag, zoom, tap a bubble; ← Back (or the phone's back)
+   closes it. On the page it's a preview, so scrolling the page never drags the map. #}
+<section class="live-map-wrap" id="live-map" aria-labelledby="live-title" data-live-map>
   <h2 class="visually-hidden" id="live-title">Happening now</h2>
   <div class="play-map" id="play-map" role="img" aria-label="Live map: {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games now"></div>
-  <p class="live-map-note">{% if map_pins %}<span class="live-dot" aria-hidden="true"></span> {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games now · tap a bubble{% else %}Nothing on right now. Games starting within an hour show up here.{% endif %}</p>
+  <p class="live-map-note">{% if map_pins %}<span class="live-dot" aria-hidden="true"></span> {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games now{% else %}Nothing on right now · games starting within an hour show up here{% endif %}</p>
+  <button type="button" class="map-open" data-map-open aria-label="Open the map full screen"><span>⤢ Tap to open the map</span></button>
+  <button type="button" class="map-back" data-map-close hidden>← Back</button>
+  <button type="button" class="map-recenter" data-map-recenter hidden aria-label="Back to campus">◎</button>
   <script type="application/json" id="play-pins">{{ map_pins|tojson }}</script>
 </section>
 
