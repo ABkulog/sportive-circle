@@ -1953,7 +1953,7 @@ def test_follow_is_not_membership(accounts, client, app):
     client.post(f"/clubs/{club}/follow")
     page = client.get(f"/clubs/{club}").data.decode()
     stats = re.findall(r"<strong>(\d+)</strong><span>(\w+)</span>", page)
-    assert ">Unfollow<" in page and ("1", "member") in stats and ("1", "follower") in stats   # captain only
+    assert ">Unfollow<" in page and ("1", "member") in stats and ("2", "followers") in stats   # captain + curious
 
 
 def test_tryouts_flow_with_messages(accounts, client, app):
@@ -2990,12 +2990,12 @@ def test_first_photo_still_required_to_pick_one(accounts, client):
 
 def test_club_page_counts_followers(accounts, client, app):
     club = _approved_club(accounts, client, app)
-    page = client.get(f"/clubs/{club}").data.decode()
-    assert "<span>followers</span>" in page and "<span>following</span>" not in page
+    page = client.get(f"/clubs/{club}").data.decode()                  # members follow too: the captain counts
+    assert "<strong>1</strong><span>follower</span>" in page and "<span>following</span>" not in page
     accounts.logout()
     accounts.signup(email="fan@uw.edu")
     client.post(f"/clubs/{club}/follow")
-    assert "<strong>1</strong><span>follower</span>" in client.get(f"/clubs/{club}").data.decode()
+    assert "<strong>2</strong><span>followers</span>" in client.get(f"/clubs/{club}").data.decode()
 
 
 def test_followers_see_one_unfollow_button(accounts, client, app):

@@ -5,7 +5,8 @@
 <a class="back-link" href="{{ url_for('clubs.view', club_id=club.id) }}" data-back>← {{ club.name }}</a>
 <div class="card form-card">
   <h1>Officers</h1>
-  <p class="muted">Officers can edit the club, post updates, make club events and confirm new members.
+  <p class="muted">Officers can edit the club, make club events and confirm new members. Only the officers you
+    turn <strong>Posts</strong> on for can post as the club (whoever runs its socials); the owner always can.
     {% if club.created_by == g.user.id %}Only the owner (you) can add or remove officers, or hand the club to another
     officer with <strong>Make owner</strong>.{% else %}You're managing this club's officers as an admin (or because
     its owner isn't an officer anymore).{% endif %}</p>
@@ -16,6 +17,11 @@
         <a class="person" href="{{ url_for('profile.view', user_id=o.id) }}">{{ avatar(o.id, o.full_name, o.avatar_updated, 36) }}<span>{{ o.full_name }}<small class="muted person-extra">{{ 'Owner' if o.id == club.created_by else o.email }}</small></span></a>
         {% if o.id != club.created_by %}
           <span class="officer-actions">
+            <form method="post">
+              {{ csrf_field() }}<input type="hidden" name="user" value="{{ o.id }}">
+              <input type="hidden" name="action" value="{{ 'posting_off' if o.can_post else 'posting_on' }}">
+              <button class="link-button" aria-label="{{ o.full_name }} {{ 'can' if o.can_post else 'can’t' }} post as the club. Tap to {{ 'turn it off' if o.can_post else 'let them' }}">
+                Posts: <strong>{{ 'On' if o.can_post else 'Off' }}</strong></button></form>
             <form method="post" data-confirm="Make {{ o.full_name }} the owner of {{ club.name }}? They'll manage officers instead of you. You stay an officer.">
               {{ csrf_field() }}<input type="hidden" name="user" value="{{ o.id }}"><input type="hidden" name="action" value="owner">
               <button class="link-button">Make owner</button></form>

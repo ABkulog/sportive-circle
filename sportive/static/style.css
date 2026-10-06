@@ -1636,6 +1636,9 @@ body.sheet-open { overflow: hidden; }
 .start-quick .chip[aria-pressed="true"] { background: var(--purple); border-color: var(--purple); color: var(--on-accent); }
 body.hide-tabs .post-fab { display: none; }  /* not over a form's own Back / Next */
 
+/* A club's pinned post (24 hours), on its page */
+.pinned-line { margin: 0 0 4px; font-size: .78rem; font-weight: 600; color: var(--muted); }
+
 /* Search in long lists (app.js): a small box right above the dropdown or the sports chips */
 .select-search { display: grid; gap: 4px; min-width: 0; }
 .select-search select { width: 100%; }
