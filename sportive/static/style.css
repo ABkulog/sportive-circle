@@ -1638,3 +1638,11 @@ body.hide-tabs .post-fab { display: none; }  /* not over a form's own Back / Nex
 
 /* A club's pinned post (24 hours), on its page */
 .pinned-line { margin: 0 0 4px; font-size: .78rem; font-weight: 600; color: var(--muted); }
+
+/* Search in long lists (app.js): a small box right above the dropdown or the sports chips */
+.select-search { display: grid; gap: 4px; min-width: 0; }
+.select-search select { width: 100%; }
+.list-search { width: 100%; min-height: 34px; padding: 5px 12px; font-size: .9rem; border-radius: 999px; }
+.list-search + .chip-grid { margin-top: 8px; }
+.chip-grid label[hidden] { display: none; }
+.list-search[hidden] { display: none; }

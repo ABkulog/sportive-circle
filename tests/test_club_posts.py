@@ -452,3 +452,15 @@ def test_clubs_pin_a_post_owner_picks_posters_and_members_keep_following(account
     assert "📌 Pinned" not in page and page.index("Newer post") < page.index("Track night 6pm")
     as_user(accounts, "fan@uw.edu")
     assert client.post(f"/posts/{first}/pin").status_code == 403         # only the club's posters pin
+
+
+def test_long_lists_have_a_search_box(accounts, client):
+    """The owner: a search bar in the dropdowns and in choosing your sports. app.js puts a small box above every
+    long dropdown (sports, places) and above the sports chips; it hides on short lists (3 places for a sport)."""
+    accounts.signup(sports=("running",))
+    js = client.get("/static/app.js").data.decode()
+    assert 'document.querySelectorAll("[data-chip-search]")' in js and "const LONG = 15;" in js
+    assert "watch.takeRecords()" in js          # the places list rebuilt for a sport resets the box
+    assert "data-chip-search" in client.get("/profile/edit/sports").data.decode()
+    css = client.get("/static/style.css").data.decode()
+    assert ".select-search { display: grid;" in css and ".list-search[hidden] { display: none; }" in css
