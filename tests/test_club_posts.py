@@ -521,3 +521,13 @@ def test_bot_round_instagram_look_keeps_contrast(client):
     assert ":root { --muted: #6b6b6b; }" in css and ':root[data-theme="dark"] { --muted: #a8a8a8; }' in css
     assert ".nav-cta, .nav-cta:hover { background: #4b2e83; color: #fff !important; }" in css
     assert "color: #e0245e; }" in css and ".feed-who .feed-name { flex: 0 1 auto; max-width: 68%; }" in css
+
+
+def test_no_sideways_scroll_on_iphone_and_posts_are_separate_small_cards(client):
+    """The owner: on an iPhone 16 the ＋ sheet had to be moved sideways to see Video (Safari zooms into boxes under
+    16px, and long dropdowns could push past the screen); nothing should scroll sideways on any device. And feed
+    posts ran together: each is a small card now, with a little gap."""
+    css = client.get("/static/style.css").data.decode()
+    assert ".list-search, .chip-more select.chip, .post-sheet input, .post-sheet select, .post-sheet textarea { font-size: 16px; }" in css
+    assert "html, body { overflow-x: clip; }" in css and ".select-search { grid-template-columns: minmax(0, 1fr); }" in css
+    assert ".feed { gap: 8px; }" in css and ".feed > .feed-card { margin: 0; padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px; }" in css
