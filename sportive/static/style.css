@@ -1693,12 +1693,12 @@ body.map-full .post-fab { display: none; }
 
 /* ============================== Instagram look ==============================
    The owner: "make it look like insta, the pages and segments too, straight up copy it". Instagram's chrome:
-   the system font, a white top bar with a script wordmark and plain black icons, an icon-only bottom bar (your
+   the system font, a white top bar with the bold wordmark and plain black icons, an icon-only bottom bar (your
    own picture is the Profile tab), grey buttons, hairline dividers, and black instead of purple for the
    everyday UI. Purple stays for our main buttons, links and the ＋. Dark mode is Instagram's black. */
 :root {
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --wordmark: "Grand Hotel", "Brush Script MT", cursive;
+  --wordmark: var(--display);  /* bold, upright letters (the owner asked for no script font) */
   --text: #000000; --heading: #000000; --muted: #737373; --faint: #a8a8a8;
   --line: #dbdbdb; --surface: #efefef; --control: #efefef; --control-line: transparent;
   --band: #dbdbdb; --tile: #ffffff; --header: #ffffff; --radius: 8px;
@@ -1720,12 +1720,12 @@ h1, .home-section-title { font-family: var(--font); font-weight: 700; letter-spa
 .page-title::after { display: none; }
 .home-section-title { font-size: 1rem; color: var(--text); }
 
-/* Top bar: white, a hairline under it, the wordmark in script, black icons */
+/* Top bar: white, a hairline under it, the bold wordmark ("Circle" in purple), black icons */
 .topbar { background: var(--bg); border-bottom: 1px solid var(--line); }
 .topbar-inner { height: 52px; }
-.topbar .brand, .appnav .brand { font-family: var(--wordmark); font-weight: 400; font-size: 1.75rem; color: var(--text);
+.topbar .brand, .appnav .brand { font-family: var(--wordmark); font-weight: 800; font-size: 1.4rem; color: var(--text);
   letter-spacing: 0; }
-.topbar .brand-accent, .appnav .brand-accent { color: inherit; margin-left: .18em; }
+.topbar .brand-accent, .appnav .brand-accent { color: var(--purple); margin-left: 0; }  /* SportiveCircle, "Circle" in purple */
 body.has-app-nav .topbar .brand img, .appnav .brand img { display: none; }
 .top-icons { gap: 6px; }
 .top-icons a { color: var(--text); width: 40px; height: 40px; }
@@ -1750,7 +1750,7 @@ body.has-app-nav .topbar .brand img, .appnav .brand img { display: none; }
 /* Laptops: Instagram's left sidebar (wordmark, icons with names, the open one bold) */
 @media (min-width: 1000px) {
   .appnav { border-right: 1px solid var(--line); padding: 30px 12px 20px; }
-  .appnav .brand { font-size: 2rem; padding: 0 12px 30px; }
+  .appnav .brand { font-size: 1.6rem; padding: 0 12px 30px; }
   .tab { color: var(--text); font-size: 1rem; padding: 12px; border-radius: 8px; }
   .tab:hover { background: var(--surface); }
   .tab.is-active .tab-label { font-weight: 700; }

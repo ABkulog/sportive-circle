@@ -2795,8 +2795,8 @@ def test_every_body_font_weight_in_the_css_is_loaded():
     import pathlib
     css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
     base = pathlib.Path("sportive/templates/base.html").read_text(encoding="utf-8")
-    # The body font is the phone's own (like Instagram), so every weight is there; the wordmark's font is loaded.
-    assert "--font: -apple-system, BlinkMacSystemFont" in css and "family=Grand+Hotel" in base
+    # The body font is the phone's own (like Instagram), so every weight is there; the wordmark is bold, not cursive.
+    assert "--font: -apple-system, BlinkMacSystemFont" in css and "Grand+Hotel" not in base
 
 
 def test_long_unbroken_titles_wrap_instead_of_widening_the_page():
