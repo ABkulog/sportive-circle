@@ -580,3 +580,12 @@ def test_a_plan_can_be_no_limit_anyone_can_come(accounts, client, app):
     client.post(f"/events/{game['id']}/join")
     with app.app_context():
         assert get_db().execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (game["id"],)).fetchone()[0] == 2
+
+
+def test_sport_search_picks_what_you_typed(client):
+    """The owner: searching the sport in the post box kept showing the first pick (Archery). In a form the current
+    pick no longer stays when it doesn't match, and the best match is picked for you right away: a name starting
+    with what you typed first ("ten" -> Tennis, not Table Tennis); no match goes back to "Choose"."""
+    js = client.get("/static/app.js").data.decode()
+    assert "(autoSubmits && option.selected) || matches(words, option.textContent)" in js
+    assert 'const best = real.find(start) || real[0];' in js and 'if (!words.length) select.value = before;' in js
