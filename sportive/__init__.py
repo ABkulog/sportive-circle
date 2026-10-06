@@ -26,7 +26,7 @@ CONTENT_SECURITY_POLICY = "; ".join([
     "script-src 'self' https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/",  # only the map library's folder
     "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/ https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https://tile.openstreetmap.org https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/",
+    "img-src 'self' data: blob: https://tile.openstreetmap.org https://*.basemaps.cartocdn.com https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/",
     "connect-src 'self'",
     "frame-ancestors 'none'",
     "form-action 'self'",
