@@ -494,13 +494,13 @@ def test_play_map_opens_full_screen_like_snap_map_and_phone_posts_are_dense(acco
 
 def test_it_looks_like_instagram(accounts, client, app):
     """The owner: "make it look like insta, the pages and segments too, straight up copy it". White top bar with a
-    script wordmark, icon-only tabs with your picture as Profile, ♡ / 💬 icons and ⋯ top right on posts, a profile
+    bold wordmark (not cursive), icon-only tabs with your picture as Profile, ♡ / 💬 icons and ⋯ top right on posts, a profile
     with posts · friends · clubs beside the picture, sports as round highlights, icon tabs, grey search boxes."""
     accounts.signup(email="maya@uw.edu", sports=("running", "tennis"))
     me = user_id(app, "maya@uw.edu")
     post(client, body="Track at 6")
     css = client.get("/static/style.css").data.decode()
-    assert "--wordmark: \"Grand Hotel\"" in css and ".topbar { background: var(--bg);" in css
+    assert "--wordmark: var(--display);" in css and "cursive" not in css and ".topbar { background: var(--bg);" in css
     assert ".appnav .tab-label { position: absolute;" in css            # icon-only bottom bar on phones
     feed = client.get("/feed").data.decode()
     assert 'class="tab-me"' in feed and '#i-heart"/>' in feed and '#i-chat"/>' in feed

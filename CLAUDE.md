@@ -9,7 +9,7 @@ on every merge, so `main` is the live site.
 ## Design rules: plain and simple (the owner's standing rule, always)
 It should feel like an actual social app (Twitter / Instagram), not a school portal. Before adding anything, check it
 against these; when in doubt, leave it out or remove something.
-- **Every page like Instagram** (a straight copy of its look: system font, white bar with the script wordmark, icon-only tabs, ♡ / 💬 / ⋯ on posts, profile stats row, round highlights, grey buttons, black dark mode), and add no feature the owner didn't ask for. Where we lack a feature, let the
+- **Every page like Instagram** (a straight copy of its look: system font, white bar with the bold wordmark (never cursive), icon-only tabs, ♡ / 💬 / ⋯ on posts, profile stats row, round highlights, grey buttons, black dark mode), and add no feature the owner didn't ask for. Where we lack a feature, let the
   rest of the page fill the space; never leave it empty.
 - **5 places only**, in Instagram's spots: Home, Clubs (its 🔍), Search (its +), Play (its Reels), Profile.
   Bottom tab bar on phones, sidebar on laptops. The 🔔 bell (its heart) and Messages sit top right. A **＋**
