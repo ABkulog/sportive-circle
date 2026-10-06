@@ -589,3 +589,35 @@ def test_sport_search_picks_what_you_typed(client):
     js = client.get("/static/app.js").data.decode()
     assert "(autoSubmits && option.selected) || matches(words, option.textContent)" in js
     assert 'const best = real.find(start) || real[0];' in js and 'if (!words.length) select.value = before;' in js
+
+
+def test_a_club_can_post_for_members_only(accounts, client, app):
+    accounts.signup(email="officer@uw.edu", sports=("running",))
+    club = approved_club(app, "officer@uw.edu")
+    composer = client.get("/feed").data.decode()
+    assert 'name="members_only"' in composer and "🔒 Members only" in composer
+    page = post(client, as_club=str(club), body="Team dinner Friday, members only", members_only="1").data.decode()
+    assert "Only its members see it." in page and "🔒 Members only" in page
+    post(client, as_club=str(club), body="Members track night", members_only="1", plan="1",
+         starts_at=form_time(timedelta(days=2)), duration="60", location="Husky Track", spots="10")
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT members_only FROM events WHERE note = 'Members track night'").fetchone()[0] == 1
+        post_id = db.execute("SELECT id FROM posts WHERE body LIKE 'Team dinner%'").fetchone()[0]
+    accounts.logout()
+    accounts.signup(email="outsider@uw.edu", sports=("running",))           # not a member: never sees it
+    for url in ("/feed", "/feed?sport=running", f"/clubs/{club}", "/clubs/updates?all=1"):
+        assert "Team dinner" not in client.get(url).data.decode()
+    assert client.get(f"/posts/{post_id}").status_code == 404
+    with app.app_context():
+        db = get_db()
+        db.execute("INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, 'member', '2026-01-01')",
+                   (club, user_id(app, "outsider@uw.edu")))
+        db.commit()
+    assert "Team dinner" in client.get("/feed").data.decode()                    # a member does
+    assert client.get(f"/posts/{post_id}").status_code == 200
+    accounts.logout()
+    accounts.signup(email="me@uw.edu", sports=("running",))
+    post(client, body="Just me", members_only="1")                              # only clubs can: ignored
+    with app.app_context():
+        assert get_db().execute("SELECT members_only FROM posts WHERE body = 'Just me'").fetchone()[0] == 0

@@ -53,6 +53,8 @@
           <option value="">{{ g.user.full_name }}</option>
           {% for c in post_as %}<option value="{{ c.id }}" {% if c.id == as_club %}selected{% endif %}>{{ c.name }} ✓ (club)</option>{% endfor %}
         </select></label>
+      {# Shows once a club is picked above (style.css) #}
+      <label class="toggle members-only"><input type="checkbox" name="members_only" value="1"><span>🔒 Members only</span></label>
     {% endif %}
     <div class="composer-row">
       <select name="sport" aria-label="Sport tag" aria-describedby="sport-hint" required data-sport-pick>

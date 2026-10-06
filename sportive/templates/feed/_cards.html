@@ -45,7 +45,7 @@
     {% if p.club_id %}
       {% set name %}{{ p.club_name }} {{ verified_badge() }}{% endset %}
       {{ card_head(url_for('clubs.view', club_id=p.club_id), club_logo(p, 32, logo=p.club_logo or '', club_id=p.club_id),
-                   name, 'Club · ' ~ (p.created_at|ago), p.sport, follow_button(p.club_id, item)) }}
+                   name, 'Club · ' ~ ('🔒 Members only · ' if p.members_only else '') ~ (p.created_at|ago), p.sport, follow_button(p.club_id, item)) }}
     {% else %}
       {{ card_head(url_for('profile.view', user_id=p.author_id), avatar(p.author_id, p.full_name, p.avatar_updated, 32),
                    p.full_name, p.created_at|ago, p.sport) }}

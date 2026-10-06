@@ -199,9 +199,11 @@ def _count(kind, me):
         return db.execute(
             f"""SELECT COUNT(*) FROM posts p JOIN users u ON u.id = p.author_id
                 WHERE p.id > ? AND p.author_id != ? AND u.suspended = 0 AND p.sport IN ({marks})
+                  AND (p.members_only = 0 OR EXISTS (SELECT 1 FROM club_members mo WHERE mo.club_id = p.club_id
+                                                     AND mo.user_id = ? AND mo.role IN ('member', 'officer')))
                   AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ? AND b.blocked_id = p.author_id)
                                                           OR (b.blocker_id = p.author_id AND b.blocked_id = ?))""",
-            (int(_since(me, kind)), me, *sports, me, me)).fetchone()[0]
+            (int(_since(me, kind)), me, *sports, me, me, me)).fetchone()[0]
     if kind == "club_updates":
         return db.execute(
             """SELECT COUNT(*) FROM club_posts p JOIN clubs c ON c.id = p.club_id
