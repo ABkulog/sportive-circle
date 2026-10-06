@@ -1591,3 +1591,47 @@ body.has-app-nav .home-tabs { position: sticky; top: 60px; z-index: 20; backgrou
 .join-actions:has(.join-panel[open]) .follow-toggle { display: none; }
 .follow-toggle form { margin: 0; }
 .follow-toggle .btn { width: 100%; }
+/* A map takes its own drags: the page (and the phone's pull-to-refresh) doesn't move with it */
+.leaflet-container, .play-map, [data-spot-map] { touch-action: none; overscroll-behavior: contain; }
+html:has(.play-map) { overscroll-behavior-y: contain; }
+/* ＋ (bottom right) and the New post sheet it opens, like Instagram */
+.post-fab { position: fixed; right: 16px; bottom: calc(72px + env(safe-area-inset-bottom, 0px)); z-index: 40; width: 54px; height: 54px;
+  border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, var(--purple), var(--purple-strong));
+  color: #fff; font-size: 1.9rem; font-weight: 400; line-height: 1; box-shadow: 0 6px 18px rgb(75 46 131 / .4); }
+.post-fab:hover { text-decoration: none; transform: translateY(-1px); }
+@media (min-width: 1000px) { .post-fab { bottom: 28px; right: 28px; } }
+body.sheet-open .post-fab { display: none; }
+.post-sheet { display: none; position: fixed; inset: 0; z-index: 85; background: rgb(0 0 0 / .45); align-items: flex-end; justify-content: center; }
+.post-sheet.is-open { display: flex; }
+.post-sheet-panel { width: 100%; max-width: 600px; max-height: 92vh; overflow-y: auto; background: var(--bg);
+  border-radius: 18px 18px 0 0; padding: 10px 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 700px) { .post-sheet { align-items: center; } .post-sheet-panel { border-radius: 18px; } }
+.post-sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.post-sheet-head h2 { margin: 0; font-size: 1.05rem; }
+.post-sheet-close { font-size: 1.6rem; line-height: 1; color: var(--muted); padding: 4px 10px; }
+.post-sheet-close:hover { text-decoration: none; }
+.post-sheet .composer { border: 0; padding: 0; margin: 0; box-shadow: none; }
+body.sheet-open { overflow: hidden; }
+
+/* Clubs tab: search + Register on one line, then the same chips as the feed */
+.club-finder { display: grid; gap: 10px; margin-bottom: 14px; }
+.club-search-row { display: flex; gap: 8px; align-items: center; }
+.club-search-row input[type=search] { flex: 1; min-width: 0; }
+.club-search-row .btn { flex: none; }
+.club-finder .feed-chips select.chip { max-width: 11rem; }
+.club-finder .choice-pills { gap: 6px; }
+.club-finder .choice-pill span { padding: 5px 11px; font-size: .85rem; }
+/* Clubs as compact rows (like Instagram's account results): logo, name, one line, a few badges */
+.club-list { display: grid; }
+.club-row { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: start; padding: 10px 2px;
+  border-bottom: 1px solid var(--line); color: var(--text); }
+.club-row:hover { text-decoration: none; background: var(--surface-2, transparent); }
+.club-row-text { display: grid; gap: 3px; min-width: 0; }
+.club-row .club-desc { -webkit-line-clamp: 1; }
+.club-row .badges { gap: 4px; }
+.club-row .badge { font-size: .72rem; padding: 2px 7px; }
+.games-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.games-head .home-section-title { margin: 0; }
+.start-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.start-quick .chip[aria-pressed="true"] { background: var(--purple); border-color: var(--purple); color: var(--on-accent); }
+body.hide-tabs .post-fab { display: none; }  /* not over a form's own Back / Next */

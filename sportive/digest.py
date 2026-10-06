@@ -65,8 +65,8 @@ def send_to(user):
     subject = f"Games this week, {first}"
     leave = unsubscribe_url(user["email"], "digest")
     body, html = compose(subject, f"Your week, {first} 🏀", lines, unsubscribe=leave,
-                         after=["Open Sportive Circle to join one (See all games, below). Short a few players? Post a Need players and it goes to the "
-                                "top of everyone's feed."],
+                         after=["Open Sportive Circle to join one (See all games, below). Short a few players? Post a game "
+                                "starting right now on Play."],
                          button=("See all games", public_url("index")),
                          reason="You're getting this Monday email because you have a Sportive Circle account. "
                                 "Turn it off in Settings → Email.")

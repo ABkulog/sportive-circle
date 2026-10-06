@@ -317,3 +317,25 @@
   if (starts) starts.addEventListener("input", update);
   update();
 })();
+
+// One game form: "Right now / In 30 min / In 1 hour" fill in Starts (Seattle time, rounded up to 5 minutes),
+// and Ends follows with the game's length, so a pickup game "starting soon" is two taps.
+(function () {
+  const form = document.querySelector("form[data-sport-form]");
+  const box = form && form.querySelector("[data-start-quick]");
+  const starts = form && form.querySelector('input[name="starts_at"]');
+  if (!box || !starts) return;
+  const seattleClock = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric",
+    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const FIVE_MIN = 5 * 60 * 1000;
+  box.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-start-in]");
+    if (!button) return;
+    const when = new Date(Math.ceil((Date.now() + Number(button.dataset.startIn) * 60000 + 60000) / FIVE_MIN) * FIVE_MIN);
+    const part = Object.fromEntries(seattleClock.formatToParts(when).map((p) => [p.type, p.value]));
+    starts.value = `${part.year}-${part.month}-${part.day}T${part.hour}:${part.minute}`;
+    starts.dispatchEvent(new Event("input", { bubbles: true }));
+    starts.dispatchEvent(new Event("change", { bubbles: true }));
+    box.querySelectorAll("[data-start-in]").forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
+  });
+})();

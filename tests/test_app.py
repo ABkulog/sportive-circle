@@ -740,7 +740,7 @@ def test_quick_post_player_cap(accounts, client):
 
 def test_forms_include_sport_rules(accounts, client):
     accounts.signup()
-    for url in ("/events/new", "/need-players"):
+    for url in ("/events/new",):
         page = client.get(url).data
         assert b'id="sport-rules"' in page and b"forms.js" in page
 
@@ -1693,10 +1693,11 @@ def test_a_removed_clubs_events_go_on_hold(accounts, client, app):
 def test_same_sections_everywhere(accounts, client):
     accounts.signup()
     page = client.get("/").data.decode()
-    # Like Twitter / Instagram: 5 places, one level (no second row of tabs); the rest is on your Profile
-    for label in ("Home", "Play", "Create", "Messages", "Profile"):
+    # Like Instagram: 5 places at the bottom, one level; messages and the bell top right, ＋ to post bottom right
+    for label in ("Home", "Clubs", "Search", "Play", "Profile"):
         assert f'<span class="tab-label">{label}<' in page, label
-    for gone in ("Clubs", "Friends", "FAQ", "Settings", "News"):
+    assert 'aria-label="Messages' in page and 'class="post-fab"' in page
+    for gone in ("Create", "Friends", "FAQ", "Settings", "News"):
         assert f'<span class="tab-label">{gone}<' not in page, gone
     assert 'class="tab is-active" href="/" aria-current="page"' in page     # Play is highlighted on Play
     assert ">My events<" not in page and 'class="home-tabs"' not in page
@@ -2568,7 +2569,7 @@ def test_calendar_lines_are_folded():
 def test_skill_level_options_have_fixed_values(accounts, client):
     """The submitted value is always the plain level name."""
     accounts.signup()
-    for page in ("/events/new", "/need-players"):
+    for page in ("/events/new",):
         html = client.get(page).data.decode()
         for level in ("All levels", "Casual", "Intermediate", "Competitive"):
             assert f'<option value="{level}"' in html, (page, level)
@@ -2875,13 +2876,11 @@ def test_gold_text_on_the_purple_header_is_readable():
         assert _contrast(c["--header"], c["--gold-on-header"]) >= 4.5, theme
 
 
-def test_register_your_club_line_has_room_below_the_grid(accounts, client, app):
-    import pathlib
+def test_register_a_club_sits_next_to_the_search(accounts, client, app):
     _approved_club(accounts, client, app)
     accounts.signup(email="fan@uw.edu")
-    assert 'class="center muted register-hint"' in client.get("/clubs").data.decode()
-    css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
-    assert re.search(r"^\.register-hint \{[^}]*margin: 24px", css, re.M)
+    page = client.get("/clubs").data.decode()                      # Register is at the top, next to the search
+    assert page.index("＋ Register a club") < page.index('class="club-list"')
 
 
 def test_every_dependency_has_a_version_pin():
@@ -2927,8 +2926,7 @@ def test_big_phone_text_and_keyboard_users(accounts, client, app):
     assert 'menu.setAttribute("role", "dialog")' in chat and "closeMenu(true)" in chat
     club = _approved_club(accounts, client, app)
     accounts.login(email="captain@uw.edu")
-    page = client.get("/create").data.decode()
-    assert '<span class="person"><strong>' in page and f"/events/new?club={club}" in page   # long club names shrink
+    assert f"/events/new?club={club}" in client.get(f"/clubs/{club}").data.decode()   # + Club event on the club
 
 
 def test_leap_day_birthdays():
@@ -4971,7 +4969,7 @@ def test_host_reserves_spots_while_creating_a_game(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Jordan", "Sam", "Stranger")
     _friends(app, ids["Maya"], ids["Jordan"], ids["Sam"])
     _as(accounts, "Maya")
-    for page in ("/events/new", "/need-players"):
+    for page in ("/events/new",):
         html = client.get(page).data.decode()
         assert "Who&#39;s coming?" in html or "Who's coming?" in html
         assert "held for 30 min" in html and "Jordan Husky" in html and 'name="is_private"' in html
@@ -5043,7 +5041,7 @@ def test_create_page_only_shows_what_makes_sense(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Jordan", "Sam")
     _friends(app, ids["Maya"], ids["Jordan"])
     _as(accounts, "Maya")
-    for page in ("/events/new", "/need-players"):
+    for page in ("/events/new",):
         html = client.get(page).data.decode()
         assert "Who can join?" in html and ">Anyone<" in html and "🔒 Private" in html
         assert re.search(r'name="password"[^>]*disabled|value="[a-z]+-[a-z]+-\d{3}"', html)   # ready-made, off until Private
@@ -6070,7 +6068,7 @@ def test_texts_announcement_emails_everyone_once(accounts, client, app):
 def test_hosts_are_told_to_check_the_place_is_free(accounts, client, app):
     """The user: the host has to make sure the courts, field or trail aren't booked; we don't check."""
     accounts.signup()
-    for page in ("/events/new", "/need-players"):
+    for page in ("/events/new",):
         html = client.get(page).data.decode()
         assert "Heads up: check you can use the" in html and "We don't reserve places" in html
     html = client.get("/events/new").data.decode()
@@ -6399,7 +6397,7 @@ def test_forms_have_back_buttons(accounts, client, app):
     assert f'href="/clubs/{club}" data-back>← Back' in client.get(f"/clubs/{club}/edit").data.decode()
     assert 'class="back-link"' in client.get("/events/new").data.decode()
     assert f'href="/clubs/{club}" data-back' in client.get(f"/events/new?club={club}").data.decode()
-    assert 'class="back-link"' in client.get("/need-players").data.decode()
+    assert client.get("/need-players").headers["Location"].endswith("/events/new")   # one game form now
 
 
 def test_owner_hands_the_club_to_another_officer(accounts, client, app):
@@ -8029,12 +8027,16 @@ def test_sports_offer_the_places_clubs_really_use():
         assert places and all(p in LOCATIONS for p in places), sport
 
 
-def test_need_players_tip_sits_under_both_boxes(accounts, client):
+def test_one_game_form_starts_right_now_too(accounts, client):
+    """New event and Need players were two forms for the same thing: one game form, on Play, with
+    Right now / In 30 min / In 1 hour for a pickup game starting soon."""
     accounts.signup()
-    page = client.get("/need-players").data.decode()
-    row = page[page.index('<div class="row">'):page.index("</div>", page.index('<div class="row">'))]
-    assert 'name="sport"' in row and 'name="location"' in row and "data-place-tip" not in row
-    assert "data-place-tip" in page
+    page = client.get("/events/new").data.decode()
+    assert "data-start-quick" in page and ">Right now<" in page and "<h1>New game</h1>" in page
+    assert "＋ New game" in client.get("/").data.decode()
+    assert client.get("/need-players?sport=soccer").headers["Location"].endswith("/events/new?sport=soccer")
+    js = client.get("/static/forms.js").data.decode()
+    assert "[data-start-in]" in js
 
 
 def test_reserve_spots_lists_every_friend_and_holds_can_be_renewed(accounts, client, app):

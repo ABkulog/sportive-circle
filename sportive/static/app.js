@@ -590,25 +590,31 @@
   // The feed's post box is one line until you tap into it; then the sport, photos, video and plan open up.
   // (Without JavaScript it's simply all open.) The line under the sport says who will see the post.
   document.querySelectorAll("[data-composer]").forEach((form) => {
-    form.classList.add("is-collapsible");
-    const open = () => form.classList.add("is-open");
-    const close = () => {
-      form.classList.remove("is-open");
-      if (document.activeElement && form.contains(document.activeElement)) document.activeElement.blur();
+    // The post box lives in the sheet the ＋ button opens (like Instagram's create): always the full form.
+    const sheet = form.closest(".post-sheet");
+    form.classList.add("is-open");
+    const open = () => {
+      if (!sheet) return;
+      sheet.classList.add("is-open");
+      document.body.classList.add("sheet-open");
+      setTimeout(() => form.querySelector("textarea")?.focus(), 60);
     };
-    form.addEventListener("focusin", open);
-    form.addEventListener("click", open);
-    // It closes back to one line when you tap anywhere else, or scroll it out of sight. What you wrote, the
-    // photos you picked and the plan stay in it for when you open it again. (Not while a menu or file picker
-    // from inside it is open: those take the focus away without being "somewhere else".)
-    document.addEventListener("pointerdown", (event) => {
-      if (form.classList.contains("is-open") && !form.contains(event.target)) close();
+    const close = () => {
+      if (!sheet) return;
+      sheet.classList.remove("is-open");
+      document.body.classList.remove("sheet-open");
+      if (location.hash === "#post") history.replaceState(null, "", location.pathname + location.search);
+    };
+    form.closePostSheet = close;
+    document.querySelectorAll("[data-open-post]").forEach((button) => button.addEventListener("click", (event) => {
+      event.preventDefault();
+      open();
+    }));
+    sheet?.querySelector("[data-close-post]")?.addEventListener("click", (event) => { event.preventDefault(); close(); });
+    sheet?.addEventListener("click", (event) => { if (event.target === sheet) close(); });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && sheet?.classList.contains("is-open")) close();
     });
-    if (window.IntersectionObserver) {
-      new IntersectionObserver((entries) => {
-        entries.forEach((entry) => { if (!entry.isIntersecting && form.classList.contains("is-open")) close(); });
-      }).observe(form);
-    }
     const pick = form.querySelector("[data-sport-pick]");
     const hint = form.querySelector("[data-sport-hint]");
     const say = () => {
@@ -644,7 +650,9 @@
     const typing = () => [...document.querySelectorAll("[data-composer] textarea")].some((box) => box.value.trim());
     const reset = () => { bar.style.setProperty("--pull", "0px"); bar.classList.remove("is-on", "is-ready"); };
     window.addEventListener("touchstart", (event) => {
-      startY = window.scrollY <= 0 && event.touches.length === 1 && !typing() ? event.touches[0].clientY : null;
+      // (never from a map: dragging a map down is moving the map, not asking for a refresh)
+      const onMap = event.target.closest && event.target.closest(".leaflet-container, [data-spot-map], .play-map");
+      startY = window.scrollY <= 0 && event.touches.length === 1 && !typing() && !onMap ? event.touches[0].clientY : null;
       pulled = 0;
     }, { passive: true });
     window.addEventListener("touchmove", (event) => {
@@ -707,7 +715,7 @@
       setTimeout(() => form.querySelectorAll("button").forEach((button) => { button.disabled = false; }));
       if (!flashes.some((flash) => flash.classList.contains("flash-error"))) {
         form.reset();
-        form.classList.remove("is-open");
+        if (form.closePostSheet) form.closePostSheet(); else form.classList.remove("is-open");
         form.querySelectorAll("[data-picked]").forEach((line) => { line.hidden = true; line.textContent = ""; });
         form.querySelectorAll("select").forEach((select) => select.dispatchEvent(new Event("change")));
         if (document.activeElement && form.contains(document.activeElement)) document.activeElement.blur();

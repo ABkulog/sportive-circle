@@ -1082,8 +1082,11 @@ def tell_players_it_was_cancelled(event, page_stays=True, by_host=True, by=None)
 @bp.route("/need-players", methods=("GET", "POST"))
 @login_required
 def quick():
-    form = request.form if request.method == "POST" else MultiDict(
-        {"starts_in": "30", "duration": "60", "skill_level": "All levels", "password": suggested_password()})
+    """Need players used to be its own form. There's one game form now (it has "Right now / In 30 min"), so
+    links to this page go there; a post from an old open tab still works."""
+    if request.method == "GET":
+        return redirect(url_for("events.create", sport=request.args.get("sport") or None))
+    form = request.form
     if request.method == "POST":
         error = None
         sport = form.get("sport", "")

@@ -17,14 +17,15 @@ It is a student project, not an official University of Washington service.
 - **Make it a plan**: "hiking Mt Si tomorrow, need 2" becomes a real game with a headcount and an **I'm in** button.
 - **🔥 and replies**, with one bell notice per post; report and delete on posts and replies; community rules
   ("athletic, not thirsty"). 18+ only.
-- Five places, like Twitter: **Home** (the feed), **Play** (find a game), **Create**, **Messages**, **Profile**
-  (your posts, clubs, games and badges, plus Friends, Settings, Help and Log out).
+- Five places, like Instagram: **Home** (the feed), **Clubs**, **Search**, **Play** (find a game), **Profile**
+  (your posts, clubs, games and badges, plus Friends, Settings, Help and Log out). The bell and Messages are
+  top right, and a **＋** button at the bottom right makes a post.
 
 
 **Playing**
 - **Home feed** of games for your sports, with filters (sport, day, place, level, open spots) and a
   "happening soon" row at the top.
-- **Need players:** "we have 8, need 2 for soccer in 15 minutes" becomes a post in seconds.
+- **Starting soon:** "we have 8, need 2 for soccer in 30 minutes" is ＋ New game → Right now / In 30 min.
 - **Events:** create, edit or cancel (everyone who joined is told); join or leave; player limits
   that can't be overbooked; campus places per sport with a map, "Where am I?", walking directions and
   calendar export. The skill level is a label, so anyone can join.
@@ -141,7 +142,7 @@ sportive/
   profile.py          profiles, photos, socials, badge showcase, Tester badge, settings, account deletion
   moderation.py       reports, the admin reports page, suspending accounts
   badges.py           badges (earned, seasonal, given)
-  pages.py            How it works, FAQ, Privacy, Terms, the Create menu
+  pages.py            How it works, FAQ, Privacy, Terms (/create goes to Clubs)
   reminders.py        game reminder emails (the app checks every 5 minutes by itself)
   stats.py            "sport-stats" command (to tune player limits)
   links.py, mail.py, photos.py, spirit.py, timeutil.py   helpers
