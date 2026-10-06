@@ -1879,3 +1879,29 @@ body.has-app-nav .topbar .brand img, .appnav .brand img { display: none; }
 :root[data-theme="dark"] { --muted: #a8a8a8; }
 @media (prefers-color-scheme: dark) { :root[data-theme="system"] { --muted: #a8a8a8; } }
 .feed-who .feed-name { flex: 0 1 auto; max-width: 68%; } .feed-who small { flex: 1 1 0; }  /* the name keeps its room; the time · #sport gives way */
+
+/* iPhone: Safari zooms into any box under 16px when it's tapped (or focused when the ＋ sheet opens), and then
+   the page has to be moved sideways. Every box is 16px, long dropdowns can't push past the screen, and nothing
+   on any page can scroll sideways ("clip" keeps the sticky top bar working). */
+.list-search, .chip-more select.chip, .post-sheet input, .post-sheet select, .post-sheet textarea { font-size: 16px; }
+.select-search { grid-template-columns: minmax(0, 1fr); }
+.select-search select, .composer-row select { min-width: 0; max-width: 100%; }
+.composer-row > * { min-width: 0; }
+.post-sheet-panel { overflow-x: hidden; }
+html, body { overflow-x: clip; }
+
+/* Feed: each post is its own small card with a little gap between (they ran together as one list), a bit
+   smaller than before. */
+.feed { gap: 8px; }
+.feed > .feed-card { margin: 0; padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.feed > .feed-card.is-news { border-left: 1px solid var(--line); }
+.feed-pic > * { --size: 28px !important; }
+.feed-name { font-size: .88rem; }
+.feed-who small { font-size: .75rem; }
+.feed-body { font-size: .86rem; line-height: 1.38; margin: 2px 0 0 36px; }
+.feed-thumbs, .feed-video-tile, .feed > .feed-card .plan-box { margin-left: 36px; }
+.feed-thumb { width: 64px; height: 64px; }
+.feed-actions { margin: 0 0 0 28px; }
+.feed-actions .react-button { min-height: 32px; font-size: .8rem; }
+.feed-actions .react-button .icon { width: 20px; height: 20px; }
+.feed > .feed-card > .feed-actions .card-more { top: 4px; right: 4px; }
