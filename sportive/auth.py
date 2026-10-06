@@ -309,10 +309,17 @@ def claim_code_try(user_id):
 @bp.route("/signup", methods=("GET", "POST"))
 def signup():
     if g.user is not None:  # already logged in: a second account from here would log this one out
-        return redirect(safe_next(request.args.get("next", "")))
+        return redirect(url_for("clubs.create") if request.args.get("club") else safe_next(request.args.get("next", "")))
     form = request.form
     if request.args.get("next"):
         session["after_login"] = safe_next(request.args["next"])
+    if request.args.get("club"):  # "Club officer?": an account, the email code, then straight to their club
+        session["club_signup"] = True
+        session["after_login"] = url_for("clubs.create")
+    elif request.method == "GET" and not request.args.get("fix"):
+        session.pop("club_signup", None)
+    # Officers skip the sports and texts steps: they're here to register their club (the profile can wait).
+    next_step = url_for("auth.verify") if session.get("club_signup") else url_for("auth.signup_sports")
     if request.method == "POST":
         full_name = person_name(form.get("full_name"))
         email = form.get("email", "").strip().lower()
@@ -335,7 +342,7 @@ def signup():
             db.commit()
             session["pending_email"] = email
             session.pop("signup_form", None)
-            return redirect(url_for("auth.signup_sports"))
+            return redirect(next_step)
         if error is None and code_recently_sent(email):
             error = "We just sent a code to that email. Check your inbox, or wait a minute and try again."
         if error is None and not codes_left_today(email):
@@ -363,7 +370,7 @@ def signup():
                 session.pop("signup_form", None)
                 start_verification(email)  # saves the code (ending the one-at-a-time hold), then emails it
                 db.commit()  # (and the account, even if no code could be sent today)
-                return redirect(url_for("auth.signup_sports"))
+                return redirect(next_step)
         db.rollback()  # let go of the hold, if taken
         flash(error, "error")
         # Back to a normal page (not the answer to a form post), so the phone's Back button works on the next
@@ -383,7 +390,7 @@ def signup():
     except ValueError:  # today is Feb 29
         latest_birth_date = today.replace(year=today.year - MIN_AGE, day=28)
     return render_template("auth/signup.html", form=form, current_year=today.year,
-                           latest_birth_date=latest_birth_date.isoformat())
+                           latest_birth_date=latest_birth_date.isoformat(), club_signup=session.get("club_signup"))
 
 
 @bp.route("/signup/sports", methods=("GET", "POST"))
@@ -501,8 +508,19 @@ def verify():
             )
             from .notifications import start_markers  # imported here: notifications.py imports this module
             start_markers(user["id"])
+            club_signup = session.get("club_signup")  # (log_in starts a new session)
+            if club_signup:
+                # No photo step and no sports: the bell reminds them, and their club comes first.
+                from .notifications import notify  # imported here: notifications.py imports this module
+                db.execute("UPDATE users SET photo_skipped = 1 WHERE id = ?", (user["id"],))
+                notify(user["id"], "account", "Your profile can wait: add a photo and your sports when you have a minute.",
+                       url_for("profile.edit"), key="tip:photo")
             db.commit()
             destination = log_in(user, just_signed_up=True)
+            if club_signup:
+                flash(f"You're in, {user['full_name'].split()[0]}! Now your club. Your profile can wait: "
+                      "fill it in later from Profile.", "celebrate")
+                return redirect(url_for("clubs.create"))
             flash(f"Welcome, {user['full_name'].split()[0]}!", "celebrate")
             if user["phone"] and not user["phone_verified"]:
                 # The email is real now, so the number from step 3 gets its code.
@@ -515,7 +533,8 @@ def verify():
                     flash(f"{problem} You can add your number in Settings → Texts.", "info")
             return redirect(destination)
         flash(error, "error")
-    return render_template("auth/verify.html", email=email, wait=resend_wait(email))
+    return render_template("auth/verify.html", email=email, wait=resend_wait(email),
+                           club_signup=session.get("club_signup"))
 
 
 @bp.route("/verify/resend", methods=("POST",))

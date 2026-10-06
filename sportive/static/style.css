@@ -1931,3 +1931,10 @@ html, body { overflow-x: clip; }
 /* Members only: the switch shows once "Post as" is set to a club */
 .composer .members-only { display: none; margin-top: 8px; }
 .composer:has(select[name="as_club"] option:not([value=""]):checked) .members-only { display: flex; }
+
+/* Sign up: the officers' short path, above the form */
+.officer-signup { display: flex; align-items: center; gap: 12px; max-width: 520px; margin: 0 auto 12px; padding: 14px 16px;
+  color: var(--text); text-decoration: none; border: 1px solid var(--purple); }
+.officer-signup:hover { text-decoration: none; }
+.officer-signup-icon { font-size: 1.6rem; flex: none; }
+.officer-signup-go { margin-left: auto; font-size: 1.6rem; color: var(--purple); flex: none; }

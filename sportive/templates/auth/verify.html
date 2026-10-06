@@ -2,7 +2,7 @@
 {% block title %}Verify your email{% endblock %}
 {% block content %}
 <div class="card form-card">
-  <p class="step-label">Last step</p>
+  <p class="step-label">{{ 'Step 2 of 3 · Email (then your club)' if club_signup else 'Last step' }}</p>
   <h1>Check your email</h1>
   <p class="muted">We sent a 6-digit code to <strong>{{ email }}</strong>. Give it a minute, and check Junk too.
     <a href="{{ url_for('auth.signup', fix=1) }}">Wrong email? Fix it</a></p>
