@@ -559,6 +559,29 @@ def test_bot_round_edit_club_links_wrap_on_small_phones(accounts, client, app):
     assert ".edit-links { margin: 0 0 10px; font-size: .9rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }" in css
 
 
+def test_a_plan_can_be_no_limit_anyone_can_come(accounts, client, app):
+    """The owner: making a plan asks how many people you need, but sometimes you just want anyone to come (going to
+    the run club's run). "No limit: anyone can come" makes the game with no cap; anyone can tap I'm in."""
+    accounts.signup(email="maya@uw.edu", sports=("running",))
+    feed = client.get("/feed").data.decode()
+    assert 'name="no_limit"' in feed and "No limit: anyone can come" in feed and "data-plan-spots" in feed
+    post(client, sport="running", body="Run club 5K, come along", plan="1", starts_at=form_time(timedelta(days=1)),
+         duration="60", location="Burke-Gilman Trail", no_limit="1")
+    with app.app_context():
+        game = get_db().execute("SELECT id, max_players FROM events").fetchone()
+    assert game["max_players"] is None
+    page = client.get("/feed").data.decode()
+    assert "Run club 5K" in page and "<strong>1</strong> going" in page
+    refused = post(client, sport="running", body="x", plan="1", starts_at=form_time(timedelta(days=1)),
+                   duration="60", location="Burke-Gilman Trail", spots="").data.decode()
+    assert "Or tick No limit: anyone can come." in refused
+    accounts.logout()
+    accounts.signup(email="sam@uw.edu", sports=("running",))
+    client.post(f"/events/{game['id']}/join")
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM rsvps WHERE event_id = ?", (game["id"],)).fetchone()[0] == 2
+
+
 def test_sport_search_picks_what_you_typed(client):
     """The owner: searching the sport in the post box kept showing the first pick (Archery). In a form the current
     pick no longer stays when it doesn't match, and the best match is picked for you right away: a name starting
