@@ -546,3 +546,14 @@ def test_no_sideways_scroll_on_iphone_and_posts_are_separate_small_cards(client)
     assert ".list-search, .chip-more select.chip, .post-sheet input, .post-sheet select, .post-sheet textarea { font-size: 16px; }" in css
     assert "html, body { overflow-x: clip; }" in css and ".select-search { grid-template-columns: minmax(0, 1fr); }" in css
     assert ".feed { gap: 8px; }" in css and ".feed > .feed-card { margin: 0; padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px; }" in css
+
+
+def test_bot_round_edit_club_links_wrap_on_small_phones(accounts, client, app):
+    """Bot round: at 320px "Manage officers and who posts →" and "Add a logo →" ran into each other on Edit club.
+    They're a wrapping row now (no "·" between them)."""
+    accounts.signup(email="officer@uw.edu", sports=("running",))
+    club = approved_club(app, "officer@uw.edu")
+    page = client.get(f"/clubs/{club}/edit").data.decode()
+    assert "who posts →</a>\n      <a " in page
+    css = client.get("/static/style.css").data.decode()
+    assert ".edit-links { margin: 0 0 10px; font-size: .9rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }" in css
