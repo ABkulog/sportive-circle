@@ -916,7 +916,11 @@
     input.addEventListener("input", () => {
       if (!snapshot) snapshot = [...select.children].map((node) => [node, node.tagName === "OPTGROUP" ? [...node.children] : null]);
       const words = fold(input.value).split(/\s+/).filter(Boolean);
-      const keep = (option) => !option.value || option.selected || matches(words, option.textContent);
+      const before = select.value;  // clearing the box keeps what's picked now (an option put back can't steal it)
+      // Your current pick stays only in filters that apply at once (they'd change without asking otherwise); in a
+      // form it goes when it doesn't match, so the box never keeps showing a sport you didn't type (it showed
+      // Archery while you searched "ten").
+      const keep = (option) => !option.value || (autoSubmits && option.selected) || matches(words, option.textContent);
       const shown = [];
       for (const [node, children] of snapshot) {
         if (!children) { if (keep(node)) shown.push(node); continue; }
@@ -925,11 +929,19 @@
         if (kept.length) shown.push(node);
       }
       select.replaceChildren(...shown);
+      if (!words.length) select.value = before;
       watch.takeRecords();  // our own change: keep the snapshot
       const real = [...select.options].filter((option) => option.value);
-      if (words.length && real.length === 1 && !autoSubmits && !real[0].selected) {
-        select.value = real[0].value;  // one match: picked for you
-        select.dispatchEvent(new Event("change", { bubbles: true }));
+      if (words.length && !autoSubmits) {
+        // The best match is picked for you, so the box shows it right away: one whose name starts with what you
+        // typed ("ten" -> Tennis, not Table Tennis), else the first match; nothing matches -> back to "Choose".
+        const start = (option) => fold(option.textContent).replace(/^[^a-z0-9]+/, "").startsWith(words[0]);
+        const best = real.find(start) || real[0];
+        const value = best ? best.value : "";
+        if (select.value !== value) {
+          select.value = value;
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+        }
       }
     });
   });

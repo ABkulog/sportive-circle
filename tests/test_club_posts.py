@@ -557,3 +557,12 @@ def test_bot_round_edit_club_links_wrap_on_small_phones(accounts, client, app):
     assert "who posts →</a>\n      <a " in page
     css = client.get("/static/style.css").data.decode()
     assert ".edit-links { margin: 0 0 10px; font-size: .9rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }" in css
+
+
+def test_sport_search_picks_what_you_typed(client):
+    """The owner: searching the sport in the post box kept showing the first pick (Archery). In a form the current
+    pick no longer stays when it doesn't match, and the best match is picked for you right away: a name starting
+    with what you typed first ("ten" -> Tennis, not Table Tennis); no match goes back to "Choose"."""
+    js = client.get("/static/app.js").data.decode()
+    assert "(autoSubmits && option.selected) || matches(words, option.textContent)" in js
+    assert 'const best = real.find(start) || real[0];' in js and 'if (!words.length) select.value = before;' in js
