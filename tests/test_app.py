@@ -72,7 +72,7 @@ def test_signup_verify_and_login(accounts, client, app):
         assert user["password_hash"] != "purple-and-gold"  # stored hashed, never plain
     accounts.logout()
     assert accounts.login().status_code == 302
-    assert b"Hey, Dubs" in client.get("/").data
+    assert b'<span class="tab-label">Profile<' in client.get("/").data   # logged in: the app's tabs
 
 
 def test_wrong_code_is_rejected_and_attempts_are_limited(accounts, client):
@@ -317,13 +317,13 @@ def test_changing_the_password_logs_out_other_devices(accounts, client, app):
     accounts.signup()
     phone = app.test_client()
     phone.post("/login", data={"email": "dubs@uw.edu", "password": "purple-and-gold"})
-    assert b"Hey, Dubs" in phone.get("/").data
+    assert b'<span class="tab-label">Profile<' in phone.get("/").data
     done = client.post("/profile/password", data={"current_password": "purple-and-gold",
                                                    "password": "brand-new-pass", "password2": "brand-new-pass"},
                        follow_redirects=True)
     assert b"Password changed" in done.data
-    assert b"Hey, Dubs" in client.get("/").data               # this device stays logged in
-    assert b"Hey, Dubs" not in phone.get("/").data            # the other one is logged out
+    assert b'<span class="tab-label">Profile<' in client.get("/").data       # this device stays logged in
+    assert b'<span class="tab-label">Profile<' not in phone.get("/").data    # the other one is logged out
 
 
 def test_new_password_must_be_new_and_not_blank(accounts, client):
@@ -1104,11 +1104,13 @@ def _joined_in_founding_year(app):
 
 
 def test_greeting_is_plain(accounts, client):
+    """Plain when it's used; Play and the feed have no greeting at all (the owner's rule: no greetings before
+    the content)."""
     from sportive.spirit import greeting
     assert greeting("Maya") == "Hey, Maya"
     accounts.signup(name="Maya Chen")
     page = client.get("/").data.decode()
-    assert "Hey, Maya" in page and "Late night" not in page and "Bow down" not in page
+    assert "Hey, Maya" not in page and "Late night" not in page and "Bow down" not in page
 
 
 def test_badges(accounts, client, app):

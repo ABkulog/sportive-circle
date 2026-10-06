@@ -763,4 +763,111 @@
       section.querySelector("textarea")?.focus({ preventScroll: true });
     } catch (error) { window.location.assign(link.href); }
   });
+
+  // Feed photos are small squares: tapping one opens it full screen; swipe, the arrows or ←/→ go through the post's
+  // photos; ×, Esc or a tap on the dark part closes it. (Chats have their own viewer in chat.js.)
+  if (document.querySelector("[data-photos]")) {
+    const viewer = document.createElement("div");
+    viewer.className = "lightbox";
+    viewer.hidden = true;
+    viewer.setAttribute("role", "dialog");
+    viewer.setAttribute("aria-modal", "true");
+    viewer.setAttribute("aria-label", "Photo");
+    const image = document.createElement("img");
+    image.alt = "";
+    const count = document.createElement("span");
+    count.className = "lightbox-count";
+    const button = (className, label, text) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = className;
+      b.setAttribute("aria-label", label);
+      b.textContent = text;
+      return b;
+    };
+    const close = button("lightbox-close", "Close", "×");
+    const prev = button("lightbox-prev", "Previous photo", "‹");
+    const next = button("lightbox-next", "Next photo", "›");
+    viewer.append(image, count, close, prev, next);
+    document.body.appendChild(viewer);
+    let urls = [];
+    let at = 0;
+    let from = "";
+    let openedFrom = null;
+    const show = (i) => {
+      at = (i + urls.length) % urls.length;
+      image.src = urls[at];
+      image.alt = `Photo ${at + 1} of ${urls.length} from ${from}`;
+      count.textContent = urls.length > 1 ? `${at + 1} / ${urls.length}` : "";
+      prev.hidden = next.hidden = urls.length < 2;
+    };
+    const shut = () => {
+      viewer.hidden = true;
+      image.removeAttribute("src");
+      if (openedFrom && openedFrom.isConnected) openedFrom.focus({ preventScroll: true });
+    };
+    document.addEventListener("click", (event) => {
+      const thumb = event.target.closest && event.target.closest("[data-photo-index]");
+      if (!thumb) return;
+      const box = thumb.closest("[data-photos]");
+      try { urls = JSON.parse(box.dataset.photos); } catch (error) { return; }
+      from = box.dataset.photosFrom || "";
+      openedFrom = thumb;
+      show(Number(thumb.dataset.photoIndex) || 0);
+      viewer.hidden = false;
+      close.focus();
+    });
+    close.addEventListener("click", shut);
+    prev.addEventListener("click", () => show(at - 1));
+    next.addEventListener("click", () => show(at + 1));
+    viewer.addEventListener("click", (event) => { if (event.target === viewer) shut(); });
+    document.addEventListener("keydown", (event) => {
+      if (viewer.hidden) return;
+      if (event.key === "Escape") shut();
+      else if (event.key === "ArrowLeft") show(at - 1);
+      else if (event.key === "ArrowRight") show(at + 1);
+    });
+    let startX = null;
+    viewer.addEventListener("touchstart", (event) => { startX = event.touches[0].clientX; }, { passive: true });
+    viewer.addEventListener("touchend", (event) => {
+      if (startX === null) return;
+      const moved = event.changedTouches[0].clientX - startX;
+      startX = null;
+      if (Math.abs(moved) > 50 && urls.length > 1) show(at + (moved < 0 ? 1 : -1));
+    });
+  }
+
+  // Feed videos play in their small tile with the button at the bottom-left; tapping the video itself opens it
+  // full screen (iPhones use their own player for that).
+  document.addEventListener("click", (event) => {
+    const toggle = event.target.closest && event.target.closest("[data-video-toggle]");
+    const video = toggle ? toggle.parentElement.querySelector("video") : event.target.closest && event.target.closest("[data-feed-video]");
+    if (!video) return;
+    if (toggle) {
+      if (video.paused) video.play(); else video.pause();
+      return;
+    }
+    if (video.requestFullscreen) video.requestFullscreen().catch(() => {});
+    else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
+    video.play();
+  });
+  const syncVideoButton = (event) => {
+    const video = event.target;
+    if (!video.matches || !video.matches("[data-feed-video]")) return;
+    const toggle = video.parentElement.querySelector("[data-video-toggle]");
+    toggle.textContent = video.paused ? "▶" : "❚❚";
+    toggle.setAttribute("aria-label", video.paused ? "Play the video" : "Pause the video");
+  };
+  ["play", "pause", "ended"].forEach((type) => document.addEventListener(type, syncVideoButton, true));
+
+  // <a data-close-details> inside an open <details> (e.g. a club's "Request to join" form): Cancel closes it right
+  // there. (Without JavaScript it's a link back to the page, which also closes it.)
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest && event.target.closest("[data-close-details]");
+    const panel = link && link.closest("details[open]");
+    if (!panel) return;
+    event.preventDefault();
+    panel.open = false;
+    panel.querySelector("summary")?.focus();
+  });
 })();

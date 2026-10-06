@@ -66,7 +66,7 @@ def test_up_to_ten_photos_cleaned_and_only_for_people_who_can_see_the_post(accou
     accounts.signup(email="maya@uw.edu", sports=("weightlifting",))
     photos = [(BytesIO(make_image()), f"pump{n}.png") for n in range(3)]
     page = post(client, sport="weightlifting", body="Leg day PR", photos=photos).data.decode()
-    assert "Posted!" in page and "1/3" in page and "3/3" in page
+    assert "Posted!" in page and "Photo 1 of 3 from" in page and "Photo 3 of 3 from" in page   # small squares, tap for big
     with app.app_context():
         post_id = get_db().execute("SELECT id FROM posts").fetchone()[0]
     image = client.get(f"/posts/{post_id}/photos/2")

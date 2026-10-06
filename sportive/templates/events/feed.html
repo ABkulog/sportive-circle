@@ -12,7 +12,6 @@
 {% endblock %}
 {% block content %}
 {{ home_tabs('feed') }}
-<p class="hello muted">{{ hello }}</p>
 <h1 class="visually-hidden">Find a game</h1>
 
 {{ install_tip() }}
@@ -35,7 +34,7 @@
 {% endif %}
 
 {# The live map, like Snap Map: what's on right now (starting within an hour, going on, ended in the last 10 min) #}
-<section class="live-map-wrap" aria-labelledby="live-title">
+<section class="live-map-wrap {% if not map_pins %}is-empty{% endif %}" aria-labelledby="live-title">
   <h2 class="visually-hidden" id="live-title">Happening now</h2>
   <div class="play-map" id="play-map" role="img" aria-label="Live map: {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games now"></div>
   <p class="live-map-note">{% if map_pins %}<span class="live-dot" aria-hidden="true"></span> {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games now · tap a bubble{% else %}Nothing on right now. Games starting within an hour show up here.{% endif %}</p>

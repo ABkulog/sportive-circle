@@ -1561,3 +1561,33 @@ body.has-app-nav .home-tabs { position: sticky; top: 60px; z-index: 20; backgrou
 /* Clean up: the checkbox was stretched full width by the global input style, squeezing the text into a column */
 .cleanup-row input[type="checkbox"] { width: 20px; height: 20px; min-width: 20px; flex: 0 0 20px; margin: 2px 0 0; }
 .cleanup-row > span { flex: 1 1 auto; min-width: 0; }
+.live-map-wrap.is-empty .play-map { height: 150px; }  /* nothing on: a small map, the note says why */
+/* Small media (the owner's rule): photos are small squares (tap for big), a video is a small tile that plays in place */
+.feed-thumbs { display: flex; gap: 6px; margin-top: 8px; }
+.feed-thumb { position: relative; width: 92px; height: 92px; flex: none; padding: 0; border: 0; border-radius: 10px;
+  overflow: hidden; background: var(--control); cursor: zoom-in; }
+.feed-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb-more { position: absolute; inset: 0; display: grid; place-items: center; background: rgb(0 0 0 / .5); color: #fff;
+  font-weight: 800; font-size: 1.1rem; }
+.feed-video-tile { position: relative; width: 200px; max-width: 100%; aspect-ratio: 16 / 10; margin-top: 8px;
+  border-radius: 10px; overflow: hidden; background: #000; }
+.feed-video-tile .feed-video { width: 100%; height: 100%; max-height: none; margin: 0; object-fit: cover; border-radius: 0; cursor: zoom-in; }
+.video-toggle { position: absolute; left: 6px; bottom: 6px; width: 30px; height: 30px; border-radius: 50%; border: 0;
+  display: grid; place-items: center; padding: 0; background: rgb(0 0 0 / .45); color: #fff; font-size: .8rem; cursor: pointer;
+  backdrop-filter: blur(2px); }
+.video-toggle:hover, .video-toggle:focus-visible { background: rgb(0 0 0 / .65); }
+@media (min-width: 700px) { .feed-thumb { width: 104px; height: 104px; } .feed-video-tile { width: 240px; } }
+/* Compact cards, round 3 */
+.feed { gap: 8px; }
+.feed-card { padding: 9px 12px; }
+.feed-body { font-size: .9rem; margin-top: 4px; }
+.feed-actions { margin-top: 4px; }
+/* A club's "Request to join": the button turns into the form (no second button above it), Send / Cancel, and
+   Follow steps aside while the form is open */
+.join-panel[open] > summary { display: none; }
+.join-title { margin: 0 0 6px; }
+.join-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.join-actions:has(.join-panel[open]) { grid-template-columns: 1fr; }
+.join-actions:has(.join-panel[open]) .follow-toggle { display: none; }
+.follow-toggle form { margin: 0; }
+.follow-toggle .btn { width: 100%; }
