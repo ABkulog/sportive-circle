@@ -1,4 +1,4 @@
-{% from "_macros.html" import avatar, club_logo, verified_badge %}
+{% from "_macros.html" import avatar, club_logo, verified_badge, icon %}
 
 {# The game behind a plan post or a club event post: when, where, how many, and "I'm in". #}
 {% macro plan_box(e) %}
@@ -79,9 +79,9 @@
       <form method="post" action="{{ url_for('posts.like', post_id=p.id) }}" class="like-form" data-inplace>
         {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.full_path }}#post-{{ p.id }}">
         <button class="react-button {% if p.i_liked %}is-on{% endif %}" aria-pressed="{{ 'true' if p.i_liked else 'false' }}"
-                aria-label="{{ 'Unlike' if p.i_liked else 'Like' }}{% if p.like_count %}, {{ p.like_count }} so far{% endif %}">🔥 <span>{{ p.like_count or '' }}</span></button>
+                aria-label="{{ 'Unlike' if p.i_liked else 'Like' }}{% if p.like_count %}, {{ p.like_count }} so far{% endif %}">{{ icon('heart') }}<span>{{ p.like_count or '' }}</span></button>
       </form>
-      <a class="react-button" href="{{ url_for('posts.view', post_id=p.id) }}#replies-{{ p.id }}" data-replies="replies-{{ p.id }}" aria-expanded="false" aria-label="Replies{% if p.reply_count %}, {{ p.reply_count }}{% endif %}">💬 <span>{{ p.reply_count or 'Reply' }}</span></a>
+      <a class="react-button" href="{{ url_for('posts.view', post_id=p.id) }}#replies-{{ p.id }}" data-replies="replies-{{ p.id }}" aria-expanded="false" aria-label="Replies{% if p.reply_count %}, {{ p.reply_count }}{% endif %}">{{ icon('chat') }}<span>{{ p.reply_count or '' }}</span></a>
       <span class="feed-actions-spacer"></span>
       {{ more_menu(url_for('moderation.report', target_type='post', target_id=p.id) if p.author_id != g.user.id else None,
                    url_for('posts.delete', post_id=p.id) if p.author_id == g.user.id or is_admin() or (p.club_id and item.my_role == 'officer') else None,
@@ -103,7 +103,7 @@
 {% endmacro %}
 
 
-{# Report and Delete: in a ⋯ menu, so each card shows just 🔥 and Reply #}
+{# Report and Delete: in a ⋯ menu (top right of the card, like Instagram), so each card shows just ♡ and 💬 #}
 {% macro more_menu(report_url=None, delete_url=None, what='post', pin_url=None, pinned=False) %}
   {% if report_url or delete_url or pin_url %}
     <details class="more-menu card-more">

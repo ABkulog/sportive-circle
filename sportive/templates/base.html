@@ -8,7 +8,7 @@
   <title>{% block title %}Home{% endblock %} · Sportive Circle</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Encode+Sans+Condensed:wght@700;800&family=Open+Sans:wght@400..700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Encode+Sans+Condensed:wght@700;800&family=Grand+Hotel&display=swap">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml">
   <meta name="theme-color" content="#4b2e83">
@@ -34,9 +34,11 @@
 {% set ep = request.endpoint or '' %}
 {% set nav_badges = tab_badges() if app_nav else {} %}
 {% macro icon(name) %}<svg class="icon" aria-hidden="true"><use href="#i-{{ name }}"/></svg>{% endmacro %}
+{# The Profile tab is your own picture, like Instagram's #}
+{% macro me_avatar() %}{% from "_macros.html" import avatar %}<span class="tab-me">{{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 26) }}</span>{% endmacro %}
 {% macro tab(url, icon_name, label, active, badge=0, extra_class='') %}
   <a class="tab{% if extra_class %} {{ extra_class }}{% endif %}{% if active %} is-active{% endif %}" href="{{ url }}" {% if active %}aria-current="page"{% endif %}>
-    <span class="tab-icon">{{ icon(icon_name) }}{% if badge %}<span class="count-dot">{{ badge_text(badge) }}</span>{% endif %}</span>
+    <span class="tab-icon">{% if icon_name == 'me' %}{{ me_avatar() }}{% else %}{{ icon(icon_name) }}{% endif %}{% if badge %}<span class="count-dot">{{ badge_text(badge) }}</span>{% endif %}</span>
     <span class="tab-label">{{ label }}{% if badge %}<span class="visually-hidden"> ({{ badge }} new)</span>{% endif %}</span>
   </a>
 {% endmacro %}
@@ -87,7 +89,7 @@
       {{ tab(url_for('clubs.directory'), 'clubs', 'Clubs', ep in ('clubs.directory', 'clubs.view', 'clubs.create', 'clubs.edit', 'clubs.updates')) }}
       {{ tab(url_for('search.search'), 'search', 'Search', ep == 'search.search') }}
       {{ tab(url_for('events.feed'), 'map', 'Play', ep in ('events.feed', 'index', 'events.detail', 'events.create', 'events.quick', 'events.edit')) }}
-      {{ tab(url_for('profile.view', user_id=g.user.id), 'user', 'Profile',
+      {{ tab(url_for('profile.view', user_id=g.user.id), 'me', 'Profile',
              profile_area and (ep != 'profile.view' or request.view_args.get('user_id') == g.user.id),
              nav_badges.profile + nav_badges.friends + nav_badges.clubs + nav_badges.admin) }}
       <div class="side-only side-extra">

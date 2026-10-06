@@ -29,6 +29,16 @@
     {% else %}
       <span class="profile-photo">{{ avatar(user.id, user.full_name, user.avatar_updated, 84) }}</span>
     {% endif %}
+    {% if counts %}
+      {# Instagram's numbers next to the picture #}
+      <ul class="profile-stats">
+        <li><strong>{{ counts.posts }}</strong><span>post{{ 's' if counts.posts != 1 }}</span></li>
+        <li>{% if me %}<a href="{{ url_for('social.friends') }}">{% endif %}<strong>{{ counts.friends }}</strong><span>friend{{ 's' if counts.friends != 1 }}</span>{% if me %}{% set fr = tab_badges().friends %}{% if fr %}<span class="count-dot">{{ fr }}</span>{% endif %}</a>{% endif %}</li>
+        <li><strong>{{ clubs|length }}</strong><span>club{{ 's' if clubs|length != 1 }}</span></li>
+      </ul>
+    {% endif %}
+  </div>
+  <div class="profile-who">
     <div class="profile-name">
       <h1>{{ user.full_name }} {% if is_team(user.id) %}<span class="team-pill" title="Runs Sportive Circle">🐾 Team</span>{% endif %}</h1>
       <p class="muted">{% if not blocked %}{{ [("Class of " ~ user.grad_year) if user.grad_year else "Husky", user.pronouns,
@@ -54,17 +64,10 @@
   {% if me %}
     <div class="profile-buttons">
       <a class="btn btn-ghost" href="{{ url_for('profile.edit') }}">Edit profile</a>
+      <a class="btn btn-ghost" href="{{ url_for('settings.home') }}">Settings{% if is_admin() and waiting %} <span class="count-dot">{{ waiting }}</span>{% endif %}</a>
     </div>
-    {# What used to crowd the sidebar: here, one tap from Profile #}
-    <nav class="profile-menu" aria-label="Your account">
-      <a href="{{ url_for('social.friends') }}">{{ icon('friends') }}<span>Friends</span>{% set fr = tab_badges().friends %}{% if fr %}<span class="count-dot">{{ fr }}</span>{% endif %}</a>
-      <a href="{{ url_for('settings.home') }}">{{ icon('sliders') }}<span>Settings</span>{% if is_admin() and waiting %}<span class="count-dot">{{ waiting }}</span>{% endif %}</a>
-      <a href="{{ url_for('faq') }}">{{ icon('help') }}<span>Help</span></a>
-      {% if is_admin() %}{% set waiting = open_report_count() + pending_club_count() + tab_badges().admin %}{% endif %}
-      <form method="post" action="{{ url_for('auth.logout') }}" data-confirm="Log out of Sportive Circle?">
-        {{ csrf_field() }}<button class="link-button">{{ icon('logout') }}<span>Log out</span></button>
-      </form>
-    </nav>
+    {# Like Instagram: two grey buttons. Friends is the number above; Help and Log out are in Settings. #}
+    {% if is_admin() %}{% set waiting = open_report_count() + pending_club_count() + tab_badges().admin %}{% endif %}
   {% elif relation.i_blocked %}
     <div class="profile-buttons">
       <form method="post" action="{{ url_for('social.unblock', user_id=user.id) }}">
@@ -118,11 +121,14 @@
 
   {% if not blocked %}{# blocked either way: just the name and photo #}
   {# A few sports, then "+12 more" (someone with 50 sports pushed everything else off the screen) #}
-  <div class="badges profile-sports">
-    {% for s in sports[:4] %}<span class="chip">{{ SPORT_EMOJI[s] }} {{ SPORTS[s] }}</span>
-    {% else %}<span class="muted">{% if me %}<a href="{{ url_for('profile.edit_sports') }}">Pick your sports</a>{% else %}No sports picked yet.{% endif %}</span>{% endfor %}
-    {% if sports|length > 4 %}<span class="chip muted" title="{% for s in sports[4:] %}{{ SPORTS[s] }}{{ ', ' if not loop.last }}{% endfor %}">+{{ sports|length - 4 }} more</span>{% endif %}
-  </div>
+  {# Their sports as round "highlights" in one row that scrolls sideways, like Instagram's story highlights #}
+  <ul class="profile-highlights" aria-label="Sports">
+    {% for s in sports %}
+      <li><a href="{{ url_for('posts.feed', sport=s) }}"><span class="highlight-ring" aria-hidden="true">{{ SPORT_EMOJI[s] }}</span><span class="highlight-name">{{ SPORTS[s].split(' / ')[0] }}</span></a></li>
+    {% endfor %}
+    {% if me %}<li><a href="{{ url_for('profile.edit_sports') }}"><span class="highlight-ring is-new" aria-hidden="true">＋</span><span class="highlight-name">{{ 'Edit' if sports else 'Your sports' }}</span></a></li>
+    {% elif not sports %}<li class="muted">No sports picked yet.</li>{% endif %}
+  </ul>
   {% endif %}
 </section>
 
@@ -130,10 +136,11 @@
 {# Like a Twitter profile: Posts first, and the rest one tap away #}
 <div class="tabs profile-tabs" data-tabs>
   <nav class="home-tabs tab-list" role="tablist" aria-label="Profile sections">
-    <button type="button" role="tab" data-tab-button="posts">Posts</button>
-    {% if clubs or me %}<button type="button" role="tab" data-tab-button="clubs">Clubs{% if clubs %} · {{ clubs|length }}{% endif %}</button>{% endif %}
-    <button type="button" role="tab" data-tab-button="games">Games</button>
-    {% if showcase or me %}<button type="button" role="tab" data-tab-button="badges">Badges</button>{% endif %}
+    {# Instagram's icon tabs (the names are for screen readers and a hover title) #}
+    <button type="button" role="tab" data-tab-button="posts" title="Posts">{{ icon('grid') }}<span class="visually-hidden">Posts</span></button>
+    {% if clubs or me %}<button type="button" role="tab" data-tab-button="clubs" title="Clubs">{{ icon('clubs') }}<span class="visually-hidden">Clubs{% if clubs %} · {{ clubs|length }}{% endif %}</span></button>{% endif %}
+    <button type="button" role="tab" data-tab-button="games" title="Games">{{ icon('calendar') }}<span class="visually-hidden">Games</span></button>
+    {% if showcase or me %}<button type="button" role="tab" data-tab-button="badges" title="Badges">{{ icon('badge') }}<span class="visually-hidden">Badges</span></button>{% endif %}
   </nav>
 
   <section class="tab-panel" data-tab-panel="posts" id="profile-posts" role="tabpanel">

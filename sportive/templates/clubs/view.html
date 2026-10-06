@@ -23,16 +23,17 @@
       {{ club_logo(club, 72) }}
       {% if role == 'officer' %}<a class="logo-edit" href="{{ url_for('clubs.edit_logo', club_id=club.id) }}">{{ 'Change logo' if club.logo_updated else 'Add logo' }}</a>{% endif %}
     </div>
-    <div class="club-profile-main">
-      <h1>{{ club.name }}</h1>
-      <p class="club-sub">{% if club.status == 'approved' %}{{ verified_badge(label=True) }} · {% endif %}{{ SPORTS[club.sport] }} · {{ focus.get(club.focus, '') }}</p>
-    </div>
+    {# Instagram's numbers next to the picture #}
+    <ul class="stat-row" aria-label="Club stats">
+      <li><strong>{{ club.member_count }}</strong><span>member{{ 's' if club.member_count != 1 }}</span></li>
+      <li><strong>{{ followers }}</strong><span>follower{{ 's' if followers != 1 }}</span></li>
+      <li><strong>{{ events|length }}</strong><span>event{{ 's' if events|length != 1 }}</span></li>
+    </ul>
   </div>
-  <ul class="stat-row" aria-label="Club stats">
-    <li><strong>{{ club.member_count }}</strong><span>member{{ 's' if club.member_count != 1 }}</span></li>
-    <li><strong>{{ followers }}</strong><span>follower{{ 's' if followers != 1 }}</span></li>
-    <li><strong>{{ events|length }}</strong><span>event{{ 's' if events|length != 1 }}</span></li>
-  </ul>
+  <div class="club-profile-main">
+    <h1>{{ club.name }}</h1>
+    <p class="club-sub">{% if club.status == 'approved' %}{{ verified_badge(label=True) }} · {% endif %}{{ SPORTS[club.sport] }} · {{ focus.get(club.focus, '') }}</p>
+  </div>
   {% if friends_line %}<p class="friends-line">👥 {{ friends_line }}</p>{% endif %}
   <p class="club-about clamp" id="club-about" title="Tap to read more" data-expand>{{ club.description }}</p>
   {% if week %}

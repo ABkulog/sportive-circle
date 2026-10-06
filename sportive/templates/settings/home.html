@@ -71,6 +71,7 @@
 </section>
 
 <section class="settings-group">
+  <p><a href="{{ url_for('faq') }}">Help and FAQ</a> · <a href="{{ url_for('how_it_works') }}">How it works</a></p>
   <form method="post" action="{{ url_for('auth.logout') }}" data-confirm="Log out of Sportive Circle?">
     {{ csrf_field() }}<button class="btn btn-ghost btn-block">Log out</button>
   </form>

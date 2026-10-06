@@ -2789,9 +2789,8 @@ def test_every_body_font_weight_in_the_css_is_loaded():
     import pathlib
     css = pathlib.Path("sportive/static/style.css").read_text(encoding="utf-8")
     base = pathlib.Path("sportive/templates/base.html").read_text(encoding="utf-8")
-    low, high = map(int, re.search(r"Open\+Sans:wght@(\d+)\.\.(\d+)", base).groups())
-    body_weights = {int(w) for w in re.findall(r"font-weight:\s*(\d+)", css)} - {800}   # 800 = display font
-    assert all(low <= weight <= high for weight in body_weights), body_weights
+    # The body font is the phone's own (like Instagram), so every weight is there; the wordmark's font is loaded.
+    assert "--font: -apple-system, BlinkMacSystemFont" in css and "family=Grand+Hotel" in base
 
 
 def test_long_unbroken_titles_wrap_instead_of_widening_the_page():
@@ -3267,7 +3266,7 @@ def test_real_email_has_text_and_html_parts(app, monkeypatch):
 
 def test_every_log_out_button_asks_first(accounts, client, app):
     accounts.signup()
-    for path in (f"/u/{_user_id(app, 'dubs@uw.edu')}", "/settings"):   # Log out is on your Profile and in Settings
+    for path in ("/settings",):   # Log out is in Settings (Profile has Edit profile and Settings, like Instagram)
         page = client.get(path).data.decode()
         forms = re.findall(r'<form[^>]*action="/logout"[^>]*>', page)
         assert forms and all('data-confirm="Log out of Sportive Circle?"' in form for form in forms), path
@@ -5364,7 +5363,7 @@ def test_public_address_is_our_domain_on_render(tmp_path, monkeypatch):
 def test_settings_page_is_separate_from_edit_profile(accounts, client, app):
     accounts.signup()
     me = _user_id(app, "dubs@uw.edu")
-    assert "<span>Settings</span></a>" in client.get(f"/u/{me}").data.decode()
+    assert 'href="/settings">Settings' in client.get(f"/u/{me}").data.decode()
     page = client.get("/settings").data.decode()
     for part in ("Notifications", "Change password", "Look", "Email me an hour before", "Log out",
                  "Delete my account"):

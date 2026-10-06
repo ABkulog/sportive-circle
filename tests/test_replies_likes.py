@@ -17,9 +17,9 @@ def test_likes_toggle_count_and_tell_the_author_once(accounts, client, app):
         accounts.signup(email=email, name=email.split("@")[0].title() + " Husky", sports=("running",))
         client.post(f"/posts/{post_id}/like", data={"next": "/feed"})
     feed = client.get("/feed").data.decode()
-    assert 'react-button is-on' in feed and "🔥 <span>2</span>" in feed
+    assert 'react-button is-on' in feed and '#i-heart"/></svg><span>2</span>' in feed
     client.post(f"/posts/{post_id}/like")                                       # a second tap takes it back
-    assert "🔥 <span>1</span>" in client.get("/feed").data.decode()
+    assert '#i-heart"/></svg><span>1</span>' in client.get("/feed").data.decode()
     as_user(accounts, "maya@uw.edu")
     bell = client.get("/notifications").data.decode()
     assert bell.count("liked your post") == 1 and "Jo and 1 other liked your post" in bell   # one notice, updated
@@ -34,7 +34,7 @@ def test_replies_thread_notify_and_can_be_deleted_and_reported(accounts, client,
     client.post(f"/posts/{post_id}/replies", data={"body": "Rattlesnake Ledge, go early!"})
     page = client.get(f"/posts/{post_id}").data.decode()
     assert "1 reply" in page and "Rattlesnake Ledge, go early!" in page
-    assert "💬 <span>1</span>" in client.get("/feed").data.decode()
+    assert '#i-chat"/></svg><span>1</span>' in client.get("/feed").data.decode()
     assert "Replies are 1 to 500" in client.post(f"/posts/{post_id}/replies", data={"body": " "},
                                                  follow_redirects=True).data.decode()
     with app.app_context():

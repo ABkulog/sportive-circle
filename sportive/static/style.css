@@ -1690,3 +1690,179 @@ body.map-full .post-fab { display: none; }
   .feed-actions .react-button.is-on { background: none; color: var(--danger); }
 }
 .live-map-wrap.is-full .live-map-note { white-space: nowrap; max-width: calc(100% - 140px); overflow: hidden; text-overflow: ellipsis; }
+
+/* ============================== Instagram look ==============================
+   The owner: "make it look like insta, the pages and segments too, straight up copy it". Instagram's chrome:
+   the system font, a white top bar with a script wordmark and plain black icons, an icon-only bottom bar (your
+   own picture is the Profile tab), grey buttons, hairline dividers, and black instead of purple for the
+   everyday UI. Purple stays for our main buttons, links and the ＋. Dark mode is Instagram's black. */
+:root {
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --wordmark: "Grand Hotel", "Brush Script MT", cursive;
+  --text: #000000; --heading: #000000; --muted: #737373; --faint: #a8a8a8;
+  --line: #dbdbdb; --surface: #efefef; --control: #efefef; --control-line: transparent;
+  --band: #dbdbdb; --tile: #ffffff; --header: #ffffff; --radius: 8px;
+}
+:root[data-theme="dark"] {
+  --bg: #000000; --text: #f5f5f5; --heading: #f5f5f5; --muted: #a8a8a8; --faint: #737373;
+  --line: #262626; --surface: #262626; --control: #363636; --control-line: transparent;
+  --band: #262626; --tile: #000000; --header: #000000;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    --bg: #000000; --text: #f5f5f5; --heading: #f5f5f5; --muted: #a8a8a8; --faint: #737373;
+    --line: #262626; --surface: #262626; --control: #363636; --control-line: transparent;
+    --band: #262626; --tile: #000000; --header: #000000;
+  }
+}
+body { font-family: var(--font); font-size: 15px; }
+h1, .home-section-title { font-family: var(--font); font-weight: 700; letter-spacing: 0; }
+.page-title::after { display: none; }
+.home-section-title { font-size: 1rem; color: var(--text); }
+
+/* Top bar: white, a hairline under it, the wordmark in script, black icons */
+.topbar { background: var(--bg); border-bottom: 1px solid var(--line); }
+.topbar-inner { height: 52px; }
+.topbar .brand, .appnav .brand { font-family: var(--wordmark); font-weight: 400; font-size: 1.75rem; color: var(--text);
+  letter-spacing: 0; }
+.topbar .brand-accent, .appnav .brand-accent { color: inherit; margin-left: .18em; }
+body.has-app-nav .topbar .brand img, .appnav .brand img { display: none; }
+.top-icons { gap: 6px; }
+.top-icons a { color: var(--text); width: 40px; height: 40px; }
+.top-icons a:hover { background: none; opacity: .6; }
+.top-icons .icon { width: 25px; height: 25px; stroke-width: 1.9; }
+.topbar .nav a, .topbar .nav .link-button { color: var(--text); }
+.nav-cta { background: var(--purple); color: #fff !important; border-radius: 8px; }
+.nav-cta:hover { background: var(--purple-strong); }
+
+/* Bottom bar: icons only (the names stay for screen readers), black, the open one bolder */
+.appnav { background: var(--bg); border-top: 1px solid var(--line); padding-top: 2px; }
+.tab { color: var(--text); min-height: 48px; }
+.tab .icon { width: 26px; height: 26px; stroke-width: 1.8; }
+.tab.is-active, .tab.is-active .icon { color: var(--text); }
+.tab.is-active .icon { stroke-width: 2.8; }
+.tab-me { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; }
+.tab-me .avatar-img { --size: 26px !important; }
+.tab.is-active .tab-me { box-shadow: 0 0 0 2px var(--text); }
+@media (max-width: 999px) {
+  .appnav .tab-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+/* Laptops: Instagram's left sidebar (wordmark, icons with names, the open one bold) */
+@media (min-width: 1000px) {
+  .appnav { border-right: 1px solid var(--line); padding: 30px 12px 20px; }
+  .appnav .brand { font-size: 2rem; padding: 0 12px 30px; }
+  .tab { color: var(--text); font-size: 1rem; padding: 12px; border-radius: 8px; }
+  .tab:hover { background: var(--surface); }
+  .tab.is-active .tab-label { font-weight: 700; }
+}
+
+/* Buttons: Instagram's grey secondary buttons, rounded 8px */
+.btn { border-radius: 8px; font-weight: 600; font-size: .9rem; padding: 8px 16px; }
+.btn-ghost, .btn-danger-ghost { background: var(--control); box-shadow: none; }
+.btn-ghost:hover { background: color-mix(in srgb, var(--control) 85%, var(--text)); }
+
+/* Thick section bars become hairlines; boxes lose their tint */
+.page .band, .page .band-title { border-top: 1px solid var(--line); }
+.card { border-color: var(--line); }
+
+/* Chips (All · My clubs · …): Instagram's outlined pills; the open one is black */
+.feed-chips .chip, .chip { background: var(--bg); border: 1px solid var(--line); color: var(--text); }
+.feed-chips .chip.is-on, .chip.is-on { background: var(--text); border-color: var(--text); color: var(--bg); }
+
+/* Posts, Instagram / Threads style: ⋯ in the top right corner, then the outlined ♡ and 💬 icons with their
+   numbers (the heart fills red once you like it). */
+.feed-card { position: relative; }
+.feed-card .feed-head { padding-right: 30px; }
+.feed-card > .feed-actions .card-more { position: absolute; top: 6px; right: 6px; }
+.feed-card > .feed-actions .card-more > summary { color: var(--text); }
+.feed-actions .react-button { border: 0; background: none; color: var(--text); padding: 4px 8px 4px 0; gap: 5px;
+  font-weight: 600; font-size: .85rem; min-height: 36px; }
+.feed-actions .react-button .icon { width: 23px; height: 23px; }
+.feed-actions .react-button:hover { background: none; opacity: .6; }
+.feed-actions .react-button.is-on, .feed-actions .react-button.is-on:hover { background: none; color: #ed4956; opacity: 1; }
+.react-button.is-on .icon { --icon-fill: currentColor; }  /* the heart fills in (a CSS variable reaches inside the icon) */
+.feed-actions { gap: 2px 14px; }
+.sport-tag { color: var(--purple); }
+/* One row of chips that scrolls sideways (no second line) */
+.feed-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -16px; padding-right: 16px; }
+.feed-chips::-webkit-scrollbar { display: none; }
+.feed-chips .chip, .feed-chips .chip-more { flex: none; }
+
+/* Profile, like Instagram: picture with posts · friends · clubs beside it, the name and bio under it, two grey
+   buttons, sports as round highlights, then icon tabs (a line on top of the open one). */
+.profile { gap: 10px; }
+.profile-top { gap: 22px; }
+.profile-top .avatar-img { --size: 86px !important; }
+.profile-stats { display: flex; flex: 1; justify-content: space-around; margin: 0; padding: 0; list-style: none; text-align: center; }
+.profile-stats li, .profile-stats a { display: flex; flex-direction: column; align-items: center; color: var(--text); position: relative; }
+.profile-stats a:hover { text-decoration: none; }
+.profile-stats strong { font-size: 1.1rem; font-weight: 700; line-height: 1.2; }
+.profile-stats span { font-size: .85rem; }
+.profile-stats .count-dot { position: absolute; top: -6px; right: -10px; }
+.profile-name h1 { font-size: .95rem; font-weight: 700; margin: 0; }
+.profile-name p { font-size: .88rem; }
+.profile-bio { margin: 0; font-size: .92rem; }
+.profile-buttons .btn { padding: 7px 12px; font-size: .88rem; }
+.profile-highlights { display: flex; gap: 14px; margin: 4px -16px 0; padding: 4px 16px 2px; overflow-x: auto; list-style: none;
+  scrollbar-width: none; }
+.profile-highlights::-webkit-scrollbar { display: none; }
+.profile-highlights li { flex: none; }
+.profile-highlights a { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 66px; color: var(--text); }
+.profile-highlights a:hover { text-decoration: none; }
+.highlight-ring { width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center; font-size: 1.6rem;
+  background: var(--bg); box-shadow: 0 0 0 1px var(--line), inset 0 0 0 3px var(--bg), inset 0 0 0 30px var(--surface); }
+.highlight-ring.is-new { font-size: 1.5rem; color: var(--text); }
+.highlight-name { max-width: 66px; font-size: .74rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-tabs .tab-list { display: flex; border-top: 1px solid var(--line); border-bottom: 0; margin: 0 -16px; gap: 0; }
+.profile-tabs .tab-list [data-tab-button] { flex: 1; display: grid; place-items: center; padding: 10px 0; border: 0;
+  border-top: 1px solid transparent; margin-top: -1px; background: none; color: var(--faint); }
+.profile-tabs .tab-list [data-tab-button] .icon { width: 24px; height: 24px; }
+.profile-tabs .tab-list [data-tab-button][aria-selected="true"] { color: var(--text); border-top-color: var(--text); }
+
+/* A club's page, like an Instagram profile: no box around the top, logo with the numbers beside it */
+.club-hero { border: 0; padding: 4px 0 0; background: none; box-shadow: none; }
+.club-profile { display: flex; align-items: center; gap: 22px; }
+.club-profile .club-logo { --size: 86px !important; }
+.club-profile .stat-row { flex: 1; display: flex; justify-content: space-around; border: 0; margin: 0; padding: 0; }
+.club-profile .stat-row strong { font-size: 1.1rem; }
+.club-profile .stat-row span { font-size: .85rem; color: var(--text); }
+.club-profile-main { margin-top: 8px; }
+.club-profile-main h1 { font-size: .95rem; margin: 0; }
+.club-sub { font-size: .85rem; color: var(--muted); margin: 0; }
+.club-about { font-size: .92rem; }
+
+/* Search, like Instagram's: one grey rounded box, no button (Enter searches) */
+.search-box input[type="search"], .club-search-row input[type="search"] { background: var(--surface); border: 0;
+  border-radius: 10px; min-height: 38px; padding: 7px 14px; }
+.search-box { display: block; }
+.search-box input[type="search"] { width: 100%; }
+.result-list .result { padding: 8px 0; }
+.section-title { font-size: 1rem; font-weight: 700; }
+/* No ring around your own picture (Instagram only rings a story) */
+.profile-photo { box-shadow: none; border: 0; }
+/* Text tabs (a club's About · Posts · Events · Members): Instagram's black underline */
+.home-tabs a.is-on, .tab-list button.is-on, .tab-list button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--text); }
+.tab-list button { color: var(--faint); font-weight: 600; }
+/* An emoji logo sits in a grey circle, like a profile picture */
+.club-emoji { width: var(--size); height: var(--size); border-radius: 50%; background: var(--surface); display: inline-grid;
+  place-items: center; font-size: calc(var(--size) * .5); flex: none; }
+/* Grey boxes instead of purple ones */
+.how-to-join, .plan-box { background: var(--surface); }
+.people-search input[type="search"] { background: var(--surface); border: 0; border-radius: 10px; min-height: 38px; padding: 7px 14px; width: 100%; }
+.people-search { display: block; }
+/* Page names are small and bold, like the name at the top of an Instagram screen */
+.page > h1:first-child, .page-title, .page h1 { font-size: 1.25rem; }
+.feed-chips { position: relative; }  /* keeps its hidden label inside the scrolling row (no sideways page scroll) */
+
+/* Posts are flat rows on laptops too (Instagram's web feed has no boxes): a hairline between posts */
+@media (min-width: 601px) {
+  .feed { gap: 0; }
+  .feed > .feed-card { margin: 0; padding: 12px 0; border-width: 0 0 1px; border-radius: 0; box-shadow: none; }
+  .feed > .feed-card.is-news { border-left: 0; }
+  .feed-who { display: flex; align-items: baseline; gap: 6px; }
+  .feed-who small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .feed-body, .feed-thumbs, .feed-video-tile, .feed > .feed-card .plan-box { margin-left: 42px; }
+  .feed-actions { margin-left: 34px; }
+  .feed > .feed-card > .feed-actions .card-more { right: 0; }
+}
+.club-line { font-size: .82rem; line-height: 1.35; }

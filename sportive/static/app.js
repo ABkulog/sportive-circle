@@ -730,7 +730,7 @@
       // Replies: keep the 💬 number on the card in step ("3 replies")
       const count = fresh.id.startsWith("replies-") && fresh.querySelector(".section-title");
       const button = count && document.querySelector(`[data-replies="${fresh.id}"] span`);
-      if (button) button.textContent = parseInt(count.textContent, 10) || "Reply";
+      if (button) button.textContent = parseInt(count.textContent, 10) || "";
     } else if (form.dataset.swapTarget) {
       // (the list isn't on the page it came back with: leave this page as it is)
     } else {
