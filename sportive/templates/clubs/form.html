@@ -18,6 +18,10 @@
   <h1>{{ 'Edit club' if club else 'Register your club' }}</h1>
   {% if not club %}
     <p class="muted">We check each club (usually within 2 days) and email you when it's live.</p>
+  {% elif owner %}
+    {# Manage officers lives here now (the club page has just Edit club · Share · + Event) #}
+    <p class="edit-links"><a href="{{ url_for('clubs.officers', club_id=club.id) }}">Manage officers and who posts →</a>
+      · <a href="{{ url_for('clubs.edit_logo', club_id=club.id) }}">{{ 'Change logo' if club.logo_updated else 'Add a logo' }} →</a></p>
   {% endif %}
   <form method="post" class="form" data-wizard data-error-field="{{ error_field or '' }}"
         {% if club and club.status == 'rejected' %}data-must-change{% endif %}>
@@ -53,17 +57,17 @@
       <datalist id="places">{% for place in locations %}<option value="{{ place }}">{% endfor %}</datalist>
     </div>
     <div class="row row-pair">
-      <label class="field"><span>Dues <em>(type Free if none)</em></span>
-        <input name="dues" maxlength="60" value="{{ form.get('dues', '') }}" placeholder="$40/quarter or Free" required></label>
-      <label class="field"><span>What to bring</span>
-        <input name="gear" maxlength="120" value="{{ form.get('gear', '') }}" placeholder="Cleats, water" required></label>
+      <label class="field"><span>Dues <em>(optional, blank = free)</em></span>
+        <input name="dues" maxlength="60" value="{{ form.get('dues', '') }}" placeholder="$40/quarter"></label>
+      <label class="field"><span>What to bring <em>(optional)</em></span>
+        <input name="gear" maxlength="120" value="{{ form.get('gear', '') }}" placeholder="Cleats, water"></label>
     </div>
     <label class="field"><span>How to join: first steps for new members</span>
       <textarea name="how_to_join" rows="2" maxlength="500" required
                 placeholder="Sign the club waiver, then come to any Tuesday practice!">{{ form.get('how_to_join', '') }}</textarea></label>
-    <label class="field"><span>A question for people who want to join</span>
+    <label class="field"><span>A question for people who want to join <em>(optional)</em></span>
       <input name="join_question" maxlength="150" value="{{ form.get('join_question', '') }}"
-             placeholder="What's your experience level?" required>
+             placeholder="What's your experience level?">
       <small class="muted">You'll see their answers in your requests.</small></label>
     <label class="toggle"><input type="checkbox" name="competes" value="1" {% if form.get('competes') %}checked{% endif %}>
       <span>We compete against other schools</span></label>

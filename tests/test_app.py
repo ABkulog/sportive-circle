@@ -2001,9 +2001,15 @@ def test_confirmed_member_gets_welcome_message(accounts, client, app):
 
 def test_all_club_info_is_required(accounts, client):
     accounts.signup()
-    for field in ("meets", "location", "dues", "gear", "how_to_join", "join_question", "club_email"):
+    for field in ("meets", "location", "how_to_join", "club_email"):
         page = client.post("/clubs/new", data={**CLUB, field: ""}).data
         assert b"Please add" in page, field
+    # Dues (blank = free), what to bring and a question for joiners are optional: fewer boxes to finish
+    client.post("/clubs/new", data={**CLUB, "name": "Short Form Club", "dues": "", "gear": "", "join_question": ""})
+    with client.application.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM clubs WHERE name = 'Short Form Club'").fetchone()[0] == 1
+        get_db().execute("DELETE FROM clubs WHERE name = 'Short Form Club'")
+        get_db().commit()
     # A social account or a website is required (either one, or both)...
     page = client.post("/clubs/new", data={**CLUB, "instagram": "", "contact_url": ""}).data
     assert b"Add at least one of your club" in page and b'data-error-field="instagram"' in page
@@ -2037,8 +2043,8 @@ def test_anyone_can_contact_a_club(accounts, client, app):
 def test_club_updates_feed(accounts, client, app):
     club = _approved_club(accounts, client, app)
     accounts.login(email="captain@uw.edu")
-    composer = client.get("/clubs/updates").data.decode()
-    assert "Post an update" in composer and "Posting as" in composer
+    composer = client.get("/clubs/updates").data.decode()          # one way to post: ＋ opens set to the club
+    assert "Post an update" not in composer and f'href="/feed?as={club}#post"' in composer
     client.post("/clubs/updates", data={"club": club, "body": "Practice moved to the Quad!"})
     accounts.logout()
     accounts.signup(email="stranger@uw.edu")
@@ -6222,8 +6228,9 @@ def test_club_owner_adds_and_removes_officers(accounts, client, app):
     ids = _people(accounts, app, "Maya", "Sam", "Jordan")
     club = _club_with_officer(accounts, client, app)
     _as(accounts, "Maya")
-    page = client.get(f"/clubs/{club}").data.decode()
-    assert "Manage officers" in page and "You're an officer" in page and "is-static" not in page
+    page = client.get(f"/clubs/{club}").data.decode()          # Edit club · Share · + Event; officers in Edit club
+    assert 'class="officer-buttons"' in page and "is-static" not in page
+    assert "Manage officers" in client.get(f"/clubs/{club}/edit").data.decode()
     found = client.get(f"/clubs/{club}/officers?q=sam").data.decode()
     assert "Sam Husky" in found and "Make officer" in found               # anyone on the app, not only members
     client.post(f"/clubs/{club}/officers", data={"user": ids["Sam"], "action": "add"})

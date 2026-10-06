@@ -216,8 +216,7 @@ def test_posting_and_opening_replies_stay_on_the_page(accounts, client, app):
     feed = client.get("/feed").data.decode()
     assert 'data-inplace data-swap-target="#feed-list"' in feed and 'id="feed-list"' in feed
     assert f'data-replies="replies-{post_id}"' in feed
-    assert 'data-swap-target="#feed-list"' in client.get("/clubs/updates").data.decode()
-    assert 'data-swap-target="#club-posts-list"' in client.get(f"/clubs/{club}").data.decode()
+    assert 'id="club-posts-list"' in client.get(f"/clubs/{club}").data.decode()      # pins swap it in place
     reply = client.post(f"/posts/{post_id}/replies", data={"body": "Hi"})
     assert reply.headers["Location"].endswith(f"#replies-{post_id}")
     js = client.get("/static/app.js").data.decode()
@@ -521,6 +520,22 @@ def test_bot_round_instagram_look_keeps_contrast(client):
     assert ":root { --muted: #6b6b6b; }" in css and ':root[data-theme="dark"] { --muted: #a8a8a8; }' in css
     assert ".nav-cta, .nav-cta:hover { background: #4b2e83; color: #fff !important; }" in css
     assert "color: #e0245e; }" in css and ".feed-who .feed-name { flex: 0 1 auto; max-width: 68%; }" in css
+
+
+def test_clubs_are_simple_one_poster_one_row_one_way_to_post(accounts, client, app):
+    """The owner: "the QR code has 3 options, that just confuses people: make it as simple and as effective as
+    possible for clubs". Share is one poster with one button (the link copies with a tap); officers get one row
+    (Edit club · Share · + Event, officers in Edit club); posting is the ＋, which opens set to post as the club."""
+    accounts.signup(email="officer@uw.edu", sports=("running",))
+    club = approved_club(app, "officer@uw.edu")
+    share = client.get(f"/clubs/{club}/share").data.decode()
+    assert share.count('class="btn') == 1 and "Print or save poster" in share and "data-copy=" in share
+    assert "Scan the code" in share and ">Flyer<" not in share and ">Share link<" not in share
+    assert client.get(f"/flyer?club={club}").headers["Location"].endswith(f"/clubs/{club}/share")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert 'class="officer-buttons"' in page and "+ Event" in page and "club-post-form" not in page
+    assert f'href="/feed?as={club}#post"' in page and "Tap <strong>＋</strong> to post as" in page
+    assert "Manage officers" in client.get(f"/clubs/{club}/edit").data.decode()
 
 
 def test_no_sideways_scroll_on_iphone_and_posts_are_separate_small_cards(client):

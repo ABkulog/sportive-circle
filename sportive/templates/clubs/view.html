@@ -43,11 +43,11 @@
       <span><b>{{ week.waiting }}</b> waiting to join</span>
       <span><b>{{ week.going }}</b> going to your events</span>
       <span><b>{{ week.posts }}</b> post{{ 's' if week.posts != 1 }}</span>
-      {% if week.posts == 0 %}<small class="muted">Clubs that post weekly show up in more feeds. Post an update!</small>{% endif %}
+      {% if week.posts == 0 %}<small class="muted">Clubs that post weekly show up in more feeds. Tap ＋ to post an update!</small>{% endif %}
     </div>
   {% endif %}
   {% if club.status == 'approved' %}
-    <p class="club-share-row"><a href="{{ url_for('clubs.share', club_id=club.id) }}">{{ icon('share') }} {{ 'Share / QR code for flyers' if role == 'officer' else 'Share this club' }}</a></p>
+    {% if role != 'officer' %}<p class="club-share-row"><a href="{{ url_for('clubs.share', club_id=club.id) }}">{{ icon('share') }} Share this club</a></p>{% endif %}
   {% endif %}
 
   <div class="club-actions" id="join">
@@ -64,15 +64,15 @@
             {{ csrf_field() }}<button class="link-button danger-link">Withdraw request</button></form>
         {% endif %}
       {% endif %}
-    {% elif role in ('member', 'officer') %}
-      <p class="going-pill club-role">✓ You're {{ 'an officer' if role == 'officer' else 'a member' }}</p>
-      {% if role == 'officer' %}
-        <div class="action-pair">
-          <a class="btn" href="{{ url_for('events.create', club=club.id) }}">+ Club event</a>
-          <a class="btn btn-ghost" href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit club</a>
-        </div>
-        {% if owner %}<a class="btn btn-ghost btn-block manage-officers" href="{{ url_for('clubs.officers', club_id=club.id) }}">Manage officers</a>{% endif %}
-      {% endif %}
+    {% elif role == 'officer' %}
+      {# Like an Instagram business profile: one row of buttons. Manage officers is in Edit club; posting is the ＋. #}
+      <div class="officer-buttons">
+        <a class="btn btn-ghost" href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit club</a>
+        <a class="btn btn-ghost" href="{{ url_for('clubs.share', club_id=club.id) }}">Share</a>
+        <a class="btn" href="{{ url_for('events.create', club=club.id) }}">+ Event</a>
+      </div>
+    {% elif role == 'member' %}
+      <p class="going-pill club-role">✓ You're a member</p>
     {% elif role in ('requested', 'tryout') %}
       <div class="waiting-box">
         <strong>{{ 'Signed up for tryouts' if role == 'tryout' else 'Request sent' }}</strong>
@@ -182,9 +182,8 @@
         {{ csrf_field() }}<button class="link-button">{{ {'member': 'Leave club', 'requested': 'Cancel request', 'tryout': 'Cancel tryout sign-up'}[role] }}</button>
       </form>
     {% elif role == 'officer' %}
-      <p class="quiet-leave"><a href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit club</a> ·
-        <form method="post" action="{{ url_for('clubs.leave', club_id=club.id) }}" class="inline-form"
-              data-confirm="Leave {{ club.name }}?">{{ csrf_field() }}<button class="link-button">Leave club</button></form></p>
+      <form method="post" action="{{ url_for('clubs.leave', club_id=club.id) }}" class="quiet-leave"
+            data-confirm="Leave {{ club.name }}?">{{ csrf_field() }}<button class="link-button">Leave club</button></form>
     {% endif %}
   </section>
 
@@ -195,19 +194,7 @@
     {% elif role == 'officer' and not can_post %}
       <p class="muted">The owner picks which officers post as the club. Ask them to turn it on for you.</p>
     {% elif role == 'officer' %}
-      {# Posts as the club, to everyone's feed: words, photos, 🔥 and replies, like anyone's post #}
-      <form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="form club-post-form" data-inplace data-swap-target="#club-posts-list">
-        {{ csrf_field() }}
-        <input type="hidden" name="as_club" value="{{ club.id }}"><input type="hidden" name="from_club" value="1">
-        <input type="hidden" name="sport" value="{{ club.sport }}">
-        <textarea name="body" rows="2" maxlength="1000" placeholder="Post as {{ club.name }}: everyone sees it in their feed" aria-label="Post as {{ club.name }}"></textarea>
-        <div class="composer-row">
-          <label class="btn btn-ghost btn-small composer-photos" title="Add up to {{ max_photos }} photos">{{ icon('camera') }}<span>Photos</span>
-            <input type="file" name="photos" accept="image/*" multiple data-max-files="{{ max_photos }}" class="visually-hidden"></label>
-          <button class="btn btn-small">Post</button>
-        </div>
-        <p class="composer-picked muted" data-picked hidden></p>
-      </form>
+      <p class="muted small">Tap <strong>＋</strong> to post as {{ club.name }}: everyone sees it in their feed.</p>
     {% endif %}
     <div id="club-posts-list">
     {% if feed_posts %}
