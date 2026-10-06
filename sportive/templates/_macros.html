@@ -6,7 +6,7 @@
 {% macro sport_checkboxes(form, legend=True) %}
   <fieldset class="field">
     <legend{% if not legend %} class="visually-hidden"{% endif %}>Which sports do you play? <em>(pick any, change later)</em></legend>
-    <div class="chip-grid">
+    <div class="chip-grid" data-chip-search>
       {% for key, label in SPORTS.items() %}
         <label class="chip-check">
           <input type="checkbox" name="sports" value="{{ key }}" {% if key in form.getlist('sports') %}checked{% endif %}>

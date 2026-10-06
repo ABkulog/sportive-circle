@@ -879,3 +879,70 @@
     panel.querySelector("summary")?.focus();
   });
 })();
+
+// Search in long lists: a small box above every long dropdown (sports, places) and above the sports chips,
+// so you type "ten" instead of scrolling 40 sports. Options are taken out and put back (phones ignore
+// hidden options); the one you picked always stays. Another script rebuilding the list (the places for a sport)
+// resets the box.
+(function () {
+  const fold = (text) => text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const matches = (words, text) => words.every((word) => fold(text).includes(word));
+  const LONG = 15;
+
+  function searchBox(label) {
+    const input = document.createElement("input");
+    input.type = "search";
+    input.className = "list-search";
+    input.placeholder = `Search ${label}`;
+    input.setAttribute("aria-label", `Search ${label}`);
+    input.autocomplete = "off";
+    input.addEventListener("keydown", (event) => { if (event.key === "Enter") event.preventDefault(); });
+    return input;
+  }
+
+  document.querySelectorAll("select:not([multiple]):not(.chip)").forEach((select) => {
+    if (select.options.length < LONG) return;
+    const name = select.name === "sport" ? "sports" : (select.name === "location" ? "places" : "the list");
+    const input = searchBox(name);
+    const wrap = document.createElement("span");
+    wrap.className = "select-search";
+    select.before(wrap);
+    wrap.append(input, select);
+    let snapshot = null;  // every option (and group) before filtering
+    const fits = () => { input.hidden = select.options.length < LONG; };  // a short list (3 places) needs no box
+    const watch = new MutationObserver(() => { snapshot = null; input.value = ""; fits(); });
+    watch.observe(select, { childList: true, subtree: true });
+    const autoSubmits = select.matches("[data-autosubmit]") || select.closest("form[data-auto-submit]");
+    input.addEventListener("input", () => {
+      if (!snapshot) snapshot = [...select.children].map((node) => [node, node.tagName === "OPTGROUP" ? [...node.children] : null]);
+      const words = fold(input.value).split(/\s+/).filter(Boolean);
+      const keep = (option) => !option.value || option.selected || matches(words, option.textContent);
+      const shown = [];
+      for (const [node, children] of snapshot) {
+        if (!children) { if (keep(node)) shown.push(node); continue; }
+        const kept = children.filter(keep);
+        node.replaceChildren(...kept);
+        if (kept.length) shown.push(node);
+      }
+      select.replaceChildren(...shown);
+      watch.takeRecords();  // our own change: keep the snapshot
+      const real = [...select.options].filter((option) => option.value);
+      if (words.length && real.length === 1 && !autoSubmits && !real[0].selected) {
+        select.value = real[0].value;  // one match: picked for you
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+  });
+
+  // The sports chips (sign-up, Your sports): the same box, hiding chips that don't match (ticked ones stay).
+  document.querySelectorAll("[data-chip-search]").forEach((grid) => {
+    const input = searchBox("sports");
+    grid.before(input);
+    input.addEventListener("input", () => {
+      const words = fold(input.value).split(/\s+/).filter(Boolean);
+      grid.querySelectorAll("label").forEach((chip) => {
+        chip.hidden = !(chip.querySelector("input").checked || matches(words, chip.textContent));
+      });
+    });
+  });
+})();
