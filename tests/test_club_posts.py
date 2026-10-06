@@ -464,3 +464,14 @@ def test_long_lists_have_a_search_box(accounts, client):
     assert "data-chip-search" in client.get("/profile/edit/sports").data.decode()
     css = client.get("/static/style.css").data.decode()
     assert ".select-search { display: grid;" in css and ".list-search[hidden] { display: none; }" in css
+
+
+def test_bot_round_the_plus_button_never_covers_the_last_links(accounts, client):
+    """Bot round (screen audit): at 320px the ＋ button sat on the footer's links, and the My clubs feed's two
+    links ran into each other. The footer gets room under it; the two links wrap instead of overlapping."""
+    accounts.signup(sports=("running",))
+    css = client.get("/static/style.css").data.decode()
+    assert "body.has-app-nav .site-footer { padding-bottom: 84px; }" in css and "padding-right: 74px; } }" in css
+    assert ".feed-find-club { margin: -4px 0 10px; display: flex; flex-wrap: wrap;" in css
+    page = client.get("/feed?show=myclubs").data.decode()
+    assert "Find a club to follow →</a><a " in page
