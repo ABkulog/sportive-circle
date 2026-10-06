@@ -98,8 +98,11 @@
       </div>
     </nav>
     {# ＋ to post, bottom right on every page (not over a chat's message box) #}
-    {% if not ep.startswith('social.thread') and ep not in ('social.event_chat', 'posts.feed') %}
-      <a class="post-fab" href="{{ url_for('posts.feed') }}#post" aria-label="New post" title="New post">＋</a>
+    {% if not ep.startswith('social.thread') and ep not in ('social.event_chat', 'posts.feed', 'clubs.share') %}
+      {% set fab_club = club.id if (ep == 'clubs.view' and can_post is defined and can_post) else
+                        (my_officer_clubs[0].id if (ep == 'clubs.updates' and my_officer_clubs) else None) %}
+      <a class="post-fab" href="{{ url_for('posts.feed', **({'as': fab_club} if fab_club else {})) }}#post"
+         aria-label="{{ 'New post as ' ~ club.name if fab_club and ep == 'clubs.view' else 'New post' }}" title="New post">＋</a>
     {% elif ep == 'posts.feed' %}
       <a class="post-fab" href="#post" aria-label="New post" title="New post" data-open-post>＋</a>
     {% endif %}

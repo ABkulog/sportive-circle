@@ -72,4 +72,4 @@ def test_friends_in_a_club_and_the_officers_week(accounts, client, app):
     as_user(accounts, "officer@uw.edu")
     page = client.get(f"/clubs/{club}").data.decode()
     assert "This week" in page and "<b>2</b> new follower" in page and "<b>1</b> waiting to join" in page
-    assert "Post an update!" in page
+    assert "Tap ＋ to post an update!" in page

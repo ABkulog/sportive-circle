@@ -253,11 +253,10 @@ def read_club_form(form, club_id=None, phone_on_file=""):
     data["verification_url"] = old["verification_url"] if old else ""
     if not 20 <= len(data["description"]) <= MAX_DESCRIPTION:
         return problem("description", f"Tell people about your club in 20 to {MAX_DESCRIPTION} characters.")
-    # Everything is required: people deciding whether to join need the full picture, and a way to reach you.
+    # What students need to decide and show up, and a way to reach you. Dues (blank = free), what to bring and a
+    # question for people joining are optional: fewer boxes, so clubs finish registering.
     required = {
-        "join_question": "a question for people who want to join",
         "meets": "when you practice or have events", "location": "where you meet",
-        "dues": "your dues (type Free if there are none)", "gear": "what to bring (or Nothing)",
         "how_to_join": "how new members get started",
         "club_email": "a club email (so students and our team can reach you)",
     }
@@ -515,7 +514,9 @@ def share(club_id):
     club = get_club(club_id)
     if club["status"] != "approved":
         abort(404)
-    return render_template("clubs/share.html", club=club, link=public_url("clubs.view", club_id=club_id))
+    from .pages import VERBS  # (pages.py imports this module)
+    return render_template("clubs/share.html", club=club, link=public_url("clubs.view", club_id=club_id),
+                           headline=f"{VERBS.get(club['sport'], 'Play')} with {club['name']}")
 
 
 @bp.route("/clubs/<int:club_id>/qr.svg")
@@ -569,6 +570,7 @@ def _club_form_page(form, club, error_field, unchanged=False):
     return render_template("clubs/form.html", form=form, club=club, locations=LOCATIONS, kinds=CLUB_KINDS,
                            focus=FOCUS, joining=JOINING, experience=EXPERIENCE, who=WHO_CAN_JOIN,
                            min_members=MIN_ACTIVE_MEMBERS, error_field=error_field, unchanged=unchanged,
+                           owner=bool(club) and is_owner(club),
                            phone_hidden=bool(club) and not can_see_club_phone(club))
 
 

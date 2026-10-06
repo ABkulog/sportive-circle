@@ -78,8 +78,10 @@ def _flyer_target():
 
 
 def flyer():
-    """A one-page printable flyer: headline, three steps and a big QR code (for a club, or the whole app)."""
+    """A one-page printable flyer for the whole app (admins). A club's poster is its Share page."""
     club, link = _flyer_target()
+    if club:
+        return redirect(url_for("clubs.share", club_id=club["id"]))
     headline = f"{VERBS.get(club['sport'], 'Play')} with {club['name']}" if club else "Find people to play with"
     return render_template("pages/flyer.html", club=club, link=link, headline=headline,
                            qr=url_for("flyer_qr", club=club["id"] if club else None))

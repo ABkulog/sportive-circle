@@ -28,29 +28,7 @@
   </section>
 {% endif %}
 
-{% if my_officer_clubs %}
-  {# Officers post as their club, to everyone's feed (and here): words, photos, 🔥 and replies #}
-  <form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="card update-composer" data-inplace data-swap-target="#feed-list">
-    {{ csrf_field() }}<input type="hidden" name="from_my_clubs" value="1">
-    <label class="field"><span>✏️ Post an update</span>
-      <textarea name="body" rows="3" maxlength="1000"
-                placeholder="Practice moved to the Quad this week! Bring water. 💧"></textarea></label>
-    <p class="composer-picked muted" data-picked hidden></p>
-    <div class="composer-row">
-      {% if my_officer_clubs|length == 1 %}
-        <input type="hidden" name="as_club" value="{{ my_officer_clubs[0].id }}">
-        <span class="muted">Posting as {{ SPORT_EMOJI[my_officer_clubs[0].sport] }} <strong>{{ my_officer_clubs[0].name }}</strong></span>
-      {% else %}
-        <select name="as_club" aria-label="Which club" required>
-          {% for c in my_officer_clubs %}<option value="{{ c.id }}">{{ SPORT_EMOJI[c.sport] }} {{ c.name }}</option>{% endfor %}
-        </select>
-      {% endif %}
-      <label class="btn btn-ghost btn-small composer-photos" title="Add up to {{ max_photos }} photos">📷<span>Photos</span>
-        <input type="file" name="photos" accept="image/*" multiple data-max-files="{{ max_photos }}" class="visually-hidden"></label>
-      <button class="btn">Post</button>
-    </div>
-  </form>
-{% endif %}
+{# Officers post with the ＋ (it opens set to post as their club): one way to post #}
 
 <div class="stack feed" id="feed-list" data-pull-refresh>
   {% for item in items %}
