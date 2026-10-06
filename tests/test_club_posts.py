@@ -485,8 +485,8 @@ def test_play_map_opens_full_screen_like_snap_map_and_phone_posts_are_dense(acco
     assert "data-map-open" in play and "data-map-close" in play and "← Back" in play and "data-map-recenter" in play
     js = client.get("/static/playmap.js").data.decode()
     assert 'history.pushState({ playMap: true }, "", "#map")' in js and "popstate" in js
-    assert "dragging: false" in js and "basemaps.cartocdn.com" in js            # a still preview, colorful tiles
-    assert "https://*.basemaps.cartocdn.com" in client.get("/").headers["Content-Security-Policy"]
+    assert "dragging: false" in js and "tile.openstreetmap.org" in js           # a still preview, colorful tiles
+    assert "cartocdn" not in js                         # CARTO's tiles need a paid key ("API KEY REQUIRED")
     css = client.get("/static/style.css").data.decode()
     assert ".live-map-wrap.is-full { position: fixed; inset: 0;" in css and ".play-map .leaflet-tile-pane { filter: grayscale" not in css
     assert ".feed > .feed-card { margin: 0 -16px; padding: 9px 16px; border-width: 0 0 1px;" in css

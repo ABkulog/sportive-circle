@@ -13,10 +13,11 @@
   const map = L.map(box, { scrollWheelZoom: false, zoomControl: false, attributionControl: true, dragging: false,
                            touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false })
     .setView([47.6553, -122.3035], 15);  // UW
-  // Bright, clean colors (CARTO Voyager, from OpenStreetMap), like Snap Map, instead of plain grey tiles.
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-    maxZoom: 19, subdomains: "abcd",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  // OpenStreetMap's own colorful tiles, like Snap Map (no grey filter). Not CARTO: its tiles need a paid key now
+  // and showed "API KEY REQUIRED" across the map.
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
 
   const bounds = [];
