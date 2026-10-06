@@ -536,3 +536,13 @@ def test_clubs_are_simple_one_poster_one_row_one_way_to_post(accounts, client, a
     assert 'class="officer-buttons"' in page and "+ Event" in page and "club-post-form" not in page
     assert f'href="/feed?as={club}#post"' in page and "Tap <strong>＋</strong> to post as" in page
     assert "Manage officers" in client.get(f"/clubs/{club}/edit").data.decode()
+
+
+def test_no_sideways_scroll_on_iphone_and_posts_are_separate_small_cards(client):
+    """The owner: on an iPhone 16 the ＋ sheet had to be moved sideways to see Video (Safari zooms into boxes under
+    16px, and long dropdowns could push past the screen); nothing should scroll sideways on any device. And feed
+    posts ran together: each is a small card now, with a little gap."""
+    css = client.get("/static/style.css").data.decode()
+    assert ".list-search, .chip-more select.chip, .post-sheet input, .post-sheet select, .post-sheet textarea { font-size: 16px; }" in css
+    assert "html, body { overflow-x: clip; }" in css and ".select-search { grid-template-columns: minmax(0, 1fr); }" in css
+    assert ".feed { gap: 8px; }" in css and ".feed > .feed-card { margin: 0; padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px; }" in css
