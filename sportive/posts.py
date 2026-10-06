@@ -38,8 +38,11 @@ PLAN_DURATIONS = [(60, "1 hour"), (120, "2 hours"), (180, "3 hours"), (240, "4 h
 MAX_PLAN_SPOTS = 50
 
 # Posts by people I blocked (or who blocked me), or by suspended people, never show. A club's post shows while the
-# club is verified. (SQL on posts p, users u and clubs c: see POST_FROM.)
-POST_VISIBLE = """u.suspended = 0 AND (p.club_id IS NULL OR c.status = 'approved') AND NOT EXISTS (SELECT 1 FROM blocks b
+# club is verified, and a club's members-only post only to its members. (SQL on posts p, users u and clubs c: see
+# POST_FROM.)
+MEMBERS_SEE = """(p.members_only = 0 OR EXISTS (SELECT 1 FROM club_members mo WHERE mo.club_id = p.club_id
+                     AND mo.user_id = :me AND mo.role IN ('member', 'officer')))"""
+POST_VISIBLE = f"""u.suspended = 0 AND (p.club_id IS NULL OR c.status = 'approved') AND {MEMBERS_SEE} AND NOT EXISTS (SELECT 1 FROM blocks b
                      WHERE (b.blocker_id = :me AND b.blocked_id = p.author_id)
                         OR (b.blocker_id = p.author_id AND b.blocked_id = :me))"""
 
@@ -542,12 +545,15 @@ def create():
     if error is not None:
         flash(error, "error")
         return redirect(back)
+    members_only = 1 if club and form.get("members_only") else 0  # a club's post just for its members
     if plan and club:
         plan["club_id"] = club["id"]  # a club's plan is a club event: it's on the club's page too
+        plan["members_only"] = members_only
     event_id = insert_event(plan) if plan else None  # (commits)
-    cur = db.execute("INSERT INTO posts (author_id, sport, body, event_id, created_at, club_id)"
-                     " VALUES (?, ?, ?, ?, ?, ?)",
-                     (g.user["id"], sport, body, event_id, to_db(now_local()), club["id"] if club else None))
+    cur = db.execute("INSERT INTO posts (author_id, sport, body, event_id, created_at, club_id, members_only)"
+                     " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                     (g.user["id"], sport, body, event_id, to_db(now_local()), club["id"] if club else None,
+                      members_only))
     for position, jpeg in enumerate(jpegs, start=1):
         db.execute("INSERT INTO post_photos (post_id, position, image) VALUES (?, ?, ?)", (cur.lastrowid, position, jpeg))
     if video:
@@ -558,7 +564,8 @@ def create():
         from .events import get_event  # (the game with its host's name, for the "Maya posted" notices)
         announce_new_game(get_event(event_id))
     if club:
-        flash(f"Posted as {club['name']}. Everyone sees it in their feed.", "success")
+        flash(f"Posted as {club['name']}. " + ("Only its members see it." if members_only
+                                                else "Everyone sees it in their feed."), "success")
         return redirect(back)
     flash("Posted! People can tap I'm in to join your plan." if plan else "Posted!", "success")
     return redirect(back)

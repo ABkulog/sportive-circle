@@ -1927,3 +1927,7 @@ html, body { overflow-x: clip; }
 .feed-actions .react-button { min-height: 32px; font-size: .8rem; }
 .feed-actions .react-button .icon { width: 20px; height: 20px; }
 .feed > .feed-card > .feed-actions .card-more { top: 4px; right: 4px; }
+
+/* Members only: the switch shows once "Post as" is set to a club */
+.composer .members-only { display: none; margin-top: 8px; }
+.composer:has(select[name="as_club"] option:not([value=""]):checked) .members-only { display: flex; }
