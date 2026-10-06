@@ -529,7 +529,7 @@ def test_clubs_are_simple_one_poster_one_row_one_way_to_post(accounts, client, a
     accounts.signup(email="officer@uw.edu", sports=("running",))
     club = approved_club(app, "officer@uw.edu")
     share = client.get(f"/clubs/{club}/share").data.decode()
-    assert share.count('class="btn') == 1 and "Print or save poster" in share and "data-copy=" in share
+    assert share.count('class="btn') == 2 and "Print or save poster" in share and "data-copy=" in share
     assert "Scan the code" in share and ">Flyer<" not in share and ">Share link<" not in share
     assert client.get(f"/flyer?club={club}").headers["Location"].endswith(f"/clubs/{club}/share")
     page = client.get(f"/clubs/{club}").data.decode()
@@ -621,3 +621,17 @@ def test_a_club_can_post_for_members_only(accounts, client, app):
     post(client, body="Just me", members_only="1")                              # only clubs can: ignored
     with app.app_context():
         assert get_db().execute("SELECT members_only FROM posts WHERE body = 'Just me'").fetchone()[0] == 0
+
+
+def test_a_club_shares_its_poster_to_an_instagram_story(accounts, client, app):
+    """The owner: the QR is nice for tables, but clubs need "share to Instagram" that opens the story ready to post.
+    The phone draws a story picture (the club, its QR code and link) and opens its share menu: Instagram → Story."""
+    accounts.signup(email="officer@uw.edu", sports=("running",))
+    club = approved_club(app, "officer@uw.edu")
+    share = client.get(f"/clubs/{club}/share").data.decode()
+    assert "Share to Instagram story" in share and 'data-story="Run with UW Run Club"' in share
+    assert f'data-story-qr="/clubs/{club}/qr.svg"' in share and 'data-story-file="uw-run-club-story.png"' in share
+    assert 'data-story-emoji="' in share                                    # no logo yet: the sport's emoji
+    js = client.get("/static/app.js").data.decode()
+    assert "navigator.share({ files: [file] })" in js and "canvas.width = 1080; canvas.height = 1920;" in js
+    assert "a.download = file.name;" in js                                  # laptops save the picture instead

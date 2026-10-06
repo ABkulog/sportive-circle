@@ -19,7 +19,14 @@
   <button type="button" class="flyer-link" data-copy="{{ link }}" title="Tap to copy the link"><span data-copy-label>{{ link.replace('https://', '') }}</span></button>
 </article>
 <div class="no-print poster-actions">
-  <button type="button" class="btn btn-block" data-print>Print or save poster</button>
+  {# The story picture is drawn on the phone (app.js) from the club's name, logo and QR code, then handed to the
+     phone's share menu: tap Instagram, then Story. Where a browser can't share pictures it saves the picture. #}
+  <button type="button" class="btn btn-block" data-story="{{ headline }}" data-story-qr="{{ url_for('clubs.qr_code', club_id=club.id) }}"
+          data-story-link="{{ link.replace('https://', '') }}" data-story-file="{{ club.name|lower|replace(' ', '-') }}-story.png"
+          {% if club.logo_updated %}data-story-logo="{{ url_for('clubs.logo', club_id=club.id, v=club.logo_updated) }}"{% else %}data-story-emoji="{{ SPORT_EMOJI[club.sport] }}"{% endif %}>
+    Share to Instagram story</button>
+  <p class="muted fine-print" data-story-tip hidden>Saved the story picture. Open Instagram, swipe to your story and pick it.</p>
+  <button type="button" class="btn btn-ghost btn-block" data-print>Print or save poster</button>
   <p class="muted fine-print">Tap the link above to copy it for your Instagram bio or group chat.</p>
 </div>
 {% endblock %}

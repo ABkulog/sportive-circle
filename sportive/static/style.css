@@ -1931,3 +1931,5 @@ html, body { overflow-x: clip; }
 /* Members only: the switch shows once "Post as" is set to a club */
 .composer .members-only { display: none; margin-top: 8px; }
 .composer:has(select[name="as_club"] option:not([value=""]):checked) .members-only { display: flex; }
+
+.poster-actions .btn + .btn, .poster-actions .fine-print + .btn { margin-top: 10px; }  /* story button, then print */
