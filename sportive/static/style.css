@@ -1723,9 +1723,9 @@ h1, .home-section-title { font-family: var(--font); font-weight: 700; letter-spa
 /* Top bar: white, a hairline under it, the bold wordmark ("Circle" in purple), black icons */
 .topbar { background: var(--bg); border-bottom: 1px solid var(--line); }
 .topbar-inner { height: 52px; }
-.topbar .brand, .appnav .brand { font-family: var(--wordmark); font-weight: 800; font-size: 1.4rem; color: var(--text);
+.topbar .brand, .appnav .brand { font-family: var(--wordmark); font-weight: 800; font-size: 1.4rem; color: var(--purple);
   letter-spacing: 0; }
-.topbar .brand-accent, .appnav .brand-accent { color: var(--purple); margin-left: 0; }  /* SportiveCircle, "Circle" in purple */
+.topbar .brand-accent, .appnav .brand-accent { color: var(--gold); margin-left: 0; }  /* "Sportive" purple, "Circle" Husky Gold */
 body.has-app-nav .topbar .brand img, .appnav .brand img { display: none; }
 .top-icons { gap: 6px; }
 .top-icons a { color: var(--text); width: 40px; height: 40px; }
