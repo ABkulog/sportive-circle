@@ -501,6 +501,7 @@ def test_it_looks_like_instagram(accounts, client, app):
     post(client, body="Track at 6")
     css = client.get("/static/style.css").data.decode()
     assert "--wordmark: var(--display);" in css and "cursive" not in css and ".topbar { background: var(--bg);" in css
+    assert "color: var(--purple);\n  letter-spacing: 0; }" in css and ".appnav .brand-accent { color: var(--gold);" in css  # Sportive purple, Circle gold
     assert ".appnav .tab-label { position: absolute;" in css            # icon-only bottom bar on phones
     feed = client.get("/feed").data.decode()
     assert 'class="tab-me"' in feed and '#i-heart"/>' in feed and '#i-chat"/>' in feed
