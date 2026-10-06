@@ -1,10 +1,26 @@
 {% extends "base.html" %}
 {% block title %}Sign up{% endblock %}
 {% block content %}
+{% if not club_signup %}
+{# Officers at a club meeting: one tap to the short path (account, code, club), no profile to fill in first #}
+<a class="card officer-signup" href="{{ url_for('auth.signup', club=1) }}">
+  <span class="officer-signup-icon" aria-hidden="true">🏆</span>
+  <span><strong>Club officer? Register your club</strong><br>
+    <small class="muted">A quick account, then straight to your club. Your profile can wait.</small></span>
+  <span class="officer-signup-go" aria-hidden="true">›</span>
+</a>
+{% endif %}
 <div class="card form-card">
+  {% if club_signup %}
+  <p class="step-label">Step 1 of 3 · Account</p>
+  <h1>Register your club</h1>
+  <p class="muted">First a quick account with your @uw.edu email, then your club. Your profile can wait.
+    <a href="{{ url_for('auth.signup') }}">Not an officer?</a></p>
+  {% else %}
   <p class="step-label">Step 1 of {{ 4 if sms_available() else 3 }}</p>
   <h1>Join Sportive Circle</h1>
   <p class="muted">For UW students. We'll email a code to your @uw.edu address.</p>
+  {% endif %}
   <form method="post" class="form">
     {{ csrf_field() }}
     <label class="field"><span>Full name</span>

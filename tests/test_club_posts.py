@@ -621,3 +621,30 @@ def test_a_club_can_post_for_members_only(accounts, client, app):
     post(client, body="Just me", members_only="1")                              # only clubs can: ignored
     with app.app_context():
         assert get_db().execute("SELECT members_only FROM posts WHERE body = 'Just me'").fetchone()[0] == 0
+
+
+def test_officers_sign_up_straight_to_their_club(accounts, client, app):
+    page = client.get("/signup").data.decode()
+    assert "Club officer? Register your club" in page and 'href="/signup?club=1"' in page
+    page = client.get("/signup?club=1").data.decode()
+    assert "Register your club" in page and "Club officer?" not in page and "Step 1 of 3" in page
+    response = client.post("/signup", data={"full_name": "Olive Officer", "email": "olive@uw.edu",
+                                            "password": "purple-and-gold", "password2": "purple-and-gold",
+                                            "birth_date": "2004-03-01", "grad_year": ""})
+    assert response.headers["Location"] == "/verify"                      # no sports step, no texts step
+    assert "Step 2 of 3" in client.get("/verify").data.decode()
+    response = client.post("/verify", data={"code": accounts.code_for("olive@uw.edu")})
+    assert response.headers["Location"] == "/clubs/new"
+    page = client.get("/clubs/new").data.decode()                           # no photo step in the way
+    assert "Now your club. Your profile can wait" in page and 'name="name"' in page
+    assert "Your profile can wait" in client.get("/notifications").data.decode()
+    assert client.get("/signup?club=1").headers["Location"] == "/clubs/new"  # already in: to the club form
+    accounts.logout()
+    client.get("/signup?club=1")
+    client.get("/signup")                                                    # "Not an officer?": the usual steps
+    response = client.post("/signup", data={"full_name": "Sam Student", "email": "sam@uw.edu",
+                                            "password": "purple-and-gold", "password2": "purple-and-gold",
+                                            "birth_date": "2004-03-01", "grad_year": ""})
+    assert response.headers["Location"] == "/signup/sports"
+    for page in ("/clubs", "/"):
+        assert 'href="/signup?club=1"' in client.get(page).data.decode()
