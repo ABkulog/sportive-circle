@@ -859,4 +859,15 @@
     toggle.setAttribute("aria-label", video.paused ? "Play the video" : "Pause the video");
   };
   ["play", "pause", "ended"].forEach((type) => document.addEventListener(type, syncVideoButton, true));
+
+  // <a data-close-details> inside an open <details> (e.g. a club's "Request to join" form): Cancel closes it right
+  // there. (Without JavaScript it's a link back to the page, which also closes it.)
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest && event.target.closest("[data-close-details]");
+    const panel = link && link.closest("details[open]");
+    if (!panel) return;
+    event.preventDefault();
+    panel.open = false;
+    panel.querySelector("summary")?.focus();
+  });
 })();

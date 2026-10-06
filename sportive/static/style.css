@@ -1582,3 +1582,12 @@ body.has-app-nav .home-tabs { position: sticky; top: 60px; z-index: 20; backgrou
 .feed-card { padding: 9px 12px; }
 .feed-body { font-size: .9rem; margin-top: 4px; }
 .feed-actions { margin-top: 4px; }
+/* A club's "Request to join": the button turns into the form (no second button above it), Send / Cancel, and
+   Follow steps aside while the form is open */
+.join-panel[open] > summary { display: none; }
+.join-title { margin: 0 0 6px; }
+.join-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.join-actions:has(.join-panel[open]) { grid-template-columns: 1fr; }
+.join-actions:has(.join-panel[open]) .follow-toggle { display: none; }
+.follow-toggle form { margin: 0; }
+.follow-toggle .btn { width: 100%; }

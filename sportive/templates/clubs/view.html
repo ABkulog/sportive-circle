@@ -75,34 +75,47 @@
     {% elif role in ('requested', 'tryout') %}
       <div class="waiting-box">
         <strong>{{ 'Signed up for tryouts' if role == 'tryout' else 'Request sent' }}</strong>
-        <span class="muted">{{ 'An officer marks who makes the team.' if role == 'tryout' else 'An officer will confirm you.' }}</span>
+        <span class="muted">{{ 'An officer marks who makes the team.' if role == 'tryout' else 'An officer will confirm you.' }}
+          You'll see their updates while you wait.</span>
       </div>
     {% else %}
-      <aside class="welcome-help" data-tip="follow-vs-member" hidden>
-        <span><strong>Follow</strong> shows you their updates. You're a <strong>member</strong> once an officer confirms you.</span>
-        <button type="button" class="link-button" aria-label="Dismiss" data-tip-close>{{ icon('x') }}</button>
-      </aside>
-      <div class="action-pair">
+      {# The tip is for people who haven't done anything here yet (it came back after following) #}
+      {% if not role %}
+        <aside class="welcome-help" data-tip="follow-vs-member" hidden>
+          <span><strong>Follow</strong> shows you their updates. You're a <strong>member</strong> once an officer confirms you.</span>
+          <button type="button" class="link-button" aria-label="Dismiss" data-tip-close>{{ icon('x') }}</button>
+        </aside>
+      {% endif %}
+      {# One thing at a time: "Request to join" turns into the form (Send / Cancel); while it's open, Follow is
+         hidden, so following can't throw away a half-written request. Asking to join already shows you their
+         updates. #}
+      <div class="action-pair join-actions">
         <details class="join-panel" {% if request.args.get('ask') %}open{% endif %}>
           <summary class="btn">{{ cta }}</summary>
           <form method="post" action="{{ url_for('clubs.join', club_id=club.id) }}" class="form">
             {{ csrf_field() }}
+            <p class="join-title"><strong>{{ cta }}</strong></p>
             {% if club.join_question %}
               <label class="field"><span>{{ club.join_question }}</span>
                 <textarea name="message" rows="3" maxlength="500" {% if club.joining == 'application' %}required{% endif %}></textarea></label>
             {% endif %}
-            <button class="btn btn-block">Send</button>
+            <div class="join-buttons">
+              <button class="btn">Send</button>
+              <a class="btn btn-ghost" href="{{ url_for('clubs.view', club_id=club.id) }}" data-close-details>Cancel</a>
+            </div>
           </form>
         </details>
-        {% if role == 'follower' %}
-          <form method="post" action="{{ url_for('clubs.leave', club_id=club.id) }}">
-            {{ csrf_field() }}<button class="btn btn-ghost">Unfollow</button>
-          </form>
-        {% else %}
-          <form method="post" action="{{ url_for('clubs.follow', club_id=club.id) }}">
-            {{ csrf_field() }}<button class="btn btn-ghost">Follow</button>
-          </form>
-        {% endif %}
+        <span id="follow-toggle" class="follow-toggle" data-swap>
+          {% if role == 'follower' %}
+            <form method="post" action="{{ url_for('clubs.leave', club_id=club.id) }}" data-inplace>
+              {{ csrf_field() }}<button class="btn btn-ghost">Unfollow</button>
+            </form>
+          {% else %}
+            <form method="post" action="{{ url_for('clubs.follow', club_id=club.id) }}" data-inplace>
+              {{ csrf_field() }}<button class="btn btn-ghost">Follow</button>
+            </form>
+          {% endif %}
+        </span>
       </div>
     {% endif %}
     {% if owner and role != 'officer' %}{# an admin who isn't an officer here: a way to fix a stuck club #}

@@ -349,3 +349,21 @@ def test_feed_media_is_small_and_opens_big(accounts, client, app):
     css = client.get("/static/style.css").data.decode()
     assert ".feed-thumb { position: relative; width: 92px; height: 92px;" in css
     assert ".video-toggle { position: absolute; left: 6px; bottom: 6px;" in css
+
+
+def test_request_to_join_is_one_clear_form(accounts, client, app):
+    """Tapping Request to join turns the button into the form (Send / Cancel); Follow steps aside while it's open
+    and works in place; the follow tip is only for people who haven't followed or asked yet."""
+    accounts.signup(email="officer@uw.edu", sports=("running",))
+    club = approved_club(app, "officer@uw.edu")
+    accounts.logout()
+    accounts.signup(email="maya@uw.edu", sports=("running",))
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "data-close-details>Cancel</a>" in page and 'data-tip="follow-vs-member"' in page
+    assert 'id="follow-toggle"' in page and 'action="/clubs/%d/follow" data-inplace' % club in page
+    client.post(f"/clubs/{club}/follow")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert 'data-tip="follow-vs-member"' not in page and ">Unfollow<" in page
+    css = client.get("/static/style.css").data.decode()
+    assert ".join-panel[open] > summary { display: none; }" in css
+    assert ".join-actions:has(.join-panel[open]) .follow-toggle { display: none; }" in css
