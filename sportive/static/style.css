@@ -1635,3 +1635,11 @@ body.sheet-open { overflow: hidden; }
 .start-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
 .start-quick .chip[aria-pressed="true"] { background: var(--purple); border-color: var(--purple); color: var(--on-accent); }
 body.hide-tabs .post-fab { display: none; }  /* not over a form's own Back / Next */
+
+/* Search in long lists (app.js): a small box right above the dropdown or the sports chips */
+.select-search { display: grid; gap: 4px; min-width: 0; }
+.select-search select { width: 100%; }
+.list-search { width: 100%; min-height: 34px; padding: 5px 12px; font-size: .9rem; border-radius: 999px; }
+.list-search + .chip-grid { margin-top: 8px; }
+.chip-grid label[hidden] { display: none; }
+.list-search[hidden] { display: none; }
