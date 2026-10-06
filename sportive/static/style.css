@@ -1469,7 +1469,7 @@ body.has-app-nav .home-tabs { position: sticky; top: 60px; z-index: 20; backgrou
 .profile-menu .icon { width: 16px; height: 16px; }
 .profile-menu .count-dot { position: static; margin-left: 2px; }
 .profile-links { margin-top: 10px; font-weight: 600; }
-.feed-find-club { margin: -4px 0 10px; }
+.feed-find-club { margin: -4px 0 10px; display: flex; flex-wrap: wrap; gap: 2px 14px; }  /* two links: they wrap, never overlap */
 .create-more { margin: 14px 0 0; }
 /* Every card the same: avatar, name, time, #sport, content, reactions. Clubs just have the verified mark. */
 .feed-card.is-club { box-shadow: none; }
@@ -1643,3 +1643,7 @@ body.hide-tabs .post-fab { display: none; }  /* not over a form's own Back / Nex
 .list-search + .chip-grid { margin-top: 8px; }
 .chip-grid label[hidden] { display: none; }
 .list-search[hidden] { display: none; }
+
+/* Room under the footer, so the ＋ button never sits on its links (or the last thing on a page) */
+body.has-app-nav .site-footer { padding-bottom: 84px; }
+@media (max-width: 999px) { body.has-app-nav .site-footer { padding-left: 74px; padding-right: 74px; } }  /* short pages: clear of ＋ */

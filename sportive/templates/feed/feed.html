@@ -27,7 +27,7 @@
     <noscript><button class="btn btn-small btn-ghost">Show</button></noscript>
   </form>
 </nav>
-{% if show %}<p class="muted small feed-find-club"><a href="{{ url_for('clubs.directory') }}">Find a club to follow →</a>{% if show == 'myclubs' %} · <a href="{{ url_for('clubs.updates') }}">Manage my clubs</a>{% endif %}</p>{% endif %}
+{% if show %}<p class="muted small feed-find-club"><a href="{{ url_for('clubs.directory') }}">Find a club to follow →</a>{% if show == 'myclubs' %}<a href="{{ url_for('clubs.updates') }}">Manage my clubs</a>{% endif %}</p>{% endif %}
 
 {# The ＋ button (bottom right) opens this sheet, like Instagram's create: the feed itself starts with posts. #}
 <div class="post-sheet" id="post" role="dialog" aria-modal="true" aria-labelledby="post-sheet-title">
