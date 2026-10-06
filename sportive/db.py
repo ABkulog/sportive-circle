@@ -34,6 +34,9 @@ def close_db(exception=None):
 # (Columns and tables of removed features, like ranks, stay in older databases unused; nothing reads them.)
 ADDED_COLUMNS = [
     ("posts", "club_id", "INTEGER REFERENCES clubs(id) ON DELETE CASCADE"),  # posted by an officer as the club
+    ("posts", "pinned_until", "TEXT"),  # a club pinned it to the top of its page, until then (24 hours)
+    # Officers the owner lets post as the club (the owner always can). Officers from before this kept posting.
+    ("club_members", "can_post", "INTEGER NOT NULL DEFAULT 1"),
     ("post_replies", "club_id", "INTEGER REFERENCES clubs(id) ON DELETE CASCADE"),  # replied as the club
     ("events", "try_it", "INTEGER NOT NULL DEFAULT 0"),
     # Off campus: exactly where (a dropped pin, coordinates from a pasted Google / Apple Maps link, an address)

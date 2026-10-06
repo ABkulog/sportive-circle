@@ -1635,3 +1635,6 @@ body.sheet-open { overflow: hidden; }
 .start-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
 .start-quick .chip[aria-pressed="true"] { background: var(--purple); border-color: var(--purple); color: var(--on-accent); }
 body.hide-tabs .post-fab { display: none; }  /* not over a form's own Back / Next */
+
+/* A club's pinned post (24 hours), on its page */
+.pinned-line { margin: 0 0 4px; font-size: .78rem; font-weight: 600; color: var(--muted); }

@@ -253,6 +253,7 @@ CREATE TABLE IF NOT EXISTS club_members (
     role      TEXT NOT NULL DEFAULT 'member',
     message   TEXT NOT NULL DEFAULT '',     -- their answer to the club's join question
     joined_at TEXT NOT NULL,
+    can_post  INTEGER NOT NULL DEFAULT 1,   -- officers: the owner lets them post as the club (new officers: 0)
     PRIMARY KEY (club_id, user_id)
 );
 
@@ -450,7 +451,8 @@ CREATE TABLE IF NOT EXISTS posts (
     body       TEXT NOT NULL DEFAULT '',
     event_id   INTEGER REFERENCES events(id) ON DELETE SET NULL,  -- a plan post's game
     created_at TEXT NOT NULL,                       -- Seattle time
-    club_id    INTEGER REFERENCES clubs(id) ON DELETE CASCADE      -- posted by an officer as the club
+    club_id    INTEGER REFERENCES clubs(id) ON DELETE CASCADE,     -- posted by an officer as the club
+    pinned_until TEXT                               -- a club pinned it on its page until then (24 hours)
 );
 CREATE INDEX IF NOT EXISTS idx_posts_sport ON posts(sport, id);
 CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_id, id);

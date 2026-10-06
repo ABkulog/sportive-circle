@@ -13,7 +13,7 @@ from flask import Blueprint, Response, abort, flash, g, redirect, render_templat
 from werkzeug.datastructures import MultiDict
 
 from .auth import login_required, safe_next
-from .clubs import MEMBER_ROLES, officer_clubs
+from .clubs import MEMBER_ROLES, can_post_as, poster_clubs
 from .constants import LOCATIONS, SPORTS
 from .db import get_db, user_sports
 from .events import (MEMBERS_ONLY_FOR_MEMBERS, NOT_BLOCKED, insert_event, posting_too_fast, query_events,
@@ -181,13 +181,17 @@ def add_club_info(item, roles):
 def club_post_items(club_id, limit=20):
     """A club's posts (made as the club), as feed items with photos, for its page."""
     me = g.user["id"]
+    now = to_db(now_local())
     rows = get_db().execute(
         f"""SELECT {POST_FIELDS}, {POST_COUNTS} FROM {POST_FROM}
-            WHERE p.club_id = :club AND {POST_VISIBLE} ORDER BY p.created_at DESC, p.id DESC LIMIT :limit""",
-        {"club": club_id, "me": me, "limit": limit}).fetchall()
+            WHERE p.club_id = :club AND {POST_VISIBLE}
+            ORDER BY COALESCE(p.pinned_until > :now, 0) DESC, p.created_at DESC, p.id DESC LIMIT :limit""",
+        {"club": club_id, "me": me, "limit": limit, "now": now}).fetchall()
     events = _events_by_id([row["event_id"] for row in rows if row["event_id"]])
     roles = _my_club_roles(me)
-    items = [add_club_info({"kind": "post", "at": row["created_at"], "post": row,
+    can_pin = can_post_as(club_id, me)  # whoever posts as the club pins its posts
+    items = [add_club_info({"kind": "post", "at": row["created_at"], "post": row, "can_pin": can_pin,
+                            "pinned": bool(row["pinned_until"] and row["pinned_until"] > now),
                             "event": events.get(row["event_id"]) if row["event_id"] else None}, roles)
              for row in rows]
     return items, photos_of([row["id"] for row in rows])
@@ -269,7 +273,7 @@ def feed():
     return render_template("feed/feed.html", items=items, older=older, sport=sport, my_sports=user_sports(g.user["id"]),
                            photos=photos, show=show,
                            durations=PLAN_DURATIONS, max_photos=MAX_PHOTOS, max_body=MAX_BODY, form={},
-                           max_seconds=MAX_SECONDS, post_as=officer_clubs(g.user["id"]),
+                           max_seconds=MAX_SECONDS, post_as=poster_clubs(g.user["id"]),
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"),
                            as_club=request.args.get("as", type=int),
                            member_roles=MEMBER_ROLES, club_picks=club_picks)
@@ -318,7 +322,7 @@ def view(post_id):
         add_club_info(item, _my_club_roles(g.user["id"]))
     return render_template("feed/post.html", item=item,
                            photos=photos_of([post_id]), replies=replies, max_reply=MAX_REPLY,
-                           post_as=officer_clubs(g.user["id"]), can_delete_post=can_delete(post))
+                           post_as=poster_clubs(g.user["id"]), can_delete_post=can_delete(post))
 
 
 def _can_interact(post):
@@ -366,7 +370,7 @@ def reply(post_id):
     back = url_for("posts.view", post_id=post_id) + f"#replies-{post_id}"
     club = None
     if request.form.get("as_club", "").isdigit():  # an officer replying as their club
-        club = next((c for c in officer_clubs(g.user["id"]) if c["id"] == int(request.form["as_club"])), None)
+        club = next((c for c in poster_clubs(g.user["id"]) if c["id"] == int(request.form["as_club"])), None)
         if club is None:
             abort(403)
     if not body or len(body) > MAX_REPLY:
@@ -496,7 +500,7 @@ def create():
     jpegs = []
     club = None
     if form.get("as_club", "").isdigit():  # an officer posting as their club
-        club = next((c for c in officer_clubs(g.user["id"]) if c["id"] == int(form["as_club"])), None)
+        club = next((c for c in poster_clubs(g.user["id"]) if c["id"] == int(form["as_club"])), None)
         if club is None:
             abort(403)
         if form.get("from_club"):
@@ -556,6 +560,31 @@ def create():
         return redirect(back)
     flash("Posted! People can tap I'm in to join your plan." if plan else "Posted!", "success")
     return redirect(back)
+
+
+PIN_FOR = timedelta(hours=24)
+
+
+@bp.route("/posts/<int:post_id>/pin", methods=("POST",))
+@login_required
+def pin(post_id):
+    """A club pins one of its posts to the top of its page for a day (one at a time); tapping again unpins it."""
+    db = get_db()
+    post = db.execute("SELECT id, club_id, pinned_until FROM posts WHERE id = ?", (post_id,)).fetchone()
+    if post is None or not post["club_id"]:
+        abort(404)
+    if not can_post_as(post["club_id"], g.user["id"]):
+        abort(403)
+    now = now_local()
+    if post["pinned_until"] and post["pinned_until"] > to_db(now):
+        db.execute("UPDATE posts SET pinned_until = NULL WHERE id = ?", (post_id,))
+        flash("Unpinned.", "info")
+    else:
+        db.execute("UPDATE posts SET pinned_until = NULL WHERE club_id = ?", (post["club_id"],))
+        db.execute("UPDATE posts SET pinned_until = ? WHERE id = ?", (to_db(now + PIN_FOR), post_id))
+        flash("Pinned to the top of the club's page for 24 hours.", "success")
+    db.commit()
+    return redirect(url_for("clubs.view", club_id=post["club_id"]) + "#announcements")
 
 
 @bp.route("/posts/<int:post_id>/delete", methods=("POST",))

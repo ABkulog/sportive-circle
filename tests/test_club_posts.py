@@ -399,3 +399,56 @@ def test_the_clubs_tab_finds_and_registers_clubs(accounts, client, app):
     assert "UW Tennis Club" in fits and "Husky Rowing" not in fits
     assert client.get("/create").headers["Location"].endswith("/clubs")
     assert '<span class="tab-label">Clubs<' in page and 'class="tab is-active" href="/clubs"' in page
+
+
+def test_clubs_pin_a_post_owner_picks_posters_and_members_keep_following(accounts, client, app):
+    """The owner: clubs pin a post on their page for a day; the owner gives officers permission to post (not every
+    officer runs the socials); members follow the club and leaving the club keeps them following."""
+    accounts.signup(email="owner@uw.edu", sports=("running",))
+    accounts.logout()
+    accounts.signup(email="vp@uw.edu", sports=("running",))
+    accounts.logout()
+    accounts.signup(email="fan@uw.edu", sports=("running",))
+    club = approved_club(app, "owner@uw.edu")
+    vp, fan = user_id(app, "vp@uw.edu"), user_id(app, "fan@uw.edu")
+    with app.app_context():
+        get_db().execute("INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, 'member', ?)",
+                         (club, vp, "2026-09-01 10:00"))
+        get_db().execute("INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, 'member', ?)",
+                         (club, fan, "2026-09-01 10:00"))
+        get_db().commit()
+    # members follow: the owner and both members are its 3 followers
+    assert "<strong>3</strong><span>followers</span>" in client.get(f"/clubs/{club}").data.decode()
+    client.post(f"/clubs/{club}/leave")                                  # fan leaves: still follows
+    with app.app_context():
+        assert get_db().execute("SELECT role FROM club_members WHERE user_id = ?", (fan,)).fetchone()[0] == "follower"
+
+    as_user(accounts, "owner@uw.edu")
+    client.post(f"/clubs/{club}/officers/{vp}")                          # a new officer: no posting yet
+    as_user(accounts, "vp@uw.edu")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "The owner picks which officers post as the club" in page
+    assert 'name="as_club"' not in client.get("/feed").data.decode()
+    refused = client.post("/posts/new", data={"sport": "running", "body": "sneaky", "as_club": str(club)},
+                          content_type="multipart/form-data")
+    assert refused.status_code == 403
+    as_user(accounts, "owner@uw.edu")
+    assert "Posts: <strong>Off</strong>" in client.get(f"/clubs/{club}/officers").data.decode()
+    client.post(f"/clubs/{club}/officers", data={"user": vp, "action": "posting_on"})
+    as_user(accounts, "vp@uw.edu")
+    post(client, as_club=str(club), body="Track night 6pm")
+    post(client, as_club=str(club), body="Newer post")
+    with app.app_context():
+        first = get_db().execute("SELECT id FROM posts WHERE body = 'Track night 6pm'").fetchone()[0]
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert page.index("Newer post") < page.index("Track night 6pm") and "📌 Pin for 24 hours" in page
+    client.post(f"/posts/{first}/pin")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "📌 Pinned" in page and page.index("Track night 6pm") < page.index("Newer post") and ">Unpin<" in page
+    with app.app_context():
+        get_db().execute("UPDATE posts SET pinned_until = '2020-01-01 00:00' WHERE id = ?", (first,))  # a day later
+        get_db().commit()
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "📌 Pinned" not in page and page.index("Newer post") < page.index("Track night 6pm")
+    as_user(accounts, "fan@uw.edu")
+    assert client.post(f"/posts/{first}/pin").status_code == 403         # only the club's posters pin

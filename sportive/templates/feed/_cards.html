@@ -41,6 +41,7 @@
   {% set p = item.post %}
   {% set who = p.club_name if p.club_id else p.full_name %}
   <article class="card feed-card {% if p.club_id %}is-club{% endif %}" id="post-{{ p.id }}" data-swap>
+    {% if item.pinned %}<p class="pinned-line">📌 Pinned</p>{% endif %}
     {% if p.club_id %}
       {% set name %}{{ p.club_name }} {{ verified_badge() }}{% endset %}
       {{ card_head(url_for('clubs.view', club_id=p.club_id), club_logo(p, 32, logo=p.club_logo or '', club_id=p.club_id),
@@ -83,7 +84,9 @@
       <a class="react-button" href="{{ url_for('posts.view', post_id=p.id) }}#replies-{{ p.id }}" data-replies="replies-{{ p.id }}" aria-expanded="false" aria-label="Replies{% if p.reply_count %}, {{ p.reply_count }}{% endif %}">💬 <span>{{ p.reply_count or 'Reply' }}</span></a>
       <span class="feed-actions-spacer"></span>
       {{ more_menu(url_for('moderation.report', target_type='post', target_id=p.id) if p.author_id != g.user.id else None,
-                   url_for('posts.delete', post_id=p.id) if p.author_id == g.user.id or is_admin() or (p.club_id and item.my_role == 'officer') else None) }}
+                   url_for('posts.delete', post_id=p.id) if p.author_id == g.user.id or is_admin() or (p.club_id and item.my_role == 'officer') else None,
+                   pin_url=url_for('posts.pin', post_id=p.id) if item.can_pin and item.on_club_page else None,
+                   pinned=item.pinned) }}
     </footer>
   </article>
 {% endmacro %}
@@ -101,11 +104,16 @@
 
 
 {# Report and Delete: in a ⋯ menu, so each card shows just 🔥 and Reply #}
-{% macro more_menu(report_url=None, delete_url=None, what='post') %}
-  {% if report_url or delete_url %}
+{% macro more_menu(report_url=None, delete_url=None, what='post', pin_url=None, pinned=False) %}
+  {% if report_url or delete_url or pin_url %}
     <details class="more-menu card-more">
       <summary aria-label="More options for this {{ what }}">⋯</summary>
       <div class="more-menu-panel right">
+        {% if pin_url %}
+          <form method="post" action="{{ pin_url }}" data-inplace data-swap-target="#club-posts-list">
+            {{ csrf_field() }}<button class="link-button">{{ 'Unpin' if pinned else '📌 Pin for 24 hours' }}</button>
+          </form>
+        {% endif %}
         {% if report_url %}<a href="{{ report_url }}">Report</a>{% endif %}
         {% if delete_url %}
           <form method="post" action="{{ delete_url }}" data-confirm="Delete this {{ what }}?" data-inplace="remove">
