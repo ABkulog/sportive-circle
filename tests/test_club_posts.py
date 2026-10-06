@@ -332,3 +332,20 @@ def test_cleanup_rows_keep_their_text_readable(client):
     """The checkbox took the whole row (global input width), squeezing each item into a one-letter column."""
     css = client.get("/static/style.css").data.decode()
     assert '.cleanup-row input[type="checkbox"] { width: 20px;' in css and ".cleanup-row > span { flex: 1 1 auto;" in css
+
+
+def test_feed_media_is_small_and_opens_big(accounts, client, app):
+    """Photos are small squares (4 shown, "+N" on the last), tapped to see big; a video is a small tile that plays
+    in place with a button at its bottom-left, and opens full screen when tapped."""
+    from io import BytesIO
+    from conftest import make_image
+    accounts.signup(sports=("running",))
+    photos = [(BytesIO(make_image()), f"p{n}.png") for n in range(6)]
+    post(client, body="Race day", photos=photos)
+    feed = client.get("/feed").data.decode()
+    assert feed.count('class="feed-thumb"') == 4 and ">+2</span>" in feed and "data-photos=" in feed
+    js = client.get("/static/app.js").data.decode()
+    assert "[data-photo-index]" in js and "[data-video-toggle]" in js and "requestFullscreen" in js
+    css = client.get("/static/style.css").data.decode()
+    assert ".feed-thumb { position: relative; width: 92px; height: 92px;" in css
+    assert ".video-toggle { position: absolute; left: 6px; bottom: 6px;" in css

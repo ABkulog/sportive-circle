@@ -42,6 +42,19 @@
     L.marker([pin.lat, pin.lng], { icon, title: `${pin.name}: ${pin.label}` }).addTo(map).bindPopup(list);
     bounds.push([pin.lat, pin.lng]);
   });
-  if (bounds.length === 1) map.setView(bounds[0], 16);
-  else if (bounds.length > 1) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+  // Center it once the page has its final size: set up while the page was still laying out, it landed ~2 km
+  // west of campus (in Wallingford) because the map thought it was wider than it is.
+  function frame() {
+    map.invalidateSize();
+    if (bounds.length === 1) map.setView(bounds[0], 16);
+    else if (bounds.length > 1) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+    else map.setView([47.6553, -122.3035], 15);
+  }
+  frame();
+  requestAnimationFrame(frame);
+  window.addEventListener("load", frame, { once: true });
+  if (window.ResizeObserver) {
+    let width = box.clientWidth;
+    new ResizeObserver(() => { if (box.clientWidth !== width) { width = box.clientWidth; frame(); } }).observe(box);
+  }
 })();

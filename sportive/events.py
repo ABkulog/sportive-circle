@@ -25,7 +25,7 @@ from .reminders import REMIND_CHOICES
 from .notifications import mark_seen, notify
 from .mail import compose, send_email
 from .social import friends_of, is_blocked_between
-from .spirit import greeting, top_dawgs
+from .spirit import top_dawgs
 from .textutil import is_number, multi_line, one_line, same_secret
 from .timeutil import (add_real, exists_in_seattle, fmt_clock, fmt_when, from_db, now_local, parse_form, real_gap,
                        to_db, to_form)
@@ -516,7 +516,7 @@ def feed():
     return render_template("events/feed.html", events=events, need_players=need_players,
                            filters=filters, my_sports=my_sports, up_next=up_next[0] if up_next else None,
                            month_name=now.strftime("%B"), more_page=more_page, capped=capped,
-                           hello=greeting(g.user["full_name"].split()[0]), top_dawgs=top_dawgs(now=now, viewer=g.user["id"]),
+                           top_dawgs=top_dawgs(now=now, viewer=g.user["id"]),
                            texts_card=show_texts_card(),
                            map_pins=game_pins(live_games(now), now))
 
