@@ -501,6 +501,7 @@ def test_it_looks_like_instagram(accounts, client, app):
     post(client, body="Track at 6")
     css = client.get("/static/style.css").data.decode()
     assert "--wordmark: var(--display);" in css and "cursive" not in css and ".topbar { background: var(--bg);" in css
+    assert "color: var(--purple);\n  letter-spacing: 0; }" in css and ".appnav .brand-accent { color: var(--gold);" in css  # Sportive purple, Circle gold
     assert ".appnav .tab-label { position: absolute;" in css            # icon-only bottom bar on phones
     feed = client.get("/feed").data.decode()
     assert 'class="tab-me"' in feed and '#i-heart"/>' in feed and '#i-chat"/>' in feed
@@ -635,3 +636,30 @@ def test_a_club_shares_its_poster_to_an_instagram_story(accounts, client, app):
     js = client.get("/static/app.js").data.decode()
     assert "navigator.share({ files: [file] })" in js and "canvas.width = 1080; canvas.height = 1920;" in js
     assert "a.download = file.name;" in js                                  # laptops save the picture instead
+
+
+def test_officers_sign_up_straight_to_their_club(accounts, client, app):
+    page = client.get("/signup").data.decode()
+    assert "Club officer? Register your club" in page and 'href="/signup?club=1"' in page
+    page = client.get("/signup?club=1").data.decode()
+    assert "Register your club" in page and "Club officer?" not in page and "Step 1 of 3" in page
+    response = client.post("/signup", data={"full_name": "Olive Officer", "email": "olive@uw.edu",
+                                            "password": "purple-and-gold", "password2": "purple-and-gold",
+                                            "birth_date": "2004-03-01", "grad_year": ""})
+    assert response.headers["Location"] == "/verify"                      # no sports step, no texts step
+    assert "Step 2 of 3" in client.get("/verify").data.decode()
+    response = client.post("/verify", data={"code": accounts.code_for("olive@uw.edu")})
+    assert response.headers["Location"] == "/clubs/new"
+    page = client.get("/clubs/new").data.decode()                           # no photo step in the way
+    assert "Now your club. Your profile can wait" in page and 'name="name"' in page
+    assert "Your profile can wait" in client.get("/notifications").data.decode()
+    assert client.get("/signup?club=1").headers["Location"] == "/clubs/new"  # already in: to the club form
+    accounts.logout()
+    client.get("/signup?club=1")
+    client.get("/signup")                                                    # "Not an officer?": the usual steps
+    response = client.post("/signup", data={"full_name": "Sam Student", "email": "sam@uw.edu",
+                                            "password": "purple-and-gold", "password2": "purple-and-gold",
+                                            "birth_date": "2004-03-01", "grad_year": ""})
+    assert response.headers["Location"] == "/signup/sports"
+    for page in ("/clubs", "/"):
+        assert 'href="/signup?club=1"' in client.get(page).data.decode()

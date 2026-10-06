@@ -8,7 +8,7 @@
   <div class="club-search-row">
     <input type="search" name="q" value="{{ q }}" placeholder="Search clubs" aria-label="Search clubs">
     {% if g.user %}<a class="btn btn-small" href="{{ url_for('clubs.create') }}">＋ Register a club</a>
-    {% else %}<a class="btn btn-small" href="{{ url_for('auth.signup', next=url_for('clubs.create')) }}">＋ Register a club</a>{% endif %}
+    {% else %}<a class="btn btn-small" href="{{ url_for('auth.signup', club=1) }}">＋ Register a club</a>{% endif %}
   </div>
   <nav class="feed-chips" aria-label="Show">
     {% set all_on = not mine and not fits and not sport %}
@@ -64,7 +64,7 @@
       <p><strong>{% if q or sport or mine or fits %}No clubs match that.{% else %}No clubs yet.{% endif %}</strong></p>
       <p class="muted">Are you an officer of an active UW club? Register it so other Huskies can find you.</p>
       {% if g.user %}<a class="btn" href="{{ url_for('clubs.create') }}">Register your club</a>
-      {% else %}<a class="btn" href="{{ url_for('auth.signup', next=url_for('clubs.create')) }}">Sign up to register your club</a>{% endif %}
+      {% else %}<a class="btn" href="{{ url_for('auth.signup', club=1) }}">Sign up to register your club</a>{% endif %}
     </div>
     {% endif %}
   {% endfor %}
