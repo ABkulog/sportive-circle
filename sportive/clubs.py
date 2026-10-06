@@ -120,12 +120,18 @@ def can_see(club):
     return club["status"] == "approved" or my_role(club["id"]) == "officer" or is_admin()
 
 
-def officer_clubs(user_id):
-    """Approved clubs this person can create events for."""
+def poster_clubs(user_id):
+    """Approved clubs this person can post as: the owner, and the officers the owner lets post (not every officer
+    runs the club's socials)."""
     return get_db().execute(
         """SELECT c.id, c.name, c.sport FROM clubs c JOIN club_members m ON m.club_id = c.id
-           WHERE m.user_id = ? AND m.role = 'officer' AND c.status = 'approved' ORDER BY fold(c.name)""",
+           WHERE m.user_id = ? AND m.role = 'officer' AND c.status = 'approved'
+             AND (m.can_post = 1 OR c.created_by = m.user_id) ORDER BY fold(c.name)""",
         (user_id,)).fetchall()
+
+
+def can_post_as(club_id, user_id):
+    return any(club["id"] == club_id for club in poster_clubs(user_id))
 
 
 def announce_new_club(club):
@@ -378,8 +384,9 @@ def view(club_id):
                FROM club_members m JOIN users u ON u.id = m.user_id
                WHERE m.club_id = ? AND m.role IN ('requested', 'tryout') AND u.suspended = 0
                ORDER BY m.joined_at""", (club_id,)).fetchall()
+    # Members and officers follow the club too (like any account's followers), and so do people waiting to join.
     followers = db.execute("SELECT COUNT(*) FROM club_members m JOIN users u ON u.id = m.user_id"
-                           " WHERE m.club_id = ? AND m.role = 'follower' AND u.suspended = 0", (club_id,)).fetchone()[0]
+                           " WHERE m.club_id = ? AND u.suspended = 0", (club_id,)).fetchone()[0]
     from .events import SHOWN_UNLESS_FULL  # imported here: events.py imports this module
     # Members-only events are the club's business: outsiders see how many there are, not when or where.
     # Private ones are invite-only: officers see them here, everyone else through their invites.
@@ -406,7 +413,8 @@ def view(club_id):
                            friends_line=friends_line(club_id, me) if me and role not in MEMBER_ROLES else None,
                            week=officer_week(club_id) if role == "officer" and club["status"] == "approved" else None,
                            members_only_hidden=members_only_hidden,
-                           role=role, owner=is_owner(club), requests=requests, can_decide=can_decide, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
+                           role=role, owner=is_owner(club), requests=requests,
+                           can_post=bool(me) and can_post_as(club_id, me), can_decide=can_decide, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
                            socials=social_links(club),
                            joining=JOINING,
                            experience=EXPERIENCE, who=WHO_CAN_JOIN_LABELS)
@@ -836,12 +844,18 @@ def leave(club_id):
         db.commit()
         flash(("Request canceled." if role == "requested" else "Tryout sign-up canceled.")
               + " You still follow the club.", "info")
-    elif role is not None:
+    elif role == "follower":
         db.execute("DELETE FROM club_members WHERE club_id = ? AND user_id = ?", (club_id, g.user["id"]))
+        db.commit()
+        flash("Unfollowed.", "info")
+    elif role is not None:
+        # Leaving the club doesn't drop you from its followers (unfollowing is one more tap).
+        db.execute("UPDATE club_members SET role = 'follower', message = '', can_post = 1"
+                   " WHERE club_id = ? AND user_id = ?", (club_id, g.user["id"]))
         hand_club_games_to_the_club(g.user["id"], club_id)
         _leave_members_only_games(club_id, g.user["id"])
         db.commit()
-        flash("Unfollowed." if role == "follower" else "You left the club.", "info")
+        flash("You left the club. You still follow it.", "info")
     db.commit()
     return redirect(url_for("clubs.view", club_id=club_id))
 
@@ -856,12 +870,13 @@ def make_officer(club_id, user_id):
     if is_blocked_between(g.user["id"], user_id):  # blocking works both ways, here too
         flash("You can't make this person an officer.", "error")
         return redirect(url_for("clubs.view", club_id=club_id) + "#members")
-    changed = db.execute("UPDATE club_members SET role = 'officer' WHERE club_id = ? AND user_id = ? AND role = 'member'",
+    changed = db.execute("UPDATE club_members SET role = 'officer', can_post = 0"
+                         " WHERE club_id = ? AND user_id = ? AND role = 'member'",
                          (club_id, user_id)).rowcount
     if changed:
         club = get_club(club_id)
-        _dm(g.user["id"], user_id, f"⭐ You're now an officer of {club['name']}. You can edit the club, post updates, "
-                                   f"make club events and confirm new members. {_club_link(club_id)}")
+        _dm(g.user["id"], user_id, f"⭐ You're now an officer of {club['name']}. You can edit the club, make club "
+                                   f"events and confirm new members. {_club_link(club_id)}")
         flash("They're an officer now.", "success")
     else:
         flash("Only confirmed members can be made officers. They may have left the club.", "error")
@@ -901,13 +916,26 @@ def officers(club_id):
         if action == "add" and is_blocked_between(g.user["id"], user_id):
             flash("You can't add this person.", "error")
         elif action == "add":
-            db.execute("""INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, 'officer', ?)
-                          ON CONFLICT(club_id, user_id) DO UPDATE SET role = 'officer'""",
+            db.execute("""INSERT INTO club_members (club_id, user_id, role, joined_at, can_post)
+                          VALUES (?, ?, 'officer', ?, 0)
+                          ON CONFLICT(club_id, user_id) DO UPDATE SET role = 'officer', can_post = 0""",
                        (club_id, user_id, to_db(now_local())))
             if user_id != g.user["id"]:
-                _dm(g.user["id"], user_id, f"⭐ You're now an officer of {club['name']}. You can edit the club, post "
-                                           f"updates, make club events and confirm new members. {_club_link(club_id)}")
+                _dm(g.user["id"], user_id, f"⭐ You're now an officer of {club['name']}. You can edit the club, make "
+                                           f"club events and confirm new members. {_club_link(club_id)}")
             flash(f"{first} is an officer now.", "success")
+        elif action in ("posting_on", "posting_off"):
+            # The owner picks who posts as the club (whoever runs its socials); the owner always can.
+            on = action == "posting_on"
+            if db.execute("UPDATE club_members SET can_post = ? WHERE club_id = ? AND user_id = ? AND role = 'officer'",
+                          (1 if on else 0, club_id, user_id)).rowcount:
+                if on and user_id != g.user["id"]:
+                    _dm(g.user["id"], user_id, f"📣 You can post as {club['name']} now: in the feed (Post as) or on "
+                                               f"the club's page. {_club_link(club_id)}")
+                flash(f"{first} can post as the club now." if on else f"{first} can't post as the club anymore.",
+                      "success")
+            else:
+                flash(f"{first} isn't an officer.", "error")
         elif action == "owner":
             # Hand the club over: they must already be an officer. The old owner stays an officer.
             is_officer = db.execute("SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ? AND role = 'officer'",
@@ -949,7 +977,8 @@ def officers(club_id):
         db.commit()
         return redirect(url_for("clubs.officers", club_id=club_id))
     current = db.execute(
-        """SELECT u.id, u.full_name, u.avatar_updated, u.email FROM club_members m JOIN users u ON u.id = m.user_id
+        """SELECT u.id, u.full_name, u.avatar_updated, u.email, m.can_post FROM club_members m
+           JOIN users u ON u.id = m.user_id
            WHERE m.club_id = ? AND m.role = 'officer' ORDER BY u.id = ? DESC, fold(u.full_name)""",
         (club_id, club["created_by"] or 0)).fetchall()
     q = one_line(request.args.get("q", ""))[:60]
@@ -977,7 +1006,7 @@ def updates():
     The fuller it is, the more joining clubs is worth it, so with no clubs it suggests some."""
     me = g.user["id"]
     db = get_db()
-    my_officer_clubs = officer_clubs(me)
+    my_officer_clubs = poster_clubs(me)  # the clubs I can post as
     if request.method == "POST":
         club_id = request.form.get("club", type=int)
         body = multi_line(request.form.get("body"))
@@ -1020,7 +1049,7 @@ def updates():
 @login_required
 def post(club_id):
     club = get_club(club_id)
-    if my_role(club_id) != "officer" or club["status"] != "approved":
+    if not can_post_as(club_id, g.user["id"]) or club["status"] != "approved":
         abort(403)
     body = multi_line(request.form.get("body"))
     if not body or len(body) > MAX_POST:

@@ -191,6 +191,8 @@
   <section class="tab-panel" data-tab-panel="updates" id="announcements" role="tabpanel">
     {% if role == 'officer' and club.status != 'approved' %}
       <p class="muted">You can post updates once the club is verified.</p>
+    {% elif role == 'officer' and not can_post %}
+      <p class="muted">The owner picks which officers post as the club. Ask them to turn it on for you.</p>
     {% elif role == 'officer' %}
       {# Posts as the club, to everyone's feed: words, photos, 🔥 and replies, like anyone's post #}
       <form method="post" action="{{ url_for('posts.create') }}" enctype="multipart/form-data" class="form club-post-form" data-inplace data-swap-target="#club-posts-list">
