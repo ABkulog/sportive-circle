@@ -1932,6 +1932,8 @@ html, body { overflow-x: clip; }
 .composer .members-only { display: none; margin-top: 8px; }
 .composer:has(select[name="as_club"] option:not([value=""]):checked) .members-only { display: flex; }
 
+.poster-actions .btn + .btn, .poster-actions .fine-print + .btn { margin-top: 10px; }  /* story button, then print */
+
 /* Sign up: the officers' short path, above the form */
 .officer-signup { display: flex; align-items: center; gap: 12px; max-width: 520px; margin: 0 auto 12px; padding: 14px 16px;
   color: var(--text); text-decoration: none; border: 1px solid var(--purple); }
