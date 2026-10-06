@@ -1891,7 +1891,7 @@ button.flyer-link:hover { background: var(--surface); }
 /* A club's officers: one row of buttons, like an Instagram business profile (Edit club · Share · + Event) */
 .officer-buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
 .officer-buttons .btn { padding: 8px 6px; }
-.edit-links { margin: 0 0 10px; font-size: .9rem; }
+.edit-links { margin: 0 0 10px; font-size: .9rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }  /* two links: wrap, never overlap */
 @media (max-width: 600px) {
   .club-poster { gap: 8px; padding: 16px 14px; }
   .club-poster .club-logo, .club-poster .club-emoji { --size: 64px !important; }
