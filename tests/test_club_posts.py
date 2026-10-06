@@ -491,3 +491,22 @@ def test_play_map_opens_full_screen_like_snap_map_and_phone_posts_are_dense(acco
     assert ".live-map-wrap.is-full { position: fixed; inset: 0;" in css and ".play-map .leaflet-tile-pane { filter: grayscale" not in css
     assert ".feed > .feed-card { margin: 0 -16px; padding: 9px 16px; border-width: 0 0 1px;" in css
     assert ".feed-thumb { width: 72px; height: 72px;" in css
+
+
+def test_it_looks_like_instagram(accounts, client, app):
+    """The owner: "make it look like insta, the pages and segments too, straight up copy it". White top bar with a
+    script wordmark, icon-only tabs with your picture as Profile, ♡ / 💬 icons and ⋯ top right on posts, a profile
+    with posts · friends · clubs beside the picture, sports as round highlights, icon tabs, grey search boxes."""
+    accounts.signup(email="maya@uw.edu", sports=("running", "tennis"))
+    me = user_id(app, "maya@uw.edu")
+    post(client, body="Track at 6")
+    css = client.get("/static/style.css").data.decode()
+    assert "--wordmark: \"Grand Hotel\"" in css and ".topbar { background: var(--bg);" in css
+    assert ".appnav .tab-label { position: absolute;" in css            # icon-only bottom bar on phones
+    feed = client.get("/feed").data.decode()
+    assert 'class="tab-me"' in feed and '#i-heart"/>' in feed and '#i-chat"/>' in feed
+    profile = client.get(f"/u/{me}").data.decode()
+    assert 'class="profile-stats"' in profile and "<strong>1</strong><span>post</span>" in profile
+    assert 'class="profile-highlights"' in profile and 'href="/settings">Settings' in profile
+    assert 'data-tab-button="posts" title="Posts">' in profile and "#i-grid" in profile
+    assert '<button class="visually-hidden">Search</button>' in client.get("/search").data.decode()

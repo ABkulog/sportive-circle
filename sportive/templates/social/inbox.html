@@ -8,7 +8,7 @@
 <form method="get" class="people-search" role="search" aria-label="Search messages">
   <input type="search" name="q" value="{{ q }}" placeholder="Search friends and chats" aria-label="Search friends and chats"
          maxlength="60" autocomplete="off" data-filter-list="#inbox-people">
-  <button class="btn">Search</button>
+  <button class="visually-hidden">Search</button>{# Enter searches, like Instagram #}
 </form>
 
 {% if q %}

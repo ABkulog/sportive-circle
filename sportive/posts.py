@@ -340,7 +340,7 @@ def _tell_author(post, text, key):
 @bp.route("/posts/<int:post_id>/like", methods=("POST",))
 @login_required
 def like(post_id):
-    """🔥 a post, or take it back (a second tap)."""
+    """♡ a post (like Instagram), or take it back (a second tap)."""
     post = get_post(post_id)
     if not _can_interact(post):
         abort(403)
@@ -352,7 +352,7 @@ def like(post_id):
         count = db.execute("SELECT COUNT(*) FROM post_likes WHERE post_id = ?", (post_id,)).fetchone()[0]
         first = g.user["full_name"].split()[0]
         others = f" and {count - 1} other{'s' if count > 2 else ''}" if count > 1 else ""
-        _tell_author(post, f"🔥 {first}{others} liked your post.", f"likes:{post_id}")
+        _tell_author(post, f"❤️ {first}{others} liked your post.", f"likes:{post_id}")
     db.commit()
     back = request.form.get("next") or ""
     return redirect(back if back.startswith(("/feed", "/posts/")) and safe_next(back) == back

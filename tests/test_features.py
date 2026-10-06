@@ -737,7 +737,7 @@ def sees_badge_in_my_clubs(world, name, badge, club):
     page = html.unescape(world.person(name).client.get("/clubs?mine=1").get_data(as_text=True))
     card = page[page.index(club):]
     card = card[:card.index("</a>")]
-    assert f">{badge}<" in card
+    assert f" · {badge} · " in card or f" · {badge}\n" in card or f">{badge}<" in card   # the club's grey line
 
 
 @then(parsers.parse('"{name}" has a message saying "{text}"'))

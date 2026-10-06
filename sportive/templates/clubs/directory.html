@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Clubs{% endblock %}
 {% block content %}
-{% from "_macros.html" import club_logo %}
+{% from "_macros.html" import club_logo, verified_badge %}
 {# The Clubs tab: find clubs (search, your clubs, clubs for your sports) and register yours, all on one page. #}
 <h1 class="visually-hidden">{{ 'My clubs' if mine else 'Clubs' }}</h1>
 <form method="get" class="club-finder" role="search" aria-label="Find a club">
@@ -38,21 +38,19 @@
     <a class="club-row" href="{{ url_for('clubs.view', club_id=c.id) }}">
       {{ club_logo(c, 44) }}
       <span class="club-row-text">
-      <strong class="club-name">{{ c.name }}</strong>
+      <strong class="club-name">{{ c.name }}{% if c.status == 'approved' %} {{ verified_badge() }}{% endif %}</strong>
       <span class="club-desc muted">{{ c.description|truncate(110) }}</span>
-      <span class="badges">
-        <span class="badge">{{ c.member_count }} member{{ 's' if c.member_count != 1 }}</span>
-        {% if c.upcoming %}<span class="badge">{{ c.upcoming }} upcoming</span>{% endif %}
-        {% if c.status == 'approved' %}<span class="badge badge-verified"><span class="check" aria-hidden="true">✓</span> Verified</span>
-        {% elif c.status == 'pending' %}<span class="badge badge-gold">⏳ In review</span>
+      {# One grey line, like Instagram's search results #}
+      {% set bits = [c.member_count ~ ' member' ~ ('s' if c.member_count != 1 else '')] %}
+      {% if c.upcoming %}{% set _ = bits.append(c.upcoming ~ ' upcoming') %}{% endif %}
+      {% if c.my_status == 'officer' %}{% set _ = bits.append('Officer') %}{% elif c.my_status == 'member' %}{% set _ = bits.append('Member') %}
+      {% elif c.my_status == 'follower' %}{% set _ = bits.append('Following') %}{% elif c.my_status in ('requested', 'tryout') %}{% set _ = bits.append('Waiting') %}{% endif %}
+      {% if c.experience == 'none' %}{% set _ = bits.append('Beginners welcome') %}{% endif %}
+      <span class="club-line muted">{{ bits|join(' · ') }}
+        {% if c.status == 'pending' %}<span class="badge badge-gold">⏳ In review</span>
         {% elif c.status == 'denied' %}<span class="badge badge-danger">Denied</span>
-        {% else %}<span class="badge badge-danger">Needs changes</span>{% endif %}
-        {% if c.my_status == 'officer' and c.waiting %}<span class="badge badge-gold">🙋 {{ c.waiting }} waiting to join</span>{% endif %}
-        {% if c.my_status in ('member', 'officer') %}<span class="badge badge-success">{{ 'Officer' if c.my_status == 'officer' else 'Member' }}</span>
-        {% elif c.my_status == 'follower' %}<span class="badge">Following</span>
-        {% elif c.my_status in ('requested', 'tryout') %}<span class="badge badge-gold">Waiting</span>{% endif %}
-        {% if c.experience == 'none' %}<span class="badge">Beginners welcome</span>{% endif %}
-      </span>
+        {% elif c.status not in ('approved',) %}<span class="badge badge-danger">Needs changes</span>{% endif %}
+        {% if c.my_status == 'officer' and c.waiting %}<span class="badge badge-gold">🙋 {{ c.waiting }} waiting to join</span>{% endif %}</span>
       </span>
     </a>
   {% else %}

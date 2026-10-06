@@ -6,7 +6,7 @@
 <form method="get" action="{{ url_for('search.search') }}" class="search-box" role="search">
   <label for="search-q" class="visually-hidden">Search clubs and people</label>
   <input id="search-q" type="search" name="q" value="{{ q }}" placeholder="Search clubs and people" autocomplete="off" {% if not q %}autofocus{% endif %}>
-  <button class="btn btn-small">Search</button>
+  <button class="visually-hidden">Search</button>{# Enter searches, like Instagram #}
 </form>
 
 {% if too_short %}

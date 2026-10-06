@@ -19,7 +19,7 @@ from .clubs import SOCIALS
 from .moderation import admin_required, is_admin
 from .notifications import mark_seen, notify
 from .textutil import HANDLE_SITES, has_a_letter, is_number, multi_line, one_line, person_name, social_handle
-from .social import can_message, friendship_status, i_blocked, is_blocked_between
+from .social import can_message, friends_of, friendship_status, i_blocked, is_blocked_between
 from .timeutil import now_local, to_db
 
 bp = Blueprint("profile", __name__)
@@ -208,7 +208,13 @@ def view(user_id):
     if blocked:  # either of them blocked the other: just the name and photo (and the Unblock button), nothing else
         user = {**dict(user), "bio": None, "pronouns": None, "gender": None, "grad_year": None,
                 **{column: "" for column in ("instagram", "snapchat", "tiktok", "x_handle", "linkedin")}}
+    # Instagram's numbers row under the picture: posts · friends · clubs
+    counts = None if blocked else {
+        "posts": get_db().execute("SELECT COUNT(*) FROM posts WHERE author_id = ? AND club_id IS NULL",
+                                  (user_id,)).fetchone()[0],
+        "friends": len(friends_of(user_id))}
     return render_template("profile/view.html", user=user, sports=[] if blocked else user_sports(user_id),
+                           counts=counts,
                            hosting=hosting, show_email=show_email, socials=person_socials(user), genders=GENDERS,
                            is_tester=TESTER.key in earned_badges(user_id),
                            showcase=[] if blocked else showcase(user_id), earned=earned_badges(user_id), rarity=rarity(),
