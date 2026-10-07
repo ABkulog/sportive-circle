@@ -8,6 +8,7 @@ Safety rules:
 - Event chats are only for people going to that event.
 """
 import json
+import re
 from datetime import timedelta
 
 from flask import (Blueprint, Response, abort, current_app, flash, g, jsonify, redirect, render_template,
@@ -16,11 +17,33 @@ from flask import (Blueprint, Response, abort, current_app, flash, g, jsonify, r
 from .auth import login_required, safe_next
 from .constants import SPORT_EMOJI
 from .db import get_db
+from markupsafe import Markup, escape
+
 from .textutil import fold, initial, multi_line, one_line, person_name
 from .photos import make_chat_photo
 from .timeutil import fmt_clock, fmt_when, from_db, now_local, to_db
 
 bp = Blueprint("social", __name__)
+
+# A web address in a message ("https://sportivecircle.com/clubs/6"), without the punctuation that ends a sentence
+LINK = re.compile(r"https?://[^\s<>\"']+[^\s<>\"'.,!?;:)\]]")
+
+
+@bp.app_template_filter("linkify")
+def linkify(text):
+    """A message with its web addresses as links you can tap (shown without "https://"). Ours open in the app;
+    other sites in a new tab. chat.js does the same for messages that arrive while the chat is open."""
+    out, at = [], 0
+    for found in LINK.finditer(text or ""):
+        url = found.group(0)
+        ours = url.split("/")[2] in (request.host, current_app.config["PUBLIC_URL"].split("/")[2],
+                                     "sportivecircle.com", "www.sportivecircle.com")
+        out.append(str(escape(text[at:found.start()])))
+        out.append(f'<a href="{escape(url)}"' + ("" if ours else ' target="_blank" rel="noopener noreferrer"')
+                   + f'>{escape(url.split("://", 1)[1])}</a>')
+        at = found.end()
+    out.append(str(escape((text or "")[at:])))
+    return Markup("".join(out))
 
 MAX_MESSAGE_LENGTH = 1000
 MAX_MESSAGES_PER_MINUTE = 20  # stops spam floods

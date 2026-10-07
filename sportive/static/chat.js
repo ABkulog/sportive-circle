@@ -7,6 +7,27 @@
   const empty = document.getElementById("chat-empty");
   let lastId = parseInt(box.dataset.lastId, 10) || 0;
 
+  // A message's text with its web addresses as links (like the linkify filter on the page): text nodes and <a>s only.
+  const linked = (text) => {
+    const p = el("p");
+    const pattern = /https?:\/\/[^\s<>"']+[^\s<>"'.,!?;:)\]]/g;
+    let at = 0;
+    for (const found of text.matchAll(pattern)) {
+      p.appendChild(document.createTextNode(text.slice(at, found.index)));
+      const link = el("a", "", found[0].split("://")[1]);
+      link.href = found[0];
+      const host = found[0].split("/")[2];
+      if (![location.host, "sportivecircle.com", "www.sportivecircle.com"].includes(host)) {
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+      }
+      p.appendChild(link);
+      at = found.index + found[0].length;
+    }
+    p.appendChild(document.createTextNode(text.slice(at)));
+    return p;
+  };
+
   // Phones: the page is pinned to the part of the screen you can actually see, so it never scrolls. When the
   // keyboard opens, iPhones slide the page up; the chat follows the visible part instead, so the back link,
   // the messages and the box all stay on screen (only the chat gets shorter).
@@ -96,7 +117,7 @@
       link.appendChild(image);
       bubble.appendChild(link);
     }
-    if (message.body) bubble.appendChild(el("p", "", message.body));
+    if (message.body) bubble.appendChild(linked(message.body));
     if (message.game) {
       const game = el("a", "chat-game" + (message.game.cancelled ? " is-cancelled" : ""));
       game.href = message.game.url;

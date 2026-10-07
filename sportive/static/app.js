@@ -500,8 +500,9 @@
   });
 
   // Pull down at the top of a page to refresh it (phones). Not while typing, not with unsaved changes in a
-  // form, not inside something that scrolls by itself (a chat), and not while a pop-up is open.
-  if (window.matchMedia("(pointer: coarse)").matches) {
+  // form, not inside something that scrolls by itself (a chat), and not while a pop-up is open. Pages with their own
+  // (data-pull-refresh: the feed, My clubs, below) use only theirs, so one pill shows, not two.
+  if (window.matchMedia("(pointer: coarse)").matches && !document.querySelector("[data-pull-refresh]")) {
     const PULL = 70;  // how far to pull (px) before letting go refreshes
     let startY = null, pulled = 0, dirty = false;
     const hint = document.createElement("div");
