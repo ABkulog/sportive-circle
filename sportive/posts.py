@@ -25,7 +25,7 @@ from .friendgames import announce_new_game
 from .moderation import is_admin
 from .photos import make_chat_photo
 from .social import friends_of, is_blocked_between, search_people
-from .textutil import fold, multi_line
+from .textutil import fold, multi_line, one_line
 from .videos import MAX_SECONDS, VideoError, check_and_save, path_of, remove_files
 from .timeutil import add_real, exists_in_seattle, now_local, parse_form, to_db
 
@@ -56,6 +56,7 @@ REPLY_VISIBLE = """ru.suspended = 0 AND NOT EXISTS (SELECT 1 FROM blocks b
                          OR (b.blocker_id = r.author_id AND b.blocked_id = :me))"""
 POST_COUNTS = f"""(SELECT COUNT(*) FROM post_photos ph WHERE ph.post_id = p.id) AS photo_count,
                   EXISTS (SELECT 1 FROM post_videos pv WHERE pv.post_id = p.id) AS has_video,
+                  EXISTS (SELECT 1 FROM polls po WHERE po.post_id = p.id) AS has_poll,
                   (SELECT pv.muted FROM post_videos pv WHERE pv.post_id = p.id) AS video_muted,
                   (SELECT COUNT(*) FROM post_likes l JOIN users lu ON lu.id = l.user_id
                    WHERE l.post_id = p.id AND lu.suspended = 0) AS like_count,
@@ -74,6 +75,8 @@ POST_TAGS = """(SELECT json_group_array(json_object('user', t.user_id, 'club', t
                      OR tc.status = 'approved')) AS tags_json"""
 POST_FIELDS = f"p.*, u.full_name, u.avatar_updated, c.name AS club_name, c.logo_updated AS club_logo, {POST_TAGS}"
 MAX_TAGS = 10
+MAX_POLL_OPTIONS = 12  # like WhatsApp
+MAX_POLL_TEXT = 100
 # Canceled games are clutter in a feed: a plan post or club event post whose game was canceled isn't shown there
 # (its page still says it's canceled, for the people who were going).
 NOT_CANCELED = "NOT EXISTS (SELECT 1 FROM events ce WHERE ce.id = p.event_id AND ce.cancelled = 1)"
@@ -303,7 +306,7 @@ def feed():
         mark_seen("feed_posts")  # the new-posts number on Home is cleared once you've seen the top of your feed
     return render_template("feed/feed.html", items=items, older=older, sport=sport, my_sports=user_sports(g.user["id"]),
                            photos=photos, show=show,
-                           durations=PLAN_DURATIONS, max_photos=MAX_PHOTOS, max_body=MAX_BODY, max_tags=MAX_TAGS, form={},
+                           durations=PLAN_DURATIONS, max_photos=MAX_PHOTOS, max_body=MAX_BODY, max_tags=MAX_TAGS, max_poll_options=MAX_POLL_OPTIONS, form={},
                            max_seconds=MAX_SECONDS, post_as=poster_clubs(g.user["id"]),
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"),
                            as_club=request.args.get("as", type=int) or (post_event["club_id"] if post_event
@@ -367,6 +370,79 @@ def _tell_author(post, text, key):
     if post["author_id"] != g.user["id"]:
         from .notifications import notify  # (notifications.py is loaded after this module)
         notify(post["author_id"], "post_activity", text, url_for("posts.view", post_id=post["id"]), key=key)
+
+
+def poll_of(post_id):
+    """A post's poll for the person looking: the question, and each option with its votes, whether they picked it,
+    its share of the people who voted (the bar), and the first few voters (their pictures). People hidden from them
+    (suspended, blocked either way) don't show as voters, but their votes count."""
+    db = get_db()
+    poll = db.execute("SELECT question, multiple FROM polls WHERE post_id = ?", (post_id,)).fetchone()
+    if poll is None:
+        return None
+    me = g.user["id"]
+    options = []
+    for row in db.execute("SELECT id, text FROM poll_options WHERE post_id = ? ORDER BY position", (post_id,)):
+        voters = db.execute(
+            """SELECT u.id, u.full_name, u.avatar_updated, v.user_id = :me AS is_me FROM poll_votes v
+               JOIN users u ON u.id = v.user_id
+               WHERE v.option_id = :option AND u.suspended = 0 AND NOT EXISTS (SELECT 1 FROM blocks b
+                     WHERE (b.blocker_id = :me AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = :me))
+               ORDER BY v.user_id = :me DESC, v.created_at DESC""", {"option": row["id"], "me": me}).fetchall()
+        count = db.execute("SELECT COUNT(*) FROM poll_votes WHERE option_id = ?", (row["id"],)).fetchone()[0]
+        options.append({"id": row["id"], "text": row["text"], "count": count, "voters": voters,
+                        "mine": any(v["is_me"] for v in voters)})
+    people = db.execute("""SELECT COUNT(DISTINCT v.user_id) FROM poll_votes v JOIN poll_options o ON o.id = v.option_id
+                           WHERE o.post_id = ?""", (post_id,)).fetchone()[0]
+    for option in options:
+        option["share"] = round(100 * option["count"] / people) if people else 0
+    return {"question": poll["question"], "multiple": bool(poll["multiple"]), "options": options, "people": people}
+
+
+def _read_poll(form):
+    """The poll from the ＋ sheet: (question, options, multiple) or an error. Empty option boxes are skipped."""
+    question = one_line(form.get("poll_question"))
+    options, seen = [], set()
+    for text in form.getlist("poll_option"):
+        text = one_line(text)[:MAX_POLL_TEXT]
+        if text and text.casefold() not in seen:  # an option twice ("Sat" and "sat") counts once
+            seen.add(text.casefold())
+            options.append(text)
+    if not question:
+        return None, "Ask a question for your poll."
+    if len(question) > 2 * MAX_POLL_TEXT:
+        return None, f"Keep the question under {2 * MAX_POLL_TEXT} characters."
+    if len(options) < 2:
+        return None, "Add at least 2 options to your poll."
+    if len(options) > MAX_POLL_OPTIONS:
+        return None, f"Polls can have up to {MAX_POLL_OPTIONS} options."
+    return (question, options, form.get("poll_multiple") == "1"), None
+
+
+@bp.route("/posts/<int:post_id>/poll", methods=("POST",))
+@login_required
+def vote(post_id):
+    """Tap an option to vote, tap it again to take it back (like WhatsApp). One-answer polls move your vote."""
+    post = get_post(post_id)
+    if not _can_interact(post):
+        abort(403)
+    db = get_db()
+    poll = db.execute("SELECT multiple FROM polls WHERE post_id = ?", (post_id,)).fetchone()
+    option = db.execute("SELECT id FROM poll_options WHERE id = ? AND post_id = ?",
+                        (request.form.get("option", type=int), post_id)).fetchone()
+    if poll is None or option is None:
+        abort(404)
+    me = g.user["id"]
+    if db.execute("DELETE FROM poll_votes WHERE option_id = ? AND user_id = ?", (option["id"], me)).rowcount == 0:
+        if not poll["multiple"]:
+            db.execute("""DELETE FROM poll_votes WHERE user_id = ? AND option_id IN
+                          (SELECT id FROM poll_options WHERE post_id = ?)""", (me, post_id))
+        db.execute("INSERT INTO poll_votes (option_id, user_id, created_at) VALUES (?, ?, ?)",
+                   (option["id"], me, to_db(now_local())))
+    db.commit()
+    back = request.form.get("next") or ""
+    return redirect(back if back.startswith(("/feed", "/posts/", "/clubs/", "/u/")) and safe_next(back) == back
+                    else url_for("posts.view", post_id=post_id))
 
 
 @bp.route("/posts/<int:post_id>/like", methods=("POST",))
@@ -631,7 +707,10 @@ def create():
     video_upload = video_upload if video_upload and video_upload.filename else None
     if error is None and video_upload and jpegs:
         error = "Post photos or a video, not both."
-    if error is None and not body and not jpegs and not video_upload and attached is None:
+    poll = None
+    if error is None and form.get("poll") == "1":
+        poll, error = _read_poll(form)
+    if error is None and not body and not jpegs and not video_upload and poll is None and attached is None:
         error = "Write something, or add a photo or a video."
     db = get_db()
     if error is None:
@@ -669,6 +748,13 @@ def create():
             (club["id"], u)).fetchone()]
         tagged_clubs = []
     _save_tags(cur.lastrowid, tagged_users, tagged_clubs, club["name"] if club else None)
+    if poll:
+        question, options, multiple = poll
+        db.execute("INSERT INTO polls (post_id, question, multiple) VALUES (?, ?, ?)",
+                   (cur.lastrowid, question, 1 if multiple else 0))
+        for position, text in enumerate(options, start=1):
+            db.execute("INSERT INTO poll_options (post_id, position, text) VALUES (?, ?, ?)",
+                       (cur.lastrowid, position, text))
     for position, jpeg in enumerate(jpegs, start=1):
         db.execute("INSERT INTO post_photos (post_id, position, image) VALUES (?, ?, ?)", (cur.lastrowid, position, jpeg))
     if video:

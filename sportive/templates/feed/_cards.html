@@ -37,6 +37,40 @@
   </header>
 {% endmacro %}
 
+{# A poll, like WhatsApp's: the question, "Select one (or more)", and each option as a row you tap to vote (again to
+   take it back) with its number of votes, the first voters' pictures and a bar for its share; "View votes" lists
+   who picked what. #}
+{% macro poll_box(p, poll) %}
+  {% if poll %}
+  <div class="poll">
+    <p class="poll-question">{{ poll.question }}</p>
+    <p class="poll-hint">{{ '✓✓ Select one or more' if poll.multiple else '✓ Select one' }}</p>
+    {% for o in poll.options %}
+      <form method="post" action="{{ url_for('posts.vote', post_id=p.id) }}" class="poll-form" data-inplace>
+        {{ csrf_field() }}<input type="hidden" name="next" value="{{ request.full_path }}#post-{{ p.id }}">
+        <input type="hidden" name="option" value="{{ o.id }}">
+        <button class="poll-option{% if o.mine %} is-mine{% endif %}" aria-pressed="{{ 'true' if o.mine else 'false' }}"
+                aria-label="{{ o.text }}, {{ o.count }} vote{{ 's' if o.count != 1 }}{{ ', your vote' if o.mine }}">
+          <span class="poll-check" aria-hidden="true">{% if o.mine %}✓{% endif %}</span>
+          <span class="poll-text">{{ o.text }}</span>
+          <span class="poll-voters" aria-hidden="true">{% for v in o.voters[:3] %}{{ avatar(v.id, v.full_name, v.avatar_updated, 18) }}{% endfor %}</span>
+          <span class="poll-count">{{ o.count }}</span>
+          <span class="poll-bar" style="--share: {{ o.share }}%" aria-hidden="true"></span>
+        </button>
+      </form>
+    {% endfor %}
+    {% if poll.people %}
+      <details class="poll-votes"><summary>View votes</summary>
+        {% for o in poll.options if o.voters %}
+          <p class="poll-votes-option"><strong>{{ o.text }}</strong> · {{ o.count }}</p>
+          <ul>{% for v in o.voters %}<li><a href="{{ url_for('profile.view', user_id=v.id) }}">{{ avatar(v.id, v.full_name, v.avatar_updated, 24) }} {{ 'You' if v.is_me else v.full_name }}</a></li>{% endfor %}</ul>
+        {% endfor %}
+      </details>
+    {% endif %}
+  </div>
+  {% endif %}
+{% endmacro %}
+
 {% macro post_card(item, photos) %}
   {% set p = item.post %}
   {% set who = p.club_name if p.club_id else p.full_name %}
@@ -79,6 +113,7 @@
         {% endfor %}
       </div>
     {% endif %}
+    {% if p.has_poll %}{{ poll_box(p, poll_of(p.id)) }}{% endif %}
     {% if item.event %}{{ plan_box(item.event) }}{% endif %}
     <footer class="feed-actions">
       <form method="post" action="{{ url_for('posts.like', post_id=p.id) }}" class="like-form" data-inplace>

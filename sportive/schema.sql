@@ -499,3 +499,23 @@ CREATE TABLE IF NOT EXISTS post_tags (
     club_id  INTEGER REFERENCES clubs(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_post_tags ON post_tags(post_id);
+
+-- A poll in a post (like WhatsApp's): the question, its options in order, and who picked what.
+CREATE TABLE IF NOT EXISTS polls (
+    post_id  INTEGER PRIMARY KEY REFERENCES posts(id) ON DELETE CASCADE,
+    question TEXT NOT NULL,
+    multiple INTEGER NOT NULL DEFAULT 1             -- 1 = people can pick more than one option
+);
+CREATE TABLE IF NOT EXISTS poll_options (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id  INTEGER NOT NULL REFERENCES polls(post_id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    text     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_poll_options ON poll_options(post_id, position);
+CREATE TABLE IF NOT EXISTS poll_votes (
+    option_id  INTEGER NOT NULL REFERENCES poll_options(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (option_id, user_id)
+);
