@@ -663,3 +663,37 @@ def test_officers_sign_up_straight_to_their_club(accounts, client, app):
     assert response.headers["Location"] == "/signup/sports"
     for page in ("/clubs", "/"):
         assert 'href="/signup?club=1"' in client.get(page).data.decode()
+
+
+def test_posts_tag_people_and_clubs(accounts, client, app):
+    """The owner: "when people post they can tag others or clubs". Type a name in the ＋ sheet, pick people or
+    clubs; the post says "with …" (links to them) and they hear about it in their bell."""
+    accounts.signup(email="officer@uw.edu", name="Olive Officer", sports=("running",))
+    club = approved_club(app, "officer@uw.edu")
+    accounts.logout()
+    accounts.signup(email="maya@uw.edu", name="Maya Chen", sports=("running",))
+    accounts.logout()
+    accounts.signup(email="me@uw.edu", name="Jordan Rivera", sports=("running",))
+    assert 'data-tag-picker' in client.get("/feed").data.decode()
+    found = client.get("/posts/tag-search?q=maya").get_json()
+    maya = user_id(app, "maya@uw.edu")
+    assert found == [{"kind": "user", "id": maya, "name": "Maya Chen", "note": "Class of 2028"}]
+    assert client.get("/posts/tag-search?q=run club").get_json()[0] == {"kind": "club", "id": club, "name": "UW Run Club",
+                                                                       "note": "Club"}
+    me = user_id(app, "me@uw.edu")
+    post(client, body="Long run done 🏃", tag_user=[str(maya), str(me), "999"], tag_club=[str(club)])
+    feed = client.get("/feed").data.decode()
+    assert f'with <a href="/u/{maya}">Maya Chen</a>, <a href="/clubs/{club}">UW Run Club</a>' in feed  # not me, not 999
+    accounts.logout()
+    accounts.login("maya@uw.edu")
+    assert "🏷️ Jordan tagged you in a post." in client.get("/notifications").data.decode()
+    accounts.logout()
+    accounts.login("officer@uw.edu")
+    assert "🏷️ Jordan tagged UW Run Club in a post." in client.get("/notifications").data.decode()
+    with app.app_context():
+        db = get_db()
+        db.execute("INSERT INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, '2026-01-01')",
+                   (user_id(app, "officer@uw.edu"), maya))
+        db.commit()
+    assert "Maya Chen" not in client.get("/feed").data.decode()                 # blocked: their tag hides too
+    assert client.get("/posts/tag-search?q=maya").get_json() == []

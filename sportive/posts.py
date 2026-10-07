@@ -6,10 +6,11 @@ The feed mixes those posts with club posts and updates and Husky news, for the s
 post on their own are on Play: the feed is for posts.) Tapping a sport tag shows just that sport (its "channel").
 """
 from datetime import timedelta
-
+import json
 import os
 
-from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, send_file, url_for
+from flask import (Blueprint, Response, abort, flash, g, jsonify, redirect, render_template, request, send_file,
+                   url_for)
 from werkzeug.datastructures import MultiDict
 
 from .auth import login_required, safe_next
@@ -21,7 +22,7 @@ from .events import (MEMBERS_ONLY_FOR_MEMBERS, NOT_BLOCKED, insert_event, postin
 from .friendgames import announce_new_game
 from .moderation import is_admin
 from .photos import make_chat_photo
-from .social import is_blocked_between
+from .social import is_blocked_between, search_people
 from .textutil import multi_line
 from .videos import MAX_SECONDS, VideoError, check_and_save, path_of, remove_files
 from .timeutil import add_real, exists_in_seattle, now_local, parse_form, to_db
@@ -60,7 +61,16 @@ POST_COUNTS = f"""(SELECT COUNT(*) FROM post_photos ph WHERE ph.post_id = p.id) 
                    WHERE r.post_id = p.id AND {REPLY_VISIBLE}) AS reply_count"""
 # A post and its author, and the club when an officer posted it as the club
 POST_FROM = """posts p JOIN users u ON u.id = p.author_id LEFT JOIN clubs c ON c.id = p.club_id"""
-POST_FIELDS = "p.*, u.full_name, u.avatar_updated, c.name AS club_name, c.logo_updated AS club_logo"
+# Who's tagged ("with …"), as JSON: people you can see (not suspended, no block either way) and verified clubs.
+POST_TAGS = """(SELECT json_group_array(json_object('user', t.user_id, 'club', t.club_id,
+                                                    'name', COALESCE(tu.full_name, tc.name)))
+               FROM post_tags t LEFT JOIN users tu ON tu.id = t.user_id LEFT JOIN clubs tc ON tc.id = t.club_id
+               WHERE t.post_id = p.id AND ((tu.id IS NOT NULL AND tu.suspended = 0 AND NOT EXISTS (
+                         SELECT 1 FROM blocks b WHERE (b.blocker_id = :me AND b.blocked_id = tu.id)
+                                                   OR (b.blocker_id = tu.id AND b.blocked_id = :me)))
+                     OR tc.status = 'approved')) AS tags_json"""
+POST_FIELDS = f"p.*, u.full_name, u.avatar_updated, c.name AS club_name, c.logo_updated AS club_logo, {POST_TAGS}"
+MAX_TAGS = 10
 # Canceled games are clutter in a feed: a plan post or club event post whose game was canceled isn't shown there
 # (its page still says it's canceled, for the people who were going).
 NOT_CANCELED = "NOT EXISTS (SELECT 1 FROM events ce WHERE ce.id = p.event_id AND ce.cancelled = 1)"
@@ -275,7 +285,7 @@ def feed():
         mark_seen("feed_posts")  # the new-posts number on Home is cleared once you've seen the top of your feed
     return render_template("feed/feed.html", items=items, older=older, sport=sport, my_sports=user_sports(g.user["id"]),
                            photos=photos, show=show,
-                           durations=PLAN_DURATIONS, max_photos=MAX_PHOTOS, max_body=MAX_BODY, form={},
+                           durations=PLAN_DURATIONS, max_photos=MAX_PHOTOS, max_body=MAX_BODY, max_tags=MAX_TAGS, form={},
                            max_seconds=MAX_SECONDS, post_as=poster_clubs(g.user["id"]),
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"),
                            as_club=request.args.get("as", type=int),
@@ -492,6 +502,59 @@ def _read_plan(form, sport, body):
     return data, None
 
 
+@bp.app_template_filter("post_tags")
+def post_tags(tags_json):
+    """The tagged people and clubs of a post row (its tags_json), for "with …" under the post."""
+    return [tag for tag in json.loads(tags_json or "[]") if tag.get("name")]
+
+
+@bp.route("/posts/tag-search")
+@login_required
+def tag_search():
+    """People and clubs to tag in a post, as you type (the ＋ sheet's "Tag people or clubs" box)."""
+    from .search import search_clubs  # (search.py imports social.py, which this module imports)
+    q = request.args.get("q", "").strip()[:100]
+    people = [{"kind": "user", "id": row["id"], "name": row["full_name"],
+               "note": f"Class of {row['grad_year']}" if row["grad_year"] else ""}
+              for row in search_people(g.user["id"], q, limit=6)]
+    clubs = [{"kind": "club", "id": row["id"], "name": row["name"], "note": "Club"} for row in search_clubs(q, limit=4)]
+    return jsonify(people + clubs)
+
+
+def _read_tags(form):
+    """The people and clubs picked in "Tag people or clubs": ones that exist and you can see, at most MAX_TAGS."""
+    me = g.user["id"]
+    db = get_db()
+    users = []
+    for raw in dict.fromkeys(form.getlist("tag_user")):
+        if raw.isdigit() and int(raw) != me and db.execute(
+                "SELECT 1 FROM users WHERE id = ? AND verified = 1 AND suspended = 0", (int(raw),)).fetchone() \
+                and not is_blocked_between(me, int(raw)):
+            users.append(int(raw))
+    clubs = [int(raw) for raw in dict.fromkeys(form.getlist("tag_club")) if raw.isdigit() and db.execute(
+        "SELECT 1 FROM clubs WHERE id = ? AND status = 'approved'", (int(raw),)).fetchone()]
+    return users[:MAX_TAGS], clubs[:max(0, MAX_TAGS - len(users))]
+
+
+def _save_tags(post_id, users, clubs, posted_as):
+    """Save the tags and tell each tagged person (and each tagged club's officers) in their bell."""
+    from .notifications import notify  # (notifications.py is loaded after this module)
+    db = get_db()
+    who = posted_as or g.user["full_name"].split()[0]
+    link = url_for("posts.view", post_id=post_id)
+    for user_id in users:
+        db.execute("INSERT INTO post_tags (post_id, user_id) VALUES (?, ?)", (post_id, user_id))
+        notify(user_id, "post_activity", f"🏷️ {who} tagged you in a post.", link, key=f"tag:{post_id}")
+    for club_id in clubs:
+        db.execute("INSERT INTO post_tags (post_id, club_id) VALUES (?, ?)", (post_id, club_id))
+        club = db.execute("SELECT name FROM clubs WHERE id = ?", (club_id,)).fetchone()
+        for officer in db.execute("SELECT user_id FROM club_members WHERE club_id = ? AND role = 'officer' AND user_id != ?",
+                                  (club_id, g.user["id"])):
+            if officer["user_id"] not in users:
+                notify(officer["user_id"], "post_activity", f"🏷️ {who} tagged {club['name']} in a post.", link,
+                       key=f"tag:{post_id}")
+
+
 @bp.route("/posts/new", methods=("POST",))
 @login_required
 def create():
@@ -554,6 +617,13 @@ def create():
                      " VALUES (?, ?, ?, ?, ?, ?, ?)",
                      (g.user["id"], sport, body, event_id, to_db(now_local()), club["id"] if club else None,
                       members_only))
+    tagged_users, tagged_clubs = _read_tags(form)
+    if members_only:  # a members-only post: only its members can see it, so only they get tagged
+        tagged_users = [u for u in tagged_users if db.execute(
+            "SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ? AND role IN ('member', 'officer')",
+            (club["id"], u)).fetchone()]
+        tagged_clubs = []
+    _save_tags(cur.lastrowid, tagged_users, tagged_clubs, club["name"] if club else None)
     for position, jpeg in enumerate(jpegs, start=1):
         db.execute("INSERT INTO post_photos (post_id, position, image) VALUES (?, ?, ?)", (cur.lastrowid, position, jpeg))
     if video:

@@ -56,6 +56,13 @@
       {# Shows once a club is picked above (style.css) #}
       <label class="toggle members-only"><input type="checkbox" name="members_only" value="1"><span>🔒 Members only</span></label>
     {% endif %}
+    {# Tag people or clubs (app.js): pick from what you type; they're told in their bell #}
+    <div class="tag-picker" data-tag-picker data-url="{{ url_for('posts.tag_search') }}" data-max="{{ max_tags|default(10) }}">
+      <label class="visually-hidden" for="tag-search">Tag people or clubs</label>
+      <input id="tag-search" type="search" placeholder="🏷️ Tag people or clubs" autocomplete="off" enterkeyhint="done" data-tag-input>
+      <ul class="tag-results" data-tag-results hidden></ul>
+      <div class="tag-chips" data-tag-chips></div>
+    </div>
     <div class="composer-row">
       <select name="sport" aria-label="Sport tag" aria-describedby="sport-hint" required data-sport-pick>
         <option value="">Tag a sport</option>

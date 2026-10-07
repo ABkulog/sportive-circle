@@ -712,6 +712,68 @@
     if (location.hash === "#post") { open(); form.querySelector("textarea")?.focus(); }
   });
 
+  // Tag people or clubs in a post: type a name, tap a result, it becomes a chip (× takes it off). Each chip is a
+  // hidden tag_user / tag_club field the post sends.
+  document.querySelectorAll("[data-tag-picker]").forEach((picker) => {
+    const input = picker.querySelector("[data-tag-input]");
+    const results = picker.querySelector("[data-tag-results]");
+    const chips = picker.querySelector("[data-tag-chips]");
+    const max = parseInt(picker.dataset.max, 10) || 10;
+    let timer = null;
+    let asked = 0;
+    const chosen = () => [...chips.querySelectorAll("input")].map((field) => field.name + ":" + field.value);
+    const add = (tag) => {
+      if (chosen().includes(`tag_${tag.kind}:${tag.id}`) || chips.children.length >= max) return;
+      const chip = document.createElement("span");
+      chip.className = "tag-chip";
+      const field = document.createElement("input");
+      field.type = "hidden"; field.name = `tag_${tag.kind}`; field.value = tag.id;
+      const remove = document.createElement("button");
+      remove.type = "button"; remove.textContent = "×"; remove.setAttribute("aria-label", `Untag ${tag.name}`);
+      remove.addEventListener("click", () => chip.remove());
+      chip.append(field, (tag.kind === "club" ? "🏆 " : "@") + tag.name, remove);
+      chips.append(chip);
+    };
+    const show = (found) => {
+      results.replaceChildren(...found.map((tag) => {
+        const item = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        const name = document.createElement("strong");
+        name.textContent = tag.name;
+        const note = document.createElement("small");
+        note.className = "muted";
+        note.textContent = tag.note || "";
+        button.append(name, note);
+        button.addEventListener("click", () => {
+          add(tag);
+          input.value = ""; results.hidden = true; input.focus();
+        });
+        item.append(button);
+        return item;
+      }));
+      results.hidden = !found.length;
+    };
+    input.addEventListener("input", () => {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (q.length < 2) { results.hidden = true; return; }
+      timer = setTimeout(async () => {
+        const mine = ++asked;
+        try {
+          const response = await fetch(`${picker.dataset.url}?q=${encodeURIComponent(q)}`, { credentials: "same-origin" });
+          const found = response.ok ? await response.json() : [];
+          if (mine === asked) show(found);
+        } catch (error) { results.hidden = true; }
+      }, 200);
+    });
+    input.addEventListener("keydown", (event) => {  // Enter picks the first result instead of sending the post
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      results.querySelector("button")?.click();
+    });
+  });
+
   // Pull to refresh on the feed (and My clubs): pull down from the very top and let go to load what's new.
   // Phones' own pull-to-refresh is off on these pages (style.css), so there's one, and it works in the
   // home-screen app too. A post you're still typing is never thrown away.
@@ -794,6 +856,7 @@
         form.reset();
         if (form.closePostSheet) form.closePostSheet(); else form.classList.remove("is-open");
         form.querySelectorAll("[data-picked]").forEach((line) => { line.hidden = true; line.textContent = ""; });
+        form.querySelectorAll("[data-tag-chips]").forEach((chips) => chips.replaceChildren());
         form.querySelectorAll("select").forEach((select) => select.dispatchEvent(new Event("change")));
         if (document.activeElement && form.contains(document.activeElement)) document.activeElement.blur();
       }

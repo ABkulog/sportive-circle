@@ -491,3 +491,11 @@ CREATE TABLE IF NOT EXISTS post_videos (
     size     INTEGER NOT NULL,                      -- bytes, for the space quota
     seconds  REAL NOT NULL
 );
+
+-- People and clubs tagged in a post ("with Maya Chen, UW Run Club"): one row each, a person or a club.
+CREATE TABLE IF NOT EXISTS post_tags (
+    post_id  INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    user_id  INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    club_id  INTEGER REFERENCES clubs(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_post_tags ON post_tags(post_id);
