@@ -56,6 +56,7 @@ REPLY_VISIBLE = """ru.suspended = 0 AND NOT EXISTS (SELECT 1 FROM blocks b
                          OR (b.blocker_id = r.author_id AND b.blocked_id = :me))"""
 POST_COUNTS = f"""(SELECT COUNT(*) FROM post_photos ph WHERE ph.post_id = p.id) AS photo_count,
                   EXISTS (SELECT 1 FROM post_videos pv WHERE pv.post_id = p.id) AS has_video,
+                  (SELECT pv.muted FROM post_videos pv WHERE pv.post_id = p.id) AS video_muted,
                   (SELECT COUNT(*) FROM post_likes l JOIN users lu ON lu.id = l.user_id
                    WHERE l.post_id = p.id AND lu.suspended = 0) AS like_count,
                   EXISTS (SELECT 1 FROM post_likes l WHERE l.post_id = p.id AND l.user_id = :me) AS i_liked,
@@ -652,8 +653,8 @@ def create():
     for position, jpeg in enumerate(jpegs, start=1):
         db.execute("INSERT INTO post_photos (post_id, position, image) VALUES (?, ?, ?)", (cur.lastrowid, position, jpeg))
     if video:
-        db.execute("INSERT INTO post_videos (post_id, filename, size, seconds) VALUES (?, ?, ?, ?)",
-                   (cur.lastrowid, *video))
+        db.execute("INSERT INTO post_videos (post_id, filename, size, seconds, muted) VALUES (?, ?, ?, ?, ?)",
+                   (cur.lastrowid, *video, 1 if form.get("video_muted") else 0))
     db.commit()
     if event_id and not club:
         from .events import get_event  # (the game with its host's name, for the "Maya posted" notices)

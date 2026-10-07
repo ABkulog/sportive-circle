@@ -714,3 +714,47 @@ def test_posts_tag_people_and_clubs(accounts, client, app):
     assert client.get("/posts/tag-search?q=maya").get_json() == []
     post(client, body="<b>@x</b> & co")                                       # the text stays escaped
     assert "&lt;b&gt;@x&lt;/b&gt; &amp; co" in client.get("/feed").data.decode()
+
+def test_post_sheet_video_preview_and_sound_off_and_a_floating_at_list(accounts, client, app):
+    """The owner: "while posting I have the option to mute the video at the bottom right, and when I chose a video
+    I can't see it until I post"; "when I type @ don't push up the page, open a dropdown"; and in the sport search,
+    "after I click Running it still shows ru"."""
+    accounts.signup(email="me@uw.edu", sports=("running",))
+    feed = client.get("/feed").data.decode()
+    assert "data-video-preview hidden" in feed and 'data-video-sound aria-pressed="false"' in feed
+    assert 'name="video_muted"' in feed and "data-video-remove" in feed
+    from test_videos import mp4
+    post(client, sport="running", body="Quiet one", video_muted="1", video=(BytesIO(mp4(10)), "clip.mp4"))
+    feed = client.get("/feed").data.decode()
+    assert "muted data-muted" in feed and "(no sound), tap to watch" in feed
+    with app.app_context():
+        assert get_db().execute("SELECT muted FROM post_videos").fetchone()[0] == 1
+    js = client.get("/static/app.js").data.decode()
+    assert "const showPicked = (input) =>" in js and '"[data-feed-video][data-muted]"' in js
+    assert ".append(list);  // a dropdown over what's below" in js
+    assert 'picked.textContent.replace(/^[^A-Za-z0-9]+/, "").trim()' in js            # "ru" becomes "Running"
+    css = client.get("/static/style.css").data.decode()
+    assert ".composer-video .video-sound { right: 6px; bottom: 6px; }" in css
+    assert ".composer-top .mention-list { position: absolute;" in css
+
+
+def test_a_video_over_8_mb_posts_with_the_form_check_on(accounts, client, app):
+    """The owner: posting a video showed "413 That photo is too big. Pick one under 8 MB." The form check (CSRF)
+    read the upload under the photo limit before the post's own bigger limit applied. Tests run with that check
+    off, so this one turns it on, like the live site."""
+    import re
+    from test_videos import mp4
+    accounts.signup(email="me@uw.edu", sports=("running",))
+    app.config["CSRF_ENABLED"] = True
+    try:
+        token = re.search(r'name="csrf_token" value="([^"]+)"', client.get("/feed").data.decode()).group(1)
+        big = mp4(10, filler=9 * 1024 * 1024)
+        response = client.post("/posts/new", data={"csrf_token": token, "sport": "running", "body": "Big clip",
+                                                   "video": (BytesIO(big), "clip.mp4")}, content_type="multipart/form-data")
+        assert response.status_code == 302
+        with app.app_context():
+            assert get_db().execute("SELECT size FROM post_videos").fetchone()[0] == len(big)
+    finally:
+        app.config["CSRF_ENABLED"] = False
+    feed = client.get("/feed").data.decode()
+    assert 'data-max-mb="60"' in feed and "Big clip" in feed

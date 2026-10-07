@@ -73,6 +73,11 @@ def csrf_field():
 
 @bp.before_app_request
 def check_csrf():
+    # Reading the form token reads the whole upload, so a post (photos or a video) gets its bigger size limit here,
+    # before that: otherwise any video over the photo limit (8 MB) was refused before the post was even looked at.
+    if request.endpoint == "posts.create":
+        from .posts import MAX_POST_UPLOAD_MB  # imported here: posts.py imports this module
+        request.max_content_length = MAX_POST_UPLOAD_MB * 1024 * 1024
     # The scheduler's reminder call proves itself with its own secret token instead (reminders.py).
     # So does an unsubscribe link (the signed link is the proof; mail apps' one-click button sends no form token).
     if (request.method == "POST" and current_app.config["CSRF_ENABLED"]

@@ -1952,3 +1952,15 @@ html, body { overflow-x: clip; }
 .feed-body a.mention { color: #00376b; font-weight: 600; text-decoration: none; }  /* Instagram's mention blue */
 :root[data-theme="dark"] .feed-body a.mention { color: #e0f1ff; }
 @media (prefers-color-scheme: dark) { :root[data-theme="system"] .feed-body a.mention { color: #e0f1ff; } }
+
+/* The ＋ sheet: the video you picked, with 🔊 / 🔇 at its bottom right and × to take it off */
+.composer-video { position: relative; width: 140px; margin-top: 8px; border-radius: 10px; overflow: hidden; background: #000; }
+.composer-video video { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; cursor: pointer; }
+.composer-video .video-sound, .composer-video .video-remove { position: absolute; display: grid; place-items: center;
+  width: 32px; height: 32px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .6); color: #fff; font-size: 1rem; cursor: pointer; }
+.composer-video .video-sound { right: 6px; bottom: 6px; }
+.composer-video .video-remove { right: 6px; top: 6px; font-size: 1.2rem; }
+/* @ list: a dropdown under the text box, over the rest of the sheet (nothing moves) */
+.composer-top { position: relative; }
+.composer-top .mention-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 20; margin: 4px 0 0; padding: 4px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .15); }
