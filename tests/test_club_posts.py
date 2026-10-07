@@ -903,3 +903,11 @@ def test_your_own_posts_are_purpleish_and_others_white(accounts, client, app):
     assert "is-mine" not in feed[feed.rindex("<article", 0, hers):hers]
     css = client.get("/static/style.css").data.decode()
     assert ".feed-card.is-mine, .feed > .feed-card.is-mine { background: color-mix(in srgb, var(--purple) 12%, var(--bg));" in css
+
+
+def test_the_screen_audit_skips_the_logo_for_contrast():
+    """The bots' screen audit flagged the gold "Circle" in the logo on every page (2.4:1). The owner picked that gold,
+    and logos are exempt from contrast rules, so the audit skips it and real problems stand out."""
+    import pathlib
+    audit = pathlib.Path("tools/visual_audit.js").read_text(encoding="utf-8")
+    assert 'if (e.closest(".brand")) continue;' in audit

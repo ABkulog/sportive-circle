@@ -128,6 +128,7 @@
       const size = parseFloat(cs.fontSize), bold = parseInt(cs.fontWeight, 10) >= 700;
       const need = size >= 24 || (size >= 18.5 && bold) ? 3 : 4.5;
       if (e.matches("input, textarea, select") ) continue;
+      if (e.closest(".brand")) continue;  // the logo (gold "Circle", the owner's pick): logotypes are exempt from contrast rules
       if (ratio < need - 0.05) {
         const key = `${cs.color}|${e.textContent.trim().slice(0, 20)}`;
         if (!seen.has(key)) { seen.add(key); add("low-contrast", `${label(e)} ${ratio.toFixed(2)} (need ${need})`); }
