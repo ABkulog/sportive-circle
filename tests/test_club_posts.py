@@ -726,7 +726,7 @@ def test_post_sheet_video_preview_and_sound_off_and_a_floating_at_list(accounts,
     from test_videos import mp4
     post(client, sport="running", body="Quiet one", video_muted="1", video=(BytesIO(mp4(10)), "clip.mp4"))
     feed = client.get("/feed").data.decode()
-    assert "muted data-muted" in feed and "(no sound), tap to watch" in feed
+    assert "data-muted" in feed and "(no sound), tap to watch" in feed and "data-feed-sound" not in feed
     with app.app_context():
         assert get_db().execute("SELECT muted FROM post_videos").fetchone()[0] == 1
     js = client.get("/static/app.js").data.decode()
@@ -795,3 +795,18 @@ def test_chats_have_one_slim_header_and_links_you_can_tap(accounts, client, app)
             'see <a href="https://example.com/a" target="_blank" rel="noopener noreferrer">example.com/a</a>. &lt;b&gt;')
     assert '!document.querySelector("[data-pull-refresh]")' in client.get("/static/app.js").data.decode()  # one pill
     assert ".tab.is-active, .tab.is-active .icon { color: var(--purple); }" in css   # the tab you're on: purple
+
+
+def test_feed_videos_show_a_frame_and_play_by_themselves(accounts, client, app):
+    """The owner (a black video tile on a Mac): "why is it black, I need it to still play". Safari shows a video's
+    first frame only with "#t=0.1"; feed videos play by themselves without sound while on screen (like Instagram),
+    with 🔇/🔊 at the bottom right; and the page lets the ＋ sheet's preview (a blob: video) play."""
+    from test_videos import mp4
+    accounts.signup(email="me@uw.edu", sports=("running",))
+    post(client, sport="running", body="Loud one", video=(BytesIO(mp4(10)), "clip.mp4"))
+    response = client.get("/feed")
+    feed = response.data.decode()
+    assert '/video#t=0.1" playsinline muted loop preload="metadata"' in feed and "data-feed-sound" in feed
+    assert "media-src 'self' blob:" in response.headers["Content-Security-Policy"]
+    js = client.get("/static/app.js").data.decode()
+    assert "const feedVideos = new IntersectionObserver(" in js and "[data-feed-sound]" in js

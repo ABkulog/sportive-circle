@@ -28,6 +28,7 @@ CONTENT_SECURITY_POLICY = "; ".join([
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https://tile.openstreetmap.org https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/",
     "connect-src 'self'",
+    "media-src 'self' blob:",  # post videos, and the one you picked in the ＋ sheet before posting (a blob: link)
     "frame-ancestors 'none'",
     "form-action 'self'",
     "base-uri 'self'",

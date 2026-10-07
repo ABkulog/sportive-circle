@@ -1107,6 +1107,29 @@
     toggle.setAttribute("aria-label", video.paused ? "Play the video" : "Pause the video");
   };
   ["play", "pause", "ended"].forEach((type) => document.addEventListener(type, syncVideoButton, true));
+  // Feed videos play by themselves, without sound, while they're on screen, and stop when you scroll past (like
+  // Instagram). 🔊 at the bottom right turns the sound on.
+  const feedVideos = new IntersectionObserver((entries) => entries.forEach((entry) => {
+    const video = entry.target;
+    if (entry.isIntersecting && entry.intersectionRatio >= 0.6) video.play().catch(() => {});
+    else if (!video.paused) video.pause();
+  }), { threshold: [0, 0.6] });
+  const watchVideos = (root) => root.querySelectorAll && root.querySelectorAll("video[data-feed-video]").forEach((video) => feedVideos.observe(video));
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    watchVideos(document);
+    new MutationObserver((changes) => changes.forEach((change) => change.addedNodes.forEach(watchVideos)))
+      .observe(document.body, { childList: true, subtree: true });  // posts that arrive in place, or "Show older"
+  }
+  document.addEventListener("click", (event) => {
+    const sound = event.target.closest && event.target.closest("[data-feed-sound]");
+    if (!sound) return;
+    const video = sound.parentElement.querySelector("video");
+    video.muted = !video.muted;
+    if (!video.muted) video.play().catch(() => {});
+    sound.textContent = video.muted ? "🔇" : "🔊";
+    sound.setAttribute("aria-pressed", String(!video.muted));
+    sound.setAttribute("aria-label", video.muted ? "Turn the sound on" : "Turn the sound off");
+  });
   // A video posted without sound (🔇 in the ＋ sheet) stays silent, even if someone turns its sound on.
   document.addEventListener("volumechange", (event) => {
     const video = event.target;
