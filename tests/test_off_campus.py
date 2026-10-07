@@ -52,6 +52,5 @@ def test_plans_and_need_players_take_a_pin_too(accounts, client, app):
          location="Off campus (see note)", spots="3", pin="47.68,-122.33")
     with app.app_context():
         assert tuple(get_db().execute("SELECT place_lat, place_lng FROM events").fetchone()) == (47.68, -122.33)
-    feed = client.get("/feed").data.decode()
-    assert "data-drop-pin" in feed and "spot.js" in feed
+    # (the feed's ＋ sheet has polls now, not plans: plans are made on Play and posted with "📣 Post this event")
     assert "data-drop-pin" in client.get("/events/new").data.decode()

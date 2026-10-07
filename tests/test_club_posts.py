@@ -130,7 +130,7 @@ def test_a_plan_follows_every_game_rule(accounts, client, app):
         game = get_db().execute("SELECT skill_level, open_to, max_players FROM events").fetchone()
     assert tuple(game) == ("Competitive", "women", 4)
     feed = client.get("/feed").data.decode()
-    assert 'id="sport-rules"' in feed and "Heads up: check you can use the" in feed and "data-pull-refresh" in feed
+    assert "data-pull-refresh" in feed and 'name="plan"' not in feed     # the ＋ sheet has polls instead of plans
 
 
 def test_the_feed_is_only_posts_games_are_on_play(accounts, client, app):
@@ -276,7 +276,7 @@ def test_one_card_pattern_no_canceled_games_and_quick_buttons(accounts, client, 
         game = get_db().execute("SELECT id, title FROM events").fetchone()
     assert game["title"] == "Basketball at the IMA"
     feed = client.get("/feed").data.decode()
-    assert "who&#39;s down" in feed and 'name="plan"' in feed and 'id="post-photos"' in feed
+    assert "who&#39;s down" in feed and 'name="poll"' in feed and 'id="post-photos"' in feed
     client.post(f"/events/{game['id']}/cancel")
     assert "who&#39;s down" not in client.get("/feed").data.decode()
     assert client.get("/create").headers["Location"].endswith("/clubs")      # the old Create page is the Clubs tab
@@ -564,8 +564,7 @@ def test_a_plan_can_be_no_limit_anyone_can_come(accounts, client, app):
     """The owner: making a plan asks how many people you need, but sometimes you just want anyone to come (going to
     the run club's run). "No limit: anyone can come" makes the game with no cap; anyone can tap I'm in."""
     accounts.signup(email="maya@uw.edu", sports=("running",))
-    feed = client.get("/feed").data.decode()
-    assert 'name="no_limit"' in feed and "No limit: anyone can come" in feed and "data-plan-spots" in feed
+    # (plans made before polls replaced them in the ＋ sheet still work: the game form on Play has No limit too)
     post(client, sport="running", body="Run club 5K, come along", plan="1", starts_at=form_time(timedelta(days=1)),
          duration="60", location="Burke-Gilman Trail", no_limit="1")
     with app.app_context():
@@ -816,6 +815,51 @@ def test_feed_videos_show_a_frame_and_play_by_themselves(accounts, client, app):
     assert "media-src 'self' blob:" in response.headers["Content-Security-Policy"]
     js = client.get("/static/app.js").data.decode()
     assert "const feedVideos = new IntersectionObserver(" in js and "[data-feed-sound]" in js
+
+
+def test_polls_like_whatsapp(accounts, client, app):
+    """The owner: "remove the 'make it a plan' thing and add polls instead, customisable, JUST LIKE WHATSAPP": a
+    question, options (as many as you add, up to 12), "Allow multiple answers"; tap an option to vote, again to take
+    it back; each option shows its votes, voters and a bar; "View votes" lists who picked what."""
+    accounts.signup(email="maya@uw.edu", name="Maya Chen", sports=("running",))
+    feed = client.get("/feed").data.decode()
+    assert "📊 Poll" in feed and 'name="poll_question"' in feed and feed.count('name="poll_option"') == 2
+    assert 'name="poll_multiple" value="1" checked' in feed and "Make it a plan" not in feed
+    assert "Ask a question" in post(client, sport="running", poll="1", poll_option=["A", "B"]).data.decode()
+    assert "at least 2 options" in post(client, sport="running", poll="1", poll_question="Q?",
+                                        poll_option=["Only", "", "only"]).data.decode()   # blanks and repeats skipped
+    post(client, sport="running", poll="1", poll_question="Long run when?", poll_multiple="",
+         poll_option=["Saturday 8am", "Sunday 9am", "  ", "Sunday 9am"])
+    with app.app_context():
+        db = get_db()
+        post_id, multiple = db.execute("SELECT post_id, multiple FROM polls").fetchone()
+        options = [row[0] for row in db.execute("SELECT id FROM poll_options WHERE post_id = ? ORDER BY position", (post_id,))]
+    assert multiple == 0 and len(options) == 2
+    feed = client.get("/feed").data.decode()
+    assert "Long run when?" in feed and "✓ Select one" in feed and "Saturday 8am" in feed
+    client.post(f"/posts/{post_id}/poll", data={"option": options[0]})
+    client.post(f"/posts/{post_id}/poll", data={"option": options[1]})          # one answer: the vote moves
+    with app.app_context():
+        assert [r[0] for r in get_db().execute("SELECT option_id FROM poll_votes")] == [options[1]]
+    feed = client.get("/feed").data.decode()
+    assert 'class="poll-option is-mine" aria-pressed="true"' in feed and "--share: 100%" in feed and "View votes" in feed
+    client.post(f"/posts/{post_id}/poll", data={"option": options[1]})          # again: taken back
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM poll_votes").fetchone()[0] == 0
+    post(client, sport="running", poll="1", poll_question="Which days?", poll_multiple="1",
+         poll_option=["Mon", "Wed", "Fri"])
+    with app.app_context():
+        multi = get_db().execute("SELECT post_id FROM polls WHERE question = 'Which days?'").fetchone()[0]
+        days = [r[0] for r in get_db().execute("SELECT id FROM poll_options WHERE post_id = ? ORDER BY position", (multi,))]
+    client.post(f"/posts/{multi}/poll", data={"option": days[0]})
+    accounts.logout()
+    accounts.signup(email="sam@uw.edu", name="Sam Okafor", sports=("running",))
+    client.post(f"/posts/{multi}/poll", data={"option": days[0]})
+    client.post(f"/posts/{multi}/poll", data={"option": days[2]})                 # more than one: both stay
+    page = client.get(f"/posts/{multi}").data.decode()
+    assert "✓✓ Select one or more" in page and "--share: 100%" in page and "--share: 50%" in page
+    assert " Maya Chen</a>" in page and " You</a>" in page                       # View votes: who picked what
+    assert client.post(f"/posts/{multi}/poll", data={"option": options[0]}).status_code == 404  # another poll's
 
 
 def test_post_your_event_with_words_and_photos(accounts, client, app):

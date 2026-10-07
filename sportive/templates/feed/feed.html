@@ -82,26 +82,18 @@
       <button type="button" class="video-remove" data-video-remove aria-label="Remove the video">×</button>
       <input type="hidden" name="video_muted" value="" data-video-muted>
     </div>
-    <label class="toggle plan-toggle"><input type="checkbox" name="plan" value="1"><span>📅 Make it a plan (people tap <strong>I'm in</strong>)</span></label>
-    {# A plan is a real game: the same places (only the ones for that sport), hours and choices as Create a game #}
-    <fieldset class="plan-fields">
-      <legend class="visually-hidden">Plan details</legend>
-      <label class="field"><span>When</span><input type="datetime-local" name="starts_at" min="{{ min_start }}"></label>
-      <label class="field"><span>How long</span>
-        <select name="duration">{% for minutes, label in durations %}<option value="{{ minutes }}" {% if minutes == 120 %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-      <label class="field plan-where"><span>Where</span>
-        <select name="location"><option value="">Pick a place</option>
-          {% for place in LOCATIONS %}<option value="{{ place }}">{{ place }}</option>{% endfor %}</select>
-        <small class="muted place-tip" data-place-tip></small>
-        <small class="muted place-hours" data-place-hours aria-live="polite"></small></label>
-      <div class="plan-spot">{{ spot_field({}) }}</div>
-      <label class="field"><span>People you need</span><input type="number" name="spots" min="1" max="50" value="2" inputmode="numeric" data-plan-spots></label>
-      {# Joining a club run or an open session: no number to fill, anyone can come #}
-      <label class="toggle no-limit"><input type="checkbox" name="no_limit" value="1" data-plan-no-limit><span>No limit: anyone can come</span></label>
-      <label class="field"><span>Level</span>
-        <select name="skill_level">{% for level in SKILL_LEVELS %}<option {% if level == 'All levels' %}selected{% endif %}>{{ level }}</option>{% endfor %}</select></label>
-      {{ open_to_field({}) }}
-      <div class="plan-check">{{ place_check(sport or '') }}</div>
+    {# A poll, like WhatsApp's: a question, options (a new box shows as you fill the last one, up to {{ max_poll_options }}),
+       and "Allow multiple answers". (Plans are made on Play now: "📣 Post this event" posts one.) #}
+    <label class="toggle poll-toggle"><input type="checkbox" name="poll" value="1"><span>📊 Poll</span></label>
+    <fieldset class="poll-fields" data-poll-fields data-max="{{ max_poll_options|default(12) }}">
+      <legend class="visually-hidden">Poll</legend>
+      <label class="field"><span>Question</span><input name="poll_question" maxlength="200" placeholder="Ask question" autocomplete="off"></label>
+      <div class="poll-option-boxes" data-poll-options>
+        <span class="poll-options-label">Options</span>
+        <input name="poll_option" maxlength="100" placeholder="+ Add" aria-label="Option 1" autocomplete="off">
+        <input name="poll_option" maxlength="100" placeholder="+ Add" aria-label="Option 2" autocomplete="off">
+      </div>
+      <label class="toggle"><input type="checkbox" name="poll_multiple" value="1" checked><span>Allow multiple answers</span></label>
     </fieldset>
   </div>
   <div class="composer-row composer-send">

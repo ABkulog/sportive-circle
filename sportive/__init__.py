@@ -140,6 +140,8 @@ def _check_secret_key(app):
 
 
 def _add_template_helpers(app):
+    from .posts import poll_of
+    app.jinja_env.globals["poll_of"] = poll_of  # a post's poll, as the viewer sees it (feed/_cards.html)
     app.jinja_env.globals.update(
         # forms and lists
         csrf_field=auth.csrf_field, SPORTS=SPORTS, SPORT_EMOJI=SPORT_EMOJI, SPORT_SPACE=SPORT_SPACE, LOCATIONS=LOCATIONS,
