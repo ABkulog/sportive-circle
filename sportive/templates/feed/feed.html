@@ -42,7 +42,12 @@
   {% if show %}<input type="hidden" name="show" value="{{ show }}">{% endif %}
   {% if post_event %}{# "📣 Post this event": its card goes under your post; add words and photos #}
     <input type="hidden" name="event_id" value="{{ post_event.id }}">
-    <p class="posting-event">📣 Posting your event: <strong>{{ event_title(post_event) }}</strong> · {{ post_event.starts_at|when }}</p>
+    {# The game you're posting, as it will look under your post (people tap I'm in on it) #}
+    <div class="posting-event">
+      <span class="posting-event-label">Your game goes under your post: people tap <strong>I'm in</strong> on it</span>
+      <span class="posting-event-card">{{ SPORT_EMOJI[post_event.sport] }} <strong>{{ event_title(post_event) }}</strong>
+        <small>{{ post_event.starts_at|when }} · {{ post_event.location }}</small></span>
+    </div>
   {% endif %}
   <div class="composer-top">
     {{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 40) }}

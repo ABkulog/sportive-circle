@@ -1985,8 +1985,11 @@ html, body { overflow-x: clip; }
 
 /* "📣 Post this event": the button on your event, and the line in the ＋ sheet saying which event you're posting */
 .post-event-btn { margin: 8px 0; }
-.posting-event { margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; font-size: .9rem;
-  background: color-mix(in srgb, var(--purple) 10%, var(--bg)); }
+.posting-event { display: grid; gap: 6px; margin: 0 0 10px; }
+.posting-event-label { font-size: .85rem; color: var(--muted); }
+.posting-event-card { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px;
+  background: color-mix(in srgb, var(--purple) 6%, var(--bg)); }
+.posting-event-card small { color: var(--muted); }
 /* Share page: how to add the link sticker, shown after "Share to Instagram story" */
 .story-tip { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; text-align: left; font-size: .9rem;
   background: color-mix(in srgb, var(--purple) 10%, var(--bg)); }
