@@ -631,11 +631,17 @@ def test_a_club_shares_its_poster_to_an_instagram_story(accounts, client, app):
     club = approved_club(app, "officer@uw.edu")
     share = client.get(f"/clubs/{club}/share").data.decode()
     assert "Share to Instagram story" in share and 'data-story="Run with UW Run Club"' in share
-    assert f'data-story-qr="/clubs/{club}/qr.svg"' in share and 'data-story-file="uw-run-club-story.png"' in share
+    assert "data-story-qr" not in share and 'data-story-file="uw-run-club-story.png"' in share  # no QR on a story
+    # The owner: "people can't scan their own screen" and stories have no links: the tap copies the club's link and
+    # the tip says how to add Instagram's link sticker, the one thing people can tap on a story.
+    link = app.config["PUBLIC_URL"].rstrip("/") + f"/clubs/{club}"
+    assert f'data-story-url="{link}"' in share and "<strong>Link copied.</strong>" in share and "→ <strong>Link</strong> → paste" in share
     assert 'data-story-emoji="' in share                                    # no logo yet: the sport's emoji
     js = client.get("/static/app.js").data.decode()
     assert "navigator.share({ files: [file] })" in js and "canvas.width = 1080; canvas.height = 1920;" in js
     assert "a.download = file.name;" in js                                  # laptops save the picture instead
+    assert "navigator.clipboard.writeText(button.dataset.storyUrl)" in js and "Tap the link to join 👇" in js
+    assert "Scan to join" not in js
 
 
 def test_officers_sign_up_straight_to_their_club(accounts, client, app):

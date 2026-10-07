@@ -217,9 +217,11 @@
     radio.addEventListener("change", () => { document.documentElement.dataset.theme = radio.value; });
   });
 
-  // <button data-story>: a club's Instagram story (1080×1920: the club, its QR code and link). The picture is drawn
-  // when the page opens, so the tap goes straight to the phone's share menu (Instagram → Story); phones only open
-  // that menu right after a tap. Laptops and older browsers save the picture instead.
+  // <button data-story>: a club's Instagram story (1080×1920). Nobody can scan a QR code on their own screen, and a
+  // website can't put Instagram's link sticker on a story (only Meta-approved apps can), so: the picture is the club
+  // with a "Tap the link to join 👇" spot, the tap copies the club's link, and a tip says where to paste it
+  // (sticker button → Link → paste). The picture is drawn when the page opens, so the tap goes straight to the
+  // phone's share menu (Instagram → Story); phones only open it right after a tap. Laptops save the picture instead.
   document.querySelectorAll("[data-story]").forEach((button) => {
     const load = (src) => new Promise((resolve) => {
       const img = new Image();
@@ -238,50 +240,51 @@
       return lines.slice(0, 3);
     };
     const draw = async () => {
-      const [qr, logo] = await Promise.all([load(button.dataset.storyQr),
-                                            button.dataset.storyLogo ? load(button.dataset.storyLogo) : null]);
+      const logo = button.dataset.storyLogo ? await load(button.dataset.storyLogo) : null;
       const canvas = document.createElement("canvas");
       canvas.width = 1080; canvas.height = 1920;
       const ctx = canvas.getContext("2d");
       const font = getComputedStyle(document.body).fontFamily;
       ctx.fillStyle = "#4b2e83"; ctx.fillRect(0, 0, 1080, 1920);
-      ctx.font = `800 68px ${font}`;
-      const lines = wrap(ctx, button.dataset.story, 800);
-      const below = 700 + (lines.length - 1) * 80;   // the headline's last line
-      const cardEnd = below + 120 + 540 + 70;          // the card ends just under the QR code
-      ctx.translate(0, Math.round((1920 - (cardEnd + 110 - 190)) / 2 - 190));  // centred, top to bottom
-      ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-      ctx.font = `800 64px ${font}`;
+      ctx.font = `800 76px ${font}`;
+      const lines = wrap(ctx, button.dataset.story, 820);
+      const cardEnd = 900 + lines.length * 90 + 90;    // the card: logo, headline, "on Sportive Circle"
+      ctx.textBaseline = "alphabetic";
+      ctx.font = `800 64px ${font}`;                     // the wordmark: Sportive white, Circle gold
       const left = ctx.measureText("Sportive").width, right = ctx.measureText("Circle").width;
-      const start = 540 - (left + right) / 2;
       ctx.textAlign = "left";
-      ctx.fillStyle = "#ffffff"; ctx.fillText("Sportive", start, 240);
-      ctx.fillStyle = "#b7a57a"; ctx.fillText("Circle", start + left, 240);
+      ctx.fillStyle = "#ffffff"; ctx.fillText("Sportive", 540 - (left + right) / 2, 300);
+      ctx.fillStyle = "#b7a57a"; ctx.fillText("Circle", 540 - (left + right) / 2 + left, 300);
       ctx.textAlign = "center";
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(80, 330, 920, cardEnd - 330, 48); else ctx.rect(80, 330, 920, cardEnd - 330);
+      if (ctx.roundRect) ctx.roundRect(80, 420, 920, cardEnd - 420, 48); else ctx.rect(80, 420, 920, cardEnd - 420);
       ctx.fill();
-      ctx.save(); ctx.beginPath(); ctx.arc(540, 500, 100, 0, Math.PI * 2); ctx.clip();
-      if (logo) { ctx.drawImage(logo, 440, 400, 200, 200); } else {
-        ctx.fillStyle = "#e8e3d3"; ctx.fillRect(440, 400, 200, 200);
-        ctx.font = `110px ${font}`; ctx.textBaseline = "middle"; ctx.fillText(button.dataset.storyEmoji || "", 540, 506);
+      ctx.save(); ctx.beginPath(); ctx.arc(540, 640, 140, 0, Math.PI * 2); ctx.clip();
+      if (logo) { ctx.drawImage(logo, 400, 500, 280, 280); } else {
+        ctx.fillStyle = "#e8e3d3"; ctx.fillRect(400, 500, 280, 280);
+        ctx.font = `150px ${font}`; ctx.textBaseline = "middle"; ctx.fillText(button.dataset.storyEmoji || "", 540, 648);
         ctx.textBaseline = "alphabetic";
       }
       ctx.restore();
-      ctx.fillStyle = "#111111"; ctx.font = `800 68px ${font}`;
-      lines.forEach((line, n) => ctx.fillText(line, 540, 700 + n * 80));
-      ctx.fillStyle = "#555555"; ctx.font = `500 40px ${font}`;
-      ctx.fillText("Scan to join us on Sportive Circle", 540, below + 70);
-      if (qr) ctx.drawImage(qr, 270, below + 120, 540, 540);
-      ctx.fillStyle = "#ffffff"; ctx.font = `700 44px ${font}`;
-      ctx.fillText(button.dataset.storyLink, 540, cardEnd + 110);
+      ctx.fillStyle = "#111111"; ctx.font = `800 76px ${font}`;
+      lines.forEach((line, n) => ctx.fillText(line, 540, 940 + n * 90));
+      ctx.fillStyle = "#555555"; ctx.font = `500 42px ${font}`;
+      ctx.fillText("Join us on Sportive Circle", 540, 940 + lines.length * 90 + 10);
+      ctx.fillStyle = "#ffffff"; ctx.font = `800 60px ${font}`;  // where the link sticker goes
+      ctx.fillText("Tap the link to join 👇", 540, cardEnd + 190);
+      ctx.fillStyle = "rgba(255, 255, 255, .7)"; ctx.font = `500 34px ${font}`;
+      ctx.fillText(button.dataset.storyLink, 540, 1840);
       return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/png"));
     };
+    const tip = document.querySelector("[data-story-tip]");
     let file = null;
     draw().then((blob) => { if (blob) file = new File([blob], button.dataset.storyFile, { type: "image/png" }); });
     button.addEventListener("click", async () => {
       if (!file) return;
+      // The link goes on the clipboard first (not awaited: the share menu must open in this same tap).
+      if (navigator.clipboard) navigator.clipboard.writeText(button.dataset.storyUrl).catch(() => {});
+      if (tip) tip.hidden = false;
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file] }); } catch (e) { /* closed the share menu */ }
         return;
@@ -289,8 +292,6 @@
       const a = document.createElement("a");
       a.href = URL.createObjectURL(file); a.download = file.name;
       document.body.append(a); a.click(); a.remove();
-      const tip = document.querySelector("[data-story-tip]");
-      if (tip) tip.hidden = false;
     });
   });
 

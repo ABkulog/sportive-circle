@@ -1983,6 +1983,9 @@ html, body { overflow-x: clip; }
 .feed-video-tile .feed-sound { position: absolute; right: 6px; bottom: 6px; display: grid; place-items: center; width: 30px; height: 30px;
   border: 0; border-radius: 50%; background: rgba(0, 0, 0, .55); color: #fff; font-size: .85rem; cursor: pointer; }
 
+/* Share page: how to add the link sticker, shown after "Share to Instagram story" */
+.story-tip { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; text-align: left; font-size: .9rem;
+  background: color-mix(in srgb, var(--purple) 10%, var(--bg)); }
 /* Posts: others' are white (.card), your own are a light purple (in dark mode, a dark purple) */
 .feed-card.is-mine, .feed > .feed-card.is-mine { background: color-mix(in srgb, var(--purple) 12%, var(--bg));
   border-color: color-mix(in srgb, var(--purple) 28%, var(--bg)); }
