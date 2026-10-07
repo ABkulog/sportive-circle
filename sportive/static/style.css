@@ -1982,3 +1982,35 @@ html, body { overflow-x: clip; }
 /* Feed videos: 🔇 / 🔊 at the bottom right (they play by themselves without sound, like Instagram) */
 .feed-video-tile .feed-sound { position: absolute; right: 6px; bottom: 6px; display: grid; place-items: center; width: 30px; height: 30px;
   border: 0; border-radius: 50%; background: rgba(0, 0, 0, .55); color: #fff; font-size: .85rem; cursor: pointer; }
+
+/* Polls, like WhatsApp's. In the ＋ sheet: the boxes open when 📊 Poll is ticked. In a post: tap a row to vote. */
+.poll-toggle { margin-top: 12px; }
+.poll-fields { display: none; border: 0; padding: 0; margin: 10px 0 0; gap: 8px; }
+.composer:has(input[name="poll"]:checked) .poll-fields { display: grid; }
+.poll-option-boxes { display: grid; gap: 6px; }
+.poll-options-label { font-size: .85rem; font-weight: 600; }
+.poll { margin: 8px 0 0; }
+.feed-card .poll { margin-left: 36px; }
+@media (min-width: 601px) { .feed-card .poll { margin-left: 42px; } }
+.poll-question { margin: 0; font-weight: 700; }
+.poll-hint { margin: 2px 0 6px; font-size: .8rem; color: var(--muted); }
+.poll-form { margin: 0; }
+.poll-option { position: relative; display: grid; grid-template-columns: 22px 1fr auto auto; align-items: center; gap: 8px;
+  width: 100%; padding: 8px 0 12px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.poll-check { display: grid; place-items: center; width: 20px; height: 20px; border: 2px solid var(--muted); border-radius: 50%;
+  font-size: .75rem; font-weight: 800; }
+.poll-option.is-mine .poll-check { border-color: var(--purple); background: var(--purple); color: var(--on-accent); }
+.poll-text { min-width: 0; overflow-wrap: anywhere; }
+.poll-voters { display: flex; }
+.poll-voters .avatar-img + .avatar-img { margin-left: -6px; }
+.poll-count { font-size: .85rem; color: var(--muted); min-width: 1ch; text-align: right; }
+.poll-bar { position: absolute; left: 30px; right: 0; bottom: 4px; height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.poll-bar::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--share, 0%); background: var(--purple);
+  border-radius: 3px; transition: width .3s; }
+.poll-votes { margin-top: 2px; font-size: .9rem; }
+.poll-votes summary { color: var(--purple); font-weight: 600; cursor: pointer; text-align: center; padding: 6px 0; }
+.poll-votes-option { margin: 8px 0 4px; }
+.poll-votes ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.poll-votes a { display: flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none; }
+.poll-votes summary { list-style: none; }
+.poll-votes summary::-webkit-details-marker { display: none; }

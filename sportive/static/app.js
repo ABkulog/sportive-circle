@@ -863,6 +863,37 @@
     });
   });
 
+  // Poll options, like WhatsApp: typing in the last box adds an empty one under it (up to the limit); emptied boxes
+  // at the end go away again, so there's always exactly one "+ Add".
+  document.querySelectorAll("[data-poll-options]").forEach((boxes) => {
+    const max = parseInt(boxes.closest("[data-poll-fields]").dataset.max, 10) || 12;
+    const inputs = () => [...boxes.querySelectorAll("input")];
+    const tidy = () => {
+      let all = inputs();
+      while (all.length > 2 && !all[all.length - 1].value.trim() && !all[all.length - 2].value.trim()
+             && document.activeElement !== all[all.length - 2]) {
+        all[all.length - 1].remove();
+        all = inputs();
+      }
+      const last = all[all.length - 1];
+      if (last.value.trim() && all.length < max) {
+        const next = last.cloneNode();
+        next.value = "";
+        next.setAttribute("aria-label", `Option ${all.length + 1}`);
+        last.after(next);
+      }
+    };
+    boxes.addEventListener("input", tidy);
+    boxes.addEventListener("keydown", (event) => {  // Enter goes to the next option instead of sending the post
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      const all = inputs();
+      const at = all.indexOf(event.target);
+      if (all[at + 1]) all[at + 1].focus();
+    });
+    boxes.closest("form")?.addEventListener("reset", () => setTimeout(() => inputs().slice(2).forEach((box) => box.remove())));
+  });
+
   // Pull to refresh on the feed (and My clubs): pull down from the very top and let go to load what's new.
   // Phones' own pull-to-refresh is off on these pages (style.css), so there's one, and it works in the
   // home-screen app too. A post you're still typing is never thrown away.
