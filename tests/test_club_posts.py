@@ -816,3 +816,18 @@ def test_feed_videos_show_a_frame_and_play_by_themselves(accounts, client, app):
     assert "media-src 'self' blob:" in response.headers["Content-Security-Policy"]
     js = client.get("/static/app.js").data.decode()
     assert "const feedVideos = new IntersectionObserver(" in js and "[data-feed-sound]" in js
+
+
+def test_your_own_posts_are_purpleish_and_others_white(accounts, client, app):
+    """The owner: "make it so that others' posts are white and your own posts are purpleish"."""
+    accounts.signup(email="maya@uw.edu", name="Maya Chen", sports=("running",))
+    post(client, sport="running", body="Mine")
+    accounts.logout()
+    accounts.signup(email="me@uw.edu", name="Jordan Rivera", sports=("running",))
+    post(client, sport="running", body="Also mine")
+    feed = client.get("/feed").data.decode()
+    mine = feed.index("Also mine"); hers = feed.index(">Mine<")
+    assert 'class="card feed-card is-mine"' in feed[feed.rindex("<article", 0, mine):mine]
+    assert "is-mine" not in feed[feed.rindex("<article", 0, hers):hers]
+    css = client.get("/static/style.css").data.decode()
+    assert ".feed-card.is-mine, .feed > .feed-card.is-mine { background: color-mix(in srgb, var(--purple) 12%, var(--bg));" in css
