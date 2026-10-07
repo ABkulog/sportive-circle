@@ -36,6 +36,7 @@ ADDED_COLUMNS = [
     ("posts", "club_id", "INTEGER REFERENCES clubs(id) ON DELETE CASCADE"),  # posted by an officer as the club
     ("posts", "pinned_until", "TEXT"),  # a club pinned it to the top of its page, until then (24 hours)
     ("posts", "members_only", "INTEGER NOT NULL DEFAULT 0"),  # a club's post only its members see
+    ("post_videos", "muted", "INTEGER NOT NULL DEFAULT 0"),  # the poster turned its sound off (🔇 in the ＋ sheet)
     # Officers the owner lets post as the club (the owner always can). Officers from before this kept posting.
     ("club_members", "can_post", "INTEGER NOT NULL DEFAULT 1"),
     ("post_replies", "club_id", "INTEGER REFERENCES clubs(id) ON DELETE CASCADE"),  # replied as the club

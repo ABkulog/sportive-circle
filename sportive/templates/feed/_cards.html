@@ -57,7 +57,8 @@
     {% if p.has_video %}
       <div class="feed-video-tile">
         <video class="feed-video" src="{{ url_for('posts.video', post_id=p.id) }}" playsinline preload="metadata"
-               aria-label="Video from {{ who }}, tap to watch full screen" data-feed-video></video>
+               {% if p.video_muted %}muted data-muted{% endif %}
+               aria-label="Video from {{ who }}{{ ' (no sound)' if p.video_muted }}, tap to watch full screen" data-feed-video></video>
         <button type="button" class="video-toggle" aria-label="Play the video" data-video-toggle>▶</button>
       </div>
     {% endif %}

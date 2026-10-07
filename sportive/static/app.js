@@ -644,6 +644,14 @@
     if (!input.matches || !input.matches("input[type=file][data-max-seconds]") || !input.files.length) return;
     const max = Number(input.dataset.maxSeconds);
     const line = input.form && input.form.querySelector("[data-picked]");
+    const maxMb = Number(input.dataset.maxMb) || 0;
+    if (maxMb && input.files[0].size > maxMb * 1024 * 1024) {  // too big to send: say so now, not after uploading
+      alert(`Videos can be up to ${maxMb} MB. This one is ${Math.round(input.files[0].size / 1048576)} MB: try a shorter clip.`);
+      input.value = "";
+      if (line) line.hidden = true;
+      showPicked(input);
+      return;
+    }
     const probe = document.createElement("video");
     probe.preload = "metadata";
     const url = URL.createObjectURL(input.files[0]);
@@ -660,9 +668,47 @@
         line.hidden = false;
         line.textContent = `Video added (${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")})`;
       }
+      showPicked(input);
     });
-    probe.addEventListener("error", () => URL.revokeObjectURL(url));  // the server will say what's wrong
+    probe.addEventListener("error", () => { URL.revokeObjectURL(url); showPicked(input); });  // the server will say what's wrong
     probe.src = url;
+  });
+  // The video you picked shows in the post box right away (tap it to play), with 🔊 at its bottom right to post it
+  // without sound, and × to take it off.
+  const showPicked = (input) => {
+    const box = input.form && input.form.querySelector("[data-video-preview]");
+    if (!box) return;
+    const video = box.querySelector("video");
+    if (video.dataset.blob) URL.revokeObjectURL(video.dataset.blob);
+    if (!input.files.length) { box.hidden = true; video.removeAttribute("src"); delete video.dataset.blob; return; }
+    video.dataset.blob = URL.createObjectURL(input.files[0]);
+    video.src = video.dataset.blob + "#t=0.1";  // iPhones then show its first frame instead of a black box
+    video.muted = box.querySelector("[data-video-muted]").value === "1";
+    box.hidden = false;
+  };
+  document.addEventListener("click", (event) => {
+    const box = event.target.closest && event.target.closest("[data-video-preview]");
+    if (!box) return;
+    const video = box.querySelector("video");
+    const muted = box.querySelector("[data-video-muted]");
+    const sound = box.querySelector("[data-video-sound]");
+    if (event.target.closest("[data-video-sound]")) {
+      const off = muted.value !== "1";
+      muted.value = off ? "1" : "";
+      video.muted = off;
+      sound.textContent = off ? "🔇" : "🔊";
+      sound.setAttribute("aria-pressed", String(off));
+      sound.setAttribute("aria-label", off ? "Turn the sound on" : "Turn the sound off");
+    } else if (event.target.closest("[data-video-remove]")) {
+      const input = box.closest("form").querySelector("input[type=file][data-max-seconds]");
+      input.value = "";
+      const line = box.closest("form").querySelector("[data-picked]");
+      if (line) line.hidden = true;
+      video.pause();
+      showPicked(input);
+    } else if (event.target === video) {
+      if (video.paused) video.play(); else video.pause();
+    }
   });
 
   // The feed's post box is one line until you tap into it; then the sport, photos, video and plan open up.
@@ -722,7 +768,7 @@
     list.className = "mention-list";
     list.hidden = true;
     list.setAttribute("role", "listbox");
-    (box.closest(".composer-top") || box).after(list);
+    (box.closest(".composer-top") || box.parentElement).append(list);  // a dropdown over what's below (style.css)
     const fields = document.createElement("div");
     fields.hidden = true;
     fields.dataset.mentionFields = "";
@@ -900,6 +946,17 @@
         if (form.closePostSheet) form.closePostSheet(); else form.classList.remove("is-open");
         form.querySelectorAll("[data-picked]").forEach((line) => { line.hidden = true; line.textContent = ""; });
         form.querySelectorAll("[data-mention-fields]").forEach((fields) => fields.replaceChildren());
+        form.querySelectorAll("[data-video-preview]").forEach((box) => {
+          const video = box.querySelector("video");
+          video.pause();
+          if (video.dataset.blob) URL.revokeObjectURL(video.dataset.blob);
+          video.removeAttribute("src");
+          delete video.dataset.blob;
+          box.hidden = true;
+          box.querySelector("[data-video-muted]").value = "";
+          box.querySelector("[data-video-sound]").textContent = "🔊";
+          box.querySelector("[data-video-sound]").setAttribute("aria-pressed", "false");
+        });
         form.querySelectorAll("select").forEach((select) => select.dispatchEvent(new Event("change")));
         if (document.activeElement && form.contains(document.activeElement)) document.activeElement.blur();
       }
@@ -1050,6 +1107,11 @@
     toggle.setAttribute("aria-label", video.paused ? "Play the video" : "Pause the video");
   };
   ["play", "pause", "ended"].forEach((type) => document.addEventListener(type, syncVideoButton, true));
+  // A video posted without sound (🔇 in the ＋ sheet) stays silent, even if someone turns its sound on.
+  document.addEventListener("volumechange", (event) => {
+    const video = event.target;
+    if (video.matches && video.matches("[data-feed-video][data-muted]") && !video.muted) video.muted = true;
+  }, true);
 
   // <a data-close-details> inside an open <details> (e.g. a club's "Request to join" form): Cancel closes it right
   // there. (Without JavaScript it's a link back to the page, which also closes it.)
@@ -1096,6 +1158,15 @@
     const watch = new MutationObserver(() => { snapshot = null; input.value = ""; fits(); });
     watch.observe(select, { childList: true, subtree: true });
     const autoSubmits = select.matches("[data-autosubmit]") || select.closest("form[data-auto-submit]");
+    // Picking from the list writes your pick in the box ("ru" → Running), like an autocomplete.
+    // (Also when the list closes: typing "ru" already picked Running, and picking it again changes nothing.)
+    const fillIn = () => {
+      if (!input.value) return;
+      const picked = select.selectedOptions[0];
+      input.value = picked && picked.value ? picked.textContent.replace(/^[^A-Za-z0-9]+/, "").trim() : "";
+    };
+    select.addEventListener("change", (event) => { if (event.isTrusted) fillIn(); });
+    select.addEventListener("blur", fillIn);
     input.addEventListener("input", () => {
       if (!snapshot) snapshot = [...select.children].map((node) => [node, node.tagName === "OPTGROUP" ? [...node.children] : null]);
       const words = fold(input.value).split(/\s+/).filter(Boolean);
