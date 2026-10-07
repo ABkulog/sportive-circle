@@ -19,13 +19,16 @@
   <button type="button" class="flyer-link" data-copy="{{ link }}" title="Tap to copy the link"><span data-copy-label>{{ link.replace('https://', '') }}</span></button>
 </article>
 <div class="no-print poster-actions">
-  {# The story picture is drawn on the phone (app.js) from the club's name, logo and QR code, then handed to the
-     phone's share menu: tap Instagram, then Story. Where a browser can't share pictures it saves the picture. #}
-  <button type="button" class="btn btn-block" data-story="{{ headline }}" data-story-qr="{{ url_for('clubs.qr_code', club_id=club.id) }}"
+  {# The story picture is drawn on the phone (app.js): the club and a "Tap the link to join 👇" spot. The tap copies
+     the club's link and opens the share menu (Instagram → Story); the tip says how to add Instagram's link sticker,
+     the one thing people can tap on a story (a website can't add it for you). #}
+  <button type="button" class="btn btn-block" data-story="{{ headline }}" data-story-url="{{ link }}"
           data-story-link="{{ link.replace('https://', '') }}" data-story-file="{{ club.name|lower|replace(' ', '-') }}-story.png"
           {% if club.logo_updated %}data-story-logo="{{ url_for('clubs.logo', club_id=club.id, v=club.logo_updated) }}"{% else %}data-story-emoji="{{ SPORT_EMOJI[club.sport] }}"{% endif %}>
     Share to Instagram story</button>
-  <p class="muted fine-print" data-story-tip hidden>Saved the story picture. Open Instagram, swipe to your story and pick it.</p>
+  <p class="story-tip" data-story-tip hidden>✅ <strong>Link copied.</strong> In your story, tap the sticker button
+    (the square smiley at the top) → <strong>Link</strong> → paste, and put it on the 👇. Anyone watching taps it to
+    open your club.</p>
   <button type="button" class="btn btn-ghost btn-block" data-print>Print or save poster</button>
   <p class="muted fine-print">Tap the link above to copy it for your Instagram bio or group chat.</p>
 </div>
