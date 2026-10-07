@@ -810,3 +810,31 @@ def test_feed_videos_show_a_frame_and_play_by_themselves(accounts, client, app):
     assert "media-src 'self' blob:" in response.headers["Content-Security-Policy"]
     js = client.get("/static/app.js").data.decode()
     assert "const feedVideos = new IntersectionObserver(" in js and "[data-feed-sound]" in js
+
+
+def test_post_your_event_with_words_and_photos(accounts, client, app):
+    """The owner: "once someone creates an event, they can post that event and type stuff or add pictures onto it,
+    so have a 'post the event' thing after it's created"."""
+    from test_app import event_form
+    accounts.signup(email="host@uw.edu", name="Hana Host", sports=("basketball",))
+    response = client.post("/events/new", data=event_form())
+    event_id = int(response.headers["Location"].rsplit("/", 1)[1])
+    page = client.get(f"/events/{event_id}").data.decode()
+    assert f'href="/feed?event={event_id}#post">📣 Post this event</a>' in page
+    sheet = client.get(f"/feed?event={event_id}").data.decode()
+    assert f'name="event_id" value="{event_id}"' in sheet and "📣 Posting your event:" in sheet
+    photos = [(BytesIO(make_image()), "court.png")]
+    post(client, event_id=str(event_id), sport="", body="Who's in tonight? 🏀", photos=photos)
+    with app.app_context():
+        row = get_db().execute("SELECT sport, event_id FROM posts WHERE body LIKE 'Who%'").fetchone()
+    assert row["event_id"] == event_id and row["sport"] == "basketball"     # the event's sport when none picked
+    feed = client.get("/feed").data.decode()
+    assert "Who&#39;s in tonight?" in feed and f'/events/{event_id}' in feed
+    post(client, event_id=str(event_id), sport="basketball", body="")        # just the event is fine too
+    accounts.logout()
+    accounts.signup(email="other@uw.edu", sports=("basketball",))
+    assert "📣 Post this event" not in client.get(f"/events/{event_id}").data.decode()  # only its host
+    assert "📣 Posting your event" not in client.get(f"/feed?event={event_id}").data.decode()
+    post(client, event_id=str(event_id), sport="basketball", body="Not mine")
+    with app.app_context():
+        assert get_db().execute("SELECT event_id FROM posts WHERE body = 'Not mine'").fetchone()[0] is None

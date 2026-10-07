@@ -84,6 +84,8 @@
     <div class="primary-action">
       {% if is_host %}
         <span class="going-pill">You're hosting</span>
+        {# Post it to the feed with your own words and photos (its card, with I'm in, goes under the post) #}
+        <a class="btn btn-block post-event-btn" href="{{ url_for('posts.feed', event=event.id) }}#post">📣 Post this event</a>
       {% elif event.i_am_going %}
         <span class="going-pill">You're going</span>
       {% endif %}
