@@ -40,6 +40,10 @@
   {{ csrf_field() }}
   {% if sport %}<input type="hidden" name="channel" value="{{ sport }}">{% endif %}
   {% if show %}<input type="hidden" name="show" value="{{ show }}">{% endif %}
+  {% if post_event %}{# "📣 Post this event": its card goes under your post; add words and photos #}
+    <input type="hidden" name="event_id" value="{{ post_event.id }}">
+    <p class="posting-event">📣 Posting your event: <strong>{{ event_title(post_event) }}</strong> · {{ post_event.starts_at|when }}</p>
+  {% endif %}
   <div class="composer-top">
     {{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 40) }}
     <label class="visually-hidden" for="post-body">Your post</label>
@@ -58,10 +62,11 @@
       <label class="toggle members-only"><input type="checkbox" name="members_only" value="1"><span>🔒 Members only</span></label>
     {% endif %}
     <div class="composer-row">
+      {% set pick = sport or (post_event.sport if post_event else '') %}
       <select name="sport" aria-label="Sport tag" aria-describedby="sport-hint" required data-sport-pick>
         <option value="">Tag a sport</option>
-        {% if my_sports %}<optgroup label="Your sports">{% for key in my_sports %}<option value="{{ key }}" {% if key == (sport or (my_sports[0] if my_sports|length == 1 else '')) %}selected{% endif %}>{{ SPORTS[key] }}</option>{% endfor %}</optgroup>{% endif %}
-        <optgroup label="All sports">{% for key, label in SPORTS.items() if key not in my_sports %}<option value="{{ key }}" {% if key == sport %}selected{% endif %}>{{ label }}</option>{% endfor %}</optgroup>
+        {% if my_sports %}<optgroup label="Your sports">{% for key in my_sports %}<option value="{{ key }}" {% if key == (pick or (my_sports[0] if my_sports|length == 1 else '')) %}selected{% endif %}>{{ SPORTS[key] }}</option>{% endfor %}</optgroup>{% endif %}
+        <optgroup label="All sports">{% for key, label in SPORTS.items() if key not in my_sports %}<option value="{{ key }}" {% if key == pick %}selected{% endif %}>{{ label }}</option>{% endfor %}</optgroup>
       </select>
       <label class="btn btn-ghost btn-small composer-photos" title="Add up to {{ max_photos }} photos">{{ icon('camera') }}<span>Photos</span>
         <input type="file" name="photos" id="post-photos" accept="image/*" multiple data-max-files="{{ max_photos }}" class="visually-hidden"></label>

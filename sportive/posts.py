@@ -268,6 +268,20 @@ def photos_of(post_ids):
     return photos
 
 
+def _postable_event(event_id):
+    """An event the person logged in made (or runs, for a club's event) that hasn't happened or been canceled:
+    "📣 Post this event" puts it under a post of theirs, with their own words and photos."""
+    if not event_id:
+        return None
+    rows = query_events(["e.id = :id"], {"id": event_id}, limit=1)
+    event = rows[0] if rows else None
+    if event is None or event["cancelled"] or event["ends_at"] < to_db(now_local()):
+        return None
+    if event["host_id"] == g.user["id"] or (event["club_id"] and can_post_as(event["club_id"], g.user["id"])):
+        return event
+    return None
+
+
 @bp.route("/feed")
 @login_required
 def feed():
@@ -286,6 +300,7 @@ def feed():
     from .clubs import suggested_clubs  # "Clubs for you" until you follow one: clubs fill the feed
     in_a_club = get_db().execute("SELECT 1 FROM club_members WHERE user_id = ?", (g.user["id"],)).fetchone()
     club_picks = [] if in_a_club or before else suggested_clubs(g.user["id"], user_sports(g.user["id"]), limit=6)
+    post_event = _postable_event(request.args.get("event", type=int))  # "📣 Post this event" (the event's page)
     if not sport and not before and not show:
         from .notifications import mark_seen  # (notifications.py is loaded after this module)
         mark_seen("feed_posts")  # the new-posts number on Home is cleared once you've seen the top of your feed
@@ -294,8 +309,9 @@ def feed():
                            durations=PLAN_DURATIONS, max_photos=MAX_PHOTOS, max_body=MAX_BODY, max_tags=MAX_TAGS, max_poll_options=MAX_POLL_OPTIONS, form={},
                            max_seconds=MAX_SECONDS, post_as=poster_clubs(g.user["id"]),
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"),
-                           as_club=request.args.get("as", type=int),
-                           member_roles=MEMBER_ROLES, club_picks=club_picks)
+                           as_club=request.args.get("as", type=int) or (post_event["club_id"] if post_event
+                                                                         and post_event["club_id"] else None),
+                           post_event=post_event, member_roles=MEMBER_ROLES, club_picks=club_picks)
 
 
 def posts_by(user_id, limit=10):
@@ -678,6 +694,9 @@ def create():
         elif form.get("from_my_clubs"):
             back = url_for("clubs.updates")
         sport = sport if sport in SPORTS else club["sport"]
+    attached = _postable_event(form.get("event_id", type=int))  # "📣 Post this event": its card goes under the post
+    if attached is not None and sport not in SPORTS:
+        sport = attached["sport"]
     if sport not in SPORTS:
         error = "Tag your post with a sport."
     elif len(body) > MAX_BODY:
@@ -691,7 +710,7 @@ def create():
     poll = None
     if error is None and form.get("poll") == "1":
         poll, error = _read_poll(form)
-    if error is None and not body and not jpegs and not video_upload and poll is None:
+    if error is None and not body and not jpegs and not video_upload and poll is None and attached is None:
         error = "Write something, or add a photo or a video."
     db = get_db()
     if error is None:
@@ -717,7 +736,7 @@ def create():
     if plan and club:
         plan["club_id"] = club["id"]  # a club's plan is a club event: it's on the club's page too
         plan["members_only"] = members_only
-    event_id = insert_event(plan) if plan else None  # (commits)
+    event_id = insert_event(plan) if plan else (attached["id"] if attached is not None else None)  # (commits)
     cur = db.execute("INSERT INTO posts (author_id, sport, body, event_id, created_at, club_id, members_only)"
                      " VALUES (?, ?, ?, ?, ?, ?, ?)",
                      (g.user["id"], sport, body, event_id, to_db(now_local()), club["id"] if club else None,
@@ -742,7 +761,7 @@ def create():
         db.execute("INSERT INTO post_videos (post_id, filename, size, seconds, muted) VALUES (?, ?, ?, ?, ?)",
                    (cur.lastrowid, *video, 1 if form.get("video_muted") else 0))
     db.commit()
-    if event_id and not club:
+    if plan and not club:  # (an event posted with "📣 Post this event" was announced when it was made)
         from .events import get_event  # (the game with its host's name, for the "Maya posted" notices)
         announce_new_game(get_event(event_id))
     if club:
