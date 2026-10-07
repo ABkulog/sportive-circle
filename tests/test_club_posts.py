@@ -188,7 +188,7 @@ def test_all_clubs_feed_and_a_tidy_feed_top(accounts, client, app):
     feed = client.get("/feed").data.decode()
     assert 'href="/feed?show=myclubs"' in feed                                   # My clubs: a chip on the feed
     assert 'class="feed-chips"' in feed and ">All<" in feed and "More ▾" in feed and "sport-channels" not in feed
-    assert "data-help-bubble" not in feed and 'placeholder="What\'s happening?"' in feed
+    assert "data-help-bubble" not in feed and 'placeholder="What\'s happening? Type @ to tag people or clubs"' in feed
 
 
 def test_play_says_how_many_sports_instead_of_listing_fifty(accounts, client):
