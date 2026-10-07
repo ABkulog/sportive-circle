@@ -2,8 +2,8 @@
 {% from "social/_chat.html" import chat_box %}
 {% block title %}Chat · {{ event_title(event) }}{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('events.detail', event_id=event.id) }}">← Back to the event</a>
 <header class="chat-header">
+  <a class="chat-back" href="{{ url_for('events.detail', event_id=event.id) }}" aria-label="Back to the event"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
   <span class="event-emoji" aria-hidden="true">{{ SPORT_EMOJI[event.sport] }}</span>
   <div>
     <h1>{{ event_title(event) }}</h1>

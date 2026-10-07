@@ -3,9 +3,10 @@
 {% from "_macros.html" import avatar %}
 {% block title %}{{ other.full_name }}{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('social.inbox') }}">← Messages</a>
+{# One slim row, like Instagram's DMs: ‹ back, their picture and name (the app's top bar is hidden here on phones) #}
 <header class="chat-header">
-  <a class="person" href="{{ url_for('profile.view', user_id=other.id) }}">{{ avatar(other.id, other.full_name, other.avatar_updated, 44) }}<h1>{{ other.full_name }}</h1></a>
+  <a class="chat-back" href="{{ url_for('social.inbox') }}" aria-label="Back to Messages"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+  <a class="person" href="{{ url_for('profile.view', user_id=other.id) }}">{{ avatar(other.id, other.full_name, other.avatar_updated, 32) }}<h1>{{ other.full_name }}</h1></a>
   {% if is_team(other.id) %}<span class="team-pill" title="Runs Sportive Circle">🐾 Team</span>{% endif %}
 </header>
 {% if blocked %}

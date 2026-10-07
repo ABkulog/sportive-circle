@@ -758,3 +758,40 @@ def test_a_video_over_8_mb_posts_with_the_form_check_on(accounts, client, app):
         app.config["CSRF_ENABLED"] = False
     feed = client.get("/feed").data.decode()
     assert 'data-max-mb="60"' in feed and "Big clip" in feed
+
+
+def test_chats_have_one_slim_header_and_links_you_can_tap(accounts, client, app):
+    """The owner (a screenshot of a DM): "the top bar is too big and what is that link, why isn't it working?"
+    Chats get one slim row like Instagram's DMs (‹, picture, name; no app bar on phones), web addresses in messages
+    are links, the picked feed chip is purple ("make the black highlight purple"), and admins see the logo too."""
+    accounts.signup(email="officer@uw.edu", name="Olive Officer", sports=("running",))
+    club = approved_club(app, "officer@uw.edu")
+    accounts.logout()
+    accounts.signup(email="maya@uw.edu", name="Maya Chen", sports=("running",))
+    with app.app_context():
+        db = get_db()
+        db.execute("INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, ?, 'requested', '2026-01-01')",
+                   (club, user_id(app, "maya@uw.edu")))
+        db.commit()
+    accounts.logout()
+    accounts.login("officer@uw.edu")
+    client.post(f"/clubs/{club}/members/{user_id(app, 'maya@uw.edu')}/approve")
+    with app.app_context():
+        found = get_db().execute("SELECT body FROM direct_messages ORDER BY id DESC LIMIT 1").fetchone()
+    assert found and f"/clubs/{club}" in found["body"]
+    page = client.get(f"/messages/{user_id(app, 'maya@uw.edu')}").data.decode()
+    assert 'class="chat-back" href="/messages" aria-label="Back to Messages"' in page and "← Messages" not in page
+    link = app.config["PUBLIC_URL"].rstrip("/") + f"/clubs/{club}"
+    assert f'<a href="{link}">{link.split("://")[1]}</a>' in page                # ours: opens in the app
+    css = client.get("/static/style.css").data.decode()
+    assert "body:has(.chat[data-poll-url]) .topbar { display: none; }" in css
+    assert ".chip.is-on { background: var(--purple); border-color: var(--purple); color: var(--on-accent); }" in css
+    assert "five-icons" not in css
+    js = client.get("/static/chat.js").data.decode()
+    assert "const linked = (text) =>" in js and "message.body) bubble.appendChild(linked(message.body))" in js
+    from sportive.social import linkify
+    with app.test_request_context():
+        assert str(linkify("see https://example.com/a. <b>")) == (
+            'see <a href="https://example.com/a" target="_blank" rel="noopener noreferrer">example.com/a</a>. &lt;b&gt;')
+    assert '!document.querySelector("[data-pull-refresh]")' in client.get("/static/app.js").data.decode()  # one pill
+    assert ".tab.is-active, .tab.is-active .icon { color: var(--purple); }" in css   # the tab you're on: purple

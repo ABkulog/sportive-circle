@@ -254,7 +254,6 @@ body.has-app-nav .topbar .brand > span { min-width: 0; overflow: hidden; text-ov
 /* On narrow phones the icons need the room: show just the paw logo (4 icons below 370px, 5 for admins below 412px). */
 @media (max-width: 370px) { body.has-app-nav .topbar .brand > span { display: none; } }
 @media (max-width: 360px) { .topbar .brand > span { display: none; } }  /* small phones: logo only, no sideways scroll */
-@media (max-width: 412px) { .topbar-inner.five-icons .brand > span { display: none; } }
 .nav { display: flex; align-items: center; gap: 16px; }
 .nav a, .nav .link-button { color: var(--text); font-weight: 600; font-size: .95rem; }
 .topbar .nav a, .topbar .nav .link-button { color: #fff; min-height: 40px; display: inline-flex; align-items: center; }
@@ -1739,11 +1738,11 @@ body.has-app-nav .topbar .brand img, .appnav .brand img { display: none; }
 .appnav { background: var(--bg); border-top: 1px solid var(--line); padding-top: 2px; }
 .tab { color: var(--text); min-height: 48px; }
 .tab .icon { width: 26px; height: 26px; stroke-width: 1.8; }
-.tab.is-active, .tab.is-active .icon { color: var(--text); }
+.tab.is-active, .tab.is-active .icon { color: var(--purple); }  /* the tab you're on: purple and bolder */
 .tab.is-active .icon { stroke-width: 2.8; }
 .tab-me { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; }
 .tab-me .avatar-img { --size: 26px !important; }
-.tab.is-active .tab-me { box-shadow: 0 0 0 2px var(--text); }
+.tab.is-active .tab-me { box-shadow: 0 0 0 2px var(--purple); }
 @media (max-width: 999px) {
   .appnav .tab-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
@@ -1767,7 +1766,7 @@ body.has-app-nav .topbar .brand img, .appnav .brand img { display: none; }
 
 /* Chips (All · My clubs · …): Instagram's outlined pills; the open one is black */
 .feed-chips .chip, .chip { background: var(--bg); border: 1px solid var(--line); color: var(--text); }
-.feed-chips .chip.is-on, .chip.is-on { background: var(--text); border-color: var(--text); color: var(--bg); }
+.feed-chips .chip.is-on, .chip.is-on { background: var(--purple); border-color: var(--purple); color: var(--on-accent); }  /* the picked chip: purple */
 
 /* Posts, Instagram / Threads style: ⋯ in the top right corner, then the outlined ♡ and 💬 icons with their
    numbers (the heart fills red once you like it). */
@@ -1964,3 +1963,18 @@ html, body { overflow-x: clip; }
 .composer-top { position: relative; }
 .composer-top .mention-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 20; margin: 4px 0 0; padding: 4px;
   background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .15); }
+/* Chats, like Instagram's DMs: one slim header row (‹, picture, name); on phones the app's top bar is hidden here */
+.chat-header { gap: 10px; margin: 0 0 8px; padding: 6px 0; }
+.chat-header h1 { font-size: 1.05rem; line-height: 1.2; }
+.chat-header .person { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--text); text-decoration: none; }
+.chat-header .person h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-header .event-emoji { font-size: 1.5rem; }
+.chat-header p { font-size: .8rem; }
+.chat-back { flex: none; display: grid; place-items: center; width: 36px; height: 44px; margin-left: -8px; color: var(--text); }
+.chat-bubble p a { color: inherit; text-decoration: underline; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  body:has(.chat[data-poll-url]) .topbar { display: none; }
+  body:has(.chat[data-poll-url]) .chat-header { margin: 0 -16px; padding: max(6px, env(safe-area-inset-top)) 16px 6px;
+    border-bottom: 1px solid var(--line); }
+  body:has(.chat[data-poll-url]) .chat { border-top: 0; }
+}
