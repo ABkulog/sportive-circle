@@ -28,7 +28,7 @@
             {% if not m.mine and kind == 'game' %}<span class="chat-name">{{ m.name }}</span>{% endif %}
             {% if m.photo %}<a class="chat-photo" href="{{ m.photo }}" target="_blank" rel="noopener">
               <img src="{{ m.photo }}" alt="Photo from {{ m.name }}"></a>{% endif %}
-            {% if m.body %}<p>{{ m.body }}</p>{% endif %}
+            {% if m.body %}<p>{{ m.body|linkify }}</p>{% endif %}
             {% if m.game %}
               <a class="chat-game{% if m.game.cancelled %} is-cancelled{% endif %}" href="{{ m.game.url }}">
                 <span class="chat-game-emoji" aria-hidden="true">{{ m.game.emoji }}</span>

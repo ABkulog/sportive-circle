@@ -48,7 +48,7 @@
 
   {# Top bar: logo + quick icons on phones; for visitors it holds the whole menu. #}
   <header class="topbar">
-    <div class="topbar-inner {% if app_nav and is_admin() %}five-icons{% endif %}">
+    <div class="topbar-inner">
       <a class="brand" href="{{ url_for('index') }}" aria-label="Sportive Circle home"><img src="{{ url_for('static', filename='icon.svg') }}" alt="" width="28" height="28"><span>Sportive<span class="brand-accent">Circle</span></span></a>
       {% if app_nav %}
         {# Like Instagram: the bell (where its heart is) and Messages up here; the 5 tabs at the bottom. #}
