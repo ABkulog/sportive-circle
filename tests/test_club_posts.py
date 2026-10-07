@@ -188,7 +188,7 @@ def test_all_clubs_feed_and_a_tidy_feed_top(accounts, client, app):
     feed = client.get("/feed").data.decode()
     assert 'href="/feed?show=myclubs"' in feed                                   # My clubs: a chip on the feed
     assert 'class="feed-chips"' in feed and ">All<" in feed and "More ▾" in feed and "sport-channels" not in feed
-    assert "data-help-bubble" not in feed and 'placeholder="What\'s happening?"' in feed
+    assert "data-help-bubble" not in feed and 'placeholder="What\'s happening? Type @ to tag people or clubs"' in feed
 
 
 def test_play_says_how_many_sports_instead_of_listing_fifty(accounts, client):
@@ -666,24 +666,38 @@ def test_officers_sign_up_straight_to_their_club(accounts, client, app):
 
 
 def test_posts_tag_people_and_clubs(accounts, client, app):
-    """The owner: "when people post they can tag others or clubs". Type a name in the ＋ sheet, pick people or
-    clubs; the post says "with …" (links to them) and they hear about it in their bell."""
+    """The owner: "when people post they can tag others or clubs", then: "make it after the @ so that people pop up
+    just like on Instagram". Type @ in the post: friends and clubs pop up, then whoever matches; picking one writes
+    "@Name" into the post. The post shows @Name as a link and they hear about it in their bell."""
     accounts.signup(email="officer@uw.edu", name="Olive Officer", sports=("running",))
     club = approved_club(app, "officer@uw.edu")
     accounts.logout()
     accounts.signup(email="maya@uw.edu", name="Maya Chen", sports=("running",))
     accounts.logout()
     accounts.signup(email="me@uw.edu", name="Jordan Rivera", sports=("running",))
-    assert 'data-tag-picker' in client.get("/feed").data.decode()
-    found = client.get("/posts/tag-search?q=maya").get_json()
-    maya = user_id(app, "maya@uw.edu")
-    assert found == [{"kind": "user", "id": maya, "name": "Maya Chen", "note": "Class of 2028"}]
-    assert client.get("/posts/tag-search?q=run club").get_json()[0] == {"kind": "club", "id": club, "name": "UW Run Club",
-                                                                       "note": "Club"}
-    me = user_id(app, "me@uw.edu")
-    post(client, body="Long run done 🏃", tag_user=[str(maya), str(me), "999"], tag_club=[str(club)])
     feed = client.get("/feed").data.decode()
-    assert f'with <a href="/u/{maya}">Maya Chen</a>, <a href="/clubs/{club}">UW Run Club</a>' in feed  # not me, not 999
+    assert 'data-mention-url="/posts/tag-search"' in feed and "Type @ to tag people or clubs" in feed
+    assert "data-tag-picker" not in feed                                     # no separate box: it's in the text
+    maya = user_id(app, "maya@uw.edu")
+    found = client.get("/posts/tag-search?q=maya").get_json()
+    assert [(f["kind"], f["id"], f["name"]) for f in found] == [("user", maya, "Maya Chen")]
+    assert found[0]["photo"].startswith(f"/u/{maya}/photo")                  # with their picture, like Instagram
+    assert client.get("/posts/tag-search?q=run club").get_json()[0]["name"] == "UW Run Club"
+    with app.app_context():                                                  # just "@": friends first
+        db = get_db()
+        db.execute("INSERT INTO friendships (requester_id, addressee_id, status, created_at) VALUES (?, ?, 'accepted', '2026-01-01')",
+                   (user_id(app, "me@uw.edu"), maya))
+        db.commit()
+    assert [f["name"] for f in client.get("/posts/tag-search?q=").get_json()] == ["Maya Chen"]
+    me = user_id(app, "me@uw.edu")
+    post(client, body="Long run with @Maya Chen and @UW Run Club 🏃", tag_user=[str(maya), str(me), "999"],
+         tag_club=[str(club)])
+    post(client, body="Picked her, then deleted the @", tag_user=[str(maya)])  # not in the text: not tagged
+    feed = client.get("/feed").data.decode()
+    assert (f'Long run with <a class="mention" href="/u/{maya}">@Maya Chen</a> and '
+            f'<a class="mention" href="/clubs/{club}">@UW Run Club</a> 🏃') in feed
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM post_tags").fetchone()[0] == 2
     accounts.logout()
     accounts.login("maya@uw.edu")
     assert "🏷️ Jordan tagged you in a post." in client.get("/notifications").data.decode()
@@ -695,5 +709,8 @@ def test_posts_tag_people_and_clubs(accounts, client, app):
         db.execute("INSERT INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, '2026-01-01')",
                    (user_id(app, "officer@uw.edu"), maya))
         db.commit()
-    assert "Maya Chen" not in client.get("/feed").data.decode()                 # blocked: their tag hides too
+    feed = client.get("/feed").data.decode()
+    assert "Long run with @Maya Chen and" in feed and f'href="/u/{maya}"' not in feed  # blocked: plain text
     assert client.get("/posts/tag-search?q=maya").get_json() == []
+    post(client, body="<b>@x</b> & co")                                       # the text stays escaped
+    assert "&lt;b&gt;@x&lt;/b&gt; &amp; co" in client.get("/feed").data.decode()

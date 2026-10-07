@@ -8,22 +8,24 @@ post on their own are on Play: the feed is for posts.) Tapping a sport tag shows
 from datetime import timedelta
 import json
 import os
+import re
 
 from flask import (Blueprint, Response, abort, flash, g, jsonify, redirect, render_template, request, send_file,
                    url_for)
+from markupsafe import Markup, escape
 from werkzeug.datastructures import MultiDict
 
 from .auth import login_required, safe_next
-from .clubs import MEMBER_ROLES, can_post_as, poster_clubs
-from .constants import LOCATIONS, SPORTS
+from .clubs import MEMBER_ROLES, can_post_as, clubs_of, poster_clubs
+from .constants import LOCATIONS, SPORT_EMOJI, SPORTS
 from .db import get_db, user_sports
 from .events import (MEMBERS_ONLY_FOR_MEMBERS, NOT_BLOCKED, insert_event, posting_too_fast, query_events,
                      read_event_form)
 from .friendgames import announce_new_game
 from .moderation import is_admin
 from .photos import make_chat_photo
-from .social import is_blocked_between, search_people
-from .textutil import multi_line
+from .social import friends_of, is_blocked_between, search_people
+from .textutil import fold, multi_line
 from .videos import MAX_SECONDS, VideoError, check_and_save, path_of, remove_files
 from .timeutil import add_real, exists_in_seattle, now_local, parse_form, to_db
 
@@ -502,37 +504,60 @@ def _read_plan(form, sport, body):
     return data, None
 
 
-@bp.app_template_filter("post_tags")
-def post_tags(tags_json):
-    """The tagged people and clubs of a post row (its tags_json), for "with …" under the post."""
-    return [tag for tag in json.loads(tags_json or "[]") if tag.get("name")]
+@bp.app_template_filter("mentions")
+def mentions(body, tags_json):
+    """A post's text with its @mentions as links (to the person or the club), like Instagram. Only people and
+    clubs that were picked from the @ list are links; any other @ stays plain text."""
+    tags = [tag for tag in json.loads(tags_json or "[]") if tag.get("name")]
+    text = str(escape(body))
+    if not tags:
+        return Markup(text)
+    links = {}
+    for tag in tags:
+        href = url_for("clubs.view", club_id=tag["club"]) if tag["club"] else url_for("profile.view", user_id=tag["user"])
+        links[str(escape("@" + tag["name"]))] = href
+    pattern = re.compile("|".join(re.escape(name) for name in sorted(links, key=len, reverse=True)))
+    return Markup(pattern.sub(lambda m: f'<a class="mention" href="{links[m.group(0)]}">{m.group(0)}</a>', text))
 
 
 @bp.route("/posts/tag-search")
 @login_required
 def tag_search():
-    """People and clubs to tag in a post, as you type (the ＋ sheet's "Tag people or clubs" box)."""
+    """Who pops up after @ in a post (like Instagram): your friends and clubs before you type, then whoever matches."""
     from .search import search_clubs  # (search.py imports social.py, which this module imports)
     q = request.args.get("q", "").strip()[:100]
-    people = [{"kind": "user", "id": row["id"], "name": row["full_name"],
-               "note": f"Class of {row['grad_year']}" if row["grad_year"] else ""}
-              for row in search_people(g.user["id"], q, limit=6)]
-    clubs = [{"kind": "club", "id": row["id"], "name": row["name"], "note": "Club"} for row in search_clubs(q, limit=4)]
-    return jsonify(people + clubs)
+    me = g.user["id"]
+    if len(q) < 2:  # just "@" or one letter: friends and your clubs first
+        start = fold(q)
+        people = [row for row in friends_of(me) if fold(row["full_name"]).startswith(start)][:6]
+        clubs = [row for row in clubs_of(me) if fold(row["name"]).startswith(start)][:3]
+    else:
+        people, clubs = search_people(me, q, limit=6), search_clubs(q, limit=3)
+    return jsonify([{"kind": "user", "id": row["id"], "name": row["full_name"],
+                     "photo": url_for("profile.photo", user_id=row["id"], v=row["avatar_updated"], s=96)
+                     if row["avatar_updated"] else "", "initial": row["full_name"][:1].upper()} for row in people]
+                   + [{"kind": "club", "id": row["id"], "name": row["name"],
+                       "photo": url_for("clubs.logo", club_id=row["id"], v=row["logo_updated"]) if row["logo_updated"] else "",
+                       "initial": SPORT_EMOJI.get(row["sport"], "🏆")} for row in clubs])
 
 
-def _read_tags(form):
-    """The people and clubs picked in "Tag people or clubs": ones that exist and you can see, at most MAX_TAGS."""
+def _read_tags(form, body):
+    """The people and clubs picked after @ in the post (tag_user / tag_club) whose "@Name" is still in it: ones that
+    exist and you can see, at most MAX_TAGS."""
     me = g.user["id"]
     db = get_db()
     users = []
     for raw in dict.fromkeys(form.getlist("tag_user")):
-        if raw.isdigit() and int(raw) != me and db.execute(
-                "SELECT 1 FROM users WHERE id = ? AND verified = 1 AND suspended = 0", (int(raw),)).fetchone() \
-                and not is_blocked_between(me, int(raw)):
+        row = raw.isdigit() and int(raw) != me and db.execute(
+            "SELECT full_name FROM users WHERE id = ? AND verified = 1 AND suspended = 0", (int(raw),)).fetchone()
+        if row and f"@{row['full_name']}" in body and not is_blocked_between(me, int(raw)):
             users.append(int(raw))
-    clubs = [int(raw) for raw in dict.fromkeys(form.getlist("tag_club")) if raw.isdigit() and db.execute(
-        "SELECT 1 FROM clubs WHERE id = ? AND status = 'approved'", (int(raw),)).fetchone()]
+    clubs = []
+    for raw in dict.fromkeys(form.getlist("tag_club")):
+        row = raw.isdigit() and db.execute("SELECT name FROM clubs WHERE id = ? AND status = 'approved'",
+                                           (int(raw),)).fetchone()
+        if row and f"@{row['name']}" in body:
+            clubs.append(int(raw))
     return users[:MAX_TAGS], clubs[:max(0, MAX_TAGS - len(users))]
 
 
@@ -617,7 +642,7 @@ def create():
                      " VALUES (?, ?, ?, ?, ?, ?, ?)",
                      (g.user["id"], sport, body, event_id, to_db(now_local()), club["id"] if club else None,
                       members_only))
-    tagged_users, tagged_clubs = _read_tags(form)
+    tagged_users, tagged_clubs = _read_tags(form, body)
     if members_only:  # a members-only post: only its members can see it, so only they get tagged
         tagged_users = [u for u in tagged_users if db.execute(
             "SELECT 1 FROM club_members WHERE club_id = ? AND user_id = ? AND role IN ('member', 'officer')",

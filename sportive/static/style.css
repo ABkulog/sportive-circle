@@ -1941,19 +1941,14 @@ html, body { overflow-x: clip; }
 .officer-signup-icon { font-size: 1.6rem; flex: none; }
 .officer-signup-go { margin-left: auto; font-size: 1.6rem; color: var(--purple); flex: none; }
 
-/* Tags in a post: the picker in the ＋ sheet, and "with …" under the post */
-.tag-picker { position: relative; margin-top: 8px; }
-.tag-picker input[type="search"] { width: 100%; }
-.tag-results { position: absolute; left: 0; right: 0; top: 100%; z-index: 5; margin: 4px 0 0; padding: 4px 0; list-style: none;
-  background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
-.tag-results button { display: flex; justify-content: space-between; gap: 10px; width: 100%; padding: 10px 12px;
-  background: none; border: 0; color: var(--text); text-align: left; cursor: pointer; font: inherit; }
-.tag-results button:hover, .tag-results button:focus-visible { background: var(--line); }
-.tag-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.tag-chips:not(:empty) { margin-top: 8px; }
-.tag-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 10px; border-radius: 999px;
-  background: var(--line); font-size: .9rem; max-width: 100%; }
-.tag-chip button { min-width: 28px; min-height: 28px; border: 0; background: none; color: var(--text); font-size: 1.1rem; cursor: pointer; }
-.feed-tags { margin: 2px 0 0 36px; font-size: .86rem; color: var(--muted); overflow-wrap: anywhere; }  /* under the post text */
-.feed-tags a { color: var(--text); font-weight: 600; }
-@media (min-width: 601px) { .feed-tags { margin-left: 42px; } }
+/* @ in a post: the people and clubs that pop up under the text (Instagram's list), and @Name as a link */
+.mention-list { margin: 6px 0 0; padding: 0; list-style: none; max-height: 240px; overflow-y: auto; }
+.mention-list button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 4px; border: 0; border-radius: 8px;
+  background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.mention-list button.is-active, .mention-list button:hover { background: var(--line); }
+.mention-list strong { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .95rem; }
+.mention-pic { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; overflow: hidden;
+  background: var(--line) center / cover no-repeat; font-weight: 700; font-size: 1rem; }
+.feed-body a.mention { color: #00376b; font-weight: 600; text-decoration: none; }  /* Instagram's mention blue */
+:root[data-theme="dark"] .feed-body a.mention { color: #e0f1ff; }
+@media (prefers-color-scheme: dark) { :root[data-theme="system"] .feed-body a.mention { color: #e0f1ff; } }
