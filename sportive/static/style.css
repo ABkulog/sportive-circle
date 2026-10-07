@@ -1983,6 +1983,10 @@ html, body { overflow-x: clip; }
 .feed-video-tile .feed-sound { position: absolute; right: 6px; bottom: 6px; display: grid; place-items: center; width: 30px; height: 30px;
   border: 0; border-radius: 50%; background: rgba(0, 0, 0, .55); color: #fff; font-size: .85rem; cursor: pointer; }
 
+/* "📣 Post this event": the button on your event, and the line in the ＋ sheet saying which event you're posting */
+.post-event-btn { margin: 8px 0; }
+.posting-event { margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; font-size: .9rem;
+  background: color-mix(in srgb, var(--purple) 10%, var(--bg)); }
 /* Share page: how to add the link sticker, shown after "Share to Instagram story" */
 .story-tip { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; text-align: left; font-size: .9rem;
   background: color-mix(in srgb, var(--purple) 10%, var(--bg)); }
