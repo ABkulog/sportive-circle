@@ -872,7 +872,7 @@ def test_post_your_event_with_words_and_photos(accounts, client, app):
     page = client.get(f"/events/{event_id}").data.decode()
     assert f'href="/feed?event={event_id}#post">📣 Post this event</a>' in page
     sheet = client.get(f"/feed?event={event_id}").data.decode()
-    assert f'name="event_id" value="{event_id}"' in sheet and "📣 Posting your event:" in sheet
+    assert f'name="event_id" value="{event_id}"' in sheet and "Your game goes under your post" in sheet
     photos = [(BytesIO(make_image()), "court.png")]
     post(client, event_id=str(event_id), sport="", body="Who's in tonight? 🏀", photos=photos)
     with app.app_context():
@@ -884,7 +884,7 @@ def test_post_your_event_with_words_and_photos(accounts, client, app):
     accounts.logout()
     accounts.signup(email="other@uw.edu", sports=("basketball",))
     assert "📣 Post this event" not in client.get(f"/events/{event_id}").data.decode()  # only its host
-    assert "📣 Posting your event" not in client.get(f"/feed?event={event_id}").data.decode()
+    assert "Your game goes under your post" not in client.get(f"/feed?event={event_id}").data.decode()
     post(client, event_id=str(event_id), sport="basketball", body="Not mine")
     with app.app_context():
         assert get_db().execute("SELECT event_id FROM posts WHERE body = 'Not mine'").fetchone()[0] is None
