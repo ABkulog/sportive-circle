@@ -50,9 +50,7 @@
       {{ card_head(url_for('profile.view', user_id=p.author_id), avatar(p.author_id, p.full_name, p.avatar_updated, 32),
                    p.full_name, p.created_at|ago, p.sport) }}
     {% endif %}
-    {% if p.body %}<p class="feed-body">{{ p.body }}</p>{% endif %}
-    {% set tags = p.tags_json|post_tags %}
-    {% if tags %}<p class="feed-tags">with {% for t in tags %}<a href="{{ url_for('clubs.view', club_id=t.club) if t.club else url_for('profile.view', user_id=t.user) }}">{{ t.name }}</a>{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+    {% if p.body %}<p class="feed-body">{{ p.body|mentions(p.tags_json) }}</p>{% endif %}
     {# Media stays small (the owner's rule: compact posts). A video plays right in its small tile (the button at
        its bottom-left), and tapping the video opens it full screen; photos are small squares, tap one to see it
        big and swipe through the rest (app.js). #}

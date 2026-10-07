@@ -712,65 +712,107 @@
     if (location.hash === "#post") { open(); form.querySelector("textarea")?.focus(); }
   });
 
-  // Tag people or clubs in a post: type a name, tap a result, it becomes a chip (× takes it off). Each chip is a
-  // hidden tag_user / tag_club field the post sends.
-  document.querySelectorAll("[data-tag-picker]").forEach((picker) => {
-    const input = picker.querySelector("[data-tag-input]");
-    const results = picker.querySelector("[data-tag-results]");
-    const chips = picker.querySelector("[data-tag-chips]");
-    const max = parseInt(picker.dataset.max, 10) || 10;
+  // @ in a post, like Instagram: type @ and people and clubs pop up under the text (your friends and clubs first,
+  // then whoever matches as you type). Tapping one writes "@Name " into the post and remembers who it is (a hidden
+  // tag_user / tag_club field), so the post links to them and they're told.
+  document.querySelectorAll("textarea[data-mention-url]").forEach((box) => {
+    const form = box.form;
+    const list = document.createElement("ul");
+    list.className = "mention-list";
+    list.hidden = true;
+    list.setAttribute("role", "listbox");
+    (box.closest(".composer-top") || box).after(list);
+    const fields = document.createElement("div");
+    fields.hidden = true;
+    fields.dataset.mentionFields = "";
+    form.append(fields);
+    const max = parseInt(box.dataset.mentionMax, 10) || 10;
     let timer = null;
     let asked = 0;
-    const chosen = () => [...chips.querySelectorAll("input")].map((field) => field.name + ":" + field.value);
-    const add = (tag) => {
-      if (chosen().includes(`tag_${tag.kind}:${tag.id}`) || chips.children.length >= max) return;
-      const chip = document.createElement("span");
-      chip.className = "tag-chip";
-      const field = document.createElement("input");
-      field.type = "hidden"; field.name = `tag_${tag.kind}`; field.value = tag.id;
-      const remove = document.createElement("button");
-      remove.type = "button"; remove.textContent = "×"; remove.setAttribute("aria-label", `Untag ${tag.name}`);
-      remove.addEventListener("click", () => chip.remove());
-      chip.append(field, (tag.kind === "club" ? "🏆 " : "@") + tag.name, remove);
-      chips.append(chip);
+    let active = -1;
+    let at = -1;
+    const query = () => {  // what's typed after the @ the cursor is in, or null
+      const before = box.value.slice(0, box.selectionStart);
+      const found = before.match(/(^|\s)@([^@\n]{0,30})$/);
+      if (!found || found[2].split(" ").length > 3) return null;
+      at = before.length - found[2].length - 1;
+      return found[2];
+    };
+    const close = () => { list.hidden = true; active = -1; };
+    const mark = () => [...list.querySelectorAll("button")].forEach((button, n) => button.classList.toggle("is-active", n === active));
+    const pick = (tag) => {
+      const text = `@${tag.name} `;
+      box.value = box.value.slice(0, at) + text + box.value.slice(box.selectionStart);
+      const caret = at + text.length;
+      box.focus();
+      box.setSelectionRange(caret, caret);
+      const name = `tag_${tag.kind}`;
+      if (![...fields.children].some((field) => field.name === name && field.value === String(tag.id)) && fields.children.length < max) {
+        const field = document.createElement("input");
+        field.type = "hidden"; field.name = name; field.value = tag.id;
+        fields.append(field);
+      }
+      close();
     };
     const show = (found) => {
-      results.replaceChildren(...found.map((tag) => {
+      active = found.length ? 0 : -1;
+      list.replaceChildren(...found.map((tag) => {
         const item = document.createElement("li");
         const button = document.createElement("button");
         button.type = "button";
+        button.setAttribute("role", "option");
+        const pic = document.createElement("span");
+        pic.className = "mention-pic";
+        if (tag.photo) pic.style.backgroundImage = `url("${tag.photo}")`; else pic.textContent = tag.initial;
         const name = document.createElement("strong");
         name.textContent = tag.name;
-        const note = document.createElement("small");
-        note.className = "muted";
-        note.textContent = tag.note || "";
-        button.append(name, note);
-        button.addEventListener("click", () => {
-          add(tag);
-          input.value = ""; results.hidden = true; input.focus();
-        });
+        button.append(pic, name);
+        if (tag.kind === "club") {
+          const note = document.createElement("small");
+          note.className = "muted";
+          note.textContent = "Club";
+          button.append(note);
+        }
+        button.addEventListener("mousedown", (event) => event.preventDefault());  // the text box keeps the cursor
+        button.addEventListener("click", () => pick(tag));
         item.append(button);
         return item;
       }));
-      results.hidden = !found.length;
+      mark();
+      list.hidden = !found.length;
     };
-    input.addEventListener("input", () => {
+    const look = () => {
       clearTimeout(timer);
-      const q = input.value.trim();
-      if (q.length < 2) { results.hidden = true; return; }
+      if (query() === null) { close(); return; }
       timer = setTimeout(async () => {
         const mine = ++asked;
+        const typed = query();
+        if (typed === null) { close(); return; }
         try {
-          const response = await fetch(`${picker.dataset.url}?q=${encodeURIComponent(q)}`, { credentials: "same-origin" });
+          const response = await fetch(`${box.dataset.mentionUrl}?q=${encodeURIComponent(typed.trim())}`, { credentials: "same-origin" });
           const found = response.ok ? await response.json() : [];
-          if (mine === asked) show(found);
-        } catch (error) { results.hidden = true; }
-      }, 200);
-    });
-    input.addEventListener("keydown", (event) => {  // Enter picks the first result instead of sending the post
-      if (event.key !== "Enter") return;
-      event.preventDefault();
-      results.querySelector("button")?.click();
+          if (mine === asked && query() !== null) show(found);
+        } catch (error) { close(); }
+      }, 150);
+    };
+    box.addEventListener("input", look);
+    box.addEventListener("click", look);
+    box.addEventListener("blur", () => setTimeout(close, 200));
+    box.addEventListener("keydown", (event) => {
+      if (list.hidden) return;
+      const buttons = [...list.querySelectorAll("button")];
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        active = (active + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+        mark();
+      } else if ((event.key === "Enter" || event.key === "Tab") && active >= 0) {
+        event.preventDefault();
+        buttons[active].click();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();  // closes the list, not the post sheet
+        close();
+      }
     });
   });
 
@@ -856,7 +898,7 @@
         form.reset();
         if (form.closePostSheet) form.closePostSheet(); else form.classList.remove("is-open");
         form.querySelectorAll("[data-picked]").forEach((line) => { line.hidden = true; line.textContent = ""; });
-        form.querySelectorAll("[data-tag-chips]").forEach((chips) => chips.replaceChildren());
+        form.querySelectorAll("[data-mention-fields]").forEach((fields) => fields.replaceChildren());
         form.querySelectorAll("select").forEach((select) => select.dispatchEvent(new Event("change")));
         if (document.activeElement && form.contains(document.activeElement)) document.activeElement.blur();
       }
