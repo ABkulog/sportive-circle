@@ -911,3 +911,17 @@ def test_the_screen_audit_skips_the_logo_for_contrast():
     import pathlib
     audit = pathlib.Path("tools/visual_audit.js").read_text(encoding="utf-8")
     assert 'if (e.closest(".brand")) continue;' in audit
+
+
+def test_the_tab_youre_on_is_filled_in_like_instagram(accounts, client):
+    """The owner: "highlight the page at the bottom ... like Instagram": the tab you're on is the same icon filled in
+    (Search gets bolder, your picture gets a ring); the others stay outlines."""
+    accounts.signup()
+    feed = client.get("/feed").data.decode()
+    assert '<use href="#i-home-on"/>' in feed and '<use href="#i-clubs"/>' in feed and '<use href="#i-map"/>' in feed
+    assert '<use href="#i-clubs-on"/>' in client.get("/clubs").data.decode()
+    assert '<use href="#i-search-on"/>' in client.get("/search").data.decode()
+    assert '<use href="#i-map-on"/>' in client.get("/").data.decode()
+    assert 'id="i-home-on"' in feed and 'id="i-map-on"' in feed
+    css = client.get("/static/style.css").data.decode()
+    assert ".tab.is-active .tab-me { box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 3.5px var(--purple); }" in css
