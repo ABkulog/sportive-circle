@@ -56,10 +56,13 @@
        big and swipe through the rest (app.js). #}
     {% if p.has_video %}
       <div class="feed-video-tile">
-        <video class="feed-video" src="{{ url_for('posts.video', post_id=p.id) }}" playsinline preload="metadata"
-               {% if p.video_muted %}muted data-muted{% endif %}
+        {# "#t=0.1": Safari shows the first frame instead of a black box. It plays by itself, without sound, while
+           it's on screen (like Instagram; app.js); 🔊 turns the sound on. #}
+        <video class="feed-video" src="{{ url_for('posts.video', post_id=p.id) }}#t=0.1" playsinline muted loop preload="metadata"
+               {% if p.video_muted %}data-muted{% endif %}
                aria-label="Video from {{ who }}{{ ' (no sound)' if p.video_muted }}, tap to watch full screen" data-feed-video></video>
         <button type="button" class="video-toggle" aria-label="Play the video" data-video-toggle>▶</button>
+        {% if not p.video_muted %}<button type="button" class="video-sound feed-sound" aria-pressed="false" aria-label="Turn the sound on" data-feed-sound>🔇</button>{% endif %}
       </div>
     {% endif %}
     {% set shots = photos.get(p.id, []) %}
