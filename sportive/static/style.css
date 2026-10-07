@@ -1742,7 +1742,7 @@ body.has-app-nav .topbar .brand img, .appnav .brand img { display: none; }
 .tab.is-active .icon { stroke-width: 2.8; }
 .tab-me { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; }
 .tab-me .avatar-img { --size: 26px !important; }
-.tab.is-active .tab-me { box-shadow: 0 0 0 2px var(--purple); }
+.tab.is-active .tab-me { box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 3.5px var(--purple); }  /* your picture with a ring, like Instagram */
 @media (max-width: 999px) {
   .appnav .tab-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }

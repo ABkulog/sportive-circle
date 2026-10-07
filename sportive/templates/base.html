@@ -38,7 +38,7 @@
 {% macro me_avatar() %}{% from "_macros.html" import avatar %}<span class="tab-me">{{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 26) }}</span>{% endmacro %}
 {% macro tab(url, icon_name, label, active, badge=0, extra_class='') %}
   <a class="tab{% if extra_class %} {{ extra_class }}{% endif %}{% if active %} is-active{% endif %}" href="{{ url }}" {% if active %}aria-current="page"{% endif %}>
-    <span class="tab-icon">{% if icon_name == 'me' %}{{ me_avatar() }}{% else %}{{ icon(icon_name) }}{% endif %}{% if badge %}<span class="count-dot">{{ badge_text(badge) }}</span>{% endif %}</span>
+    <span class="tab-icon">{% if icon_name == 'me' %}{{ me_avatar() }}{% else %}{{ icon(icon_name ~ ('-on' if active and icon_name in ('home', 'clubs', 'search', 'map') else '')) }}{% endif %}{% if badge %}<span class="count-dot">{{ badge_text(badge) }}</span>{% endif %}</span>
     <span class="tab-label">{{ label }}{% if badge %}<span class="visually-hidden"> ({{ badge }} new)</span>{% endif %}</span>
   </a>
 {% endmacro %}
