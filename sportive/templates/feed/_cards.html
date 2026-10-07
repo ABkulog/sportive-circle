@@ -40,7 +40,8 @@
 {% macro post_card(item, photos) %}
   {% set p = item.post %}
   {% set who = p.club_name if p.club_id else p.full_name %}
-  <article class="card feed-card {% if p.club_id %}is-club{% endif %}" id="post-{{ p.id }}" data-swap>
+  {# Your own posts are tinted purple, everyone else's are white (the owner's ask) #}
+  <article class="card feed-card {% if p.club_id %}is-club{% elif g.user and p.author_id == g.user.id %}is-mine{% endif %}" id="post-{{ p.id }}" data-swap>
     {% if item.pinned %}<p class="pinned-line">📌 Pinned</p>{% endif %}
     {% if p.club_id %}
       {% set name %}{{ p.club_name }} {{ verified_badge() }}{% endset %}
