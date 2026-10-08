@@ -509,13 +509,46 @@ def edit_logo(club_id):
 
 # ---------------------------------------------------- share (link + QR code for flyers and the involvement fair)
 
+def _taken_paths():
+    """First parts of the site's own addresses (/feed, /clubs, /login...): a short link can't be one of them."""
+    return {rule.rule.strip("/").split("/")[0].lower() for rule in current_app.url_map.iter_rules()}
+
+
+def short_link(club):
+    """The club's short link, sportivecircle.com/hrc: its initials (Husky Running Club → hrc), with a number when
+    another club has them. Made the first time it's needed, then it never changes (it's on posters and in bios)."""
+    db = get_db()
+    slug = db.execute("SELECT slug FROM clubs WHERE id = ?", (club["id"],)).fetchone()["slug"]
+    if not slug:
+        words = re.findall(r"[a-z0-9]+", fold(club["name"]))
+        base = "".join(word[0] for word in words) if len(words) > 1 else (words[0] if words else "club")
+        base = base[:12] if len(base) >= 2 else (words[0] if words else "club")[:12]
+        taken = _taken_paths()
+        slug, n = base, 1
+        while slug in taken or db.execute("SELECT 1 FROM clubs WHERE slug = ?", (slug,)).fetchone():
+            n += 1
+            slug = f"{base}{n}"
+        db.execute("UPDATE clubs SET slug = ? WHERE id = ?", (slug, club["id"]))
+        db.commit()
+    return current_app.config["PUBLIC_URL"].rstrip("/") + "/" + slug
+
+
+@bp.route("/<string:slug>")
+def by_short_link(slug):
+    """sportivecircle.com/hrc opens the club (the site's own pages always come first)."""
+    club = get_db().execute("SELECT id FROM clubs WHERE slug = ? AND status = 'approved'", (slug.lower(),)).fetchone()
+    if club is None:
+        abort(404)
+    return redirect(url_for("clubs.view", club_id=club["id"]))
+
+
 @bp.route("/clubs/<int:club_id>/share")
 def share(club_id):
     club = get_club(club_id)
     if club["status"] != "approved":
         abort(404)
     from .pages import VERBS  # (pages.py imports this module)
-    return render_template("clubs/share.html", club=club, link=public_url("clubs.view", club_id=club_id),
+    return render_template("clubs/share.html", club=club, link=short_link(club),
                            headline=f"{VERBS.get(club['sport'], 'Play')} with {club['name']}")
 
 
@@ -526,7 +559,7 @@ def qr_code(club_id):
     club = get_club(club_id)
     if club["status"] != "approved":
         abort(404)
-    code = segno.make(public_url("clubs.view", club_id=club_id), error="m")
+    code = segno.make(short_link(club), error="m")
     output = io.BytesIO()
     code.save(output, kind="svg", scale=8, dark="#4b2e83", light="#ffffff", border=2, xmldecl=False)
     response = Response(output.getvalue(), mimetype="image/svg+xml")

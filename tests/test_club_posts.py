@@ -633,7 +633,7 @@ def test_a_club_shares_its_poster_to_an_instagram_story(accounts, client, app):
     assert "data-story-qr" not in share and 'data-story-file="uw-run-club-story.png"' in share  # no QR on a story
     # The owner: "people can't scan their own screen" and stories have no links: the tap copies the club's link and
     # the tip says how to add Instagram's link sticker, the one thing people can tap on a story.
-    link = app.config["PUBLIC_URL"].rstrip("/") + f"/clubs/{club}"
+    link = app.config["PUBLIC_URL"].rstrip("/") + "/urc"                       # its short link (UW Run Club)
     assert f'data-story-url="{link}"' in share and "<strong>Link copied.</strong>" in share and "→ <strong>Link</strong> → paste" in share
     assert 'data-story-emoji="' in share                                    # no logo yet: the sport's emoji
     js = client.get("/static/app.js").data.decode()
@@ -925,3 +925,28 @@ def test_the_tab_youre_on_is_filled_in_like_instagram(accounts, client):
     assert 'id="i-home-on"' in feed and 'id="i-map-on"' in feed
     css = client.get("/static/style.css").data.decode()
     assert ".tab.is-active .tab-me { box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 3.5px var(--purple); }" in css
+
+
+def test_clubs_get_short_links(accounts, client, app):
+    """The owner: on an Instagram story nobody can tap or copy a link, so the story shows a short club link, big, that
+    people can read and type: sportivecircle.com/hrc (the club's initials). The Share page and the QR code use it."""
+    accounts.signup(email="officer@uw.edu", sports=("running",))
+    club = approved_club(app, "officer@uw.edu", name="Husky Running Club")
+    other = approved_club(app, "officer@uw.edu", name="Huskies Rowing Crew")
+    share = client.get(f"/clubs/{club}/share").data.decode()
+    base = app.config["PUBLIC_URL"].rstrip("/")
+    assert f'data-story-url="{base}/hrc"' in share and f'data-story-link="{base.split("://")[1]}/hrc"' in share
+    assert f'{base}/hrc2' in client.get(f"/clubs/{other}/share").data.decode()        # same initials: a number
+    assert client.get("/hrc").headers["Location"].endswith(f"/clubs/{club}")
+    assert client.get("/HRC").headers["Location"].endswith(f"/clubs/{club}")
+    assert client.get("/nosuchclub").status_code == 404
+    assert client.get("/feed").status_code == 200                                        # the site's own pages first
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE clubs SET slug = NULL WHERE id = ?", (other,))
+        db.execute("INSERT INTO clubs (name, sport, description, status, created_by, created_at) VALUES ('Feed', 'running', 'x', 'approved', 1, '2026-01-01')")
+        db.commit()
+        feed_club = db.execute("SELECT id FROM clubs WHERE name = 'Feed'").fetchone()[0]
+    assert "/feed2" in client.get(f"/clubs/{feed_club}/share").data.decode()           # never a page's address
+    js = client.get("/static/app.js").data.decode()
+    assert "ctx.fillText(button.dataset.storyLink, 540, 940 + lines.length * 90 + 20);" in js
