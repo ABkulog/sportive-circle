@@ -248,7 +248,7 @@
       ctx.fillStyle = "#4b2e83"; ctx.fillRect(0, 0, 1080, 1920);
       ctx.font = `800 76px ${font}`;
       const lines = wrap(ctx, button.dataset.story, 820);
-      const cardEnd = 900 + lines.length * 90 + 90;    // the card: logo, headline, "on Sportive Circle"
+      const cardEnd = 900 + lines.length * 90 + 120;   // the card: logo, headline, the short link
       ctx.textBaseline = "alphabetic";
       ctx.font = `800 64px ${font}`;                     // the wordmark: Sportive white, Circle gold
       const left = ctx.measureText("Sportive").width, right = ctx.measureText("Circle").width;
@@ -269,12 +269,10 @@
       ctx.restore();
       ctx.fillStyle = "#111111"; ctx.font = `800 76px ${font}`;
       lines.forEach((line, n) => ctx.fillText(line, 540, 940 + n * 90));
-      ctx.fillStyle = "#555555"; ctx.font = `500 42px ${font}`;
-      ctx.fillText("Join us on Sportive Circle", 540, 940 + lines.length * 90 + 10);
+      ctx.fillStyle = "#4b2e83"; ctx.font = `800 52px ${font}`;  // the club's short link, big enough to read and type
+      ctx.fillText(button.dataset.storyLink, 540, 940 + lines.length * 90 + 20);
       ctx.fillStyle = "#ffffff"; ctx.font = `800 60px ${font}`;  // where the link sticker goes
       ctx.fillText("Tap the link to join 👇", 540, cardEnd + 190);
-      ctx.fillStyle = "rgba(255, 255, 255, .7)"; ctx.font = `500 34px ${font}`;
-      ctx.fillText(button.dataset.storyLink, 540, 1840);
       return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/png"));
     };
     const tip = document.querySelector("[data-story-tip]");

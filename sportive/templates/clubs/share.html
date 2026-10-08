@@ -16,14 +16,14 @@
     <li><span>2</span>Sign up with your UW email</li>
     <li><span>3</span>Tap Request to join or Follow</li>
   </ol>
-  <button type="button" class="flyer-link" data-copy="{{ link }}" title="Tap to copy the link"><span data-copy-label>{{ link.replace('https://', '') }}</span></button>
+  <button type="button" class="flyer-link" data-copy="{{ link }}" title="Tap to copy the link"><span data-copy-label>{{ link.split('://')[-1] }}</span></button>
 </article>
 <div class="no-print poster-actions">
   {# The story picture is drawn on the phone (app.js): the club and a "Tap the link to join 👇" spot. The tap copies
      the club's link and opens the share menu (Instagram → Story); the tip says how to add Instagram's link sticker,
      the one thing people can tap on a story (a website can't add it for you). #}
   <button type="button" class="btn btn-block" data-story="{{ headline }}" data-story-url="{{ link }}"
-          data-story-link="{{ link.replace('https://', '') }}" data-story-file="{{ club.name|lower|replace(' ', '-') }}-story.png"
+          data-story-link="{{ link.split('://')[-1] }}" data-story-file="{{ club.name|lower|replace(' ', '-') }}-story.png"
           {% if club.logo_updated %}data-story-logo="{{ url_for('clubs.logo', club_id=club.id, v=club.logo_updated) }}"{% else %}data-story-emoji="{{ SPORT_EMOJI[club.sport] }}"{% endif %}>
     Share to Instagram story</button>
   <p class="story-tip" data-story-tip hidden>✅ <strong>Link copied.</strong> In your story, tap the sticker button
