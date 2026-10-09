@@ -203,7 +203,7 @@
     <span>
       <strong>{{ b.name }}</strong>
       {% if has %}
-        <small>Earned {{ earned[b.key].strftime('%b %Y') }}{% if rarity.get(b.key) is not none %} · {{ rarity[b.key] }}% of Huskies{% endif %}</small>
+        <small>Earned {{ earned[b.key].strftime('%b %Y') }}{% if rarity.get(b.key) is not none %} · {{ rarity[b.key] }}% of students{% endif %}</small>
       {% else %}
         <small>{{ b.how }}</small>
       {% endif %}

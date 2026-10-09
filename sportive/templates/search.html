@@ -33,7 +33,7 @@
         {% for p in people %}
           <li><a class="result" href="{{ url_for('profile.view', user_id=p.id) }}">{{ avatar(p.id, p.full_name, p.avatar_updated, 40) }}
             <span><strong>{{ p.full_name }}</strong>
-              <small class="muted">{{ ('Class of ' ~ p.grad_year) if p.grad_year else 'Husky' }}{% if p.played %} · You've played together{% elif p.mutual %} · {{ p.mutual }} mutual friend{{ 's' if p.mutual != 1 }}{% endif %}</small></span></a></li>
+              <small class="muted">{{ ('Class of ' ~ p.grad_year) if p.grad_year else 'UW student' }}{% if p.played %} · You've played together{% elif p.mutual %} · {{ p.mutual }} mutual friend{{ 's' if p.mutual != 1 }}{% endif %}</small></span></a></li>
         {% endfor %}
       </ul>
     {% else %}

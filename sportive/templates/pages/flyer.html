@@ -6,7 +6,7 @@
 <article class="flyer">
   <img src="{{ url_for('static', filename='icon-512.png') }}" alt="" width="96" height="96" class="flyer-icon">
   <h1>{{ headline }}</h1>
-  <p class="flyer-sub">{% if club %}Our {{ SPORTS[club.sport]|lower }} on Sportive Circle, for UW students.{% else %}Pickup games, runs and UW clubs. For Huskies, by Huskies.{% endif %}</p>
+  <p class="flyer-sub">{% if club %}Our {{ SPORTS[club.sport]|lower }} on Sportive Circle, for UW students.{% else %}Pickup games, runs and UW clubs. By UW students, for UW students.{% endif %}</p>
   <img src="{{ qr }}" alt="QR code to {{ link }}" class="flyer-qr" width="300" height="300">
   <ol class="flyer-steps">
     <li><span>1</span>Scan the code</li>

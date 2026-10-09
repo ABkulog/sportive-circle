@@ -1156,11 +1156,21 @@ def test_top_dawgs(accounts, client, app, monkeypatch):
     assert b"Top Dawgs this month" in feed and b"Hana Host" in feed
 
 
+def test_own_wording_says_uw_students_not_huskies(accounts, client):
+    """NFR-LEGAL-3: "Husky" is a UW trademark, so the app's own wording says UW students."""
+    for path in ("/", "/flyer"):
+        page = client.get(path).get_data(as_text=True)
+        assert "Huskies" not in page and "UW students" in page
+    accounts.signup()
+    page = client.get("/profile/badges").get_data(as_text=True)
+    assert "Huskies" not in page
+
+
 def test_celebration_and_footer(accounts, client):
     accounts.signup()
     response = client.post("/events/new", data=event_form(), follow_redirects=True).data
     assert b"flash-celebrate" in response and b"Your game is up!" in response
-    assert b"Made by Huskies, for Huskies" in response
+    assert b"Made by UW students, for UW students" in response
     assert b"Not an official University of Washington service" in response
 
 
@@ -1225,7 +1235,7 @@ def test_badges_are_kept_forever(accounts, client, app):
         assert "season-2026-autumn" in earned_badges(player)   # the flex stays
     page = client.get(f"/u/{player}").data
     assert b"Autumn 2026" in page
-    assert b"% of Huskies" in client.get("/profile/badges").data
+    assert b"% of students" in client.get("/profile/badges").data
 
 
 def test_midnight_games_count_as_night_not_early(accounts, client, app):

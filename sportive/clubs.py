@@ -373,7 +373,7 @@ def view(club_id):
     members, requests = [], []
     role = my_role(club_id)
     if request.args.get("approved") and role == "officer" and club["status"] == "approved":
-        flash(f"{club['name']} is verified! Every Husky can find it now.", "celebrate")  # confetti
+        flash(f"{club['name']} is verified! Every student can find it now.", "celebrate")  # confetti
     if g.get("user") is not None:
         members = roster(club_id)
     can_decide = role == "officer" or is_admin()  # admins too: a club whose only officer was suspended
@@ -1259,7 +1259,7 @@ def review(club_id, decision):
     if decision == "approve":
         announce_new_club(club)
         _notify_officers(club, f"✅ {club['name']} is live on Sportive Circle!", f"{club['name']} is live! 🎉",
-                         ["Your club is verified and now visible to every Husky.",
+                         ["Your club is verified and now visible to every student.",
                           "Next: post an update and add your next practice as a club event."],
                          ("Open your club", link + "?approved=1"),
                          notice=(f"{club['name']} is verified and live!",

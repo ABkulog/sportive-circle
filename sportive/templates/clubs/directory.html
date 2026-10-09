@@ -62,7 +62,7 @@
     </div>
     {% else %}
       <p><strong>{% if q or sport or mine or fits %}No clubs match that.{% else %}No clubs yet.{% endif %}</strong></p>
-      <p class="muted">Are you an officer of an active UW club? Register it so other Huskies can find you.</p>
+      <p class="muted">Are you an officer of an active UW club? Register it so other students can find you.</p>
       {% if g.user %}<a class="btn" href="{{ url_for('clubs.create') }}">Register your club</a>
       {% else %}<a class="btn" href="{{ url_for('auth.signup', club=1) }}">Sign up to register your club</a>{% endif %}
     </div>
