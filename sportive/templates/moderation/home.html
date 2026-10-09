@@ -4,6 +4,9 @@
 <h1 class="page-title">Admin</h1>
 {% set reports, clubs, trending = open_report_count(), pending_club_count(), tab_badges().admin %}
 <div class="create-grid admin-home">
+  <a class="card create-option" href="{{ url_for('moderation.admin_numbers') }}">
+    <span class="create-emoji" aria-hidden="true">📈</span><strong>Numbers</strong>
+    <span class="muted">Who uses the app and how often</span></a>
   <a class="card create-option" href="{{ url_for('moderation.admin_reports') }}">
     <span class="create-emoji" aria-hidden="true">🛡️</span><strong>Reports</strong>
     <span class="muted">{{ reports ~ ' open' if reports else 'Nothing to check' }}</span></a>

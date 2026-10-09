@@ -2027,3 +2027,12 @@ html, body { overflow-x: clip; }
 /* Posts: others' are white (.card), your own are a light purple (in dark mode, a dark purple) */
 .feed-card.is-mine, .feed > .feed-card.is-mine { background: color-mix(in srgb, var(--purple) 12%, var(--bg));
   border-color: color-mix(in srgb, var(--purple) 28%, var(--bg)); }
+
+/* Admin numbers: big totals, then a week-by-week table. */
+.numbers-grid { list-style: none; padding: 0; margin: 14px 0 22px; display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.numbers-grid li { display: grid; gap: 2px; padding: 14px; }
+.numbers-grid strong { font-size: 1.6rem; font-weight: 700; line-height: 1.1; color: var(--purple); }
+.table-wrap { overflow-x: auto; }
+.numbers-table { width: 100%; border-collapse: collapse; }
+.numbers-table th, .numbers-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }

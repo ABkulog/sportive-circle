@@ -179,6 +179,48 @@ def admin_home():
     return render_template("moderation/home.html", upcoming_rec=upcoming)
 
 
+# Doing any of these counts as being active: posting, replying, liking, joining a game, hosting one, messaging.
+ACTIVITY = (("posts", "author_id"), ("post_replies", "author_id"), ("post_likes", "user_id"), ("rsvps", "user_id"),
+            ("direct_messages", "sender_id"))
+
+
+def _active_between(start, end):
+    """How many different students did something between start and end (Seattle time)."""
+    parts = [f"SELECT {who} AS id FROM {table} WHERE created_at >= :start AND created_at < :end"
+             for table, who in ACTIVITY]
+    parts.append("SELECT host_id FROM events WHERE datetime(created_at, '-8 hours') >= :start"
+                 " AND datetime(created_at, '-8 hours') < :end")  # events.created_at is UTC: about Seattle time
+    return get_db().execute(f"SELECT COUNT(DISTINCT id) FROM ({' UNION '.join(parts)})",
+                            {"start": to_db(start), "end": to_db(end)}).fetchone()[0]
+
+
+@bp.route("/admin/numbers")
+@admin_required
+def admin_numbers():
+    """How the app is doing: the numbers to show UW or a club (who uses it, how often, and is it growing)."""
+    db, now = get_db(), now_local()
+    week_ago, month_ago = now - timedelta(days=7), now - timedelta(days=30)
+    count = lambda sql, *args: db.execute(sql, args).fetchone()[0]  # noqa: E731
+    totals = [
+        (count("SELECT COUNT(*) FROM users WHERE verified = 1 AND suspended = 0"), "students signed up"),
+        (_active_between(week_ago, now), "active this week"),
+        (_active_between(month_ago, now), "active this month"),
+        (count("SELECT COUNT(*) FROM events WHERE cancelled = 0 AND starts_at >= ? AND starts_at <= ?",
+               to_db(month_ago), to_db(now)), "games played this month"),
+        (count("SELECT COUNT(*) FROM posts WHERE created_at >= ?", to_db(week_ago)), "posts this week"),
+        (count("SELECT COUNT(*) FROM clubs WHERE status = 'approved'"), "clubs on the app"),
+        (count("SELECT COUNT(DISTINCT user_id) FROM club_members"), "students in a club"),
+    ]
+    weeks = []
+    for back in range(8):  # this week first, then the 7 before it
+        end = now - timedelta(days=7 * back)
+        start = end - timedelta(days=7)
+        new = count("SELECT COUNT(*) FROM users WHERE verified = 1 AND datetime(created_at, '-8 hours') >= ?"
+                    " AND datetime(created_at, '-8 hours') < ?", to_db(start), to_db(end))
+        weeks.append({"start": start, "new": new, "active": _active_between(start, end)})
+    return render_template("moderation/numbers.html", totals=totals, weeks=weeks)
+
+
 @bp.route("/admin/reports")
 @admin_required
 def admin_reports():
