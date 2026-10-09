@@ -351,6 +351,7 @@ until demanded"). The last version with them is the git tag `ranks-and-news-v1`.
 |---|---|---|
 | NFR-LEGAL-1 | Says clearly on every page that it's a student project, not an official UW service. | ✅ |
 | NFR-LEGAL-2 | Uses no UW logos (the "W", Husky dog marks). Only UW colors and place names. | ✅ |
+| NFR-LEGAL-3 | Says "UW students", not "Huskies", on its own pages, emails and flyers (Husky is a UW trademark). Real place names like Husky Track stay. | ✅ |
 | NFR-LEGAL-4 | Have someone review the Privacy and Terms pages before a large public launch. | ⬜ |
 
 ---
