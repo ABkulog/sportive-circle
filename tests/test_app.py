@@ -1820,6 +1820,21 @@ def test_report_spam_limit(accounts, client, app):
     assert b"a lot of reports" in client.post(f"/report/user/{bad}", data={"reason": "spam"}, follow_redirects=True).data
 
 
+def test_admin_numbers_page(accounts, client, app):
+    """FR-ADMIN-2: admins see how many students use the app, how often, and week by week."""
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    accounts.signup(email="maya@uw.edu", name="Maya Chen")
+    client.post("/events/new", data=event_form())                     # hosting a game counts as active
+    assert client.get("/admin/numbers").status_code == 404            # hidden from non-admins
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    page = client.get("/admin/numbers").get_data(as_text=True)
+    assert "2</strong><span class=\"muted\">students signed up" in page
+    assert "1</strong><span class=\"muted\">active this week" in page
+    assert "Week by week" in page and page.count("<tr>") == 9           # header + 8 weeks
+    assert "/admin/numbers" in client.get("/admin").get_data(as_text=True)
+
+
 def test_admin_reports_page(accounts, client, app):
     app.config["ADMIN_EMAILS"] = "admin@uw.edu"
     accounts.signup(email="bad@uw.edu", name="Bad Actor")
