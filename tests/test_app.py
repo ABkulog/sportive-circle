@@ -6176,12 +6176,13 @@ def test_open_rec_basketball_is_drop_in_for_a_basketball_game(accounts, client, 
     _, two_pm = _day_after_tomorrow(14)
     four_pm = two_pm[:-5] + "16:00"
     ima = "IMA (Intramural Activities Building)"
+    day = two_pm[:10]  # the database keeps "YYYY-MM-DD HH:MM"
     with app.app_context():
         db = get_db()
         for label in ("Gym A: Open Rec Basketball", "Gym C: Open Rec Volleyball", "Gym B: Badminton - Scrimmage"):
             db.execute("""INSERT INTO rec_reservations (location, starts_at, ends_at, label, source, created_at)
-                          VALUES (?, ?, ?, ?, 'feed', ?)""", (ima, two_pm[:-5] + "09:00", two_pm[:-5] + "20:30",
-                                                               label, two_pm))
+                          VALUES (?, ?, ?, ?, 'feed', ?)""", (ima, day + " 09:00", day + " 20:30",
+                                                               label, day + " 08:00"))
         db.commit()
 
     def drop_ins(sport):
