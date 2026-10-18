@@ -2,7 +2,8 @@
 
 Two different things, shown differently:
 - **UW Rec reservations** (IM leagues, club practices, rentals) mean the courts or field aren't free: people
-  usually can't play there then. UW Rec has no public feed of these, so admins copy them in from UW Rec's
+  usually can't play there then. Except "Open Rec <sport>": that's drop-in play, so for a game of that
+  sport it's good news, not a warning. UW Rec has no public feed of these, so admins copy them in from UW Rec's
   schedule (Admin -> UW Rec). If UW Rec ever shares a feed, it can fill the same table (source = 'feed').
 - **Other games on Sportive Circle** aren't reservations: the place is busy, not taken, and there may be room
   for more people. Hosts can still post; it's only a heads-up.
@@ -14,7 +15,7 @@ import logging
 from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 
 from .auth import login_required
-from .constants import LOCATIONS
+from .constants import LOCATIONS, SPORTS
 from .db import get_db
 from .moderation import admin_required
 from .textutil import one_line
@@ -77,12 +78,21 @@ def games_at(location, starts, ends, exclude=None):
     return games
 
 
-def whats_on(location, starts, ends, exclude=None):
+def is_drop_in(label, sport):
+    """UW Rec's 'Gym A: Open Rec Basketball' is drop-in play for anyone, not a booking that keeps people out:
+    for a basketball game it's the time to go. For any other sport that gym is still taken."""
+    name = SPORTS.get(sport or "")
+    text = (label or "").lower()
+    return bool(name) and "open rec" in text and name.lower() in text
+
+
+def whats_on(location, starts, ends, exclude=None, sport=None):
     """Everything the host (or a player) should know about this place at this time."""
     return {
         "uw_rec": is_uw_rec(location),
         "schedule": UW_REC_SCHEDULE if is_uw_rec(location) else None,
-        "reserved": [{"label": r["label"], "when": time_range(r["starts_at"], r["ends_at"])}
+        "reserved": [{"label": r["label"], "when": time_range(r["starts_at"], r["ends_at"]),
+                      "drop_in": is_drop_in(r["label"], sport)}
                      for r in rec_reservations(location, starts, ends)],
         "games": games_at(location, starts, ends, exclude),
         # We copy UW Rec's schedule only so far ahead: past that, "no reservations" would be a guess.
@@ -103,7 +113,7 @@ def place_check():
     if location not in LOCATIONS or ends <= starts or ends - starts > timedelta(days=2):
         return jsonify(None)
     exclude = request.args.get("event", type=int)
-    return jsonify(whats_on(location, to_db(starts), to_db(ends), exclude))
+    return jsonify(whats_on(location, to_db(starts), to_db(ends), exclude, request.args.get("sport")))
 
 
 # ---------------------------------------------------------------- admin: copy in UW Rec's reservations

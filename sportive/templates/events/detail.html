@@ -58,13 +58,18 @@
   {% if event.note and inside %}<p class="note">{{ event.note }}</p>{% endif %}
 
   {% if not event.cancelled and not ended and not place_hidden %}
-    {% set on = whats_on(event.location, event.starts_at, event.ends_at, event.id) %}
+    {% set on = whats_on(event.location, event.starts_at, event.ends_at, event.id, event.sport) %}
     {% if on.reserved or on.games %}
       <section class="whats-on" aria-label="Also at this place">
         {% for r in on.reserved %}
+          {% if r.drop_in %}
+          <p class="whats-on-open"><strong>UW Rec: drop-in</strong> {{ r.when }} · {{ r.label }}. Anyone can play then.
+            <a href="{{ on.schedule }}" target="_blank" rel="noopener">UW Rec's schedule</a></p>
+          {% else %}
           <p class="whats-on-rec"><strong>UW Rec: reserved</strong> {{ r.when }} · {{ r.label }}.
             {% if is_host %}Check the place is still free, or move the game.{% endif %}
             <a href="{{ on.schedule }}" target="_blank" rel="noopener">UW Rec's schedule</a></p>
+          {% endif %}
         {% endfor %}
         {% if on.games %}
           <p class="whats-on-title">Also on Sportive Circle here then:</p>
