@@ -230,6 +230,12 @@
     box.replaceChildren();
     if (!info) { box.hidden = true; return; }
     info.reserved.forEach((r) => {
+      if (r.drop_in) {  // "Open Rec Basketball" for a basketball game: drop-in play, the time to go
+        const line = el("p", "whats-on-open");
+        line.append(el("strong", "", "UW Rec: drop-in "), `${r.when}`, ` · ${r.label}. Anyone can play then.`);
+        box.appendChild(line);
+        return;
+      }
       const line = el("p", "whats-on-rec");
       line.append(el("strong", "", "UW Rec: reserved "), `${r.when}`, ` · ${r.label}. You probably can't play there then.`);
       box.appendChild(line);
@@ -268,6 +274,8 @@
       if (!location.value || !starts || !ends) { ++asked; show(null); return; }  // and ignore older answers
       const params = new URLSearchParams({ location: location.value, starts_at: starts, ends_at: ends });
       if (form.dataset.eventId) params.set("event", form.dataset.eventId);
+      const sport = form.querySelector('[name="sport"]');
+      if (sport && sport.value) params.set("sport", sport.value);
       const ticket = ++asked;
       try {
         const response = await fetch(`${box.dataset.url}?${params}`, { headers: { Accept: "application/json" } });

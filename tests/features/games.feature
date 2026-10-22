@@ -20,6 +20,16 @@ Feature: Games
     When "Maya" tries to host basketball at the IMA on a Saturday from 10 to 12
     Then "Jordan" sees "Pickup 5v5" in the feed
 
+  @FR-EVT-20
+  Scenario: Open Rec Basketball is drop-in play, not a reason you can't play
+    Given UW Rec has "Gym A: Open Rec Basketball" at the IMA all day tomorrow
+    And UW Rec has "Gym C: Open Rec Volleyball" at the IMA all day tomorrow
+    When "Maya" hosts a basketball game tomorrow
+    And "Jordan" opens Maya's game
+    Then they see "UW Rec: drop-in"
+    And they see "Anyone can play then."
+    And they see "UW Rec: reserved"
+
   @FR-EVT-2
   Scenario: A sport can only be played where it makes sense
     When "Maya" tries to host rowing at "Denny Field"
