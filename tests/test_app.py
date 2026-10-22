@@ -4606,8 +4606,8 @@ def test_games_only_while_the_place_is_open(accounts, client, app):
     accounts.logout()
     club = _approved_club(accounts, client, app, name="Husky Golf", sport="golf", location="UW Golf Driving Range")
     accounts.login(email="captain@uw.edu")
-    tuesday = _next(1, 12, month=10)
-    while (tuesday + timedelta(weeks=5)).month != 11:                         # a practice that runs into November
+    tuesday = _next(1, 12)                                # a 6-week practice with a week in November (closed
+    while all((tuesday + timedelta(weeks=week)).month != 11 for week in range(6)):  # Tuesdays), within a year
         tuesday += timedelta(weeks=1)
     page = client.post(f"/events/new?club={club}", data=event_form(
         title="Range day", sport="golf", location="UW Golf Driving Range", club=str(club), repeat="6",
@@ -8056,6 +8056,20 @@ def test_sports_offer_the_places_clubs_really_use():
         assert "IMA Mat Rooms (martial arts)" in SPORT_LOCATIONS[sport], sport
     for sport, places in SPORT_LOCATIONS.items():
         assert places and all(p in LOCATIONS for p in places), sport
+
+
+def test_hub_games_for_pool_bowling_table_tennis_and_esports(accounts, client):
+    """FR-PLACE-2: the HUB's games room (once called Area 01) can be picked, and pool is a sport."""
+    from sportive.constants import LOCATION_COORDS, PLACE_TIPS, SPORT_LOCATIONS, SPORTS
+    hub_games = "HUB Games (HUB basement, room B150)"
+    assert SPORTS["billiards"] == "Pool / Billiards"
+    for sport in ("billiards", "bowling", "table_tennis", "esports"):
+        assert hub_games in SPORT_LOCATIONS[sport] and (sport, hub_games) in PLACE_TIPS, sport
+    assert LOCATION_COORDS[hub_games] and "$2.50" in PLACE_TIPS[("bowling", hub_games)]
+    accounts.signup()
+    event = client.post("/events/new", data=event_form(title="Pool night", sport="billiards", location=hub_games,
+                                                       players="4"), follow_redirects=True).data.decode()
+    assert "Pool night" in event and "25% off on Wednesdays" in event
 
 
 def test_one_game_form_starts_right_now_too(accounts, client):

@@ -37,6 +37,7 @@ SPORTS = {
     "lacrosse": "Lacrosse",
     "muay_thai": "Muay Thai / Kickboxing",
     "pickleball": "Pickleball",
+    "billiards": "Pool / Billiards",
     "racquetball": "Racquetball",
     "rowing": "Rowing / Kayaking",
     "rugby": "Rugby",
@@ -68,7 +69,7 @@ SPORT_SPACE = {
     "running": "trail", "hiking": "trail", "biking": "trail", "climbing": "wall", "gym": "gym",
     "rowing": "boathouse", "snow": "slopes", "esports": "room", "other": "place",
     # UW club sports
-    "archery": "range", "badminton": "courts", "baseball": "field", "bowling": "lanes", "boxing": "mat room", "bjj": "mat room", "cricket": "field", "disc_golf": "course", "dodgeball": "gym", "equestrian": "stables", "fencing": "room", "field_hockey": "field", "figure_skating": "rink", "golf": "course", "gymnastics": "gym", "handball": "courts", "ice_hockey": "rink", "judo": "mat room", "karate": "mat room", "kendo": "room", "lacrosse": "field", "muay_thai": "mat room", "racquetball": "court", "rugby": "field", "sailing": "dock", "skateboarding": "spot", "softball": "field", "squash": "court", "swimming": "pool", "table_tennis": "tables", "taekwondo": "mat room", "triathlon": "route", "water_polo": "pool", "weightlifting": "gym", "wrestling": "mat room",
+    "archery": "range", "badminton": "courts", "baseball": "field", "billiards": "tables", "bowling": "lanes", "boxing": "mat room", "bjj": "mat room", "cricket": "field", "disc_golf": "course", "dodgeball": "gym", "equestrian": "stables", "fencing": "room", "field_hockey": "field", "figure_skating": "rink", "golf": "course", "gymnastics": "gym", "handball": "courts", "ice_hockey": "rink", "judo": "mat room", "karate": "mat room", "kendo": "room", "lacrosse": "field", "muay_thai": "mat room", "racquetball": "court", "rugby": "field", "sailing": "dock", "skateboarding": "spot", "softball": "field", "squash": "court", "swimming": "pool", "table_tennis": "tables", "taekwondo": "mat room", "triathlon": "route", "water_polo": "pool", "weightlifting": "gym", "wrestling": "mat room",
 }
 
 SPORT_EMOJI = {
@@ -91,6 +92,7 @@ SPORT_EMOJI = {
     "archery": "🏹",
     "badminton": "🏸",
     "baseball": "⚾",
+    "billiards": "🎱",
     "bowling": "🎳",
     "boxing": "🥊",
     "bjj": "🥋",
@@ -134,6 +136,7 @@ LOCATIONS = [
     "Fitness Center West (under Elm Hall)",
     "Green Lake Park pickleball courts",
     "The HUB (Husky Union Building)",
+    "HUB Games (HUB basement, room B150)",
     "Hec Edmundson Pavilion",
     "Husky Track",
     "IMA (Intramural Activities Building)",
@@ -184,7 +187,10 @@ TRAIL = "Burke-Gilman Trail"
 GREEN_LAKE_PICKLEBALL = "Green Lake Park pickleball courts"
 OFF_CAMPUS = "Off campus (see note)"
 ONLINE = "Online"
-HUB = "The HUB (Husky Union Building)"  # the student union: its games area is where esports meet up
+HUB = "The HUB (Husky Union Building)"  # the student union
+# The HUB's games room (it used to be called Area 01): 12 bowling lanes, 9 pool tables, 2 table tennis tables and a
+# PC gaming lounge. Closed Sundays. hub.washington.edu/play/hub-games, checked Oct 2026.
+HUB_GAMES = "HUB Games (HUB basement, room B150)"
 
 # Opening hours: a game can't be posted at a place while it's closed. Each place has seasons, each with
 # hours per weekday (0 = Monday): (opens, closes) as "HH:MM", or None = closed all day. A date outside every
@@ -243,6 +249,7 @@ LOCATION_COORDS = {
     TRAIL: None,                              # a 20-mile trail: search instead of one pin
     GREEN_LAKE_PICKLEBALL: (47.681547, -122.328384),  # next to the Green Lake Community Center
     HUB: (47.655500, -122.305100),            # the Husky Union Building, on Stevens Way
+    HUB_GAMES: (47.655500, -122.305100),      # in the HUB's basement
     IMA_MATS: (47.653743, -122.301231),       # inside the IMA
     IMA_POOL: (47.653743, -122.301231),
     IMA_ARCHERY: (47.653743, -122.301231),
@@ -274,12 +281,13 @@ SPORT_LOCATIONS = {
     "snow": [OFF_CAMPUS],
     "hiking": [OFF_CAMPUS],
     "biking": [TRAIL, OFF_CAMPUS],
-    "esports": [HUB, ONLINE, OFF_CAMPUS],
+    "esports": [HUB_GAMES, HUB, ONLINE, OFF_CAMPUS],     # HUB Games has a PC gaming lounge
     # UW club sports
     "archery": [IMA_ARCHERY, OFF_CAMPUS],
     "badminton": [IMA, OFF_CAMPUS],                            # Gym B is the badminton gym
     "baseball": OPEN_FIELDS + [OFF_CAMPUS],
-    "bowling": [OFF_CAMPUS],
+    "billiards": [HUB_GAMES, OFF_CAMPUS],
+    "bowling": [HUB_GAMES, OFF_CAMPUS],
     "boxing": [IMA, IMA_MATS, BOXING_GYM, OFF_CAMPUS],         # IMA: heavy bags in the conditioning room
     "bjj": [IMA, IMA_MATS, OFF_CAMPUS],
     "cricket": OPEN_FIELDS + [OFF_CAMPUS],
@@ -305,7 +313,7 @@ SPORT_LOCATIONS = {
     "softball": OPEN_FIELDS + [OFF_CAMPUS],
     "squash": [IMA_COURTS, OFF_CAMPUS],
     "swimming": [IMA_POOL, WAC, OFF_CAMPUS],                   # WAC: open-water swims on Union Bay
-    "table_tennis": [IMA, HUB, OFF_CAMPUS],
+    "table_tennis": [IMA, HUB_GAMES, HUB, OFF_CAMPUS],
     "taekwondo": [IMA, IMA_MATS, OFF_CAMPUS],
     "triathlon": [IMA_POOL, TRACK, TRAIL, WAC, OFF_CAMPUS],
     "water_polo": [IMA_POOL, OFF_CAMPUS],
@@ -343,6 +351,7 @@ SPORT_TEAM_SIZES = {
     "rugby": [7, 15],
     "softball": [9, 10],
     "table_tennis": [2],
+    "billiards": [2],
     "water_polo": [7],
     "other": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
 }
@@ -352,7 +361,7 @@ DEFAULT_PLAYERS = {
     "basketball": 10, "soccer": 14, "football": 14, "volleyball": 12, "spikeball": 4, "ultimate": 14,
     "tennis": 4, "pickleball": 4, "running": 6, "climbing": 4, "gym": 2, "rowing": 4, "snow": 4,
     "hiking": 6, "biking": 6, "esports": 5, "other": 10,
-    "archery": 6, "badminton": 4, "baseball": 18, "bowling": 6, "boxing": 8, "bjj": 8, "cricket": 22, "disc_golf": 4, "dodgeball": 12, "equestrian": 4, "fencing": 6, "field_hockey": 14, "figure_skating": 6, "golf": 4, "gymnastics": 6, "handball": 4, "ice_hockey": 12, "judo": 8, "karate": 8, "kendo": 8, "lacrosse": 12, "muay_thai": 8, "racquetball": 2, "rugby": 14, "sailing": 4, "skateboarding": 4, "softball": 18, "squash": 2, "swimming": 6, "table_tennis": 4, "taekwondo": 8, "triathlon": 6, "water_polo": 14, "weightlifting": 2, "wrestling": 8,
+    "archery": 6, "badminton": 4, "baseball": 18, "billiards": 2, "bowling": 6, "boxing": 8, "bjj": 8, "cricket": 22, "disc_golf": 4, "dodgeball": 12, "equestrian": 4, "fencing": 6, "field_hockey": 14, "figure_skating": 6, "golf": 4, "gymnastics": 6, "handball": 4, "ice_hockey": 12, "judo": 8, "karate": 8, "kendo": 8, "lacrosse": 12, "muay_thai": 8, "racquetball": 2, "rugby": 14, "sailing": 4, "skateboarding": 4, "softball": 18, "squash": 2, "swimming": 6, "table_tennis": 4, "taekwondo": 8, "triathlon": 6, "water_polo": 14, "weightlifting": 2, "wrestling": 8,
 }
 
 SKILL_LEVELS = ["All levels", "Casual", "Intermediate", "Competitive"]
@@ -403,6 +412,12 @@ PLACE_TIPS = {
     ("swimming", IMA_POOL): "14-lane pool in the IMA. Check lap-swim hours; needs an IMA membership.",
     ("water_polo", IMA_POOL): "14-lane pool in the IMA. Check the pool schedule; needs an IMA membership.",
     ("triathlon", IMA_POOL): "14-lane pool in the IMA. Check lap-swim hours; needs an IMA membership.",
+    # HUB Games deals: hub.washington.edu/play/hub-games/deals-discounts (checked Oct 2026).
+    ("bowling", HUB_GAMES): "12 lanes in the HUB basement, shoes included. $2.50 a game on Tuesdays for UW walk-ins. "
+                            "Closed Sundays.",
+    ("billiards", HUB_GAMES): "9 pool tables in the HUB basement. 25% off on Wednesdays for UW walk-ins. Closed Sundays.",
+    ("table_tennis", HUB_GAMES): "2 table tennis tables in the HUB basement's pool hall. Closed Sundays.",
+    ("esports", HUB_GAMES): "The PC gaming lounge in the HUB basement. Closed Sundays.",
     ("badminton", IMA): "Gym B is the IMA's badminton gym. Needs an IMA membership.",
     ("volleyball", IMA): "Gym C is the IMA's volleyball gym. Needs an IMA membership.",
     ("climbing", IMA): "The Crags climbing center: a 42-foot wall and a bouldering area. Needs an IMA membership.",
