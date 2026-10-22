@@ -354,6 +354,14 @@ def host_at_ima_saturday(world, host, start, end):
               ends_at=starts.replace(hour=end).strftime("%Y-%m-%dT%H:%M"))
 
 
+@given(parsers.parse('UW Rec has "{label}" at the IMA all day tomorrow'))
+def rec_all_day_tomorrow(world, label):
+    tomorrow = now_local() + timedelta(days=1)
+    world.db("""INSERT INTO rec_reservations (location, starts_at, ends_at, label, source, created_at)
+                VALUES (?, ?, ?, ?, 'feed', ?)""", (IMA, to_db(tomorrow - timedelta(hours=3)),
+                                                     to_db(tomorrow + timedelta(hours=5)), label, to_db(now_local())))
+
+
 @when(parsers.parse('"{host}" tries to host basketball for {n:d} players'))
 def host_too_big(world, host, n):
     host_game(world, host, players=str(n))

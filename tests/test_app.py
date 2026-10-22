@@ -6168,6 +6168,39 @@ def test_uw_rec_reservations_and_other_games_show_while_making_a_game(accounts, 
     assert client.get("/admin/uw-rec").status_code == 404                     # admins only
 
 
+def test_open_rec_basketball_is_drop_in_for_a_basketball_game(accounts, client, app):
+    """The user: "Open Rec Basketball" is drop-in play, so a basketball game there isn't told it can't play.
+    For any other sport (or Open Rec Volleyball for basketball) the gym is still taken."""
+    _people(accounts, app, "Maya")
+    _as(accounts, "Maya")
+    _, two_pm = _day_after_tomorrow(14)
+    four_pm = two_pm[:-5] + "16:00"
+    ima = "IMA (Intramural Activities Building)"
+    day = two_pm[:10]  # the database keeps "YYYY-MM-DD HH:MM"
+    with app.app_context():
+        db = get_db()
+        for label in ("Gym A: Open Rec Basketball", "Gym C: Open Rec Volleyball", "Gym B: Badminton - Scrimmage"):
+            db.execute("""INSERT INTO rec_reservations (location, starts_at, ends_at, label, source, created_at)
+                          VALUES (?, ?, ?, ?, 'feed', ?)""", (ima, day + " 09:00", day + " 20:30",
+                                                               label, day + " 08:00"))
+        db.commit()
+
+    def drop_ins(sport):
+        info = client.get("/events/place-check", query_string={"location": ima, "starts_at": two_pm,
+                                                               "ends_at": four_pm, "sport": sport}).get_json()
+        return {r["label"]: r["drop_in"] for r in info["reserved"]}
+    assert drop_ins("basketball") == {"Gym A: Open Rec Basketball": True, "Gym C: Open Rec Volleyball": False,
+                                      "Gym B: Badminton - Scrimmage": False}
+    assert drop_ins("volleyball")["Gym C: Open Rec Volleyball"] is True
+    assert not any(drop_ins("badminton").values())                  # a scrimmage isn't drop-in
+    assert not any(drop_ins("").values())                           # no sport picked yet: all reserved
+    done = client.post("/events/new", data=event_form(title="Hoops", sport="basketball", location=ima,
+                                                      starts_at=two_pm, ends_at=four_pm), follow_redirects=True)
+    page = done.get_data(as_text=True)
+    assert "UW Rec: drop-in" in page and "Anyone can play then." in page
+    assert page.count("UW Rec: reserved") == 2                      # volleyball and badminton gyms
+
+
 def test_game_page_shows_what_else_is_on_there(accounts, client, app):
     app.config["ADMIN_EMAILS"] = "maya@uw.edu"
     _people(accounts, app, "Maya", "Sam")

@@ -761,6 +761,8 @@ form[data-wizard] .form-step { display: none; }
 .whats-on p { margin: 4px 0; }
 .whats-on-rec { padding: 8px 10px; border-radius: 10px; background: var(--gold-light); color: var(--gold-ink); }
 .whats-on-rec strong, .whats-on-rec a { color: inherit; }
+.whats-on-open { padding: 8px 10px; border-radius: 10px; background: var(--accent-soft); color: var(--text); }
+.whats-on-open strong, .whats-on-open a { color: var(--purple); }
 .whats-on-title { font-weight: 600; }
 .whats-on-games { margin: 2px 0 4px; padding-left: 18px; }
 .rec-list { list-style: none; padding: 0; margin: 0; }
