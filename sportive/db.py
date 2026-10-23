@@ -40,7 +40,8 @@ ADDED_COLUMNS = [
     ("clubs", "discord", "TEXT NOT NULL DEFAULT ''"),
     ("clubs", "huskylink_id", "INTEGER"),
     ("club_posts", "link", "TEXT NOT NULL DEFAULT ''"),  # where to RSVP (an event from HuskyLink)
-    ("club_posts", "huskylink_event", "INTEGER"),  # the HuskyLink event it's about (huskylink.py): one post each  # its group on HuskyLink (UW's student org site), for its events  # an invite link (discord.gg/... or discord.com/invite/...)  # 0 = filled in from UW's public listings, no officer here yet
+    ("club_posts", "huskylink_event", "INTEGER"),
+    ("club_posts", "ends_at", "TEXT"),  # an automatic post about an event: removed once the event is over  # the HuskyLink event it's about (huskylink.py): one post each  # its group on HuskyLink (UW's student org site), for its events  # an invite link (discord.gg/... or discord.com/invite/...)  # 0 = filled in from UW's public listings, no officer here yet
     ("clubs", "slug", "TEXT"),  # the club's short link: sportivecircle.com/hrc (clubs.short_link)  # a club's post only its members see
     ("post_videos", "muted", "INTEGER NOT NULL DEFAULT 0"),  # the poster turned its sound off (🔇 in the ＋ sheet)
     # Officers the owner lets post as the club (the owner always can). Officers from before this kept posting.

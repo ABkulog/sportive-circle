@@ -2091,18 +2091,56 @@ def test_huskylink_events_post_themselves_for_their_club(accounts, client, app):
         sync(feed(title="Max Out Day", deleted=1))
         assert get_db().execute("SELECT body FROM club_posts").fetchone()[0].startswith("Canceled: ")
     assert "Max Out Day" not in client.get("/feed").data.decode()           # canceled posts leave the feed
+    with app.app_context():                                                # "we don't want old feed"
+        from sportive.huskylink import remove_past
+        db = get_db()
+        sync(feed(eid=5, title="Morning Lift"))
+        assert "Morning Lift" in client.get(f"/clubs/{club}").data.decode()
+        db.execute("UPDATE club_posts SET ends_at = '2020-01-01 10:00' WHERE huskylink_event = 5")
+        db.commit()
+        assert remove_past() == 1 and remove_past() == 0
+        sync(feed(eid=5, title="Morning Lift"))                             # it stays over
+        assert db.execute("SELECT body FROM club_posts WHERE huskylink_event = 5").fetchone()[0].startswith("Over: ")
+    assert "Morning Lift" not in client.get(f"/clubs/{club}").data.decode()
+    assert "Morning Lift" not in client.get("/feed").data.decode()
 
 
-def test_uw_clubs_add_themselves_when_a_new_list_ships(accounts, client, app):
-    """The owner: "don't leave me anything". The background loop adds the list's clubs once, without an admin."""
-    from sportive.clubs import clubs_round
-    clubs_round(app)
+def test_uw_clubs_refresh_themselves_every_day(accounts, client, app, monkeypatch):
+    """The owner: "don't leave me anything" and "access all the information daily". Once a day the site reads UW's
+    club lists again (here they're down, so it uses the saved copy), adds new clubs and fills in their About tab;
+    unclaimed clubs get UW's latest info, claimed ones are left to their officers."""
+    import sportive.clubs as clubs_module
+    import sportive.clubsources as sources
+    with app.app_context():                                                # listed before it was found not a sport
+        get_db().execute("INSERT INTO clubs (name, sport, description, status, claimed, created_at) VALUES "
+                         "('Sumo Union Membership Organization', 'wrestling', 'TV', 'approved', 0, '2026-10-01 10:00')")
+        get_db().commit()
+    monkeypatch.setattr(sources, "build_listing", lambda log=None: (_ for _ in ()).throw(OSError("UW is down")))
+    monkeypatch.setattr(clubs_module.threading, "Thread", lambda target, args, **kw: type(
+        "Now", (), {"start": lambda self: target(*args)})())
+    clubs_module.clubs_round(app)
     with app.app_context():
-        count = get_db().execute("SELECT COUNT(*) FROM clubs WHERE claimed = 0").fetchone()[0]
-    assert count >= 80
-    clubs_round(app)                                                   # the same list again: nothing doubles
+        db = get_db()
+        count = db.execute("SELECT COUNT(*) FROM clubs WHERE claimed = 0").fetchone()[0]
+        running = db.execute("SELECT * FROM clubs WHERE name = 'UW Running Club'").fetchone()
+        assert count >= 80 and running["meets"] == "Every weekday at 5 PM" and running["location"] == "The Quad"
+        assert running["joining"] == "open" and running["focus"] == "recreational"
+        assert db.execute("SELECT joining FROM clubs WHERE name = 'UW Men''s Rugby Club'").fetchone()[0] == ""
+        assert not db.execute("SELECT 1 FROM clubs WHERE name LIKE 'Sumo%'").fetchone()
+        db.execute("UPDATE clubs SET meets = 'Old info' WHERE id = ?", (running["id"],))
+        db.execute("DELETE FROM app_state WHERE key LIKE 'club_sync:%'")      # the next day
+        db.commit()
+    clubs_module.clubs_round(app)
+    clubs_module.clubs_round(app)                                          # same day: nothing more
     with app.app_context():
-        assert get_db().execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == count
+        db = get_db()
+        assert db.execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == count
+        assert db.execute("SELECT meets FROM clubs WHERE id = ?", (running["id"],)).fetchone()[0] == "Every weekday at 5 PM"
+    accounts.signup()
+    rugby = client.get(f"/clubs/{_club_id(app, 'UW Men' + chr(39) + 's Rugby Club')}").data.decode()
+    running_page = client.get(f"/clubs/{running['id']}").data.decode()
+    assert "Every weekday at 5 PM" in running_page and "Just show up at the Quad" in running_page
+    assert "Free" not in rugby                                             # unknown dues aren't "Free"
 
 
 def test_follow_is_not_membership(accounts, client, app):

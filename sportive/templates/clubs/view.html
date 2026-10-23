@@ -173,11 +173,11 @@
     {% if club.how_to_join %}
       <div class="how-to-join" id="how-to-join" tabindex="-1"><strong>How to join</strong><p>{{ club.how_to_join }}</p></div>
     {% endif %}
-    {% if club.focus %}
+    {% if club.focus or club.meets or club.location %}
       <ul class="quick-facts" aria-label="Quick facts">
-        <li><small>Joining</small><strong>{{ joining[club.joining] }}</strong></li>
-        <li><small>Experience</small><strong>{{ experience[club.experience] }}</strong></li>
-        <li><small>Dues</small><strong>{{ club.dues or 'Free' }}</strong></li>
+        <li><small>Joining</small><strong>{{ joining.get(club.joining, 'Ask the club') }}</strong></li>
+        <li><small>Experience</small><strong>{{ experience.get(club.experience, 'Ask the club') }}</strong></li>
+        <li><small>Dues</small><strong>{{ club.dues or ('Free' if club.claimed else 'Ask the club') }}</strong></li>
         <li><small>Practices / events</small><strong>{{ club.meets or 'Ask the club' }}</strong></li>
         <li><small>Where</small><strong>{{ club.location or 'Ask the club' }}</strong></li>
         <li><small>Who can join</small><strong>{{ who[club.who_can_join] }}</strong></li>

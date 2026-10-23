@@ -11,6 +11,7 @@ import os
 import logging
 import re
 import secrets
+import threading
 from datetime import timedelta
 
 from flask import Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request, url_for
@@ -374,7 +375,7 @@ def view(club_id):
     posts = db.execute(
         """SELECT p.*, CASE WHEN u.suspended = 1 THEN NULL ELSE u.full_name END AS full_name  -- suspended: "An officer"
            FROM club_posts p LEFT JOIN users u ON u.id = p.author_id
-           WHERE p.club_id = ? ORDER BY p.id DESC LIMIT 20""", (club_id,)).fetchall()
+           WHERE p.club_id = ? AND p.body NOT LIKE 'Over: %' ORDER BY p.id DESC LIMIT 20""", (club_id,)).fetchall()
     members, requests = [], []
     role = my_role(club_id)
     if request.args.get("approved") and role == "officer" and club["status"] == "approved":
@@ -1252,11 +1253,13 @@ UW_REC_CLUBS = os.path.join(os.path.dirname(__file__), "data", "uw_rec_clubs.jso
 CLUB_SOURCES = {"uw_rec": "UW Rec", "huskylink": "HuskyLink"}
 
 
-def uw_rec_clubs():
+def uw_rec_clubs(listing=None):
     """Every UW sports club on UW Rec's page and HuskyLink (name, sport, description, links), each with the club
-    already on the app that matches it (same name, Instagram or HuskyLink group), or None."""
-    with open(UW_REC_CLUBS, encoding="utf-8") as file:
-        listing = json.load(file)
+    already on the app that matches it (same name, Instagram or HuskyLink group), or None. Without a listing: the
+    copy saved in data/uw_rec_clubs.json."""
+    if listing is None:
+        with open(UW_REC_CLUBS, encoding="utf-8") as file:
+            listing = json.load(file)
     ours = get_db().execute("SELECT id, name, instagram, huskylink_id, claimed FROM clubs WHERE status != 'denied'").fetchall()
     by_name = {fold(row["name"]): row for row in ours}
     by_instagram = {row["instagram"].lower(): row for row in ours if row["instagram"]}
@@ -1267,43 +1270,82 @@ def uw_rec_clubs():
     return listing
 
 
-def add_uw_rec_clubs():
+CLUB_ABOUT = os.path.join(os.path.dirname(__file__), "data", "club_about.json")
+ABOUT_FIELDS = ("focus", "joining", "experience", "competes", "meets", "location", "how_to_join", "dues")
+
+
+def listed_club_values(club):
+    """What the app shows about a club nobody runs here yet: UW's description and links, and the About facts
+    read from them (data/club_about.json). Unknown facts stay blank, so the page says "Ask the club"."""
+    with open(CLUB_ABOUT, encoding="utf-8") as file:
+        about = json.load(file).get(club["name"], {})
+    values = {"description": club["description"] or (
+                  f"{club['uw_name']}, one of UW Recreation's Rec Clubs." if club["source"] == "uw_rec"
+                  else f"{club['name']}, a UW student organization."),
+              "contact_url": club["website"], "instagram": club["instagram"], "facebook": club["facebook"],
+              "x_handle": club["x_handle"], "discord": club["discord"], "huskylink_id": club["huskylink_id"],
+              "who_can_join": club["who_can_join"]}
+    values.update({key: about.get(key, 0 if key == "competes" else "") for key in ABOUT_FIELDS})
+    return values
+
+
+def add_uw_rec_clubs(listing=None):
     """Lists every UW sports club that isn't on the app yet: verified by UW (approved), but nobody runs it here
-    until an officer claims it. No "just joined" feed posts: 80 at once would bury everything else."""
-    listing, db, added = uw_rec_clubs(), get_db(), []
+    until an officer claims it. No "just joined" feed posts: 80 at once would bury everything else. Clubs already
+    listed and still unclaimed get UW's latest description, links and About facts (claimed ones are the officers')."""
+    from .clubsources import HUSKYLINK_CLUBS
+    listing, db, added = uw_rec_clubs(listing), get_db(), []
+    not_sports = [name for name, sport in HUSKYLINK_CLUBS.items() if sport is None]  # e.g. a sumo-watching club
+    db.execute(f"DELETE FROM clubs WHERE claimed = 0 AND created_by IS NULL AND name IN ({', '.join('?' * len(not_sports))})",
+               not_sports)
     for club in listing["clubs"]:
+        values = listed_club_values(club)
         if club["match"]:
+            if not club["match"]["claimed"]:
+                keep = {k: v for k, v in values.items() if v not in ("", None) or k in ABOUT_FIELDS}
+                db.execute(f"UPDATE clubs SET {', '.join(f'{k} = ?' for k in keep)} WHERE id = ? AND claimed = 0",
+                           (*keep.values(), club["match"]["id"]))
             continue
-        about = club["description"] or (f"{club['uw_name']}, one of UW Recreation's Rec Clubs." if club["source"] == "uw_rec"
-                                         else f"{club['name']}, a UW student organization.")
-        db.execute("""INSERT INTO clubs (name, sport, description, contact_url, status, claimed, club_kind, who_can_join,
-                                         instagram, facebook, x_handle, discord, huskylink_id, created_at)
-                      VALUES (?, ?, ?, ?, 'approved', 0, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                   (club["name"], club["sport"], about, club["website"],
-                    "rec_club" if club["source"] == "uw_rec" else "rso", club["who_can_join"], club["instagram"],
-                    club["facebook"], club["x_handle"], club["discord"], club["huskylink_id"], to_db(now_local())))
+        columns = {"name": club["name"], "sport": club["sport"], "status": "approved", "claimed": 0,
+                   "club_kind": "rec_club" if club["source"] == "uw_rec" else "rso", "created_at": to_db(now_local()),
+                   **values}
+        db.execute(f"INSERT INTO clubs ({', '.join(columns)}) VALUES ({', '.join('?' * len(columns))})",
+                   tuple(columns.values()))
         added.append(club["name"])
     db.commit()
     return added
 
 
 def clubs_round(app):
-    """Called from the background loop: when a new club list ships (its "checked" date changed), the clubs not on
-    the app yet are added by themselves, so nobody has to press the button. Claimed first, so the two copies of
-    the site never both add them. Never raises."""
+    """Called from the background loop: once a day the site reads UW Rec's club page and HuskyLink again, adds clubs
+    that are new there and refreshes the unclaimed ones, so nobody has to press anything. Claimed first, so the two
+    copies of the site never both do it; in its own thread (the sites can be slow). Never raises."""
     try:
         with app.app_context():
-            with open(UW_REC_CLUBS, encoding="utf-8") as file:
-                checked = json.load(file)["checked"]
             db = get_db()
             claimed = db.execute("INSERT OR IGNORE INTO app_state (key, value) VALUES (?, ?)",
-                                 (f"uw_clubs:{checked}", to_db(now_local()))).rowcount
+                                 (f"club_sync:{to_db(now_local())[:10]}", to_db(now_local()))).rowcount
             db.commit()
-            if claimed:
-                added = add_uw_rec_clubs()
-                log.info("Added %d UW clubs from the %s list.", len(added), checked)
     except Exception:
-        log.exception("Couldn't add the UW club list")
+        log.exception("Couldn't check the UW club list")
+        return
+    if claimed:
+        threading.Thread(target=_sync_clubs, args=(app,), name="club-sync", daemon=True).start()
+
+
+def _sync_clubs(app):
+    from .clubsources import build_listing
+    try:
+        listing = build_listing(log=log.info)
+    except Exception:
+        log.exception("Couldn't read UW's club lists today; using the saved copy")
+        listing = None
+    try:
+        with app.app_context():
+            added = add_uw_rec_clubs(listing)
+            log.info("UW clubs refreshed; %d new.", len(added))
+    except Exception:
+        log.exception("Couldn't refresh the UW clubs")
 
 
 @bp.route("/admin/clubs/uw-rec", methods=("GET", "POST"))
