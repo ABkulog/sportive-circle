@@ -6,6 +6,8 @@ The registration form also captures what each club is actually like (tryouts? du
 experience? gear?), so students know exactly what they're signing up for.
 """
 import io
+import json
+import os
 import logging
 import re
 import secrets
@@ -55,7 +57,9 @@ SOCIALS = {
     "x_handle": ("X / Twitter", "𝕏", r"[A-Za-z0-9_]{1,15}", "https://x.com/{}"),
     "facebook": ("Facebook", "📘", r"https://(www\.|m\.)?(facebook|fb)\.com/\S{1,150}", "{}"),
     "youtube": ("YouTube", "▶️", r"https://(www\.|m\.)?(youtube\.com|youtu\.be)/\S{1,150}", "{}"),
+    "discord": ("Discord", "💬", r"https://(discord\.gg|(www\.)?discord\.com/invite)/[A-Za-z0-9-]{2,40}/?", "{}"),
 }
+LINK_SOCIALS = ("facebook", "youtube", "discord")  # saved as full links, not usernames
 
 
 def social_links(club):
@@ -230,7 +234,7 @@ def read_club_form(form, club_id=None, phone_on_file=""):
     data.update({key: get(key) for key in ("description", "how_to_join")})
     for key in SOCIALS:
         value = get(key)
-        data[key] = value if key in ("facebook", "youtube") else social_handle(key, value)  # those two: a link
+        data[key] = value if key in LINK_SOCIALS else social_handle(key, value)
     data["competes"] = 1 if form.get("competes") else 0
     typed_phone = form.get("contact_phone", "").strip()
     data["contact_phone"] = (phone_from_form(form.get("contact_phone_country"), typed_phone) or ""
@@ -273,8 +277,9 @@ def read_club_form(form, club_id=None, phone_on_file=""):
         return problem("club_email", "Please enter a valid club email.")
     for key, (label, _, rule, _) in SOCIALS.items():
         if data[key] and not re.fullmatch(rule, data[key]):
-            example = "a link like https://facebook.com/yourclub" if key == "facebook" else (
-                "a link like https://youtube.com/@yourclub" if key == "youtube" else "just the username, like @uwyourclub")
+            example = {"facebook": "a link like https://facebook.com/yourclub",
+                       "youtube": "a link like https://youtube.com/@yourclub",
+                       "discord": "an invite link like https://discord.gg/abc123"}.get(key, "just the username, like @uwyourclub")
             return problem(key, f"That {label} doesn't look right. Use {example}.")
     # A social account or a website (or both): at least one is how we check the club is real.
     if not any(data[key] for key in SOCIALS) and not data["contact_url"]:
@@ -303,7 +308,7 @@ def read_club_form(form, club_id=None, phone_on_file=""):
 FIELDS = ("name", "sport", "description", "meets", "location", "contact_url", "club_kind", "verification_url",
           "officer_role", "member_estimate", "focus", "joining", "experience", "who_can_join", "dues", "gear",
           "competes", "how_to_join", "club_email", "instagram", "join_question", "tiktok", "snapchat", "x_handle",
-          "facebook", "youtube", "contact_phone")
+          "facebook", "youtube", "discord", "contact_phone")
 
 
 # ---------------------------------------------------------------- browse
@@ -1239,6 +1244,59 @@ def review_claim(claim_id, decision):
     db.commit()
     flash(f"{claim_row['role']} is now running {club['name']}. It's verified.", "success")
     return back
+
+
+# ---------------------------------------------------- UW Rec Clubs, listed before any officer signs up
+
+UW_REC_CLUBS = os.path.join(os.path.dirname(__file__), "data", "uw_rec_clubs.json")  # tools/fetch_rec_clubs.py
+
+
+def uw_rec_clubs():
+    """UW Recreation's Rec Clubs (name, sport, description, links), each with the club already on the app that
+    matches it (same name or same Instagram), or None."""
+    with open(UW_REC_CLUBS, encoding="utf-8") as file:
+        listing = json.load(file)
+    ours = get_db().execute("SELECT id, name, instagram, claimed FROM clubs WHERE status != 'denied'").fetchall()
+    by_name = {fold(row["name"]): row for row in ours}
+    by_instagram = {row["instagram"].lower(): row for row in ours if row["instagram"]}
+    for club in listing["clubs"]:
+        club["match"] = by_name.get(fold(club["name"])) or by_instagram.get(club["instagram"].lower())
+    return listing
+
+
+def add_uw_rec_clubs():
+    """Lists every UW Rec Club that isn't on the app yet: verified by UW (approved), but nobody runs it here until
+    an officer claims it. No "just joined" feed posts: 40 at once would bury everything else."""
+    listing, db, added = uw_rec_clubs(), get_db(), []
+    for club in listing["clubs"]:
+        if club["match"]:
+            continue
+        about = club["description"] or f"{club['uw_name']}, one of UW Recreation's Rec Clubs."
+        db.execute("""INSERT INTO clubs (name, sport, description, contact_url, status, claimed, club_kind, who_can_join,
+                                         instagram, facebook, x_handle, discord, created_at)
+                      VALUES (?, ?, ?, ?, 'approved', 0, 'rec_club', ?, ?, ?, ?, ?, ?)""",
+                   (club["name"], club["sport"], about, club["website"], club["who_can_join"], club["instagram"],
+                    club["facebook"], club["x_handle"], club["discord"], to_db(now_local())))
+        added.append(club["name"])
+    db.commit()
+    return added
+
+
+@bp.route("/admin/clubs/uw-rec", methods=("GET", "POST"))
+@login_required
+def uw_rec_import():
+    """Admins check UW Rec's club list, then add the clubs that aren't on the app yet in one go."""
+    if not is_admin():
+        abort(404)
+    if request.method == "POST":
+        added = add_uw_rec_clubs()
+        flash(f"Added {len(added)} club{'s' if len(added) != 1 else ''}. Officers can claim them from their pages."
+              if added else "Every UW Rec Club is on the app already.", "success")
+        return redirect(url_for("clubs.uw_rec_import"))
+    listing = uw_rec_clubs()
+    return render_template("clubs/uw_rec.html", listing=listing,
+                           new=[c for c in listing["clubs"] if not c["match"]],
+                           already=[c for c in listing["clubs"] if c["match"]])
 
 
 @bp.route("/admin/clubs")

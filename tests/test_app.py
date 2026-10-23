@@ -2014,6 +2014,39 @@ def test_officer_claims_a_listed_club_and_it_gets_verified(accounts, client, app
     assert client.post(f"/clubs/{club}/claim", data={"role": "VP"}).status_code == 404  # already claimed
 
 
+def test_admins_add_every_uw_rec_club_with_its_links(accounts, client, app):
+    """FR-CLUB-40: every club on UW Rec's list goes on the app (unclaimed), with its Instagram, Discord and site."""
+    import json
+    from sportive.clubs import UW_REC_CLUBS
+    from sportive.constants import SPORTS
+    with open(UW_REC_CLUBS, encoding="utf-8") as file:
+        listing = json.load(file)["clubs"]
+    assert len(listing) >= 40 and all(club["sport"] in SPORTS for club in listing)
+    climbing = next(club for club in listing if club["name"] == "UW Climbing Club")
+    assert climbing["instagram"] == "climbuw" and climbing["discord"].startswith("https://discord.com/invite/")
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    _approved_club(accounts, client, app, name="UW Running Club", sport="running")   # already registered here
+    accounts.signup(email="student@uw.edu")
+    assert client.get("/admin/clubs/uw-rec").status_code == 404                      # admins only
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    page = client.get("/admin/clubs/uw-rec").data.decode()
+    assert f"Add {len(listing) - 1} clubs to the app" in page and "Already on the app (1)" in page
+    client.post("/admin/clubs/uw-rec")
+    assert "Every UW Rec Club is on the app." in client.get("/admin/clubs/uw-rec").data.decode()
+    client.post("/admin/clubs/uw-rec")                                                # twice: nothing doubles
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == len(listing)
+        club = db.execute("SELECT * FROM clubs WHERE name = 'UW Climbing Club'").fetchone()
+        assert club["claimed"] == 0 and club["status"] == "approved" and club["instagram"] == "climbuw"
+        assert db.execute("SELECT COUNT(*) FROM club_posts").fetchone()[0] == 0         # no flood of "just joined"
+    page = client.get(f"/clubs/{club['id']}").data.decode()
+    assert "Nobody from UW Climbing Club runs this page yet" in page and "instagram.com/climbuw" in page
+    assert "discord.com/invite/" in page
+    assert "UW Climbing Club" in client.get("/clubs").data.decode()
+
+
 def test_follow_is_not_membership(accounts, client, app):
     club = _approved_club(accounts, client, app)
     accounts.signup(email="curious@uw.edu")

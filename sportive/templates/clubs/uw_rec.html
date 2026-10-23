@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}UW Rec Clubs{% endblock %}
+{% block content %}
+{% from "_macros.html" import admin_nav %}{{ admin_nav('uwrecclubs') }}
+<h1 class="page-title">UW Rec Clubs</h1>
+<p class="muted">Every club on <a href="{{ listing.source }}" target="_blank" rel="noopener">UW Recreation's club list</a>
+  (checked {{ listing.checked }}), with its links. Added clubs say nobody runs their page yet; their officers can claim them.</p>
+{% if new %}
+  <form method="post" class="form" data-confirm="Add {{ new|length }} club{{ 's' if new|length != 1 }} to the app?">
+    {{ csrf_field() }}<button class="btn btn-block">Add {{ new|length }} club{{ 's' if new|length != 1 }} to the app</button>
+  </form>
+  <h2>Not on the app yet ({{ new|length }})</h2>
+  <div class="stack">
+    {% for c in new %}
+      <article class="card report-card">
+        <div class="report-head"><strong class="club-name">{{ SPORT_EMOJI[c.sport] }} {{ c.name }}</strong>
+          <span class="muted">{{ SPORTS[c.sport] }}{% if c.who_can_join != 'everyone' %} · {{ c.who_can_join|capitalize }}{% endif %}</span></div>
+        {% if c.description %}<p class="clamp">{{ c.description }}</p>{% else %}<p class="muted">No description on UW's page.</p>{% endif %}
+        <ul class="contact-list">
+          {% if c.instagram %}<li><a href="https://instagram.com/{{ c.instagram }}" target="_blank" rel="noopener nofollow"><strong>Instagram</strong> @{{ c.instagram }} ↗</a></li>{% endif %}
+          {% if c.discord %}<li><a href="{{ c.discord }}" target="_blank" rel="noopener nofollow"><strong>Discord</strong> ↗</a></li>{% endif %}
+          {% if c.facebook %}<li><a href="{{ c.facebook }}" target="_blank" rel="noopener nofollow"><strong>Facebook</strong> ↗</a></li>{% endif %}
+          {% if c.x_handle %}<li><a href="https://x.com/{{ c.x_handle }}" target="_blank" rel="noopener nofollow"><strong>X</strong> @{{ c.x_handle }} ↗</a></li>{% endif %}
+          {% if c.website %}<li><a href="{{ c.website }}" target="_blank" rel="noopener nofollow"><strong>Website</strong> ↗</a></li>{% endif %}
+        </ul>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="flash flash-success">Every UW Rec Club is on the app.</p>
+{% endif %}
+{% if already %}
+  <h2>Already on the app ({{ already|length }})</h2>
+  <ul class="contact-list">
+    {% for c in already %}<li><a href="{{ url_for('clubs.view', club_id=c.match.id) }}">{{ c.match.name }}</a>
+      {% if not c.match.claimed %}<span class="muted">· not claimed yet</span>{% endif %}</li>{% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}
