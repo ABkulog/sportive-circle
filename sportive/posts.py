@@ -142,7 +142,7 @@ def feed_items(sport=None, before=None, limit=PAGE):
     club_sports = _sports_clause("c.sport", sports, params) if sport else "1"
     mine = ""
     for row in db.execute(
-            f"""SELECT cp.*, c.name AS club_name, c.sport, c.logo_updated AS club_logo,
+            f"""SELECT cp.*, c.name AS club_name, c.sport, c.logo_updated AS club_logo, c.claimed AS club_claimed,
                        (SELECT m.role FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me) AS my_role
                 FROM club_posts cp JOIN clubs c ON c.id = cp.club_id
                 WHERE c.status = 'approved' AND ({club_sports}{mine}) AND cp.created_at <= :before
@@ -229,7 +229,7 @@ def my_clubs_items(limit=60, all_clubs=False, sport=None):
             WHERE p.club_id IS NOT NULL AND {mine} AND {POST_VISIBLE} AND {NOT_CANCELED}
             ORDER BY p.created_at DESC, p.id DESC LIMIT :limit""", {"me": me, "limit": limit, "sport": sport})]
     items += [{"kind": "club_post", "at": row["created_at"], "club_post": row} for row in db.execute(
-        f"""SELECT cp.*, c.name AS club_name, c.sport, c.logo_updated AS club_logo,
+        f"""SELECT cp.*, c.name AS club_name, c.sport, c.logo_updated AS club_logo, c.claimed AS club_claimed,
                    (SELECT m.role FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me) AS my_role
             FROM club_posts cp JOIN clubs c ON c.id = cp.club_id
             WHERE c.status = 'approved' AND {mine} AND {CLUB_POST_NOT_CANCELED} ORDER BY cp.id DESC LIMIT :limit""", {"me": me, "limit": limit,

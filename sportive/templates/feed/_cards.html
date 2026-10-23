@@ -177,10 +177,12 @@
     </article>
   {% else %}
   <article class="card feed-card is-club" id="club-post-{{ p.id }}" data-swap>
-    {% set name %}{{ p.club_name }} {{ verified_badge() }}{% endset %}
+    {% set name %}{{ p.club_name }}{% if p.club_claimed %} {{ verified_badge() }}{% endif %}{% endset %}
     {{ card_head(url_for('clubs.view', club_id=p.club_id), club_logo(p, 32, logo=p.club_logo or '', club_id=p.club_id),
-                 name, 'Club · ' ~ (p.created_at|ago), p.sport, follow_button(p.club_id, {'my_role': p.my_role})) }}
+                 name, ('From HuskyLink' if p.huskylink_event else 'Club') ~ ' · ' ~ (p.created_at|ago), p.sport,
+                 follow_button(p.club_id, {'my_role': p.my_role})) }}
     <p class="feed-body">{{ p.body }}</p>
+    {% if p.link %}<a class="btn btn-ghost btn-small" href="{{ p.link }}" target="_blank" rel="noopener nofollow">RSVP on HuskyLink ↗</a>{% endif %}
     {% if item.event %}{{ plan_box(item.event) }}{% endif %}
     {% if item.friends %}<p class="friends-line">👥 {{ item.friends }}</p>{% endif %}
 
