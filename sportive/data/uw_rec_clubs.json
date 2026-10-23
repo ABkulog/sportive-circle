@@ -1,6 +1,5 @@
 {
  "source": "https://www.washington.edu/ima/rec-clubs/club-offerings/",
- "checked": "2026-10-23",
  "clubs": [
   {
    "uw_name": "Men's Baseball",
@@ -32,7 +31,7 @@
   },
   {
    "uw_name": "Men's Rugby",
-   "description": "",
+   "description": "The Husky Rugby Club at the University of Washington promotes rugby by offering students opportunities to play, learn, and grow in a supportive team environment. The club competes at a D1AA divisional level.",
    "website": "https://www.huskyrugby.com/",
    "instagram": "huskyrugbyclub",
    "facebook": "https://www.facebook.com/huskyrugby/",
@@ -46,7 +45,7 @@
   },
   {
    "uw_name": "Men's Soccer",
-   "description": "",
+   "description": "The Men's Soccer Club at the University of Washington aims to provide students with the opportunity to play soccer at a competitive collegiate club level.",
    "website": "https://students.washington.edu/msoccer/",
    "instagram": "uw_msoccer",
    "facebook": "https://www.facebook.com/groups/195701590449863/",
@@ -102,7 +101,7 @@
   },
   {
    "uw_name": "Women's Ice Hockey",
-   "description": "",
+   "description": "Our purpose is to provide a competitive and fun environment for women who wish to play the sport of ice hockey.",
    "website": "https://www.uwwomenshockey.com",
    "instagram": "womenshockeyuw",
    "facebook": "",
@@ -364,7 +363,7 @@
    "sport": "swimming",
    "who_can_join": "everyone",
    "source": "uw_rec",
-   "huskylink_id": 36014
+   "huskylink_id": null
   },
   {
    "uw_name": "Table Tennis",
@@ -424,7 +423,7 @@
   },
   {
    "uw_name": "Washington Yacht Club",
-   "description": "",
+   "description": "Our purpose is to teach and promote sailing among students, staff and alumni of the University of Washington.",
    "website": "",
    "instagram": "washingtonyachtclub",
    "facebook": "",
@@ -522,7 +521,7 @@
   },
   {
    "uw_name": "Kendo",
-   "description": "",
+   "description": "We promote the study and practice of Japanese swordsmanship through Kendo and Iaido. All levels are welcome to join! Feel free to contact us through email or any of our social media platforms for more information.",
    "website": "https://sites.uw.edu/uwkc/",
    "instagram": "kendo_uw",
    "facebook": "https://www.facebook.com/uwkendoclub/",
@@ -720,7 +719,7 @@
    "uw_name": "Hacky Sack Club",
    "name": "Hacky Sack Club",
    "sport": "other",
-   "description": "Our mission is to create fun and chill space for people to enjoy the game of hacky sack. All skill levels are welcome. Come hack with us! @uwhackysack on Instagram > follow usssss\\r\\n\\r\\nEmail me your email to get on the mailing list !",
+   "description": "Our mission is to create fun and chill space for people to enjoy the game of hacky sack. All skill levels are welcome. Come hack with us! @uwhackysack on Instagram > follow usssss\n\nEmail me your email to get on the mailing list !",
    "website": "https://huskylink.washington.edu/uwhackysack/",
    "instagram": "",
    "facebook": "",
@@ -804,7 +803,7 @@
    "uw_name": "Husky Fly Fishing Club",
    "name": "Husky Fly Fishing Club",
    "sport": "other",
-   "description": "Our goal here is to connect both experienced and inexperienced anglers to build a strong community of outdoor enthusiasts. HFFC members will have opportunities to participate in fishing trips, learn how to tie and cast, and receive access to discounts.\\r\\n",
+   "description": "Our goal here is to connect both experienced and inexperienced anglers to build a strong community of outdoor enthusiasts. HFFC members will have opportunities to participate in fishing trips, learn how to tie and cast, and receive access to discounts.",
    "website": "https://huskylink.washington.edu/hffc/",
    "instagram": "",
    "facebook": "",
@@ -860,7 +859,7 @@
    "uw_name": "Husky Surf Club",
    "name": "Husky Surf Club",
    "sport": "other",
-   "description": "If you would like to join Husky Surf Club please join the facebook group. \\r\\n\\r\\nhttps://www.facebook.com/groups/957988905161023\\r\\n\\r\\nWe love to surf so if you do to join the club!",
+   "description": "If you would like to join Husky Surf Club please join the facebook group.\n\nhttps://www.facebook.com/groups/957988905161023\n\nWe love to surf so if you do to join the club!",
    "website": "https://huskysurfclub.com",
    "instagram": "",
    "facebook": "",
@@ -888,7 +887,7 @@
    "uw_name": "Husky Wiffle Club",
    "name": "Husky Wiffle Club",
    "sport": "other",
-   "description": "Husky Wiffle Club exists to provide students with an opportunity to play fun, casual games of Wiffle Ball, regardless of prior Wiffle Ball/baseball experience.\\r\\n",
+   "description": "Husky Wiffle Club exists to provide students with an opportunity to play fun, casual games of Wiffle Ball, regardless of prior Wiffle Ball/baseball experience.",
    "website": "https://huskylink.washington.edu/huskywiffleclub/",
    "instagram": "",
    "facebook": "",
@@ -1039,20 +1038,6 @@
    "who_can_join": "everyone"
   },
   {
-   "uw_name": "Sumo Union Membership Organization",
-   "name": "Sumo Union Membership Organization",
-   "sport": "wrestling",
-   "description": "Huskies who want to watch Japanese Grand Sumo with some friends. Primarily meeting during each of the six yearly tournaments. Join the Discord! https://discord.gg/j2D7s9hrBF Follow the Instagram! https://www.instagram.com/sumo.uw/",
-   "website": "https://huskylink.washington.edu/sumounionmembershiporganization/",
-   "instagram": "",
-   "facebook": "",
-   "x_handle": "",
-   "discord": "",
-   "source": "huskylink",
-   "huskylink_id": 36009,
-   "who_can_join": "everyone"
-  },
-  {
    "uw_name": "The Golf Club at UW",
    "name": "The Golf Club at UW",
    "sport": "golf",
@@ -1164,5 +1149,6 @@
    "huskylink_id": 36587,
    "who_can_join": "women"
   }
- ]
+ ],
+ "checked": "2026-10-23"
 }
