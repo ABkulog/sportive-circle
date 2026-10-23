@@ -11,7 +11,6 @@ A club UW Rec adds later is filed under the sport its name says (or Other) until
 HuskyLink group is left out until it gets a line in HUSKYLINK_CLUBS (most aren't sports), and is logged.
 """
 import html
-import json
 import re
 import urllib.request
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -67,7 +66,7 @@ HUSKYLINK_CLUBS = {
     "QueerTrans Sports Club": "other", "Riichi Mahjong Club at University of Washington": None,
     "Shellhouse Canoe Family at UW": "=Canoe Family", "SKY@UW": None, "snowbee snowboarding club": "snow",
     "Sports Analytics Club at UW": None, "Strawberries & Sudoku at UW": None,
-    "Sumo Union Membership Organization": None,  # watching sumo on TV "Swim Club at UW": "=Swimming", "Team Bao": None,
+    "Sumo Union Membership Organization": None, "Swim Club at UW": "=Swimming", "Team Bao": None,  # Sumo: watching it on TV
     "The Golf Club at UW": "golf", "The Hiking Club at UW": "hiking", "Union Bay Rowing Club": "=Union Bay Rowing",
     "Washington Husky STUNT": "other", "Washington Men's Gymnastics": "gymnastics",
     "Washington Men's Ultimate Frisbee": "=Men's Ultimate Frisbee",

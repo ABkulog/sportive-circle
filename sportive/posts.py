@@ -80,7 +80,7 @@ MAX_POLL_TEXT = 100
 # Canceled games are clutter in a feed: a plan post or club event post whose game was canceled isn't shown there
 # (its page still says it's canceled, for the people who were going).
 NOT_CANCELED = "NOT EXISTS (SELECT 1 FROM events ce WHERE ce.id = p.event_id AND ce.cancelled = 1)"
-CLUB_POST_NOT_CANCELED = """cp.body NOT LIKE 'Canceled: %'
+CLUB_POST_NOT_CANCELED = """cp.body NOT LIKE 'Canceled: %' AND cp.body NOT LIKE 'Over: %'
     AND NOT EXISTS (SELECT 1 FROM events ce WHERE ce.id = cp.event_id AND ce.cancelled = 1)"""
 MAX_REPLY = 500
 REPLIES_PER_HOUR = 30

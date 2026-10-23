@@ -4,7 +4,7 @@ Once a day the background loop reads HuskyLink's public events feed (huskylink.w
 event of a club on the app (matched by its HuskyLink group, clubs.huskylink_id) becomes a club update a week before:
 "📅 Group Lift · Fri Oct 23 · 3:00 PM · IMA", with a link to RSVP on HuskyLink. It shows on the club's page and in
 the feed, marked "From HuskyLink", even before an officer claims the club. A changed time or title updates the post;
-a canceled event's post says so.
+a canceled event's post says so, and every post leaves the feed and the club's page once its event is over.
 """
 import logging
 import threading
@@ -35,10 +35,15 @@ def parse(xml_text):
             event_id = int(text("eventId"))
         except ValueError:
             continue
+        try:
+            ends = datetime.fromisoformat(text("eventEndDateTime")[:19] + text("eventEndDateTime")[27:])
+            ends = max(ends.astimezone(SEATTLE).replace(tzinfo=None), starts)
+        except ValueError:
+            ends = starts + timedelta(hours=2)  # no end time: about two hours
         link = text("eventLink")
         groups = {int(g) for g in (text("groupId") + "," + text("coHostedGroupIds")).split(",") if g.strip().isdigit()}
         events.append({"id": event_id, "groups": groups, "title": " ".join(text("title").split())[:120],
-                       "starts_at": to_db(starts), "link": link if link.startswith(LINK_PREFIX) else "",
+                       "starts_at": to_db(starts), "ends_at": to_db(ends), "link": link if link.startswith(LINK_PREFIX) else "",
                        "location": "" if text("eventLocation").startswith(HIDDEN_PLACE)  # the place, not the address
                        else text("eventLocation").split(",")[0][:80],
                        "deleted": text("eventDelete") == "1"})
@@ -63,14 +68,25 @@ def sync(xml_text):
         body = ("Canceled: " if event["deleted"] else "") + post_text(event)
         old = db.execute("SELECT id, body FROM club_posts WHERE huskylink_event = ?", (event["id"],)).fetchone()
         if old:
-            if old["body"] != body:
-                db.execute("UPDATE club_posts SET body = ?, link = ? WHERE id = ?", (body, event["link"], old["id"]))
+            if old["body"] != body and not old["body"].startswith("Over: "):
+                db.execute("UPDATE club_posts SET body = ?, link = ?, ends_at = ? WHERE id = ?",
+                           (body, event["link"], event["ends_at"], old["id"]))
         elif now <= event["starts_at"] <= horizon and not event["deleted"]:
-            db.execute("INSERT INTO club_posts (club_id, author_id, body, created_at, link, huskylink_event)"
-                       " VALUES (?, NULL, ?, ?, ?, ?)", (club_id, body, now, event["link"], event["id"]))
+            db.execute("INSERT INTO club_posts (club_id, author_id, body, created_at, link, huskylink_event, ends_at)"
+                       " VALUES (?, NULL, ?, ?, ?, ?, ?)", (club_id, body, now, event["link"], event["id"], event["ends_at"]))
             added += 1
     db.commit()
     return added
+
+
+def remove_past():
+    """No old feed: an automatic post about an event goes away once the event is over (marked "Over: ", so the
+    same HuskyLink event isn't posted again)."""
+    db = get_db()
+    gone = db.execute("UPDATE club_posts SET body = 'Over: ' || body WHERE huskylink_event IS NOT NULL"
+                      " AND ends_at < ? AND body NOT LIKE 'Over: %'", (to_db(now_local()),)).rowcount
+    db.commit()
+    return gone
 
 
 def fetch():
@@ -84,6 +100,7 @@ def sync_round(app):
     if not app.config.get("HUSKYLINK_SYNC", True):
         return
     with app.app_context():
+        remove_past()  # every round (a few minutes), not once a day: a finished event leaves the feed right away
         db = get_db()
         claimed = db.execute("INSERT OR IGNORE INTO app_state (key, value) VALUES (?, ?)",
                              (f"huskylink:{to_db(now_local())[:10]}", to_db(now_local()))).rowcount
