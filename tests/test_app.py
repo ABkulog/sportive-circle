@@ -2051,6 +2051,18 @@ def test_admins_add_every_uw_rec_club_with_its_links(accounts, client, app):
     assert "UW Climbing Club" in client.get("/clubs").data.decode()
 
 
+def test_uw_clubs_add_themselves_when_a_new_list_ships(accounts, client, app):
+    """The owner: "don't leave me anything". The background loop adds the list's clubs once, without an admin."""
+    from sportive.clubs import clubs_round
+    clubs_round(app)
+    with app.app_context():
+        count = get_db().execute("SELECT COUNT(*) FROM clubs WHERE claimed = 0").fetchone()[0]
+    assert count >= 80
+    clubs_round(app)                                                   # the same list again: nothing doubles
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == count
+
+
 def test_follow_is_not_membership(accounts, client, app):
     club = _approved_club(accounts, client, app)
     accounts.signup(email="curious@uw.edu")
