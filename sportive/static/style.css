@@ -2052,3 +2052,11 @@ html, body { overflow-x: clip; }
 .claim-ways legend { font-weight: 600; margin-bottom: 4px; }
 .claim-ways .choice { display: flex; gap: 8px; align-items: flex-start; }
 .claim-code { font-size: 1.1rem; font-weight: 700; letter-spacing: .05em; }
+
+/* Club page: its links as a row of pills under the description (no About tab). */
+.club-links { list-style: none; padding: 0; margin: 10px 0 4px; display: flex; flex-wrap: wrap; gap: 6px; }
+.link-pill { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--line); font-size: .85rem; font-weight: 600; color: var(--text); text-decoration: none; }
+.link-pill:hover { border-color: var(--purple); color: var(--purple); }
+.link-pill.is-muted { color: var(--muted); font-weight: 400; }
+.club-facts { margin: 6px 0 0; font-size: .85rem; }

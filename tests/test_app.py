@@ -1596,7 +1596,7 @@ def test_clubs_are_open_to_everyone(accounts, client, app):
     assert "UW Spikeball Club" in directory and "1 member" in directory
     page = client.get(f"/clubs/{club}").data.decode()
     assert "Casual roundnet" in page and "Verified club</span>" in page and "Sign up to join" in page
-    assert "No experience needed" in page and "Come to any Tuesday practice!" in page and "@uwspikeball" in page
+    assert "Come to any Tuesday practice!" in page and "@uwspikeball" in page
     assert "Cap Tain" not in page                             # member names need an account
 
 
@@ -1958,7 +1958,7 @@ def test_joining_a_club_jumps_to_how_to_join(accounts, client, app):
     response = client.post(f"/clubs/{club}/join")
     assert response.headers["Location"].endswith(f"/clubs/{club}#how-to-join")
     page = client.get(f"/clubs/{club}").data.decode()
-    assert page.index('id="how-to-join"') < page.index('class="quick-facts"')   # before the Quick facts
+    assert page.index('id="how-to-join"') < page.index('data-tab-button="updates"')  # under the description, no About tab
 
 
 # ---------------------------------------------------------- club membership
@@ -2168,7 +2168,8 @@ def test_all_club_info_is_required(accounts, client):
 def test_anyone_can_contact_a_club(accounts, client, app):
     club = _approved_club(accounts, client, app)
     visitor = client.get(f"/clubs/{club}").data.decode()          # logged out
-    assert 'id="contact">Contact' in visitor and "spike@uw.edu" in visitor and "@uwspikeball" in visitor
+    assert 'id="contact"' in visitor and "mailto:spike@uw.edu" in visitor and "Instagram: @uwspikeball" in visitor
+    assert 'data-tab-button="about"' not in visitor                    # the owner: "an about page is just useless"
     accounts.signup(email="question@uw.edu")
     page = client.get(f"/clubs/{club}").data.decode()
     captain = _user_id(app, "captain@uw.edu")
