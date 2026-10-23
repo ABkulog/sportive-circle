@@ -130,6 +130,7 @@ SPORT_EMOJI = {
 
 # Alphabetical ("The Quad" under Q), with Off campus and Online last.
 LOCATIONS = [
+    "Area 01 (Maple Hall)",
     "Burke-Gilman Trail",
     "Denny Field",
     "Emerald City Boxing Gym (Roosevelt)",
@@ -188,9 +189,13 @@ GREEN_LAKE_PICKLEBALL = "Green Lake Park pickleball courts"
 OFF_CAMPUS = "Off campus (see note)"
 ONLINE = "Online"
 HUB = "The HUB (Husky Union Building)"  # the student union
-# The HUB's games room (it used to be called Area 01): 12 bowling lanes, 9 pool tables, 2 table tennis tables and a
+# The HUB's games room: 12 bowling lanes, 9 pool tables, 2 table tennis tables and a
 # PC gaming lounge. Closed Sundays. hub.washington.edu/play/hub-games, checked Oct 2026.
 HUB_GAMES = "HUB Games (HUB basement, room B150)"
+# HFS's makerspace and game room in Maple Hall (West Campus). Its Game Lab has pool, ping pong, foosball and air
+# hockey; residents use every lab free, other UW students the Game Lab. Open 1-11 PM daily in the school year,
+# 4-11 PM in summer. hfs.washington.edu/experience/perks-recreation/area-01, checked Oct 2026.
+AREA_01 = "Area 01 (Maple Hall)"
 
 # Opening hours: a game can't be posted at a place while it's closed. Each place has seasons, each with
 # hours per weekday (0 = Monday): (opens, closes) as "HH:MM", or None = closed all day. A date outside every
@@ -224,6 +229,10 @@ PLACE_HOURS = {
           (("10-13", "12-31"), {day: None for day in range(7)}),      # closed for the season
           (("01-01", "03-31"), {day: None for day in range(7)})],
     GREEN_LAKE_PICKLEBALL: [(ALL_YEAR, {day: ("04:00", "23:30") for day in range(7)})],
+    # Area 01: school year 1-11 PM, summer (about mid-June to mid-September) 4-11 PM.
+    AREA_01: [(("01-01", "06-14"), {day: ("13:00", "23:00") for day in range(7)}),
+              (("06-15", "09-20"), {day: ("16:00", "23:00") for day in range(7)}),
+              (("09-21", "12-31"), {day: ("13:00", "23:00") for day in range(7)})],
 }
 
 
@@ -250,6 +259,7 @@ LOCATION_COORDS = {
     GREEN_LAKE_PICKLEBALL: (47.681547, -122.328384),  # next to the Green Lake Community Center
     HUB: (47.655500, -122.305100),            # the Husky Union Building, on Stevens Way
     HUB_GAMES: (47.655500, -122.305100),      # in the HUB's basement
+    AREA_01: None,                            # Maple Hall, West Campus: the maps app finds it by name
     IMA_MATS: (47.653743, -122.301231),       # inside the IMA
     IMA_POOL: (47.653743, -122.301231),
     IMA_ARCHERY: (47.653743, -122.301231),
@@ -286,7 +296,7 @@ SPORT_LOCATIONS = {
     "archery": [IMA_ARCHERY, OFF_CAMPUS],
     "badminton": [IMA, OFF_CAMPUS],                            # Gym B is the badminton gym
     "baseball": OPEN_FIELDS + [OFF_CAMPUS],
-    "billiards": [HUB_GAMES, OFF_CAMPUS],
+    "billiards": [AREA_01, HUB_GAMES, OFF_CAMPUS],
     "bowling": [HUB_GAMES, OFF_CAMPUS],
     "boxing": [IMA, IMA_MATS, BOXING_GYM, OFF_CAMPUS],         # IMA: heavy bags in the conditioning room
     "bjj": [IMA, IMA_MATS, OFF_CAMPUS],
@@ -313,7 +323,7 @@ SPORT_LOCATIONS = {
     "softball": OPEN_FIELDS + [OFF_CAMPUS],
     "squash": [IMA_COURTS, OFF_CAMPUS],
     "swimming": [IMA_POOL, WAC, OFF_CAMPUS],                   # WAC: open-water swims on Union Bay
-    "table_tennis": [IMA, HUB_GAMES, HUB, OFF_CAMPUS],
+    "table_tennis": [IMA, AREA_01, HUB_GAMES, HUB, OFF_CAMPUS],
     "taekwondo": [IMA, IMA_MATS, OFF_CAMPUS],
     "triathlon": [IMA_POOL, TRACK, TRAIL, WAC, OFF_CAMPUS],
     "water_polo": [IMA_POOL, OFF_CAMPUS],
@@ -418,6 +428,10 @@ PLACE_TIPS = {
     ("billiards", HUB_GAMES): "9 pool tables in the HUB basement. 25% off on Wednesdays for UW walk-ins. Closed Sundays.",
     ("table_tennis", HUB_GAMES): "2 table tennis tables in the HUB basement's pool hall. Closed Sundays.",
     ("esports", HUB_GAMES): "The PC gaming lounge in the HUB basement. Closed Sundays.",
+    ("billiards", AREA_01): "The Game Lab in Maple Hall's Area 01: pool, ping pong, foosball and air hockey. "
+                            "Free for HFS residents; other UW students can use the Game Lab too. Open 1-11 PM.",
+    ("table_tennis", AREA_01): "The Game Lab in Maple Hall's Area 01: ping pong, pool, foosball and air hockey. "
+                               "Free for HFS residents; other UW students can use the Game Lab too. Open 1-11 PM.",
     ("badminton", IMA): "Gym B is the IMA's badminton gym. Needs an IMA membership.",
     ("volleyball", IMA): "Gym C is the IMA's volleyball gym. Needs an IMA membership.",
     ("climbing", IMA): "The Crags climbing center: a 42-foot wall and a bouldering area. Needs an IMA membership.",

@@ -8092,7 +8092,7 @@ def test_sports_offer_the_places_clubs_really_use():
 
 
 def test_hub_games_for_pool_bowling_table_tennis_and_esports(accounts, client):
-    """FR-PLACE-2: the HUB's games room (once called Area 01) can be picked, and pool is a sport."""
+    """FR-PLACE-2: the HUB's games room can be picked, and pool is a sport."""
     from sportive.constants import LOCATION_COORDS, PLACE_TIPS, SPORT_LOCATIONS, SPORTS
     hub_games = "HUB Games (HUB basement, room B150)"
     assert SPORTS["billiards"] == "Pool / Billiards"
@@ -8103,6 +8103,27 @@ def test_hub_games_for_pool_bowling_table_tennis_and_esports(accounts, client):
     event = client.post("/events/new", data=event_form(title="Pool night", sport="billiards", location=hub_games,
                                                        players="4"), follow_redirects=True).data.decode()
     assert "Pool night" in event and "25% off on Wednesdays" in event
+
+
+def test_area_01_in_maple_hall_for_pool_and_ping_pong(accounts, client, app):
+    """FR-PLACE-3: the owner: "isn't there a billiard and table tennis place near Elm Hall... Maple Hall?" """
+    from sportive.constants import LOCATION_COORDS, PLACE_TIPS, SPORT_LOCATIONS
+    from datetime import datetime
+    from sportive.placehours import closed_message
+    area = "Area 01 (Maple Hall)"
+    assert area in SPORT_LOCATIONS["billiards"] and area in SPORT_LOCATIONS["table_tennis"]
+    assert area in LOCATION_COORDS and "Game Lab" in PLACE_TIPS[("billiards", area)]
+    app.config["CHECK_PLACE_HOURS"] = True
+    with app.app_context():
+        october = datetime(2026, 10, 20, 12)
+        assert "open 1:00 PM – 11:00 PM" in closed_message(area, october, october.replace(hour=14))
+        assert closed_message(area, october.replace(hour=20), october.replace(hour=22)) is None
+    accounts.signup()
+    at = lambda moment: moment.strftime("%Y-%m-%dT%H:%M")  # noqa: E731
+    page = client.post("/events/new", data=event_form(title="Ping pong", sport="table_tennis", location=area,
+                                                      players="2", starts_at=at(_next(2, 19)),
+                                                      ends_at=at(_next(2, 21))), follow_redirects=True).data.decode()
+    assert "Ping pong" in page and "Maple Hall" in page
 
 
 def test_one_game_form_starts_right_now_too(accounts, client):
