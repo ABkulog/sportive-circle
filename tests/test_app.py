@@ -2015,7 +2015,7 @@ def test_officer_claims_a_listed_club_and_it_gets_verified(accounts, client, app
 
 
 def test_admins_add_every_uw_rec_club_with_its_links(accounts, client, app):
-    """FR-CLUB-40: every club on UW Rec's list goes on the app (unclaimed), with its Instagram, Discord and site."""
+    """FR-CLUB-40: every club on UW Rec's list and HuskyLink goes on the app (unclaimed), with its links."""
     import json
     from sportive.clubs import UW_REC_CLUBS
     from sportive.constants import SPORTS
@@ -2024,6 +2024,10 @@ def test_admins_add_every_uw_rec_club_with_its_links(accounts, client, app):
     assert len(listing) >= 40 and all(club["sport"] in SPORTS for club in listing)
     climbing = next(club for club in listing if club["name"] == "UW Climbing Club")
     assert climbing["instagram"] == "climbuw" and climbing["discord"].startswith("https://discord.com/invite/")
+    assert climbing["huskylink_id"]                                    # its HuskyLink group, for its events
+    pickleball = next(club for club in listing if club["name"] == "Husky Pickleball Club")  # only on HuskyLink
+    assert pickleball["sport"] == "pickleball" and pickleball["source"] == "huskylink"
+    assert not any(club["name"] == "Origami Club" for club in listing)               # not a sport
     app.config["ADMIN_EMAILS"] = "admin@uw.edu"
     _approved_club(accounts, client, app, name="UW Running Club", sport="running")   # already registered here
     accounts.signup(email="student@uw.edu")
@@ -2033,7 +2037,7 @@ def test_admins_add_every_uw_rec_club_with_its_links(accounts, client, app):
     page = client.get("/admin/clubs/uw-rec").data.decode()
     assert f"Add {len(listing) - 1} clubs to the app" in page and "Already on the app (1)" in page
     client.post("/admin/clubs/uw-rec")
-    assert "Every UW Rec Club is on the app." in client.get("/admin/clubs/uw-rec").data.decode()
+    assert "Every UW sports club is on the app." in client.get("/admin/clubs/uw-rec").data.decode()
     client.post("/admin/clubs/uw-rec")                                                # twice: nothing doubles
     with app.app_context():
         db = get_db()

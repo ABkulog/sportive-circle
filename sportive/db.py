@@ -37,7 +37,8 @@ ADDED_COLUMNS = [
     ("posts", "pinned_until", "TEXT"),  # a club pinned it to the top of its page, until then (24 hours)
     ("posts", "members_only", "INTEGER NOT NULL DEFAULT 0"),
     ("clubs", "claimed", "INTEGER NOT NULL DEFAULT 1"),
-    ("clubs", "discord", "TEXT NOT NULL DEFAULT ''"),  # an invite link (discord.gg/... or discord.com/invite/...)  # 0 = filled in from UW's public listings, no officer here yet
+    ("clubs", "discord", "TEXT NOT NULL DEFAULT ''"),
+    ("clubs", "huskylink_id", "INTEGER"),  # its group on HuskyLink (UW's student org site), for its events  # an invite link (discord.gg/... or discord.com/invite/...)  # 0 = filled in from UW's public listings, no officer here yet
     ("clubs", "slug", "TEXT"),  # the club's short link: sportivecircle.com/hrc (clubs.short_link)  # a club's post only its members see
     ("post_videos", "muted", "INTEGER NOT NULL DEFAULT 0"),  # the poster turned its sound off (🔇 in the ＋ sheet)
     # Officers the owner lets post as the club (the owner always can). Officers from before this kept posting.

@@ -1249,34 +1249,39 @@ def review_claim(claim_id, decision):
 # ---------------------------------------------------- UW Rec Clubs, listed before any officer signs up
 
 UW_REC_CLUBS = os.path.join(os.path.dirname(__file__), "data", "uw_rec_clubs.json")  # tools/fetch_rec_clubs.py
+CLUB_SOURCES = {"uw_rec": "UW Rec", "huskylink": "HuskyLink"}
 
 
 def uw_rec_clubs():
-    """UW Recreation's Rec Clubs (name, sport, description, links), each with the club already on the app that
-    matches it (same name or same Instagram), or None."""
+    """Every UW sports club on UW Rec's page and HuskyLink (name, sport, description, links), each with the club
+    already on the app that matches it (same name, Instagram or HuskyLink group), or None."""
     with open(UW_REC_CLUBS, encoding="utf-8") as file:
         listing = json.load(file)
-    ours = get_db().execute("SELECT id, name, instagram, claimed FROM clubs WHERE status != 'denied'").fetchall()
+    ours = get_db().execute("SELECT id, name, instagram, huskylink_id, claimed FROM clubs WHERE status != 'denied'").fetchall()
     by_name = {fold(row["name"]): row for row in ours}
     by_instagram = {row["instagram"].lower(): row for row in ours if row["instagram"]}
+    by_huskylink = {row["huskylink_id"]: row for row in ours if row["huskylink_id"]}
     for club in listing["clubs"]:
-        club["match"] = by_name.get(fold(club["name"])) or by_instagram.get(club["instagram"].lower())
+        club["match"] = (by_name.get(fold(club["name"])) or by_instagram.get(club["instagram"].lower())
+                         or by_huskylink.get(club["huskylink_id"]))
     return listing
 
 
 def add_uw_rec_clubs():
-    """Lists every UW Rec Club that isn't on the app yet: verified by UW (approved), but nobody runs it here until
-    an officer claims it. No "just joined" feed posts: 40 at once would bury everything else."""
+    """Lists every UW sports club that isn't on the app yet: verified by UW (approved), but nobody runs it here
+    until an officer claims it. No "just joined" feed posts: 80 at once would bury everything else."""
     listing, db, added = uw_rec_clubs(), get_db(), []
     for club in listing["clubs"]:
         if club["match"]:
             continue
-        about = club["description"] or f"{club['uw_name']}, one of UW Recreation's Rec Clubs."
+        about = club["description"] or (f"{club['uw_name']}, one of UW Recreation's Rec Clubs." if club["source"] == "uw_rec"
+                                         else f"{club['name']}, a UW student organization.")
         db.execute("""INSERT INTO clubs (name, sport, description, contact_url, status, claimed, club_kind, who_can_join,
-                                         instagram, facebook, x_handle, discord, created_at)
-                      VALUES (?, ?, ?, ?, 'approved', 0, 'rec_club', ?, ?, ?, ?, ?, ?)""",
-                   (club["name"], club["sport"], about, club["website"], club["who_can_join"], club["instagram"],
-                    club["facebook"], club["x_handle"], club["discord"], to_db(now_local())))
+                                         instagram, facebook, x_handle, discord, huskylink_id, created_at)
+                      VALUES (?, ?, ?, ?, 'approved', 0, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (club["name"], club["sport"], about, club["website"],
+                    "rec_club" if club["source"] == "uw_rec" else "rso", club["who_can_join"], club["instagram"],
+                    club["facebook"], club["x_handle"], club["discord"], club["huskylink_id"], to_db(now_local())))
         added.append(club["name"])
     db.commit()
     return added
@@ -1291,10 +1296,10 @@ def uw_rec_import():
     if request.method == "POST":
         added = add_uw_rec_clubs()
         flash(f"Added {len(added)} club{'s' if len(added) != 1 else ''}. Officers can claim them from their pages."
-              if added else "Every UW Rec Club is on the app already.", "success")
+              if added else "Every UW sports club is on the app already.", "success")
         return redirect(url_for("clubs.uw_rec_import"))
     listing = uw_rec_clubs()
-    return render_template("clubs/uw_rec.html", listing=listing,
+    return render_template("clubs/uw_rec.html", listing=listing, sources=CLUB_SOURCES,
                            new=[c for c in listing["clubs"] if not c["match"]],
                            already=[c for c in listing["clubs"] if c["match"]])
 

@@ -12,7 +12,9 @@
    "discord": "",
    "name": "UW Men's Baseball Club",
    "sport": "baseball",
-   "who_can_join": "men"
+   "who_can_join": "men",
+   "source": "uw_rec",
+   "huskylink_id": 36252
   },
   {
    "uw_name": "Men's Lacrosse",
@@ -24,7 +26,9 @@
    "discord": "",
    "name": "UW Men's Lacrosse Club",
    "sport": "lacrosse",
-   "who_can_join": "men"
+   "who_can_join": "men",
+   "source": "uw_rec",
+   "huskylink_id": 36389
   },
   {
    "uw_name": "Men's Rugby",
@@ -36,7 +40,9 @@
    "discord": "",
    "name": "UW Men's Rugby Club",
    "sport": "rugby",
-   "who_can_join": "men"
+   "who_can_join": "men",
+   "source": "uw_rec",
+   "huskylink_id": 35741
   },
   {
    "uw_name": "Men's Soccer",
@@ -48,7 +54,9 @@
    "discord": "",
    "name": "UW Men's Soccer Club",
    "sport": "soccer",
-   "who_can_join": "men"
+   "who_can_join": "men",
+   "source": "uw_rec",
+   "huskylink_id": 35834
   },
   {
    "uw_name": "Men's Ultimate Frisbee",
@@ -60,7 +68,9 @@
    "discord": "",
    "name": "UW Men's Ultimate Frisbee Club",
    "sport": "ultimate",
-   "who_can_join": "men"
+   "who_can_join": "men",
+   "source": "uw_rec",
+   "huskylink_id": 36573
   },
   {
    "uw_name": "Men's Volleyball",
@@ -72,7 +82,9 @@
    "discord": "",
    "name": "UW Men's Volleyball Club",
    "sport": "volleyball",
-   "who_can_join": "men"
+   "who_can_join": "men",
+   "source": "uw_rec",
+   "huskylink_id": 35835
   },
   {
    "uw_name": "Men's Water Polo",
@@ -84,7 +96,9 @@
    "discord": "",
    "name": "UW Men's Water Polo Club",
    "sport": "water_polo",
-   "who_can_join": "men"
+   "who_can_join": "men",
+   "source": "uw_rec",
+   "huskylink_id": null
   },
   {
    "uw_name": "Women's Ice Hockey",
@@ -96,7 +110,9 @@
    "discord": "",
    "name": "UW Women's Ice Hockey Club",
    "sport": "ice_hockey",
-   "who_can_join": "women"
+   "who_can_join": "women",
+   "source": "uw_rec",
+   "huskylink_id": 36113
   },
   {
    "uw_name": "Women's Lacrosse",
@@ -108,7 +124,9 @@
    "discord": "",
    "name": "UW Women's Lacrosse Club",
    "sport": "lacrosse",
-   "who_can_join": "women"
+   "who_can_join": "women",
+   "source": "uw_rec",
+   "huskylink_id": 36096
   },
   {
    "uw_name": "Women's Rugby",
@@ -120,7 +138,9 @@
    "discord": "",
    "name": "UW Women's Rugby Club",
    "sport": "rugby",
-   "who_can_join": "women"
+   "who_can_join": "women",
+   "source": "uw_rec",
+   "huskylink_id": 36114
   },
   {
    "uw_name": "Women's Soccer",
@@ -132,7 +152,9 @@
    "discord": "",
    "name": "UW Women's Soccer Club",
    "sport": "soccer",
-   "who_can_join": "women"
+   "who_can_join": "women",
+   "source": "uw_rec",
+   "huskylink_id": 36110
   },
   {
    "uw_name": "Women's Ultimate Frisbee",
@@ -144,7 +166,9 @@
    "discord": "",
    "name": "UW Women's Ultimate Frisbee Club",
    "sport": "ultimate",
-   "who_can_join": "women"
+   "who_can_join": "women",
+   "source": "uw_rec",
+   "huskylink_id": 36097
   },
   {
    "uw_name": "Women's Volleyball",
@@ -156,7 +180,9 @@
    "discord": "",
    "name": "UW Women's Volleyball Club",
    "sport": "volleyball",
-   "who_can_join": "women"
+   "who_can_join": "women",
+   "source": "uw_rec",
+   "huskylink_id": 36111
   },
   {
    "uw_name": "Women's Water Polo",
@@ -168,7 +194,9 @@
    "discord": "",
    "name": "UW Women's Water Polo Club",
    "sport": "water_polo",
-   "who_can_join": "women"
+   "who_can_join": "women",
+   "source": "uw_rec",
+   "huskylink_id": 36115
   },
   {
    "uw_name": "Badminton",
@@ -180,7 +208,9 @@
    "discord": "https://discord.com/invite/UTfs8Egek4",
    "name": "UW Badminton Club",
    "sport": "badminton",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35720
   },
   {
    "uw_name": "Canoe Family",
@@ -192,7 +222,9 @@
    "discord": "",
    "name": "UW Canoe Family",
    "sport": "rowing",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35566
   },
   {
    "uw_name": "Climbing",
@@ -204,7 +236,9 @@
    "discord": "https://discord.com/invite/AxuwKVdTwN",
    "name": "UW Climbing Club",
    "sport": "climbing",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35591
   },
   {
    "uw_name": "Concrete Canoe",
@@ -216,7 +250,9 @@
    "discord": "",
    "name": "UW Concrete Canoe Team",
    "sport": "rowing",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": null
   },
   {
    "uw_name": "Cycling",
@@ -228,7 +264,9 @@
    "discord": "",
    "name": "UW Cycling Club",
    "sport": "biking",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35728
   },
   {
    "uw_name": "Equestrian",
@@ -240,7 +278,9 @@
    "discord": "",
    "name": "UW Equestrian Club",
    "sport": "equestrian",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35772
   },
   {
    "uw_name": "Roundnet",
@@ -252,7 +292,9 @@
    "discord": "",
    "name": "UW Roundnet Club",
    "sport": "spikeball",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35740
   },
   {
    "uw_name": "Running",
@@ -264,7 +306,9 @@
    "discord": "",
    "name": "UW Running Club",
    "sport": "running",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35742
   },
   {
    "uw_name": "Sailing",
@@ -276,7 +320,9 @@
    "discord": "",
    "name": "UW Sailing Club",
    "sport": "sailing",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35743
   },
   {
    "uw_name": "Skiing",
@@ -288,7 +334,9 @@
    "discord": "",
    "name": "UW Skiing Club",
    "sport": "snow",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35745
   },
   {
    "uw_name": "Squash",
@@ -300,7 +348,9 @@
    "discord": "https://discord.com/invite/5Ww4bAGupw",
    "name": "UW Squash Club",
    "sport": "squash",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 36327
   },
   {
    "uw_name": "Swimming",
@@ -312,7 +362,9 @@
    "discord": "https://discord.gg/ue2wE4zzaY",
    "name": "UW Swimming Club",
    "sport": "swimming",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 36014
   },
   {
    "uw_name": "Table Tennis",
@@ -324,7 +376,9 @@
    "discord": "",
    "name": "UW Table Tennis Club",
    "sport": "table_tennis",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35747
   },
   {
    "uw_name": "Tennis",
@@ -336,7 +390,9 @@
    "discord": "",
    "name": "UW Tennis Club",
    "sport": "tennis",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35749
   },
   {
    "uw_name": "Triathlon",
@@ -348,7 +404,9 @@
    "discord": "",
    "name": "UW Triathlon Club",
    "sport": "triathlon",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 36329
   },
   {
    "uw_name": "Union Bay Rowing",
@@ -360,7 +418,9 @@
    "discord": "https://discord.com/invite/tSskC9NZcK",
    "name": "Union Bay Rowing Club",
    "sport": "rowing",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 36073
   },
   {
    "uw_name": "Washington Yacht Club",
@@ -372,7 +432,9 @@
    "discord": "https://discord.com/invite/U9KDCgJ48Q",
    "name": "Washington Yacht Club",
    "sport": "sailing",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 36576
   },
   {
    "uw_name": "Aikido",
@@ -384,7 +446,9 @@
    "discord": "",
    "name": "UW Aikido Club",
    "sport": "other",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35790
   },
   {
    "uw_name": "Archery",
@@ -396,7 +460,9 @@
    "discord": "https://discord.gg/khe3777XfJ",
    "name": "UW Archery Club",
    "sport": "archery",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35719
   },
   {
    "uw_name": "Boxing",
@@ -408,7 +474,9 @@
    "discord": "",
    "name": "UW Boxing Club",
    "sport": "boxing",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": null
   },
   {
    "uw_name": "Brazilian Jiu-Jitsu",
@@ -420,7 +488,9 @@
    "discord": "https://discord.com/invite/TFPjxH79qn",
    "name": "UW Brazilian Jiu-Jitsu Club",
    "sport": "bjj",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 36195
   },
   {
    "uw_name": "Judo",
@@ -432,7 +502,9 @@
    "discord": "",
    "name": "UW Judo Club",
    "sport": "judo",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35787
   },
   {
    "uw_name": "Karate – Shotokan",
@@ -444,7 +516,9 @@
    "discord": "",
    "name": "UW Shotokan Karate Club",
    "sport": "karate",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": null
   },
   {
    "uw_name": "Kendo",
@@ -456,7 +530,9 @@
    "discord": "",
    "name": "UW Kendo Club",
    "sport": "kendo",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35796
   },
   {
    "uw_name": "Kung Fu / Tai Chi",
@@ -468,7 +544,9 @@
    "discord": "https://discord.com/invite/QnphXd6PMc",
    "name": "UW Kung Fu / Tai Chi Club",
    "sport": "other",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35805
   },
   {
    "uw_name": "Taekwondo",
@@ -480,7 +558,9 @@
    "discord": "",
    "name": "UW Taekwondo Club",
    "sport": "taekwondo",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35748
   },
   {
    "uw_name": "Wrestling",
@@ -492,7 +572,9 @@
    "discord": "",
    "name": "UW Wrestling Club",
    "sport": "wrestling",
-   "who_can_join": "everyone"
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 36330
   },
   {
    "uw_name": "Wushu",
@@ -504,7 +586,583 @@
    "discord": "",
    "name": "UW Wushu Club",
    "sport": "other",
+   "who_can_join": "everyone",
+   "source": "uw_rec",
+   "huskylink_id": 35754
+  },
+  {
+   "uw_name": "Barbell Club at the University of Washington",
+   "name": "Barbell Club at the University of Washington",
+   "sport": "weightlifting",
+   "description": "The Barbell Club at the University of Washington is an inclusive, student-run organization dedicated to creating a community for students interested in or currently active in weight training and/or physique building. We operate as a social fitness club on the UW Seattle campus, hosting weekly group lifts at the IMA as well as regular meetups and social events on campus. Our goal is to help students connect and build friendships with others who share their commitment to health, fitness, and personal growth.",
+   "website": "https://huskylink.washington.edu/barbellclub/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35538,
    "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Breakfast Ball Golf Club",
+   "name": "Breakfast Ball Golf Club",
+   "sport": "golf",
+   "description": "Breakfast Ball Golf Club is dedicated to extending golf to all students. We are dedicated to providing instruction, equipment, and a sense of community to all golfers, regardless of their capabilities or knowledge.",
+   "website": "https://huskylink.washington.edu/breakfastballgc/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36197,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Competitive Leatherball Cricket @ the University of Washington",
+   "name": "Competitive Leatherball Cricket @ the University of Washington",
+   "sport": "cricket",
+   "description": "CLC @ UW plays competitive cricket at both the local and intercollegiate level. We play international formats including T20 and ODI and focus on developing leatherball skills among new and experienced players.",
+   "website": "https://huskylink.washington.edu/clc/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36226,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Eta Mu Beta Flag Football Club",
+   "name": "Eta Mu Beta Flag Football Club",
+   "sport": "football",
+   "description": "This organization is for members of the husky marching band to be able to exist as a group entity which will be utilized to reserve campus facilities and spaces for practicing and playing flag football.",
+   "website": "https://huskylink.washington.edu/hmbffc/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36262,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Figure Skating at UW",
+   "name": "Figure Skating at UW",
+   "sport": "figure_skating",
+   "description": "We are a figure skating team at UW that conducts group practices at Kraken Community Iceplex. Interested candidates do not have to have any skating experience! Additionally, we hold team bonding events and fundraisers. Please email if interested!",
+   "website": "https://linktr.ee/uwfigureskating",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35654,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Fishing Club @ UW",
+   "name": "Fishing Club @ UW",
+   "sport": "other",
+   "description": "Fishing Club is a student group at the University of Washington that brings together anglers of all skill levels. We organize fishing trips, share knowledge, and encourage responsible fishing practices in the Seattle area.",
+   "website": "https://huskylink.washington.edu/fishingclubatuw/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36274,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Girl Gains UW",
+   "name": "Girl Gains UW",
+   "sport": "gym",
+   "description": "Our mission is to promote female weightlifting while empowering women to feel strong and beautiful in a judgmentfree community.",
+   "website": "https://huskylink.washington.edu/girlgains/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35677,
+   "who_can_join": "women"
+  },
+  {
+   "uw_name": "Girlz Gone Wild Womxn's Outdoors Collective",
+   "name": "Girlz Gone Wild Womxn's Outdoors Collective",
+   "sport": "hiking",
+   "description": "A community that nurtures female friendship and growth, and encourages female identifying UW students to get outside and explore the outdoors together.",
+   "website": "https://girlsgonewilduw.wixsite.com/mysite",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36292,
+   "who_can_join": "women"
+  },
+  {
+   "uw_name": "GRIT LIFT Bodybuilding Club @UW",
+   "name": "GRIT LIFT Bodybuilding Club @UW",
+   "sport": "weightlifting",
+   "description": "GRIT LIFT unites lifters of all experience levels aiming to build muscle and lose fat in a healthy, sustainable way. We provide support, guidance, and a community for those dedicated to improving their fitness through weightlifting and shared knowledge.",
+   "website": "https://huskylink.washington.edu/gritlift/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35690,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Hacky Sack Club",
+   "name": "Hacky Sack Club",
+   "sport": "other",
+   "description": "Our mission is to create fun and chill space for people to enjoy the game of hacky sack. All skill levels are welcome. Come hack with us! @uwhackysack on Instagram > follow usssss\\r\\n\\r\\nEmail me your email to get on the mailing list !",
+   "website": "https://huskylink.washington.edu/uwhackysack/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36302,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Historical Fencing Club at the UW",
+   "name": "Historical Fencing Club at the UW",
+   "sport": "fencing",
+   "description": "The mission of this club is to enable students to safely and productively explore their interest in fencing as a western martial art. This will include introduction to the theories and practices of classical fencing as well as discussion of its history.",
+   "website": "https://www.uwhistoricalfencingclub.weebly.com/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35703,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Humans vs. Zombies Tag",
+   "name": "Humans vs. Zombies Tag",
+   "sport": "other",
+   "description": "Humans vs. Zombies Tag is a campuswide alternate reality game, hosted quarterly, in which members of the Human Resistance attempt to outlast the Zombie Horde. HvZT is played at hundreds of US colleges and universities and across 5 continents.",
+   "website": "https://www.uwhvzt.com/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35712,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Husky Bowling Club",
+   "name": "Husky Bowling Club",
+   "sport": "bowling",
+   "description": "The Husky Bowling Club at the University of Washington is dedicated to creating a vibrant and inclusive community for students passionate about bowling. Our mission is to cultivate a love for bowling among members.",
+   "website": "https://huskylink.washington.edu/huskybowlingclub/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35722,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Husky Cricket Club",
+   "name": "Husky Cricket Club",
+   "sport": "cricket",
+   "description": "Introducing the culture and sport of cricket to the University of Washington campus in Seattle. Promoting the sportsmanship and craftsmanship the sport has to offer. Developing and boosting the passion for cricket amongst the students at UW.",
+   "website": "https://huskylink.washington.edu/huskycricketclub/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35726,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Husky Fencing Club @ UW",
+   "name": "Husky Fencing Club @ UW",
+   "sport": "fencing",
+   "description": "To create a community of fencing and pomote fencing to the public. To encourage people to explore fencing and to find out their interests on three weapons foil, epee, and saber, and participate tournaments in clubs.",
+   "website": "https://huskylink.washington.edu/hfcuw/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35729,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Husky Fly Fishing Club",
+   "name": "Husky Fly Fishing Club",
+   "sport": "other",
+   "description": "Our goal here is to connect both experienced and inexperienced anglers to build a strong community of outdoor enthusiasts. HFFC members will have opportunities to participate in fishing trips, learn how to tie and cast, and receive access to discounts.\\r\\n",
+   "website": "https://huskylink.washington.edu/hffc/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36316,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Husky High Adventure",
+   "name": "Husky High Adventure",
+   "sport": "hiking",
+   "description": "HHA provides members with opportunites to do challenging outdoor high adventure activities and meet likeminded people that share that same spark for the rugged outdoors.",
+   "website": "https://huskylink.washington.edu/huskyhighadventure/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36319,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Husky MMA",
+   "name": "Husky MMA",
+   "sport": "muay_thai",
+   "description": "Whether you're trying to get in shape, learn a new skill, or sharpen existing ones, come train with Husky MMA today! We train with safety and fun in mind multiple times a week. Join the discord for the best way to get in touch.",
+   "website": "",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "https://discord.gg/bf3YV2EUme",
+   "source": "huskylink",
+   "huskylink_id": 36320,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Husky Pickleball Club",
+   "name": "Husky Pickleball Club",
+   "sport": "pickleball",
+   "description": "Husky Pickleball Club: Smash, Serve, and Score with us! Join our passionate community of pickleball enthusiasts at the University of Washington. Hope to see you on the courts and remember, don't step in the kitchen!",
+   "website": "https://huskylink.washington.edu/huskypickle/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36322,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Husky Surf Club",
+   "name": "Husky Surf Club",
+   "sport": "other",
+   "description": "If you would like to join Husky Surf Club please join the facebook group. \\r\\n\\r\\nhttps://www.facebook.com/groups/957988905161023\\r\\n\\r\\nWe love to surf so if you do to join the club!",
+   "website": "https://huskysurfclub.com",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36328,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Husky Water Polo",
+   "name": "Husky Water Polo",
+   "sport": "water_polo",
+   "description": "To provide and promote water polo at the University of Washington, and to spread the camaraderie and passion for the great sport of water polo throughout the Pacific Northwest. https://sites.uw.edu/dawgpolo",
+   "website": "https://sites.uw.edu/dawgpolo",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35751,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Husky Wiffle Club",
+   "name": "Husky Wiffle Club",
+   "sport": "other",
+   "description": "Husky Wiffle Club exists to provide students with an opportunity to play fun, casual games of Wiffle Ball, regardless of prior Wiffle Ball/baseball experience.\\r\\n",
+   "website": "https://huskylink.washington.edu/huskywiffleclub/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35752,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Husky Winter Sports",
+   "name": "Husky Winter Sports",
+   "sport": "snow",
+   "description": "Provide fun, safe, high quality and affordable mountain experiences to skiers and snowboarders of all ability levels, and to foster friendships among likeminded winter sports enthusiasts.",
+   "website": "https://www.huskywintersports.org/become-an-instructor",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35753,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Ice Hockey Club at the UW",
+   "name": "Ice Hockey Club at the UW",
+   "sport": "ice_hockey",
+   "description": "Our purpose is to provide a competitive and fun environment for those who wish to play the sport of ice hockey.",
+   "website": "https://huskyicehockey.com/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35756,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "JUST ELITES Basketball Club",
+   "name": "JUST ELITES Basketball Club",
+   "sport": "basketball",
+   "description": "Just Elites Basketball Club, established by UW students and alumni in 2016, provides a platform for students to engage in basketball, compete, and support each other academically and socially.",
+   "website": "https://sites.google.com/view/justelitesabc/%E9%A6%96%E9%A1%B5",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35788,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Kyokushin Karate Washington Club",
+   "name": "Kyokushin Karate Washington Club",
+   "sport": "karate",
+   "description": "KYOKUSHIN means Ultimate Truth. It describes the pinnacle of martial arts training. Not an end result, but a neverending path to the point where dedication, perseverance, and sweat meets strength, humility, and wisdom.",
+   "website": "https://www.kyokushinkarate.com/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36359,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Lowkey Sports Club",
+   "name": "Lowkey Sports Club",
+   "sport": "other",
+   "description": "Lowkey Sports Club brings students together to play sports casually, find partners or teams for recreational activities, go to the gym together, and make friends.",
+   "website": "https://lowkeysportsclub.webflow.io/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36373,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Martial Arts at UW",
+   "name": "Martial Arts at UW",
+   "sport": "other",
+   "description": "Martial Arts at UW provides Martial arts training based on the experience of its instructor.",
+   "website": "https://huskylink.washington.edu/shorinjikempouw/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35825,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Men's Basketball Club @ UW",
+   "name": "Men's Basketball Club @ UW",
+   "sport": "basketball",
+   "description": "Providing basketball enthusiasts at the University of Washington with an opportunity to continue their career through competitive leagues and tournaments throughout the Pacific Northwest.",
+   "website": "https://huskylink.washington.edu/mensclubbasketball/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35833,
+   "who_can_join": "men"
+  },
+  {
+   "uw_name": "Peaks & Professors at UW",
+   "name": "Peaks & Professors at UW",
+   "sport": "hiking",
+   "description": "Peaks & Professors cultivates unique experiences between students and faculty by organizing hikes to provide an avenue to Think Outside and inspire meaningful conversations in the great outdoors.",
+   "website": "https://www.peaksandprofessorsuw.org",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 35884,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "QueerTrans Sports Club",
+   "name": "QueerTrans Sports Club",
+   "sport": "other",
+   "description": "We support inclusive space for trans, genderqueer, gender nonconforming, queer, and LGBTQIA+ allies to practice new sports together— offering an alternative to traditional, gendered intramurals. Come try new things with other queer beginners!",
+   "website": "",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "https://discord.gg/3zRHKrPG",
+   "source": "huskylink",
+   "huskylink_id": 35924,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "snowbee snowboarding club",
+   "name": "snowbee snowboarding club",
+   "sport": "snow",
+   "description": "Snowbee Snowboarding Club is a welcoming community that hosts weekly open classes, seasonal ski trips, and events focused on various riding styles—helping riders improve skills, make friends, and create lasting memories.",
+   "website": "https://huskylink.washington.edu/snowbee/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36493,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Sumo Union Membership Organization",
+   "name": "Sumo Union Membership Organization",
+   "sport": "wrestling",
+   "description": "Huskies who want to watch Japanese Grand Sumo with some friends. Primarily meeting during each of the six yearly tournaments. Join the Discord! https://discord.gg/j2D7s9hrBF Follow the Instagram! https://www.instagram.com/sumo.uw/",
+   "website": "https://huskylink.washington.edu/sumounionmembershiporganization/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36009,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "The Golf Club at UW",
+   "name": "The Golf Club at UW",
+   "sport": "golf",
+   "description": "We are a laidback and inclusive studentrun sports club centered around the game of golf.",
+   "website": "https://huskylink.washington.edu/golfclub/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36040,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "The Hiking Club at UW",
+   "name": "The Hiking Club at UW",
+   "sport": "hiking",
+   "description": "The Hiking Club is an organization focused on getting our community outside. We host group hiking trips designed to get people of all skill levels involved. Whether you've never set foot on a mountain before or are a certified Dirtbag, we want you here!",
+   "website": "https://huskylink.washington.edu/hikingclubatuw/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36041,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Washington Husky STUNT",
+   "name": "Washington Husky STUNT",
+   "sport": "other",
+   "description": "We are a collegiate stunt team that competes against other college teams in a sport rooted in cheerleading, gymnastics, acrobatics, and tumbling.",
+   "website": "https://huskylink.washington.edu/washingtonhuskystunt/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36571,
+   "who_can_join": "everyone"
+  },
+  {
+   "uw_name": "Washington Men's Gymnastics",
+   "name": "Washington Men's Gymnastics",
+   "sport": "gymnastics",
+   "description": "",
+   "website": "https://wmgf.us",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36786,
+   "who_can_join": "men"
+  },
+  {
+   "uw_name": "Women's Club Baseball at The University of Washington",
+   "name": "Women's Club Baseball at The University of Washington",
+   "sport": "baseball",
+   "description": "The Women's Club Baseball team at the University of Washington is committed to creating more opportunities for women to play baseball at a higher level. We are working with the Baseball For All Foundation to create a more inclusive future of baseball.",
+   "website": "https://huskylink.washington.edu/womensclubbaseball/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36588,
+   "who_can_join": "women"
+  },
+  {
+   "uw_name": "Women's Field Hockey at the University of Washington",
+   "name": "Women's Field Hockey at the University of Washington",
+   "sport": "field_hockey",
+   "description": "Women's Field Hockey at the University of Washington aims to provide a relaxed and collaborative environment in which women can hone their athletic field hockey skills, create friendships, and build character in and out of practice.",
+   "website": "https://huskylink.washington.edu/womensfhockey/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36589,
+   "who_can_join": "women"
+  },
+  {
+   "uw_name": "Women's Run Club @UW",
+   "name": "Women's Run Club @UW",
+   "sport": "running",
+   "description": "The Women's Run Club @UW empowers women of all backgrounds and abilities to connect through running. We foster a welcoming, supportive community that encourages fitness, friendship, and personal growth.",
+   "website": "https://huskylink.washington.edu/thepack/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36591,
+   "who_can_join": "women"
+  },
+  {
+   "uw_name": "Womens Basketball Club",
+   "name": "Womens Basketball Club",
+   "sport": "basketball",
+   "description": "The Women's basketball club is a safe space that provides students for the opportunity to play basketball recreationally with others who share the same love for the sport.",
+   "website": "https://huskylink.washington.edu/uwwbbc/",
+   "instagram": "",
+   "facebook": "",
+   "x_handle": "",
+   "discord": "",
+   "source": "huskylink",
+   "huskylink_id": 36587,
+   "who_can_join": "women"
   }
  ]
 }
