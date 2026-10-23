@@ -18,7 +18,7 @@
       <ul class="result-list">
         {% for c in clubs %}
           <li><a class="result" href="{{ url_for('clubs.view', club_id=c.id) }}">{{ club_logo(c, 40) }}
-            <span><strong>{{ c.name }} {{ verified_badge() }}</strong>
+            <span><strong>{{ c.name }}{% if c.claimed %} {{ verified_badge() }}{% endif %}</strong>
               <small class="muted">{{ SPORTS[c.sport] }} · {{ c.member_count }} member{{ 's' if c.member_count != 1 }}{% if c.my_role %} · {{ {'officer': 'Officer', 'member': 'Member', 'follower': 'Following'}.get(c.my_role, 'Asked to join') }}{% endif %}</small></span></a></li>
         {% endfor %}
       </ul>
