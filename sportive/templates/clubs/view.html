@@ -239,8 +239,9 @@
     <ul class="club-posts">
       {% for p in posts %}
         <li>
-          <p>{{ p.body }}{% if p.event_id and g.user %} <a href="{{ url_for('events.detail', event_id=p.event_id) }}">See it →</a>{% endif %}</p>
-          <small class="muted">{{ (p.full_name if g.user else None) or 'An officer' }} · {{ p.created_at|when }}</small>
+          <p>{{ p.body }}{% if p.event_id and g.user %} <a href="{{ url_for('events.detail', event_id=p.event_id) }}">See it →</a>{% endif %}
+            {% if p.link %} <a href="{{ p.link }}" target="_blank" rel="noopener nofollow">RSVP on HuskyLink ↗</a>{% endif %}</p>
+          <small class="muted">{{ 'From HuskyLink' if p.huskylink_event else ((p.full_name if g.user else None) or 'An officer') }} · {{ p.created_at|when }}</small>
           {% if role == 'officer' %}
             <form method="post" action="{{ url_for('clubs.delete_post', club_id=club.id, post_id=p.id) }}" class="inline-form">
               {{ csrf_field() }}<button class="link-button danger-link">Delete</button>
