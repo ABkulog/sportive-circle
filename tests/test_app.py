@@ -2051,6 +2051,48 @@ def test_admins_add_every_uw_rec_club_with_its_links(accounts, client, app):
     assert "UW Climbing Club" in client.get("/clubs").data.decode()
 
 
+HUSKYLINK_FEED = """<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>washington Events</title>
+<item><eventId>{eid}</eventId><groupId>{gid}</groupId><coHostedGroupIds></coHostedGroupIds><title>{title}</title>
+<eventStartDateTime>{start}T18:00:00.0000000-07:00</eventStartDateTime><eventLocation>{place}</eventLocation>
+<eventLink>https://huskylink.washington.edu/barbellclub/rsvp?id={eid}</eventLink><eventDelete>{deleted}</eventDelete></item>
+<item><eventId>2</eventId><groupId>999</groupId><title>Origami night</title>
+<eventStartDateTime>{start}T18:00:00.0000000-07:00</eventStartDateTime><eventLink>https://huskylink.washington.edu/o/</eventLink></item>
+</channel></rss>"""
+
+
+def test_huskylink_events_post_themselves_for_their_club(accounts, client, app):
+    """FR-CLUB-41: a club's HuskyLink events show up as its updates by themselves, marked From HuskyLink."""
+    from sportive.huskylink import sync
+    start = (now_local() + timedelta(days=3)).strftime("%Y-%m-%d")
+    feed = lambda **kw: HUSKYLINK_FEED.format(**{"eid": 1, "gid": 35, "title": "Group Lift", "start": start,  # noqa: E731
+                                                 "place": "IMA", "deleted": 0, **kw})
+    with app.app_context():
+        db = get_db()
+        club = db.execute("INSERT INTO clubs (name, sport, description, status, claimed, huskylink_id, created_at)"
+                          " VALUES ('Barbell Club', 'weightlifting', 'Lifting', 'approved', 0, 35, '2026-10-01 10:00')").lastrowid
+        db.commit()
+        assert sync(feed()) == 1 and sync(feed()) == 0                   # once per event, other groups ignored
+        post = db.execute("SELECT * FROM club_posts").fetchone()
+        assert post["body"].startswith("📅 Group Lift · ") and post["body"].endswith(" · 6:00 PM · IMA")
+        assert post["link"] == "https://huskylink.washington.edu/barbellclub/rsvp?id=1"
+        sync(feed(title="Max Out Day", place="Private Location (sign in to display)"))  # changed: same post, updated
+        bodies = [r["body"] for r in db.execute("SELECT body FROM club_posts")]
+        assert len(bodies) == 1 and bodies[0].startswith("📅 Max Out Day · ")
+        assert "Private" not in db.execute("SELECT body FROM club_posts").fetchone()[0]
+        sync(feed(eid=3, start="2020-01-01"))                              # already over: not posted
+        far = (now_local() + timedelta(days=20)).strftime("%Y-%m-%d")
+        sync(feed(eid=4, start=far))                                       # weeks away: posted when it's closer
+        assert db.execute("SELECT COUNT(*) FROM club_posts").fetchone()[0] == 1
+    accounts.signup(sports=("weightlifting",))                            # the feed shows your sports' clubs
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Max Out Day" in page and "RSVP on HuskyLink" in page and "From HuskyLink" in page
+    assert "Max Out Day" in client.get("/feed").data.decode()               # in the feed too
+    with app.app_context():
+        sync(feed(title="Max Out Day", deleted=1))
+        assert get_db().execute("SELECT body FROM club_posts").fetchone()[0].startswith("Canceled: ")
+    assert "Max Out Day" not in client.get("/feed").data.decode()           # canceled posts leave the feed
+
+
 def test_follow_is_not_membership(accounts, client, app):
     club = _approved_club(accounts, client, app)
     accounts.signup(email="curious@uw.edu")

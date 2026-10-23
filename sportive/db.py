@@ -38,7 +38,9 @@ ADDED_COLUMNS = [
     ("posts", "members_only", "INTEGER NOT NULL DEFAULT 0"),
     ("clubs", "claimed", "INTEGER NOT NULL DEFAULT 1"),
     ("clubs", "discord", "TEXT NOT NULL DEFAULT ''"),
-    ("clubs", "huskylink_id", "INTEGER"),  # its group on HuskyLink (UW's student org site), for its events  # an invite link (discord.gg/... or discord.com/invite/...)  # 0 = filled in from UW's public listings, no officer here yet
+    ("clubs", "huskylink_id", "INTEGER"),
+    ("club_posts", "link", "TEXT NOT NULL DEFAULT ''"),  # where to RSVP (an event from HuskyLink)
+    ("club_posts", "huskylink_event", "INTEGER"),  # the HuskyLink event it's about (huskylink.py): one post each  # its group on HuskyLink (UW's student org site), for its events  # an invite link (discord.gg/... or discord.com/invite/...)  # 0 = filled in from UW's public listings, no officer here yet
     ("clubs", "slug", "TEXT"),  # the club's short link: sportivecircle.com/hrc (clubs.short_link)  # a club's post only its members see
     ("post_videos", "muted", "INTEGER NOT NULL DEFAULT 0"),  # the poster turned its sound off (🔇 in the ＋ sheet)
     # Officers the owner lets post as the club (the owner always can). Officers from before this kept posting.
@@ -144,6 +146,7 @@ def init_db():
         sort_other_clubs(db)
         db.execute("PRAGMA user_version = 1")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_clubs_slug ON clubs(slug)")  # one club per short link
+    db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_club_posts_huskylink ON club_posts(huskylink_event)")
     if db.execute("PRAGMA user_version").fetchone()[0] < 2:  # version 2 = club posts know their weeks
         count_series_weeks(db)
         db.execute("PRAGMA user_version = 2")

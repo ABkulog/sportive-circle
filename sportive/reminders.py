@@ -20,6 +20,7 @@ from .backups import backup_round
 from .constants import SPORTS
 from .db import get_db
 from .digest import weekly_round
+from .huskylink import sync_round as huskylink_round
 from .mail import compose, send_email
 from .sms import text_user
 from .textutil import same_secret
@@ -132,6 +133,7 @@ def start_reminder_loop(app):
             reminder_round(app)
             backup_round(app)  # once a day; a quick "already done today?" check otherwise
             uw_rec_round(app)  # UW Rec's bookings, copied once a day (uwrec.py)
+            huskylink_round(app)  # clubs' HuskyLink events, posted once a day (huskylink.py)
             weekly_round(app)  # Mondays from 9 AM: the "Games this week" email (digest.py)
             time.sleep(CHECK_EVERY.total_seconds())
 
