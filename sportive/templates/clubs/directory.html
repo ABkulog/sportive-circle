@@ -38,7 +38,7 @@
     <a class="club-row" href="{{ url_for('clubs.view', club_id=c.id) }}">
       {{ club_logo(c, 44) }}
       <span class="club-row-text">
-      <strong class="club-name">{{ c.name }}{% if c.status == 'approved' %} {{ verified_badge() }}{% endif %}</strong>
+      <strong class="club-name">{{ c.name }}{% if c.status == 'approved' and c.claimed %} {{ verified_badge() }}{% endif %}</strong>
       <span class="club-desc muted">{{ c.description|truncate(110) }}</span>
       {# One grey line, like Instagram's search results #}
       {% set bits = [c.member_count ~ ' member' ~ ('s' if c.member_count != 1 else '')] %}

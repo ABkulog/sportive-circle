@@ -412,7 +412,7 @@ def view(club_id):
                            friends_line=friends_line(club_id, me) if me and role not in MEMBER_ROLES else None,
                            week=officer_week(club_id) if role == "officer" and club["status"] == "approved" else None,
                            members_only_hidden=members_only_hidden,
-                           role=role, owner=is_owner(club), requests=requests,
+                           role=role, owner=is_owner(club), requests=requests, claim_status=my_claim(club_id),
                            can_post=bool(me) and can_post_as(club_id, me), can_decide=can_decide, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
                            socials=social_links(club),
                            joining=JOINING,
@@ -730,6 +730,9 @@ def join(club_id):
     club = get_club(club_id)
     if club["status"] != "approved":
         abort(404)
+    if not club["claimed"]:  # nobody runs it here yet, so nobody could confirm them
+        flash(f"{club['name']} isn't run on Sportive Circle yet. Follow it, and use its links to join for now.", "info")
+        return redirect(url_for("clubs.view", club_id=club_id))
     role = my_role(club_id)
     if role in MEMBER_ROLES or role in WAITING_ROLES:
         return redirect(url_for("clubs.view", club_id=club_id))
@@ -1114,7 +1117,8 @@ def delete_post(club_id, post_id):
 def pending_club_count():
     if not is_admin():
         return 0
-    return get_db().execute("SELECT COUNT(*) FROM clubs WHERE status = 'pending'").fetchone()[0]
+    return get_db().execute("SELECT (SELECT COUNT(*) FROM clubs WHERE status = 'pending')"
+                            " + (SELECT COUNT(*) FROM club_claims WHERE status = 'pending')").fetchone()[0]
 
 
 def public_url_for(path):
@@ -1160,6 +1164,83 @@ def _notify_officers(club, subject, heading, lines, button, notice):
             log.exception("Couldn't email officer %s", row["email"])
 
 
+# ---------------------------------------------------- claiming a listed club
+
+@bp.route("/clubs/<int:club_id>/claim", methods=("POST",))
+@login_required
+def claim(club_id):
+    """"This is my club": an officer asks to run a club the app listed from UW's public listings. An admin checks
+    they're really an officer (Admin → Club requests), like a new club."""
+    club = get_club(club_id)
+    if club["status"] != "approved" or club["claimed"]:
+        abort(404)
+    role, proof = one_line(request.form.get("role"))[:60], multi_line(request.form.get("proof"))[:500]
+    if not role:
+        flash("Say what your role in the club is, e.g. President.", "error")
+        return redirect(url_for("clubs.view", club_id=club_id, claim=1) + "#join")
+    get_db().execute("""INSERT INTO club_claims (club_id, user_id, role, proof, created_at) VALUES (?, ?, ?, ?, ?)
+                        ON CONFLICT(club_id, user_id) DO UPDATE SET role = excluded.role, proof = excluded.proof,
+                            status = 'pending', created_at = excluded.created_at""",
+                     (club_id, g.user["id"], role, proof, to_db(now_local())))
+    get_db().commit()
+    flash(f"Thanks! We'll check you're an officer of {club['name']} (usually within 2 days) and let you know.",
+          "success")
+    return redirect(url_for("clubs.view", club_id=club_id))
+
+
+def my_claim(club_id):
+    """This person's request to run the club ('pending' / 'denied'), or None."""
+    if g.get("user") is None:
+        return None
+    row = get_db().execute("SELECT status FROM club_claims WHERE club_id = ? AND user_id = ?",
+                           (club_id, g.user["id"])).fetchone()
+    return row["status"] if row else None
+
+
+@bp.route("/admin/claims/<int:claim_id>/<decision>", methods=("POST",))
+@login_required
+def review_claim(claim_id, decision):
+    """Approve: they own the club now (officer, can post as it) and it gets the verified badge. Other people's
+    claims on it are closed. Deny: they're told, and can try again with better proof."""
+    if not is_admin() or decision not in ("approve", "deny"):
+        abort(404)
+    from .notifications import notify  # imported here: notifications.py is loaded after this module
+    db = get_db()
+    claim_row = db.execute("SELECT * FROM club_claims WHERE id = ?", (claim_id,)).fetchone()
+    if claim_row is None:
+        abort(404)
+    club = get_club(claim_row["club_id"])
+    back = redirect(url_for("clubs.review_queue"))
+    if claim_row["status"] != "pending" or club["claimed"]:
+        flash("That claim was already decided.", "info")
+        return back
+    link = url_for("clubs.view", club_id=club["id"])
+    if decision == "deny":
+        db.execute("UPDATE club_claims SET status = 'denied' WHERE id = ?", (claim_id,))
+        notify(claim_row["user_id"], "club_review",
+               f"We couldn't confirm you're an officer of {club['name']}. Reply with more proof and try again.", link)
+        db.commit()
+        flash(f"Denied the claim on {club['name']}.", "info")
+        return back
+    db.execute("UPDATE clubs SET claimed = 1, created_by = ? WHERE id = ? AND claimed = 0",
+               (claim_row["user_id"], club["id"]))
+    db.execute("""INSERT INTO club_members (club_id, user_id, role, joined_at, can_post) VALUES (?, ?, 'officer', ?, 1)
+                  ON CONFLICT(club_id, user_id) DO UPDATE SET role = 'officer', can_post = 1""",
+               (club["id"], claim_row["user_id"], to_db(now_local())))
+    db.execute("UPDATE club_claims SET status = 'approved' WHERE id = ?", (claim_id,))
+    for other in db.execute("SELECT user_id FROM club_claims WHERE club_id = ? AND status = 'pending'",
+                            (club["id"],)).fetchall():
+        notify(other["user_id"], "club_review", f"Another officer now runs {club['name']} on Sportive Circle. "
+               "Ask them to add you in Manage officers.", link)
+    db.execute("UPDATE club_claims SET status = 'denied' WHERE club_id = ? AND status = 'pending'", (club["id"],))
+    notify(claim_row["user_id"], "club_review",
+           f"✅ You run {club['name']} on Sportive Circle now! It has the verified badge, and you can post as the club.",
+           link)
+    db.commit()
+    flash(f"{claim_row['role']} is now running {club['name']}. It's verified.", "success")
+    return back
+
+
 @bp.route("/admin/clubs")
 @login_required
 def review_queue():
@@ -1175,7 +1256,13 @@ def review_queue():
         (status,)).fetchall()
     club_counts = {row["status"]: row["n"] for row in get_db().execute(
         "SELECT status, COUNT(*) AS n FROM clubs GROUP BY status")}
-    return render_template("clubs/review.html", clubs=clubs, status=status, club_counts=club_counts, social_links=social_links,
+    claims = get_db().execute(
+        """SELECT k.*, c.name AS club_name, c.sport, c.instagram, c.contact_url, c.club_email,
+                  u.full_name, u.email
+           FROM club_claims k JOIN clubs c ON c.id = k.club_id JOIN users u ON u.id = k.user_id
+           WHERE k.status = 'pending' AND u.suspended = 0 ORDER BY k.id""").fetchall()
+    return render_template("clubs/review.html", clubs=clubs, status=status, club_counts=club_counts, claims=claims,
+                           social_links=social_links,
                            kinds=CLUB_KINDS, focus=FOCUS, joining=JOINING, experience=EXPERIENCE,
                            who=WHO_CAN_JOIN_LABELS)
 

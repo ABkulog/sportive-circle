@@ -23,7 +23,7 @@ def search_clubs(q, limit=20):
         by_sport = f" OR c.sport IN ({', '.join(repr(s) for s in sports)})" if sports else ""
         where.append(f"(fold(c.name || ' ' || c.description) LIKE :w{n} ESCAPE '\\'{by_sport})")
     return get_db().execute(
-        f"""SELECT c.id, c.name, c.sport, c.logo_updated, c.description,
+        f"""SELECT c.id, c.name, c.sport, c.logo_updated, c.description, c.claimed,
                    (SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id AND m.role IN ('member', 'officer'))
                        AS member_count,
                    (SELECT m.role FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me) AS my_role

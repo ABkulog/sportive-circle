@@ -2038,3 +2038,9 @@ html, body { overflow-x: clip; }
 .table-wrap { overflow-x: auto; }
 .numbers-table { width: 100%; border-collapse: collapse; }
 .numbers-table th, .numbers-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+
+/* A club listed from UW's public info that no officer runs here yet, and the "Claim this club" form. */
+.unclaimed-note { margin: 4px 0 0; font-size: .85rem; color: var(--muted); }
+.claim-panel { margin-top: 10px; }
+.claim-panel > summary { list-style: none; cursor: pointer; color: var(--purple); font-weight: 600; }
+.claim-panel > summary::-webkit-details-marker { display: none; }

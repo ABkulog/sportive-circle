@@ -1972,6 +1972,48 @@ def _approved_club(accounts, client, app, **overrides):
     return club
 
 
+def test_officer_claims_a_listed_club_and_it_gets_verified(accounts, client, app):
+    """FR-CLUB-39: clubs the app listed from UW's public info have no officer yet. Students can follow them; an
+    officer claims one, an admin confirms it, and the officer runs it (verified badge, posting as the club)."""
+    app.config["ADMIN_EMAILS"] = "admin@uw.edu"
+    with app.app_context():
+        db = get_db()
+        club = db.execute("INSERT INTO clubs (name, sport, description, status, claimed, created_at)"
+                          " VALUES ('UW Ultimate', 'ultimate', 'Frisbee club', 'approved', 0, '2026-10-01 10:00')").lastrowid
+        db.commit()
+    accounts.signup(email="fan@uw.edu", name="Fan Person")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Nobody from UW Ultimate runs this page yet" in page and "Claim this club" in page
+    assert "Verified" not in page and "Request to join" not in page
+    client.post(f"/clubs/{club}/join")                                   # nobody could confirm them
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM club_members WHERE club_id = ?", (club,)).fetchone()[0] == 0
+    client.post(f"/clubs/{club}/follow")
+    accounts.logout()
+    accounts.signup(email="prez@uw.edu", name="Pres Ident")
+    assert "Say what your role" in client.post(f"/clubs/{club}/claim", data={"role": ""},
+                                               follow_redirects=True).data.decode()
+    client.post(f"/clubs/{club}/claim", data={"role": "President", "proof": "On the IMLeagues roster"})
+    assert "Claim sent" in client.get(f"/clubs/{club}").data.decode()
+    assert client.get("/admin/clubs").status_code == 404                  # admins only
+    accounts.logout()
+    accounts.signup(email="admin@uw.edu")
+    queue = client.get("/admin/clubs").data.decode()
+    assert "Officers claiming a listed club (1)" in queue and "On the IMLeagues roster" in queue
+    with app.app_context():
+        claim_id = get_db().execute("SELECT id FROM club_claims").fetchone()[0]
+    client.post(f"/admin/claims/{claim_id}/approve")
+    accounts.logout()
+    accounts.login(email="prez@uw.edu")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "Verified" in page and "Claim this club" not in page and "Edit club" in page
+    assert "You run UW Ultimate" in client.get("/notifications").data.decode()
+    with app.app_context():
+        from sportive.clubs import poster_clubs
+        assert [c["name"] for c in poster_clubs(_user_id(app, "prez@uw.edu"))] == ["UW Ultimate"]
+    assert client.post(f"/clubs/{club}/claim", data={"role": "VP"}).status_code == 404  # already claimed
+
+
 def test_follow_is_not_membership(accounts, client, app):
     club = _approved_club(accounts, client, app)
     accounts.signup(email="curious@uw.edu")

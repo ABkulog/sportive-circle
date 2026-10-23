@@ -5,6 +5,29 @@
 <h1 class="page-title">Club requests</h1>
 <p class="muted">Open the club's social accounts or website: is it a real UW club, active this quarter, and is the
   applicant one of its officers?</p>
+{% if claims %}
+  <h2>Officers claiming a listed club ({{ claims|length }})</h2>
+  <p class="muted">Check they're really an officer: the club's Instagram, website or IMLeagues roster.</p>
+  <div class="stack">
+    {% for k in claims %}
+      <article class="card report-card">
+        <div class="report-head"><strong class="club-name">{{ SPORT_EMOJI[k.sport] }} {{ k.club_name }}</strong></div>
+        <p><strong>{{ k.full_name }}</strong> <span class="muted">({{ k.email }})</span>, {{ k.role }}</p>
+        {% if k.proof %}<p><strong>How to check:</strong> {{ k.proof }}</p>{% endif %}
+        <ul class="contact-list">
+          {% if k.instagram %}<li><a href="https://instagram.com/{{ k.instagram }}" target="_blank" rel="noopener nofollow"><strong>Instagram</strong> @{{ k.instagram }} ↗</a></li>{% endif %}
+          {% if k.contact_url %}<li><a href="{{ k.contact_url }}" target="_blank" rel="noopener nofollow"><strong>Website</strong> ↗</a></li>{% endif %}
+          {% if k.club_email %}<li><a href="mailto:{{ k.club_email }}"><strong>Club email</strong> {{ k.club_email }}</a></li>{% endif %}
+        </ul>
+        <div class="review-actions">
+          <form method="post" action="{{ url_for('clubs.review_claim', claim_id=k.id, decision='approve') }}">{{ csrf_field() }}<button class="btn">Approve</button></form>
+          <form method="post" action="{{ url_for('clubs.review_claim', claim_id=k.id, decision='deny') }}">{{ csrf_field() }}<button class="btn btn-ghost">Deny</button></form>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+  <h2>New clubs</h2>
+{% endif %}
 <nav class="home-tabs" aria-label="Status">
   {% for key, label in [('pending', 'Waiting'), ('approved', 'Approved'), ('rejected', 'Sent back'), ('denied', 'Denied')] %}
     <a href="{{ url_for('clubs.review_queue', status=key) }}" {% if status == key %}class="is-on" aria-current="page"{% endif %}>{{ label }} ({{ club_counts.get(key, 0) }})</a>

@@ -235,6 +235,19 @@ CREATE TABLE IF NOT EXISTS clubs (
     created_at  TEXT NOT NULL
 );
 
+-- "This is my club": an officer asks to run a club the app listed from UW's public listings (clubs.claimed = 0).
+-- An admin checks they're really an officer, then they become its owner and the club gets the verified badge.
+CREATE TABLE IF NOT EXISTS club_claims (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    club_id    INTEGER NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role       TEXT NOT NULL,                 -- e.g. President
+    proof      TEXT NOT NULL DEFAULT '',      -- how admins can check (e.g. "I'm on the IMLeagues roster")
+    status     TEXT NOT NULL DEFAULT 'pending',  -- pending / approved / denied
+    created_at TEXT NOT NULL,
+    UNIQUE (club_id, user_id)
+);
+
 -- Club logos: 256x256 JPEGs (like profile pictures), uploaded by officers.
 CREATE TABLE IF NOT EXISTS club_logos (
     club_id INTEGER PRIMARY KEY REFERENCES clubs(id) ON DELETE CASCADE,
