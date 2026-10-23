@@ -1287,6 +1287,25 @@ def add_uw_rec_clubs():
     return added
 
 
+def clubs_round(app):
+    """Called from the background loop: when a new club list ships (its "checked" date changed), the clubs not on
+    the app yet are added by themselves, so nobody has to press the button. Claimed first, so the two copies of
+    the site never both add them. Never raises."""
+    try:
+        with app.app_context():
+            with open(UW_REC_CLUBS, encoding="utf-8") as file:
+                checked = json.load(file)["checked"]
+            db = get_db()
+            claimed = db.execute("INSERT OR IGNORE INTO app_state (key, value) VALUES (?, ?)",
+                                 (f"uw_clubs:{checked}", to_db(now_local()))).rowcount
+            db.commit()
+            if claimed:
+                added = add_uw_rec_clubs()
+                log.info("Added %d UW clubs from the %s list.", len(added), checked)
+    except Exception:
+        log.exception("Couldn't add the UW club list")
+
+
 @bp.route("/admin/clubs/uw-rec", methods=("GET", "POST"))
 @login_required
 def uw_rec_import():

@@ -17,6 +17,7 @@ from flask import Blueprint, abort, current_app, jsonify, request
 from flask.cli import with_appcontext
 
 from .backups import backup_round
+from .clubs import clubs_round
 from .constants import SPORTS
 from .db import get_db
 from .digest import weekly_round
@@ -133,6 +134,7 @@ def start_reminder_loop(app):
             backup_round(app)  # once a day; a quick "already done today?" check otherwise
             uw_rec_round(app)  # UW Rec's bookings, copied once a day (uwrec.py)
             weekly_round(app)  # Mondays from 9 AM: the "Games this week" email (digest.py)
+            clubs_round(app)  # a new UW club list (data/uw_rec_clubs.json): its new clubs go on the app
             time.sleep(CHECK_EVERY.total_seconds())
 
     threading.Thread(target=loop, name="reminders", daemon=True).start()
