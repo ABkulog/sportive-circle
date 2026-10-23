@@ -391,7 +391,7 @@ def test_the_clubs_tab_finds_and_registers_clubs(accounts, client, app):
     accounts.logout()
     accounts.signup(email="maya@uw.edu", sports=("tennis",))
     page = client.get("/clubs").data.decode()
-    assert "＋ Register a club" in page and 'href="/clubs/new"' in page and 'placeholder="Search clubs"' in page
+    assert "Can't find your club?" in page and 'href="/clubs/new"' in page and 'placeholder="Search clubs"' in page
     assert 'href="/clubs?mine=1"' in page and 'href="/clubs?fits=1"' in page and 'class="page-title"' not in page
     assert "UW Tennis Club" in page and "Husky Rowing" in page
     fits = client.get("/clubs?fits=1").data.decode()
@@ -645,20 +645,20 @@ def test_a_club_shares_its_poster_to_an_instagram_story(accounts, client, app):
 
 def test_officers_sign_up_straight_to_their_club(accounts, client, app):
     page = client.get("/signup").data.decode()
-    assert "Club officer? Register your club" in page and 'href="/signup?club=1"' in page
+    assert "Club officer? Claim your club" in page and 'href="/signup?club=1"' in page
     page = client.get("/signup?club=1").data.decode()
-    assert "Register your club" in page and "Club officer?" not in page and "Step 1 of 3" in page
+    assert "Claim your club" in page and "Club officer?" not in page and "Step 1 of 3" in page
     response = client.post("/signup", data={"full_name": "Olive Officer", "email": "olive@uw.edu",
                                             "password": "purple-and-gold", "password2": "purple-and-gold",
                                             "birth_date": "2004-03-01", "grad_year": ""})
     assert response.headers["Location"] == "/verify"                      # no sports step, no texts step
     assert "Step 2 of 3" in client.get("/verify").data.decode()
     response = client.post("/verify", data={"code": accounts.code_for("olive@uw.edu")})
-    assert response.headers["Location"] == "/clubs/new"
-    page = client.get("/clubs/new").data.decode()                           # no photo step in the way
-    assert "Now your club. Your profile can wait" in page and 'name="name"' in page
+    assert response.headers["Location"] == "/clubs"                        # every club is listed: claim yours
+    page = client.get("/clubs").data.decode()                               # no photo step in the way
+    assert "find yours and tap" in page and "Your profile can wait" in page
     assert "Your profile can wait" in client.get("/notifications").data.decode()
-    assert client.get("/signup?club=1").headers["Location"] == "/clubs/new"  # already in: to the club form
+    assert client.get("/signup?club=1").headers["Location"] == "/clubs"     # already in: to the club list
     accounts.logout()
     client.get("/signup?club=1")
     client.get("/signup")                                                    # "Not an officer?": the usual steps

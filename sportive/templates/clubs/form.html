@@ -91,6 +91,8 @@
           <input name="youtube" type="url" maxlength="170" value="{{ form.get('youtube', '') }}" placeholder="https://youtube.com/@uwyourclub"></label>
         <label class="field"><span>Discord invite</span>
           <input name="discord" type="url" maxlength="80" value="{{ form.get('discord', '') }}" placeholder="https://discord.gg/…"></label>
+        <label class="check"><input type="checkbox" name="discord_members_only" value="1" {% if form.get('discord_members_only') in (1, '1', True) %}checked{% endif %}>
+          Only members see the Discord link</label>
       </div>
       <label class="field"><span>Website, Discord or GroupMe</span>
         <input name="contact_url" type="url" maxlength="200" value="{{ form.get('contact_url', '') }}" placeholder="https://…"></label>

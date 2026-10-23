@@ -80,22 +80,45 @@
           {% endif %}
         </span>
       </div>
-      {% if claim_status == 'pending' %}
+      {% if claim_status and claim_status.status == 'pending' and claim_status.by_email %}
+        <form method="post" action="{{ url_for('clubs.claim_with_code', club_id=club.id) }}" class="form waiting-box">
+          {{ csrf_field() }}
+          <strong>Check the club's email</strong>
+          <span class="muted">We sent a code to {{ club_email_masked }}. Ask whoever reads it, then type it here.</span>
+          <input name="code" inputmode="numeric" maxlength="7" required placeholder="6-digit code" aria-label="Code">
+          <button class="btn">Confirm</button>
+        </form>
+      {% elif claim_status and claim_status.status == 'pending' %}
         <div class="waiting-box"><strong>Claim sent</strong>
-          <span class="muted">We're checking you're an officer. You'll get a notification.</span></div>
+          <span class="muted">We'll check {{ club.name }}'s account for <strong>{{ my_claim_code }}</strong> and let you
+            know. Keep it up until then.</span></div>
       {% else %}
         <details class="join-panel claim-panel" {% if request.args.get('claim') %}open{% endif %}>
           <summary class="link-button">Are you an officer? Claim this club</summary>
+          {% if not g.user %}
+            <p><a class="btn" href="{{ url_for('auth.signup', club=1) }}">Sign up to claim it</a></p>
+          {% else %}
           <form method="post" action="{{ url_for('clubs.claim', club_id=club.id) }}" class="form">
             {{ csrf_field() }}
-            {% if claim_status == 'denied' %}<p class="muted">We couldn't confirm it last time. Add something we can check.</p>{% endif %}
+            {% if claim_status and claim_status.status == 'denied' %}<p class="muted">We couldn't confirm it last time. Try again.</p>{% endif %}
             <label class="field"><span>Your role</span>
               <input name="role" maxlength="60" required placeholder="e.g. President"></label>
-            <label class="field"><span>How can we check? <em>(optional)</em></span>
-              <textarea name="proof" rows="2" maxlength="500" placeholder="e.g. I'm listed as an officer on IMLeagues or HuskyLink"></textarea></label>
-            <p class="muted">Once we confirm it, the club gets the verified badge and you can post as it.</p>
-            <button class="btn">Send</button>
+            <fieldset class="claim-ways">
+              <legend>Show us you run it</legend>
+              {% if club.club_email %}
+                <label class="choice"><input type="radio" name="how" value="email" checked>
+                  <span><strong>Club email</strong> (instant): we email a code to {{ club_email_masked }}</span></label>
+              {% endif %}
+              <label class="choice"><input type="radio" name="how" value="post" {% if not club.club_email %}checked{% endif %}>
+                <span><strong>Instagram or Discord</strong>: put <strong>{{ my_claim_code }}</strong> in the club's Instagram
+                  bio or story, or post it in its Discord, then tell us where</span></label>
+              <label class="field"><span>Where did you post it?</span>
+                <input name="proof" maxlength="200" placeholder="e.g. Instagram bio of @{{ club.instagram or 'yourclub' }}"></label>
+            </fieldset>
+            <p class="muted">Once it's confirmed, the club gets the verified badge and you can edit it and post as it.</p>
+            <button class="btn">Claim</button>
           </form>
+          {% endif %}
         </details>
       {% endif %}
     {% elif role == 'officer' %}
@@ -173,7 +196,7 @@
     {% if club.how_to_join %}
       <div class="how-to-join" id="how-to-join" tabindex="-1"><strong>How to join</strong><p>{{ club.how_to_join }}</p></div>
     {% endif %}
-    {% if club.focus or club.meets or club.location %}
+    {% if club.claimed and (club.focus or club.meets or club.location) %}{# listed clubs: only what they published #}
       <ul class="quick-facts" aria-label="Quick facts">
         <li><small>Joining</small><strong>{{ joining.get(club.joining, 'Ask the club') }}</strong></li>
         <li><small>Experience</small><strong>{{ experience.get(club.experience, 'Ask the club') }}</strong></li>
@@ -193,8 +216,9 @@
         <li><span aria-hidden="true">{{ emoji }}</span> <a href="{{ url }}" target="_blank" rel="noopener nofollow"
             aria-label="{{ label }}: {{ shown }}">{{ shown|truncate(45) }}</a></li>
       {% endfor %}
+      {% if discord_hidden %}<li><span aria-hidden="true">💬</span> <span class="muted">Discord: for members (join to see it)</span></li>{% endif %}
       {% if club.contact_url %}<li><span aria-hidden="true">🔗</span> <a href="{{ club.contact_url }}" target="_blank" rel="noopener nofollow">{{ club.contact_url|replace('https://', '')|truncate(45) }}</a></li>{% endif %}
-      {% if club.verification_url %}<li><span aria-hidden="true">🏛️</span> <a href="{{ club.verification_url }}" target="_blank" rel="noopener nofollow">{{ kinds.get(club.club_kind, 'Official page') }}</a></li>{% endif %}
+      {% if club.verification_url %}<li><span aria-hidden="true">🏛️</span> <a href="{{ club.verification_url }}" target="_blank" rel="noopener nofollow">{{ 'HuskyLink page' if 'huskylink.washington.edu' in club.verification_url else 'UW Rec club page' if 'washington.edu/ima' in club.verification_url else kinds.get(club.club_kind, 'Official page') }}</a></li>{% endif %}
     </ul>
     {% if g.user %}
       {% set officers = members|selectattr('role', 'equalto', 'officer')|list %}
@@ -239,9 +263,8 @@
     <ul class="club-posts">
       {% for p in posts %}
         <li>
-          <p>{{ p.body }}{% if p.event_id and g.user %} <a href="{{ url_for('events.detail', event_id=p.event_id) }}">See it →</a>{% endif %}
-            {% if p.link %} <a href="{{ p.link }}" target="_blank" rel="noopener nofollow">RSVP on HuskyLink ↗</a>{% endif %}</p>
-          <small class="muted">{{ 'From HuskyLink' if p.huskylink_event else ((p.full_name if g.user else None) or 'An officer') }} · {{ p.created_at|when }}</small>
+          <p>{{ p.body }}{% if p.event_id and g.user %} <a href="{{ url_for('events.detail', event_id=p.event_id) }}">See it →</a>{% endif %}</p>
+          <small class="muted">{{ (p.full_name if g.user else None) or 'An officer' }} · {{ p.created_at|when }}</small>
           {% if role == 'officer' %}
             <form method="post" action="{{ url_for('clubs.delete_post', club_id=club.id, post_id=p.id) }}" class="inline-form">
               {{ csrf_field() }}<button class="link-button danger-link">Delete</button>

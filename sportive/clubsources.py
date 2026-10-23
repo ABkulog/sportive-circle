@@ -170,6 +170,32 @@ def tidy(text):
     return "\n\n".join(" ".join(p.split()) for p in paragraphs if p.strip())
 
 
+def links_in_text(text):
+    """Links a club put in its own description ("@uwhackysack on Instagram", a Facebook group, an email): they
+    chose to make these public, so they go with the club's other links."""
+    found = {}
+    for url in re.findall(r"https?://[^\s<>\"')]+", text):
+        url = clean(url.rstrip(".,!"))
+        host = urlsplit(url).netloc.lower().removeprefix("www.")
+        if host == "instagram.com" and handle(url, r"instagram\.com"):
+            found.setdefault("instagram", handle(url, r"instagram\.com"))
+        elif host in ("facebook.com", "fb.com"):
+            found.setdefault("facebook", url)
+        elif host in ("discord.gg", "discord.com"):
+            found.setdefault("discord", url)
+        elif host in ("x.com", "twitter.com") and handle(url, r"x\.com|twitter\.com"):
+            found.setdefault("x_handle", handle(url, r"x\.com|twitter\.com"))
+        else:
+            found.setdefault("website", url)
+    mention = re.search(r"@([A-Za-z0-9._]{2,30}) on Instagram", text, re.I)
+    if mention:
+        found.setdefault("instagram", mention.group(1).rstrip("."))
+    email = re.search(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", text)
+    if email:
+        found.setdefault("club_email", email.group(0))
+    return found
+
+
 def build_listing(log=print):
     """Every UW sports club, read live: {"source", "clubs": [...]}. Raises if a site can't be read."""
     clubs = parse(fetch(SOURCE))
@@ -182,7 +208,7 @@ def build_listing(log=print):
         club["name"] = APP_NAME.get(name, f"UW {name} Club")
         club["sport"] = SPORT_OF.get(name) or guess_sport(name)
         club["who_can_join"] = "men" if name.startswith("Men's") else "women" if name.startswith("Women's") else "everyone"
-        club["source"], club["huskylink_id"] = "uw_rec", None
+        club["source"], club["huskylink_id"], club["uw_page"] = "uw_rec", None, SOURCE
     by_uw_name = {club["uw_name"]: club for club in clubs}
     unsorted = []
     for path in HUSKYLINK_LISTS:
@@ -203,10 +229,17 @@ def build_listing(log=print):
             lowered = name.lower()
             club = {"uw_name": name, "name": name, "sport": sport, "description": about, "website": "", "instagram": "",
                     "facebook": "", "x_handle": "", "discord": "", "source": "huskylink", "huskylink_id": group_id,
+                    "uw_page": link if link.startswith(HUSKYLINK) else "",
                     "who_can_join": "men" if "men's" in lowered and "women's" not in lowered
                     else "women" if any(w in lowered for w in ("women", "womxn", "girl")) else "everyone"}
-            club[link_kind(link)] = link
+            if not link.startswith(HUSKYLINK):  # their HuskyLink page is uw_page; anything else is their own site
+                club[link_kind(link)] = link
             clubs.append(club)
     if unsorted:
         log("New HuskyLink sports groups, left out until they're in HUSKYLINK_CLUBS: " + "; ".join(unsorted))
+    for club in clubs:
+        club["club_email"] = ""
+        for key, value in links_in_text(club["description"]).items():
+            if not club[key] and not (key == "website" and value.startswith((HUSKYLINK, SOURCE))):
+                club[key] = value
     return {"source": SOURCE, "clubs": clubs}

@@ -7,13 +7,15 @@
   applicant one of its officers?</p>
 {% if claims %}
   <h2>Officers claiming a listed club ({{ claims|length }})</h2>
-  <p class="muted">Check they're really an officer: the club's Instagram, website or IMLeagues roster.</p>
+  <p class="muted">Open the club's Instagram (or Discord) and look for the claimant's code in the bio, a story or a
+    post. No code there: deny. Claims through the club's own email approve themselves and don't show up here.</p>
   <div class="stack">
     {% for k in claims %}
       <article class="card report-card">
         <div class="report-head"><strong class="club-name">{{ SPORT_EMOJI[k.sport] }} {{ k.club_name }}</strong></div>
         <p><strong>{{ k.full_name }}</strong> <span class="muted">({{ k.email }})</span>, {{ k.role }}</p>
-        {% if k.proof %}<p><strong>How to check:</strong> {{ k.proof }}</p>{% endif %}
+        <p><strong>Look for:</strong> <code class="claim-code">{{ k.code }}</code>
+          {% if k.proof %}<br><strong>They say it's in:</strong> {{ k.proof }}{% endif %}</p>
         <ul class="contact-list">
           {% if k.instagram %}<li><a href="https://instagram.com/{{ k.instagram }}" target="_blank" rel="noopener nofollow"><strong>Instagram</strong> @{{ k.instagram }} ↗</a></li>{% endif %}
           {% if k.contact_url %}<li><a href="{{ k.contact_url }}" target="_blank" rel="noopener nofollow"><strong>Website</strong> ↗</a></li>{% endif %}

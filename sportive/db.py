@@ -35,14 +35,17 @@ def close_db(exception=None):
 ADDED_COLUMNS = [
     ("posts", "club_id", "INTEGER REFERENCES clubs(id) ON DELETE CASCADE"),  # posted by an officer as the club
     ("posts", "pinned_until", "TEXT"),  # a club pinned it to the top of its page, until then (24 hours)
-    ("posts", "members_only", "INTEGER NOT NULL DEFAULT 0"),
-    ("clubs", "claimed", "INTEGER NOT NULL DEFAULT 1"),
-    ("clubs", "discord", "TEXT NOT NULL DEFAULT ''"),
-    ("clubs", "huskylink_id", "INTEGER"),
-    ("club_posts", "link", "TEXT NOT NULL DEFAULT ''"),  # where to RSVP (an event from HuskyLink)
-    ("club_posts", "huskylink_event", "INTEGER"),
-    ("club_posts", "ends_at", "TEXT"),  # an automatic post about an event: removed once the event is over  # the HuskyLink event it's about (huskylink.py): one post each  # its group on HuskyLink (UW's student org site), for its events  # an invite link (discord.gg/... or discord.com/invite/...)  # 0 = filled in from UW's public listings, no officer here yet
-    ("clubs", "slug", "TEXT"),  # the club's short link: sportivecircle.com/hrc (clubs.short_link)  # a club's post only its members see
+    ("posts", "members_only", "INTEGER NOT NULL DEFAULT 0"),  # a club's post only its members see
+    ("clubs", "claimed", "INTEGER NOT NULL DEFAULT 1"),  # 0 = filled in from UW's public listings, no officer here yet
+    ("clubs", "discord", "TEXT NOT NULL DEFAULT ''"),  # an invite link (discord.gg/... or discord.com/invite/...)
+    ("clubs", "huskylink_id", "INTEGER"),  # its group on HuskyLink (UW's student org site)
+    ("clubs", "discord_members_only", "INTEGER NOT NULL DEFAULT 0"),  # 1 = only members see the Discord invite
+    ("club_posts", "link", "TEXT NOT NULL DEFAULT ''"),  # unused now (automatic HuskyLink event posts were taken out)
+    ("club_posts", "huskylink_event", "INTEGER"),  # unused now: kept so older databases stay readable
+    ("club_posts", "ends_at", "TEXT"),  # unused now
+    ("club_claims", "email_code", "TEXT NOT NULL DEFAULT ''"),  # the code emailed to the club's own address
+    ("club_claims", "email_tries", "INTEGER NOT NULL DEFAULT 0"),
+    ("clubs", "slug", "TEXT"),  # the club's short link: sportivecircle.com/hrc (clubs.short_link)
     ("post_videos", "muted", "INTEGER NOT NULL DEFAULT 0"),  # the poster turned its sound off (🔇 in the ＋ sheet)
     # Officers the owner lets post as the club (the owner always can). Officers from before this kept posting.
     ("club_members", "can_post", "INTEGER NOT NULL DEFAULT 1"),
@@ -147,10 +150,12 @@ def init_db():
         sort_other_clubs(db)
         db.execute("PRAGMA user_version = 1")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_clubs_slug ON clubs(slug)")  # one club per short link
-    db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_club_posts_huskylink ON club_posts(huskylink_event)")
     if db.execute("PRAGMA user_version").fetchone()[0] < 2:  # version 2 = club posts know their weeks
         count_series_weeks(db)
         db.execute("PRAGMA user_version = 2")
+    if db.execute("PRAGMA user_version").fetchone()[0] < 3:  # version 3 = no automatic HuskyLink event posts:
+        db.execute("DELETE FROM club_posts WHERE huskylink_event IS NOT NULL")  # the app has clubs' links, not news
+        db.execute("PRAGMA user_version = 3")
     db.commit()
 
 
