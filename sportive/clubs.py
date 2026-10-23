@@ -10,6 +10,7 @@ import json
 import os
 import logging
 import re
+import hmac
 import secrets
 import threading
 from datetime import timedelta
@@ -63,11 +64,14 @@ SOCIALS = {
 LINK_SOCIALS = ("facebook", "youtube", "discord")  # saved as full links, not usernames
 
 
-def social_links(club):
-    """[(label, emoji, url, shown text)] for the socials a club filled in."""
+def social_links(club, members=True):
+    """[(label, emoji, url, shown text)] for the socials a club filled in. A Discord invite the club keeps for
+    members is left out for everyone else (members=False)."""
     links = []
     for key, (label, emoji, _, link) in SOCIALS.items():
         value = club[key]
+        if key == "discord" and club["discord_members_only"] and not members:
+            continue
         if value:
             shown = value.replace("https://", "").replace("www.", "") if value.startswith("https://") else f"@{value}"
             links.append((label, emoji, link.format(value), shown))
@@ -237,6 +241,7 @@ def read_club_form(form, club_id=None, phone_on_file=""):
         value = get(key)
         data[key] = value if key in LINK_SOCIALS else social_handle(key, value)
     data["competes"] = 1 if form.get("competes") else 0
+    data["discord_members_only"] = 1 if form.get("discord_members_only") else 0
     typed_phone = form.get("contact_phone", "").strip()
     data["contact_phone"] = (phone_from_form(form.get("contact_phone_country"), typed_phone) or ""
                              if typed_phone else phone_on_file)
@@ -309,7 +314,7 @@ def read_club_form(form, club_id=None, phone_on_file=""):
 FIELDS = ("name", "sport", "description", "meets", "location", "contact_url", "club_kind", "verification_url",
           "officer_role", "member_estimate", "focus", "joining", "experience", "who_can_join", "dues", "gear",
           "competes", "how_to_join", "club_email", "instagram", "join_question", "tiktok", "snapchat", "x_handle",
-          "facebook", "youtube", "discord", "contact_phone")
+          "facebook", "youtube", "discord", "discord_members_only", "contact_phone")
 
 
 # ---------------------------------------------------------------- browse
@@ -327,7 +332,7 @@ def directory():
     where, params = [], {"me": g.user["id"] if g.get("user") else 0}
     if mine:  # my clubs, including ones still being reviewed (those only for their officers: others can't open them)
         where.append("EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me"
-                     " AND (c.status = 'approved' OR m.role = 'officer'))")
+                     " AND (c.status = 'approved' OR m.role = 'officer')) AND c.status != 'denied'")  # denied: clutter
     else:
         where.append("c.status = 'approved'")
     for n, word in enumerate(fold(q).split()[:5]):  # every word, any order, accents and capitals ignored
@@ -349,8 +354,18 @@ def directory():
         where.append(FREE_DUES)
     if "no_tryouts" in easy:
         where.append("c.joining = 'open'")
+    # "For you" first (your clubs, and clubs for your sports that you can join), then every other club A-Z.
+    gender = (g.user["gender"] if g.get("user") else "") or ""
+    params.update({f"you{i}": key for i, key in enumerate(my_sports)})
+    yours = " OR ".join([f"c.sport = :you{i}" for i in range(len(my_sports))]) or "0"
+    can_join = ("1" if not gender else
+                "c.who_can_join = 'everyone' OR c.who_can_join = :gender_group OR "
+                "(c.who_can_join = 'women_nb' AND :gender IN ('woman', 'nonbinary'))")
+    params.update({"gender": gender, "gender_group": {"woman": "women", "man": "men"}.get(gender, gender)})
     clubs = get_db().execute(
         f"""SELECT c.*, {MEMBER_COUNT},
+                   ((SELECT m.role FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me) IS NOT NULL
+                    OR (({yours}) AND ({can_join}))) AS for_you,
                    (SELECT m.role FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me) AS my_status,
                    (SELECT COUNT(*) FROM club_members m JOIN users wu ON wu.id = m.user_id WHERE m.club_id = c.id
                                      AND m.role IN ('requested', 'tryout') AND wu.suspended = 0) AS waiting,
@@ -359,7 +374,7 @@ def directory():
                                                    AND e.ends_at >= :now AND e.is_private = 0
                                                    AND NOT {IS_FULL_SQL}) AS upcoming
             FROM clubs c WHERE {" AND ".join(where)}
-            ORDER BY my_status IS NOT NULL DESC, member_count DESC, fold(c.name) LIMIT 200""",
+            ORDER BY for_you DESC, fold(c.name) LIMIT 300""",
         {**params, "now": to_db(now_local()), "hold_now": to_db(now_local())}).fetchall()
     return render_template("clubs/directory.html", clubs=clubs, q=q, sport=sport, mine=mine, easy=easy,
                            fits=fits, my_sports=my_sports)
@@ -375,7 +390,7 @@ def view(club_id):
     posts = db.execute(
         """SELECT p.*, CASE WHEN u.suspended = 1 THEN NULL ELSE u.full_name END AS full_name  -- suspended: "An officer"
            FROM club_posts p LEFT JOIN users u ON u.id = p.author_id
-           WHERE p.club_id = ? AND p.body NOT LIKE 'Over: %' ORDER BY p.id DESC LIMIT 20""", (club_id,)).fetchall()
+           WHERE p.club_id = ? ORDER BY p.id DESC LIMIT 20""", (club_id,)).fetchall()
     members, requests = [], []
     role = my_role(club_id)
     if request.args.get("approved") and role == "officer" and club["status"] == "approved":
@@ -419,8 +434,12 @@ def view(club_id):
                            week=officer_week(club_id) if role == "officer" and club["status"] == "approved" else None,
                            members_only_hidden=members_only_hidden,
                            role=role, owner=is_owner(club), requests=requests, claim_status=my_claim(club_id),
+                           my_claim_code=claim_code(club_id, g.user["id"]) if g.get("user") else "",
+                           club_email_masked=masked_email(club["club_email"]) if club["club_email"] else "",
                            can_post=bool(me) and can_post_as(club_id, me), can_decide=can_decide, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
-                           socials=social_links(club),
+                           socials=social_links(club, members=role in MEMBER_ROLES or is_admin()),
+                           discord_hidden=bool(club["discord"] and club["discord_members_only"]
+                                               and not (role in MEMBER_ROLES or is_admin())),
                            joining=JOINING,
                            experience=EXPERIENCE, who=WHO_CAN_JOIN_LABELS)
 
@@ -1172,35 +1191,127 @@ def _notify_officers(club, subject, heading, lines, button, notice):
 
 # ---------------------------------------------------- claiming a listed club
 
+CLAIM_CODE_TRIES = 5
+
+
+def claim_code(club_id, user_id):
+    """The code an officer posts on the club's Instagram or Discord to show they run it, like "SC-4821". The same
+    for them every time (so they can post it before sending the claim), different for everyone else."""
+    digest = hmac.new(current_app.config["SECRET_KEY"].encode(), f"claim:{club_id}:{user_id}".encode(), "sha256")
+    return f"SC-{int(digest.hexdigest()[:8], 16) % 10000:04d}"
+
+
+def masked_email(email):
+    name, _, domain = email.partition("@")
+    return f"{name[:2]}{'•' * max(len(name) - 2, 1)}@{domain}"
+
+
 @bp.route("/clubs/<int:club_id>/claim", methods=("POST",))
 @login_required
 def claim(club_id):
-    """"This is my club": an officer asks to run a club the app listed from UW's public listings. An admin checks
-    they're really an officer (Admin → Club requests), like a new club."""
+    """"This is my club": an officer proves they run a club the app listed from UW's public info. Two ways:
+    - the club's own email (from its public page): we email it a code; typing it back makes them the owner at once.
+    - the club's Instagram or Discord: they post their code (claim_code) there and say where; an admin opens the
+      club's account from Admin → Club requests, sees the code, and approves."""
     club = get_club(club_id)
     if club["status"] != "approved" or club["claimed"]:
         abort(404)
+    how = request.form.get("how", "post")
     role, proof = one_line(request.form.get("role"))[:60], multi_line(request.form.get("proof"))[:500]
+    back = redirect(url_for("clubs.view", club_id=club_id, claim=1) + "#join")
     if not role:
         flash("Say what your role in the club is, e.g. President.", "error")
-        return redirect(url_for("clubs.view", club_id=club_id, claim=1) + "#join")
-    get_db().execute("""INSERT INTO club_claims (club_id, user_id, role, proof, created_at) VALUES (?, ?, ?, ?, ?)
-                        ON CONFLICT(club_id, user_id) DO UPDATE SET role = excluded.role, proof = excluded.proof,
-                            status = 'pending', created_at = excluded.created_at""",
-                     (club_id, g.user["id"], role, proof, to_db(now_local())))
-    get_db().commit()
-    flash(f"Thanks! We'll check you're an officer of {club['name']} (usually within 2 days) and let you know.",
-          "success")
+        return back
+    if how == "email" and not club["club_email"]:
+        how = "post"
+    if how == "post" and not proof:
+        flash(f"Post your code {claim_code(club_id, g.user['id'])} on the club's Instagram or Discord first, "
+              "then say where you posted it.", "error")
+        return back
+    email_code = f"{secrets.randbelow(10 ** 6):06d}" if how == "email" else ""
+    db = get_db()
+    db.execute("""INSERT INTO club_claims (club_id, user_id, role, proof, created_at, email_code, email_tries)
+                  VALUES (?, ?, ?, ?, ?, ?, 0)
+                  ON CONFLICT(club_id, user_id) DO UPDATE SET role = excluded.role, proof = excluded.proof,
+                      status = 'pending', created_at = excluded.created_at, email_code = excluded.email_code,
+                      email_tries = 0""",
+               (club_id, g.user["id"], role, proof if how == "post" else "Checking by the club's email",
+                to_db(now_local()), email_code))
+    db.commit()
+    if how == "email":
+        subject = f"{email_code} is the code to run {club['name']} on Sportive Circle"
+        body, html = compose(subject, f"Is {g.user['full_name']} one of your officers?",
+                             [f"{g.user['full_name']} ({g.user['email']}) says they're {role} of {club['name']} and wants to "
+                              "run its page on Sportive Circle. If that's right, give them this code:"],
+                             code=email_code,
+                             reason="You're getting this because this address is listed as the club's email. "
+                                    "If you don't know them, ignore this email: nothing happens without the code.")
+        try:
+            send_email(club["club_email"], subject, body, html=html)
+        except Exception:
+            log.exception("Couldn't email a claim code for club %s", club_id)
+            flash("We couldn't send the email. Try again, or use Instagram or Discord instead.", "error")
+            return back
+        flash(f"We emailed a code to {masked_email(club['club_email'])}, the club's address. Ask whoever reads it "
+              "for the code and type it below.", "success")
+        return back
+    flash(f"Thanks! We'll check {club['name']}'s account for {claim_code(club_id, g.user['id'])} (usually within "
+          "2 days) and let you know.", "success")
     return redirect(url_for("clubs.view", club_id=club_id))
 
 
+@bp.route("/clubs/<int:club_id>/claim/code", methods=("POST",))
+@login_required
+def claim_with_code(club_id):
+    """The code from the club's own email: right, and they run the club now."""
+    club = get_club(club_id)
+    db = get_db()
+    row = db.execute("SELECT * FROM club_claims WHERE club_id = ? AND user_id = ? AND status = 'pending'"
+                     " AND email_code != ''", (club_id, g.user["id"])).fetchone()
+    if row is None or club["claimed"]:
+        abort(404)
+    typed = "".join(ch for ch in request.form.get("code", "") if ch.isdigit())
+    if row["email_tries"] >= CLAIM_CODE_TRIES:
+        flash("Too many wrong codes. Send a new one, or use Instagram or Discord instead.", "error")
+    elif secrets.compare_digest(typed, row["email_code"]):
+        approve_claim(row, club)
+        flash(f"✅ You run {club['name']} on Sportive Circle now! It has the verified badge.", "celebrate")
+        return redirect(url_for("clubs.view", club_id=club_id))
+    else:
+        db.execute("UPDATE club_claims SET email_tries = email_tries + 1 WHERE id = ?", (row["id"],))
+        db.commit()
+        flash("That code isn't right. Check the club's email and try again.", "error")
+    return redirect(url_for("clubs.view", club_id=club_id, claim=1) + "#join")
+
+
 def my_claim(club_id):
-    """This person's request to run the club ('pending' / 'denied'), or None."""
+    """This person's request to run the club: {status, by_email}, or None."""
     if g.get("user") is None:
         return None
-    row = get_db().execute("SELECT status FROM club_claims WHERE club_id = ? AND user_id = ?",
+    row = get_db().execute("SELECT status, email_code FROM club_claims WHERE club_id = ? AND user_id = ?",
                            (club_id, g.user["id"])).fetchone()
-    return row["status"] if row else None
+    return {"status": row["status"], "by_email": bool(row["email_code"])} if row else None
+
+
+def approve_claim(claim_row, club):
+    """They own the club now (officer, can post as it) and it gets the verified badge; other claims are closed."""
+    from .notifications import notify  # imported here: notifications.py is loaded after this module
+    db, link = get_db(), url_for("clubs.view", club_id=club["id"])
+    db.execute("UPDATE clubs SET claimed = 1, created_by = ? WHERE id = ? AND claimed = 0",
+               (claim_row["user_id"], club["id"]))
+    db.execute("""INSERT INTO club_members (club_id, user_id, role, joined_at, can_post) VALUES (?, ?, 'officer', ?, 1)
+                  ON CONFLICT(club_id, user_id) DO UPDATE SET role = 'officer', can_post = 1""",
+               (club["id"], claim_row["user_id"], to_db(now_local())))
+    db.execute("UPDATE club_claims SET status = 'approved' WHERE id = ?", (claim_row["id"],))
+    for other in db.execute("SELECT user_id FROM club_claims WHERE club_id = ? AND status = 'pending' AND id != ?",
+                            (club["id"], claim_row["id"])).fetchall():
+        notify(other["user_id"], "club_review", f"Another officer now runs {club['name']} on Sportive Circle. "
+               "Ask them to add you in Manage officers.", link)
+    db.execute("UPDATE club_claims SET status = 'denied' WHERE club_id = ? AND status = 'pending'", (club["id"],))
+    notify(claim_row["user_id"], "club_review",
+           f"✅ You run {club['name']} on Sportive Circle now! It has the verified badge, and you can post as the club.",
+           link)
+    db.commit()
 
 
 @bp.route("/admin/claims/<int:claim_id>/<decision>", methods=("POST",))
@@ -1228,21 +1339,7 @@ def review_claim(claim_id, decision):
         db.commit()
         flash(f"Denied the claim on {club['name']}.", "info")
         return back
-    db.execute("UPDATE clubs SET claimed = 1, created_by = ? WHERE id = ? AND claimed = 0",
-               (claim_row["user_id"], club["id"]))
-    db.execute("""INSERT INTO club_members (club_id, user_id, role, joined_at, can_post) VALUES (?, ?, 'officer', ?, 1)
-                  ON CONFLICT(club_id, user_id) DO UPDATE SET role = 'officer', can_post = 1""",
-               (club["id"], claim_row["user_id"], to_db(now_local())))
-    db.execute("UPDATE club_claims SET status = 'approved' WHERE id = ?", (claim_id,))
-    for other in db.execute("SELECT user_id FROM club_claims WHERE club_id = ? AND status = 'pending'",
-                            (club["id"],)).fetchall():
-        notify(other["user_id"], "club_review", f"Another officer now runs {club['name']} on Sportive Circle. "
-               "Ask them to add you in Manage officers.", link)
-    db.execute("UPDATE club_claims SET status = 'denied' WHERE club_id = ? AND status = 'pending'", (club["id"],))
-    notify(claim_row["user_id"], "club_review",
-           f"✅ You run {club['name']} on Sportive Circle now! It has the verified badge, and you can post as the club.",
-           link)
-    db.commit()
+    approve_claim(claim_row, club)
     flash(f"{claim_row['role']} is now running {club['name']}. It's verified.", "success")
     return back
 
@@ -1270,23 +1367,21 @@ def uw_rec_clubs(listing=None):
     return listing
 
 
-CLUB_ABOUT = os.path.join(os.path.dirname(__file__), "data", "club_about.json")
-ABOUT_FIELDS = ("focus", "joining", "experience", "competes", "meets", "location", "how_to_join", "dues")
+LISTED_BLANKS = {"focus": "", "joining": "", "experience": "", "competes": 0, "meets": "", "location": "",
+                 "how_to_join": "", "dues": ""}  # nothing guessed: the About tab only shows what the club published
 
 
 def listed_club_values(club):
-    """What the app shows about a club nobody runs here yet: UW's description and links, and the About facts
-    read from them (data/club_about.json). Unknown facts stay blank, so the page says "Ask the club"."""
-    with open(CLUB_ABOUT, encoding="utf-8") as file:
-        about = json.load(file).get(club["name"], {})
-    values = {"description": club["description"] or (
-                  f"{club['uw_name']}, one of UW Recreation's Rec Clubs." if club["source"] == "uw_rec"
-                  else f"{club['name']}, a UW student organization."),
-              "contact_url": club["website"], "instagram": club["instagram"], "facebook": club["facebook"],
-              "x_handle": club["x_handle"], "discord": club["discord"], "huskylink_id": club["huskylink_id"],
-              "who_can_join": club["who_can_join"]}
-    values.update({key: about.get(key, 0 if key == "competes" else "") for key in ABOUT_FIELDS})
-    return values
+    """What the app shows about a club nobody runs here yet: its own description and every link it made public
+    (Instagram, its UW Rec or HuskyLink page, Discord, website...). No facts guessed from the text: wrong ones are
+    worse than none, so the About tab's quick facts stay hidden until an officer claims the club."""
+    return {"description": club["description"] or (
+                f"{club['uw_name']}, one of UW Recreation's Rec Clubs." if club["source"] == "uw_rec"
+                else f"{club['name']}, a UW student organization."),
+            "contact_url": club["website"], "instagram": club["instagram"], "facebook": club["facebook"],
+            "x_handle": club["x_handle"], "discord": club["discord"], "huskylink_id": club["huskylink_id"],
+            "verification_url": club.get("uw_page", ""), "club_email": club.get("club_email", ""),
+            "who_can_join": club["who_can_join"], **LISTED_BLANKS}
 
 
 def add_uw_rec_clubs(listing=None):
@@ -1302,7 +1397,7 @@ def add_uw_rec_clubs(listing=None):
         values = listed_club_values(club)
         if club["match"]:
             if not club["match"]["claimed"]:
-                keep = {k: v for k, v in values.items() if v not in ("", None) or k in ABOUT_FIELDS}
+                keep = {k: v for k, v in values.items() if v not in ("", None) or k in LISTED_BLANKS}
                 db.execute(f"UPDATE clubs SET {', '.join(f'{k} = ?' for k in keep)} WHERE id = ? AND claimed = 0",
                            (*keep.values(), club["match"]["id"]))
             continue
@@ -1384,7 +1479,8 @@ def review_queue():
         """SELECT k.*, c.name AS club_name, c.sport, c.instagram, c.contact_url, c.club_email,
                   u.full_name, u.email
            FROM club_claims k JOIN clubs c ON c.id = k.club_id JOIN users u ON u.id = k.user_id
-           WHERE k.status = 'pending' AND u.suspended = 0 ORDER BY k.id""").fetchall()
+           WHERE k.status = 'pending' AND k.email_code = '' AND u.suspended = 0 ORDER BY k.id""").fetchall()
+    claims = [{**dict(k), "code": claim_code(k["club_id"], k["user_id"])} for k in claims]  # by email: no admin
     return render_template("clubs/review.html", clubs=clubs, status=status, club_counts=club_counts, claims=claims,
                            social_links=social_links,
                            kinds=CLUB_KINDS, focus=FOCUS, joining=JOINING, experience=EXPERIENCE,

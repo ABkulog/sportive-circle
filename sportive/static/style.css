@@ -2044,3 +2044,11 @@ html, body { overflow-x: clip; }
 .claim-panel { margin-top: 10px; }
 .claim-panel > summary { list-style: none; cursor: pointer; color: var(--purple); font-weight: 600; }
 .claim-panel > summary::-webkit-details-marker { display: none; }
+
+/* Clubs tab: "For you" first, then every club A-Z; adding a missing club is a small line at the bottom. */
+.list-heading { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 4px 4px; }
+.add-club-line { text-align: center; margin: 16px 0 4px; }
+.claim-ways { border: 0; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
+.claim-ways legend { font-weight: 600; margin-bottom: 4px; }
+.claim-ways .choice { display: flex; gap: 8px; align-items: flex-start; }
+.claim-code { font-size: 1.1rem; font-weight: 700; letter-spacing: .05em; }

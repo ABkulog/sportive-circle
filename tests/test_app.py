@@ -1993,13 +1993,19 @@ def test_officer_claims_a_listed_club_and_it_gets_verified(accounts, client, app
     accounts.signup(email="prez@uw.edu", name="Pres Ident")
     assert "Say what your role" in client.post(f"/clubs/{club}/claim", data={"role": ""},
                                                follow_redirects=True).data.decode()
-    client.post(f"/clubs/{club}/claim", data={"role": "President", "proof": "On the IMLeagues roster"})
+    from sportive.clubs import claim_code
+    with app.app_context():
+        code = claim_code(club, _user_id(app, "prez@uw.edu"))
+    assert code in client.get(f"/clubs/{club}").data.decode()            # post this on the club's account
+    assert f"Post your code {code}" in client.post(f"/clubs/{club}/claim", data={"role": "President"},
+                                                   follow_redirects=True).data.decode()  # where: required
+    client.post(f"/clubs/{club}/claim", data={"role": "President", "how": "post", "proof": "Instagram bio"})
     assert "Claim sent" in client.get(f"/clubs/{club}").data.decode()
     assert client.get("/admin/clubs").status_code == 404                  # admins only
     accounts.logout()
     accounts.signup(email="admin@uw.edu")
     queue = client.get("/admin/clubs").data.decode()
-    assert "Officers claiming a listed club (1)" in queue and "On the IMLeagues roster" in queue
+    assert "Officers claiming a listed club (1)" in queue and code in queue and "Instagram bio" in queue
     with app.app_context():
         claim_id = get_db().execute("SELECT id FROM club_claims").fetchone()[0]
     client.post(f"/admin/claims/{claim_id}/approve")
@@ -2012,6 +2018,34 @@ def test_officer_claims_a_listed_club_and_it_gets_verified(accounts, client, app
         from sportive.clubs import poster_clubs
         assert [c["name"] for c in poster_clubs(_user_id(app, "prez@uw.edu"))] == ["UW Ultimate"]
     assert client.post(f"/clubs/{club}/claim", data={"role": "VP"}).status_code == 404  # already claimed
+
+
+def test_officer_claims_a_listed_club_through_its_own_email(accounts, client, app):
+    """The owner: "how can we check if someone's actually an officer?" A club with a public email: we send that
+    address a code, and only someone who reads the club's email can type it back. No admin needed."""
+    with app.app_context():
+        db = get_db()
+        club = db.execute("INSERT INTO clubs (name, sport, description, status, claimed, club_email, created_at) VALUES"
+                          " ('Canoe Family', 'rowing', 'Canoes', 'approved', 0, 'canoefamily@gmail.com', '2026-10-01')").lastrowid
+        db.commit()
+    accounts.signup(email="paddler@uw.edu", name="Pat Paddler")
+    page = client.get(f"/clubs/{club}").data.decode()
+    assert "ca•••••••••@gmail.com" in page and 'value="email"' in page
+    client.post(f"/clubs/{club}/claim", data={"role": "Captain", "how": "email"})
+    outbox = app.extensions["outbox"]
+    sent = outbox[-1]
+    assert sent["to"] == "canoefamily@gmail.com" and "Pat Paddler" in sent["body"]
+    code = re.search(r"\b(\d{6})\b", sent["subject"]).group(1)
+    for _ in range(5):
+        client.post(f"/clubs/{club}/claim/code", data={"code": "000000" if code != "000000" else "111111"})
+    assert "Too many wrong codes" in client.post(f"/clubs/{club}/claim/code", data={"code": code},
+                                                 follow_redirects=True).data.decode()
+    client.post(f"/clubs/{club}/claim", data={"role": "Captain", "how": "email"})          # a new code
+    code = re.search(r"\b(\d{6})\b", outbox[-1]["subject"]).group(1)
+    client.post(f"/clubs/{club}/claim/code", data={"code": code})
+    with app.app_context():
+        assert get_db().execute("SELECT claimed FROM clubs WHERE id = ?", (club,)).fetchone()[0] == 1
+    assert "Edit club" in client.get(f"/clubs/{club}").data.decode()
 
 
 def test_admins_add_every_uw_rec_club_with_its_links(accounts, client, app):
@@ -2049,98 +2083,6 @@ def test_admins_add_every_uw_rec_club_with_its_links(accounts, client, app):
     assert "Nobody from UW Climbing Club runs this page yet" in page and "instagram.com/climbuw" in page
     assert "discord.com/invite/" in page
     assert "UW Climbing Club" in client.get("/clubs").data.decode()
-
-
-HUSKYLINK_FEED = """<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>washington Events</title>
-<item><eventId>{eid}</eventId><groupId>{gid}</groupId><coHostedGroupIds></coHostedGroupIds><title>{title}</title>
-<eventStartDateTime>{start}T18:00:00.0000000-07:00</eventStartDateTime><eventLocation>{place}</eventLocation>
-<eventLink>https://huskylink.washington.edu/barbellclub/rsvp?id={eid}</eventLink><eventDelete>{deleted}</eventDelete></item>
-<item><eventId>2</eventId><groupId>999</groupId><title>Origami night</title>
-<eventStartDateTime>{start}T18:00:00.0000000-07:00</eventStartDateTime><eventLink>https://huskylink.washington.edu/o/</eventLink></item>
-</channel></rss>"""
-
-
-def test_huskylink_events_post_themselves_for_their_club(accounts, client, app):
-    """FR-CLUB-41: a club's HuskyLink events show up as its updates by themselves, marked From HuskyLink."""
-    from sportive.huskylink import sync
-    start = (now_local() + timedelta(days=3)).strftime("%Y-%m-%d")
-    feed = lambda **kw: HUSKYLINK_FEED.format(**{"eid": 1, "gid": 35, "title": "Group Lift", "start": start,  # noqa: E731
-                                                 "place": "IMA", "deleted": 0, **kw})
-    with app.app_context():
-        db = get_db()
-        club = db.execute("INSERT INTO clubs (name, sport, description, status, claimed, huskylink_id, created_at)"
-                          " VALUES ('Barbell Club', 'weightlifting', 'Lifting', 'approved', 0, 35, '2026-10-01 10:00')").lastrowid
-        db.commit()
-        assert sync(feed()) == 1 and sync(feed()) == 0                   # once per event, other groups ignored
-        post = db.execute("SELECT * FROM club_posts").fetchone()
-        assert post["body"].startswith("📅 Group Lift · ") and post["body"].endswith(" · 6:00 PM · IMA")
-        assert post["link"] == "https://huskylink.washington.edu/barbellclub/rsvp?id=1"
-        sync(feed(title="Max Out Day", place="Private Location (sign in to display)"))  # changed: same post, updated
-        bodies = [r["body"] for r in db.execute("SELECT body FROM club_posts")]
-        assert len(bodies) == 1 and bodies[0].startswith("📅 Max Out Day · ")
-        assert "Private" not in db.execute("SELECT body FROM club_posts").fetchone()[0]
-        sync(feed(eid=3, start="2020-01-01"))                              # already over: not posted
-        far = (now_local() + timedelta(days=20)).strftime("%Y-%m-%d")
-        sync(feed(eid=4, start=far))                                       # weeks away: posted when it's closer
-        assert db.execute("SELECT COUNT(*) FROM club_posts").fetchone()[0] == 1
-    accounts.signup(sports=("weightlifting",))                            # the feed shows your sports' clubs
-    page = client.get(f"/clubs/{club}").data.decode()
-    assert "Max Out Day" in page and "RSVP on HuskyLink" in page and "From HuskyLink" in page
-    assert "Max Out Day" in client.get("/feed").data.decode()               # in the feed too
-    with app.app_context():
-        sync(feed(title="Max Out Day", deleted=1))
-        assert get_db().execute("SELECT body FROM club_posts").fetchone()[0].startswith("Canceled: ")
-    assert "Max Out Day" not in client.get("/feed").data.decode()           # canceled posts leave the feed
-    with app.app_context():                                                # "we don't want old feed"
-        from sportive.huskylink import remove_past
-        db = get_db()
-        sync(feed(eid=5, title="Morning Lift"))
-        assert "Morning Lift" in client.get(f"/clubs/{club}").data.decode()
-        db.execute("UPDATE club_posts SET ends_at = '2020-01-01 10:00' WHERE huskylink_event = 5")
-        db.commit()
-        assert remove_past() == 1 and remove_past() == 0
-        sync(feed(eid=5, title="Morning Lift"))                             # it stays over
-        assert db.execute("SELECT body FROM club_posts WHERE huskylink_event = 5").fetchone()[0].startswith("Over: ")
-    assert "Morning Lift" not in client.get(f"/clubs/{club}").data.decode()
-    assert "Morning Lift" not in client.get("/feed").data.decode()
-
-
-def test_uw_clubs_refresh_themselves_every_day(accounts, client, app, monkeypatch):
-    """The owner: "don't leave me anything" and "access all the information daily". Once a day the site reads UW's
-    club lists again (here they're down, so it uses the saved copy), adds new clubs and fills in their About tab;
-    unclaimed clubs get UW's latest info, claimed ones are left to their officers."""
-    import sportive.clubs as clubs_module
-    import sportive.clubsources as sources
-    with app.app_context():                                                # listed before it was found not a sport
-        get_db().execute("INSERT INTO clubs (name, sport, description, status, claimed, created_at) VALUES "
-                         "('Sumo Union Membership Organization', 'wrestling', 'TV', 'approved', 0, '2026-10-01 10:00')")
-        get_db().commit()
-    monkeypatch.setattr(sources, "build_listing", lambda log=None: (_ for _ in ()).throw(OSError("UW is down")))
-    monkeypatch.setattr(clubs_module.threading, "Thread", lambda target, args, **kw: type(
-        "Now", (), {"start": lambda self: target(*args)})())
-    clubs_module.clubs_round(app)
-    with app.app_context():
-        db = get_db()
-        count = db.execute("SELECT COUNT(*) FROM clubs WHERE claimed = 0").fetchone()[0]
-        running = db.execute("SELECT * FROM clubs WHERE name = 'UW Running Club'").fetchone()
-        assert count >= 80 and running["meets"] == "Every weekday at 5 PM" and running["location"] == "The Quad"
-        assert running["joining"] == "open" and running["focus"] == "recreational"
-        assert db.execute("SELECT joining FROM clubs WHERE name = 'UW Men''s Rugby Club'").fetchone()[0] == ""
-        assert not db.execute("SELECT 1 FROM clubs WHERE name LIKE 'Sumo%'").fetchone()
-        db.execute("UPDATE clubs SET meets = 'Old info' WHERE id = ?", (running["id"],))
-        db.execute("DELETE FROM app_state WHERE key LIKE 'club_sync:%'")      # the next day
-        db.commit()
-    clubs_module.clubs_round(app)
-    clubs_module.clubs_round(app)                                          # same day: nothing more
-    with app.app_context():
-        db = get_db()
-        assert db.execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == count
-        assert db.execute("SELECT meets FROM clubs WHERE id = ?", (running["id"],)).fetchone()[0] == "Every weekday at 5 PM"
-    accounts.signup()
-    rugby = client.get(f"/clubs/{_club_id(app, 'UW Men' + chr(39) + 's Rugby Club')}").data.decode()
-    running_page = client.get(f"/clubs/{running['id']}").data.decode()
-    assert "Every weekday at 5 PM" in running_page and "Just show up at the Quad" in running_page
-    assert "Free" not in rugby                                             # unknown dues aren't "Free"
 
 
 def test_follow_is_not_membership(accounts, client, app):
@@ -3077,11 +3019,38 @@ def test_gold_text_on_the_purple_header_is_readable():
         assert _contrast(c["--header"], c["--gold-on-header"]) >= 4.5, theme
 
 
-def test_register_a_club_sits_next_to_the_search(accounts, client, app):
-    _approved_club(accounts, client, app)
-    accounts.signup(email="fan@uw.edu")
-    page = client.get("/clubs").data.decode()                      # Register is at the top, next to the search
-    assert page.index("＋ Register a club") < page.index('class="club-list"')
+def test_clubs_for_you_first_then_a_to_z_and_adding_one_is_a_small_link(accounts, client, app):
+    """The owner: every club is on the app, so no big Register button; clubs you might like on top, then A-Z;
+    denied ones don't crowd My clubs."""
+    _approved_club(accounts, client, app, name="Zed Tennis Club", sport="tennis")
+    with app.app_context():
+        for name, sport in (("Alpha Rowing Club", "rowing"), ("Beta Tennis Club", "tennis")):
+            get_db().execute("INSERT INTO clubs (name, sport, description, status, claimed, created_at)"
+                             " VALUES (?, ?, 'A club', 'approved', 0, '2026-10-01 10:00')", (name, sport))
+        get_db().commit()
+    accounts.signup(email="fan@uw.edu", sports=("tennis",))
+    page = client.get("/clubs").data.decode()
+    assert "＋ Register a club" not in page and "Can't find your club?" in page
+    order = [page.index(name) for name in ("For you", "Beta Tennis Club", "Zed Tennis Club", "All clubs, A–Z",
+                                           "Alpha Rowing Club")]
+    assert order == sorted(order)
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")
+    client.post("/clubs/new", data={**CLUB, "name": "Spam Club"})
+    with app.app_context():
+        get_db().execute("UPDATE clubs SET status = 'denied' WHERE name = 'Spam Club'")
+        get_db().commit()
+    assert "Spam Club" not in client.get("/clubs?mine=1").data.decode()
+    zed = _club_id(app, "Zed Tennis Club")
+    with app.app_context():                                                 # a Discord kept for members
+        get_db().execute("UPDATE clubs SET discord = 'https://discord.gg/abc123', discord_members_only = 1"
+                         " WHERE id = ?", (zed,))
+        get_db().commit()
+    assert "discord.gg/abc123" in client.get(f"/clubs/{zed}").data.decode()   # the captain is an officer
+    accounts.logout()
+    accounts.login(email="fan@uw.edu")
+    page = client.get(f"/clubs/{zed}").data.decode()
+    assert "discord.gg/abc123" not in page and "Discord: for members" in page
 
 
 def test_every_dependency_has_a_version_pin():

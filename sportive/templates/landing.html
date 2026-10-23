@@ -55,8 +55,8 @@
     </div>
     <p><a class="btn btn-ghost" href="{{ url_for('clubs.directory') }}">See all clubs →</a></p>
   {% else %}
-    <p class="card muted">Clubs are joining now. Officer of a UW club?
-      <a href="{{ url_for('auth.signup', club=1) }}">Register it</a>.</p>
+    <p class="card muted">Every UW club is here. Officer of one?
+      <a href="{{ url_for('auth.signup', club=1) }}">Claim it</a>.</p>
   {% endif %}
 </section>
 {% endblock %}

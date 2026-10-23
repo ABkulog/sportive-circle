@@ -7,8 +7,6 @@
 <form method="get" class="club-finder" role="search" aria-label="Find a club">
   <div class="club-search-row">
     <input type="search" name="q" value="{{ q }}" placeholder="Search clubs" aria-label="Search clubs">
-    {% if g.user %}<a class="btn btn-small" href="{{ url_for('clubs.create') }}">＋ Register a club</a>
-    {% else %}<a class="btn btn-small" href="{{ url_for('auth.signup', club=1) }}">＋ Register a club</a>{% endif %}
   </div>
   <nav class="feed-chips" aria-label="Show">
     {% set all_on = not mine and not fits and not sport %}
@@ -34,7 +32,10 @@
 </form>
 
 <div class="club-list">
+  {% set split = not mine and clubs and clubs[0].for_you and not clubs[-1].for_you %}
   {% for c in clubs %}
+    {% if split and loop.first %}<h2 class="list-heading">For you</h2>{% endif %}
+    {% if split and not c.for_you and loop.previtem.for_you %}<h2 class="list-heading">All clubs, A–Z</h2>{% endif %}
     <a class="club-row" href="{{ url_for('clubs.view', club_id=c.id) }}">
       {{ club_logo(c, 44) }}
       <span class="club-row-text">
@@ -62,11 +63,15 @@
     </div>
     {% else %}
       <p><strong>{% if q or sport or mine or fits %}No clubs match that.{% else %}No clubs yet.{% endif %}</strong></p>
-      <p class="muted">Are you an officer of an active UW club? Register it so other students can find you.</p>
-      {% if g.user %}<a class="btn" href="{{ url_for('clubs.create') }}">Register your club</a>
-      {% else %}<a class="btn" href="{{ url_for('auth.signup', club=1) }}">Sign up to register your club</a>{% endif %}
+      <p class="muted">Every club on UW Rec and HuskyLink is here. Run one that isn't?</p>
+      {% if g.user %}<a class="btn" href="{{ url_for('clubs.create') }}">Add your club</a>
+      {% else %}<a class="btn" href="{{ url_for('auth.signup', club=1) }}">Sign up to add your club</a>{% endif %}
     </div>
     {% endif %}
   {% endfor %}
+  {% if clubs and not mine %}
+    <p class="muted small add-club-line">Can't find your club?
+      <a href="{{ url_for('clubs.create') if g.user else url_for('auth.signup', club=1) }}">Add it</a></p>
+  {% endif %}
 </div>
 {% endblock %}
