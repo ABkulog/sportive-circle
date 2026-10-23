@@ -13,6 +13,9 @@
   <a class="card create-option" href="{{ url_for('clubs.review_queue') }}">
     <span class="create-emoji" aria-hidden="true">🚩</span><strong>Club requests</strong>
     <span class="muted">{{ clubs ~ ' waiting' if clubs else 'None waiting' }}</span></a>
+  <a class="card create-option" href="{{ url_for('clubs.uw_rec_import') }}">
+    <span class="create-emoji" aria-hidden="true">🏛️</span><strong>UW clubs</strong>
+    <span class="muted">Put every UW sports club on the app, with its links</span></a>
   <a class="card create-option" href="{{ url_for('placecheck.admin_rec') }}">
     <span class="create-emoji" aria-hidden="true">🏟️</span><strong>UW Rec reservations</strong>
     <span class="muted">{{ upcoming_rec ~ ' coming up' if upcoming_rec else 'None added yet' }}</span></a>

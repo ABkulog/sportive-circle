@@ -32,7 +32,7 @@
   </div>
   <div class="club-profile-main">
     <h1>{{ club.name }}</h1>
-    <p class="club-sub">{% if club.status == 'approved' and club.claimed %}{{ verified_badge(label=True) }} · {% endif %}{{ SPORTS[club.sport] }} · {{ focus.get(club.focus, '') }}</p>
+    <p class="club-sub">{% if club.status == 'approved' and club.claimed %}{{ verified_badge(label=True) }} · {% endif %}{{ SPORTS[club.sport] }}{% if club.focus %} · {{ focus.get(club.focus, '') }}{% endif %}</p>
   </div>
   {% if club.status == 'approved' and not club.claimed %}
     <p class="unclaimed-note">From UW's public club listings. Nobody from {{ club.name }} runs this page yet.</p>

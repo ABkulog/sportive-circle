@@ -219,6 +219,7 @@
     <a href="{{ url_for('moderation.admin_home') }}">← Admin</a>
     <a href="{{ url_for('moderation.admin_reports') }}" {% if active == 'reports' %}aria-current="page"{% endif %}>🛡️ Reports{% set n = open_report_count() %}{% if n %} ({{ n }}){% endif %}</a>
     <a href="{{ url_for('clubs.review_queue') }}" {% if active == 'clubs' %}aria-current="page"{% endif %}>🚩 Club requests{% set n = pending_club_count() %}{% if n %} ({{ n }}){% endif %}</a>
+    <a href="{{ url_for('clubs.uw_rec_import') }}" {% if active == 'uwrecclubs' %}aria-current="page"{% endif %}>🏛️ UW clubs</a>
     <a href="{{ url_for('placecheck.admin_rec') }}" {% if active == 'uwrec' %}aria-current="page"{% endif %}>🏟️ UW Rec reservations</a>
     <a href="{{ url_for('feedback.admin_suggestions') }}" {% if active == 'suggestions' %}aria-current="page"{% endif %}>💡 Suggestions{% set n = tab_badges().admin %}{% if n %} ({{ n }} trending){% endif %}</a>
   </nav>
