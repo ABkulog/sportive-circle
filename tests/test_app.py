@@ -4706,7 +4706,7 @@ def _next(weekday, hour, minute=0, month=None):
     return day.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
 
-def test_games_only_while_the_place_is_open(accounts, client, app):
+def test_games_only_while_the_place_is_open(accounts, client, app, monkeypatch):
     """The owner: a game can't be posted at a place when it's closed (the IMA closes at 8:30 PM on weekends, the golf
     range is closed on Mondays in October, the WAC closes for the season). The form shows the hours; editing a
     game's note isn't held to hours that changed later; every week of a weekly practice is checked."""
@@ -4747,9 +4747,12 @@ def test_games_only_while_the_place_is_open(accounts, client, app):
     accounts.logout()
     club = _approved_club(accounts, client, app, name="Husky Golf", sport="golf", location="UW Golf Driving Range")
     accounts.login(email="captain@uw.edu")
-    tuesday = _next(1, 12)                                # a 6-week practice with a week in November (closed
-    while all((tuesday + timedelta(weeks=week)).month != 11 for week in range(6)):  # Tuesdays), within a year
-        tuesday += timedelta(weeks=1)
+    # A 6-week practice whose 4th week falls on a closed Tuesday. The range's real seasons (closed Tuesdays in
+    # November) only line up like that part of the year, so the test closes that one day itself.
+    from sportive.constants import GOLF_RANGE, PLACE_HOURS
+    tuesday = _next(1, 12)
+    closed = (tuesday + timedelta(weeks=3)).strftime("%m-%d")
+    monkeypatch.setitem(PLACE_HOURS, GOLF_RANGE, [((closed, closed), {**{day: ("10:00", "18:00") for day in range(7)}, 1: None})])
     page = client.post(f"/events/new?club={club}", data=event_form(
         title="Range day", sport="golf", location="UW Golf Driving Range", club=str(club), repeat="6",
         starts_at=at(tuesday), ends_at=at(tuesday.replace(hour=14))), follow_redirects=True).data.decode()
