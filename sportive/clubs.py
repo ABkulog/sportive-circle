@@ -78,6 +78,34 @@ def social_links(club, members=True):
     return links
 
 
+UW_REC_LIST = "https://www.washington.edu/ima/rec-clubs/club-offerings/"  # one page listing all 42 Rec Clubs
+
+
+def club_link_row(club, socials):
+    """The one row of links under a club's description, most useful first: Instagram, the club's own website, its
+    other socials, its HuskyLink or UW page, email. A link that goes where another one already does shows once, and
+    UW Rec's page of every Rec Club (not about this club) only shows when a club has no other link."""
+    def bare(url):
+        return url.lower().split("://")[-1].removeprefix("www.").rstrip("/")
+
+    def same(a, b):
+        return bare(a) == bare(b)
+    instagram = [link for link in socials if link[0] == "Instagram"]
+    rows = list(instagram)
+    if club["contact_url"]:
+        rows.append(("Website", "🔗", club["contact_url"], club["contact_url"].split("://")[-1]))
+    rows += [link for link in socials if link[0] != "Instagram"]
+    page = club["verification_url"] or ""
+    if page and not any(same(page, url) for _, _, url, _ in rows):
+        label = ("HuskyLink" if "huskylink.washington.edu" in page else "UW Rec" if "washington.edu/ima" in page
+                 else "UW page")
+        if not (same(page, UW_REC_LIST) and rows):
+            rows.append((label, "🏛️", page, page.split("://")[-1]))
+    if club["club_email"]:
+        rows.append(("Email", "✉️", f"mailto:{club['club_email']}", club["club_email"]))
+    return rows
+
+
 # SQL for "how many confirmed members" (members + officers; followers and people waiting don't count).
 # A member count only says something once a club has people here; "0 members" makes a real club look empty.
 SHOW_MEMBERS_FROM = 5
@@ -439,7 +467,7 @@ def view(club_id):
                            my_claim_code=claim_code(club_id, g.user["id"]) if g.get("user") else "",
                            club_email_masked=masked_email(club["club_email"]) if club["club_email"] else "",
                            can_post=bool(me) and can_post_as(club_id, me), can_decide=can_decide, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
-                           socials=social_links(club, members=role in MEMBER_ROLES or is_admin()),
+                           links=club_link_row(club, social_links(club, members=role in MEMBER_ROLES or is_admin())),
                            discord_hidden=bool(club["discord"] and club["discord_members_only"]
                                                and not (role in MEMBER_ROLES or is_admin())),
                            joining=JOINING,

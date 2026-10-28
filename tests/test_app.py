@@ -8356,3 +8356,30 @@ def test_club_cards_hide_member_counts_until_a_club_has_a_few(accounts, client, 
         db.commit()
     assert "5 members" in client.get("/clubs").data.decode()
     assert "<strong>5</strong><span>members</span>" in client.get(f"/clubs/{club}").data.decode()
+def test_club_links_one_row_most_useful_first(accounts, client, app):
+    """FR-CLUB-46: a club's links read Instagram first, then its own website, then its other socials, its HuskyLink
+    or UW page, email. A link that goes where another does shows once, and UW Rec's page of all 42 Rec Clubs only
+    shows when a club has no other link."""
+    from sportive.clubs import UW_REC_LIST
+    with app.app_context():
+        db = get_db()
+        def listed(name, **links):
+            row = {"name": name, "sport": "running", "status": "approved", "claimed": 0, "club_kind": "rec_club",
+                   "description": "A club.", "created_at": "2026-10-01 12:00:00", **links}
+            return db.execute(f"INSERT INTO clubs ({', '.join(row)}) VALUES ({', '.join('?' * len(row))})",
+                              tuple(row.values())).lastrowid
+        rec = listed("UW Running Club", instagram="huskyrunningclub", facebook="https://facebook.com/hrc",
+                     contact_url="https://students.washington.edu/uwrunner/", verification_url=UW_REC_LIST)
+        lone = listed("UW Shotokan Karate Club", verification_url=UW_REC_LIST)
+        twice = listed("Husky Pickleball Club", contact_url="https://huskylink.washington.edu/huskypickle/",
+                       verification_url="https://huskylink.washington.edu/huskypickle")
+        db.commit()
+    page = client.get(f"/clubs/{rec}").data.decode()
+    row = page[page.index('id="contact"'):page.index("</ul>", page.index('id="contact"'))]
+    assert row.index("Instagram") < row.index("Website") < row.index("Facebook")
+    assert UW_REC_LIST not in row                                     # not about this club, and it has others
+    lone_page = client.get(f"/clubs/{lone}").data.decode()
+    assert f'href="{UW_REC_LIST}"' in lone_page and "UW Rec" in lone_page   # its only link
+    twice_page = client.get(f"/clubs/{twice}").data.decode()
+    row = twice_page[twice_page.index('id="contact"'):twice_page.index("</ul>", twice_page.index('id="contact"'))]
+    assert row.count("href=\"https://huskylink.washington.edu/huskypickle") == 1
