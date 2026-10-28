@@ -90,12 +90,14 @@ def club_link_row(club, socials):
 
     def same(a, b):
         return bare(a) == bare(b)
+    from .linkcheck import dead  # websites that were gone two days in a row (linkcheck.py)
+    gone = dead([club["contact_url"], club["verification_url"]])
     instagram = [link for link in socials if link[0] == "Instagram"]
     rows = list(instagram)
-    if club["contact_url"]:
+    if club["contact_url"] and club["contact_url"] not in gone:
         rows.append(("Website", "🔗", club["contact_url"], club["contact_url"].split("://")[-1]))
     rows += [link for link in socials if link[0] != "Instagram"]
-    page = club["verification_url"] or ""
+    page = club["verification_url"] if club["verification_url"] not in gone else ""
     if page and not any(same(page, url) for _, _, url, _ in rows):
         label = ("HuskyLink" if "huskylink.washington.edu" in page else "UW Rec" if "washington.edu/ima" in page
                  else "UW page")
@@ -1377,6 +1379,8 @@ def review_claim(claim_id, decision):
 # ---------------------------------------------------- UW Rec Clubs, listed before any officer signs up
 
 UW_REC_CLUBS = os.path.join(os.path.dirname(__file__), "data", "uw_rec_clubs.json")  # tools/fetch_rec_clubs.py
+CLUB_LINKS_BY_HAND = os.path.join(os.path.dirname(__file__), "data", "club_links_by_hand.json")
+HAND_LINK_KEYS = ("instagram", "website", "facebook", "discord", "x_handle", "club_email")
 CLUB_SOURCES = {"uw_rec": "UW Rec", "huskylink": "HuskyLink"}
 
 
@@ -1387,6 +1391,12 @@ def uw_rec_clubs(listing=None):
     if listing is None:
         with open(UW_REC_CLUBS, encoding="utf-8") as file:
             listing = json.load(file)
+    with open(CLUB_LINKS_BY_HAND, encoding="utf-8") as file:
+        by_hand = json.load(file)["clubs"]
+    for club in listing["clubs"]:  # links a person checked win over what UW's pages say
+        for key, value in by_hand.get(club["name"], {}).items():
+            if key in HAND_LINK_KEYS and isinstance(value, str):
+                club[key] = value.strip().lstrip("@") if key == "instagram" else value.strip()
     ours = get_db().execute("SELECT id, name, instagram, huskylink_id, claimed FROM clubs WHERE status != 'denied'").fetchall()
     by_name = {fold(row["name"]): row for row in ours}
     by_instagram = {row["instagram"].lower(): row for row in ours if row["instagram"]}
@@ -1471,6 +1481,12 @@ def _sync_clubs(app):
             log.info("UW clubs refreshed; %d new.", len(added))
     except Exception:
         log.exception("Couldn't refresh the UW clubs")
+    try:
+        with app.app_context():
+            from .linkcheck import check_club_websites
+            check_club_websites()
+    except Exception:
+        log.exception("Couldn't check the club websites")
 
 
 @bp.route("/admin/clubs/uw-rec", methods=("GET", "POST"))
