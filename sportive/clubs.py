@@ -50,6 +50,8 @@ JOINING = {"open": "Open: just show up", "tryouts": "Tryouts", "application": "A
 EXPERIENCE = {"none": "No experience needed", "some": "Some experience helps", "experienced": "Experienced players"}
 WHO_CAN_JOIN = {"everyone": "Anyone", "women": "Women", "men": "Men", "nonbinary": "Nonbinary",  # in the form
                 "other": "Other"}
+# "Clubs to suggest" in a student's sports: which men's / women's clubs For you shows (no choice: neither).
+CLUB_SHOW = {"men": "Men's + co-ed", "women": "Women's + co-ed", "all": "All"}
 WHO_CAN_JOIN_LABELS = {**WHO_CAN_JOIN, "women_nb": "Women & nonbinary"}  # older clubs may still say this
 # Optional social accounts: (label, emoji, rule to check it, how to turn it into a link)
 SOCIALS = {
@@ -387,13 +389,18 @@ def directory():
     if "no_tryouts" in easy:
         where.append("c.joining = 'open'")
     # "For you" first (your clubs, and clubs for your sports that you can join), then every other club A-Z.
+    # Which men's or women's clubs count as "for you": from the gender on their profile, else the "Clubs to show
+    # me" choice in their sports. Nobody's guessed: with neither, only clubs open to everyone are suggested.
     gender = (g.user["gender"] if g.get("user") else "") or ""
+    show = (g.user["club_show"] if g.get("user") else "") or ""
     params.update({f"you{i}": key for i, key in enumerate(my_sports)})
     yours = " OR ".join([f"c.sport = :you{i}" for i in range(len(my_sports))]) or "0"
-    can_join = ("1" if not gender else
+    group = {"woman": "women", "man": "men"}.get(gender, gender) if gender in ("woman", "man", "nonbinary") else \
+        show if show in ("men", "women") else ""
+    can_join = ("1" if show == "all" and not group else
                 "c.who_can_join = 'everyone' OR c.who_can_join = :gender_group OR "
-                "(c.who_can_join = 'women_nb' AND :gender IN ('woman', 'nonbinary'))")
-    params.update({"gender": gender, "gender_group": {"woman": "women", "man": "men"}.get(gender, gender)})
+                "(c.who_can_join = 'women_nb' AND :gender_group IN ('women', 'nonbinary'))")
+    params.update({"gender_group": group})
     clubs = get_db().execute(
         f"""SELECT c.*, {MEMBER_COUNT},
                    ((SELECT m.role FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me) IS NOT NULL
@@ -723,7 +730,8 @@ ACTIVE_OFFICERS = """SELECT COUNT(*) FROM club_members m JOIN users u ON u.id = 
 WAITING_ROLES = ("requested", "tryout")
 # Dues officers typed that mean free: "Free", "Free!", "free (shirt optional)", "$0", "None", "No dues", blank.
 # ("Free first quarter, then $40" has a price in it, so it isn't.)
-FREE_DUES = """(TRIM(c.dues) = '' OR LOWER(TRIM(c.dues)) IN ('0', '$0', '0$', '$0.00', 'none', 'no', 'no dues', 'n/a', 'na')
+# Only dues a club wrote down: blank means nobody said (a club listed from UW's pages, or officers who skipped it).
+FREE_DUES = """(LOWER(TRIM(c.dues)) IN ('0', '$0', '0$', '$0.00', 'none', 'no', 'no dues', 'n/a', 'na')
                OR ((LOWER(TRIM(c.dues)) LIKE 'free%' OR LOWER(TRIM(c.dues)) LIKE 'no dues%')
                    AND c.dues NOT GLOB '*[1-9]*'))"""
 
