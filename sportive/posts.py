@@ -10,7 +10,7 @@ import json
 import os
 import re
 
-from flask import (Blueprint, Response, abort, flash, g, jsonify, redirect, render_template, request, send_file,
+from flask import (Blueprint, Response, abort, current_app, flash, g, jsonify, redirect, render_template, request, send_file,
                    url_for)
 from markupsafe import Markup, escape
 from werkzeug.datastructures import MultiDict
@@ -311,7 +311,9 @@ def feed():
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"),
                            as_club=request.args.get("as", type=int) or (post_event["club_id"] if post_event
                                                                          and post_event["club_id"] else None),
-                           post_event=post_event, member_roles=MEMBER_ROLES, club_picks=club_picks)
+                           post_event=post_event, member_roles=MEMBER_ROLES, club_picks=club_picks,
+                           can_open_sheet=bool(current_app.config.get("PEOPLE_POSTING", False) or post_event
+                                               or poster_clubs(g.user["id"])))
 
 
 def posts_by(user_id, limit=10):
@@ -695,6 +697,9 @@ def create():
             back = url_for("clubs.updates")
         sport = sport if sport in SPORTS else club["sport"]
     attached = _postable_event(form.get("event_id", type=int))  # "📣 Post this event": its card goes under the post
+    if club is None and attached is None and not current_app.config.get("PEOPLE_POSTING", False):
+        flash("Posts are paused for now. Clubs still post here, and you can post a game from Play.", "error")
+        return redirect(url_for("posts.feed"))
     if attached is not None and sport not in SPORTS:
         sport = attached["sport"]
     if sport not in SPORTS:
