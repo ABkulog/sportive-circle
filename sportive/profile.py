@@ -15,7 +15,7 @@ from .events import INSIDE_VISIBLE, SHOWN_UNLESS_FULL, celebrate_progress, query
 from .photos import THUMB_SIZES, make_avatar, thumbnail
 from .badges import (GIVEN_BADGES, ROLE_BADGES, SHOWCASE_SLOTS, TESTER, catalog, earned_badges, is_retired,
                      give_badge, rarity, set_showcase, showcase, sync_badges)
-from .clubs import SOCIALS
+from .clubs import CLUB_SHOW, SOCIALS
 from .moderation import admin_required, is_admin
 from .notifications import mark_seen, notify
 from .textutil import HANDLE_SITES, has_a_letter, is_number, multi_line, one_line, person_name, social_handle
@@ -323,12 +323,15 @@ def edit_sports():
             db.execute("UPDATE users SET instagram = :instagram, snapchat = :snapchat, tiktok = :tiktok,"
                        " x_handle = :x_handle, linkedin = :linkedin WHERE id = :id", {**socials, "id": me["id"]})
             set_user_sports(me["id"], [s for s in form.getlist("sports") if s in SPORTS])
+            db.execute("UPDATE users SET club_show = ? WHERE id = ?",
+                       (form.get("club_show") if form.get("club_show") in CLUB_SHOW else "", me["id"]))
             db.commit()
             flash("Profile saved.", "success")
             return redirect(url_for("profile.view", user_id=me["id"]))
     else:
         form = MultiDict([(key, me[key]) for key in PERSON_SOCIALS] + [("sports", s) for s in user_sports(me["id"])])
-    return render_template("profile/edit_sports.html", form=form,
+    return render_template("profile/edit_sports.html", form=form, CLUB_SHOW=CLUB_SHOW,
+                           club_show=form.get("club_show", me["club_show"]),
                            socials={key: PERSON_SOCIAL_RULES[key][0] for key in PERSON_SOCIALS})
 
 

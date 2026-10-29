@@ -410,14 +410,18 @@ def signup_sports():
     if request.method == "POST":
         theme = request.form.get("theme") if request.form.get("theme") in THEMES else "light"
         set_user_sports(user["id"], [s for s in request.form.getlist("sports") if s in SPORTS])
-        get_db().execute("UPDATE users SET theme = ? WHERE id = ?", (theme, user["id"]))
+        from .clubs import CLUB_SHOW  # imported here: clubs.py imports this module
+        show = request.form.get("club_show") if request.form.get("club_show") in CLUB_SHOW else ""
+        get_db().execute("UPDATE users SET theme = ?, club_show = ? WHERE id = ?", (theme, show, user["id"]))
         get_db().commit()
         session["theme"] = theme  # the code page already looks the way they picked
         from .sms import sms_available  # imported here: sms.py is small, but keep auth.py's imports light
         return redirect(url_for("auth.signup_texts" if sms_available() else "auth.verify"))
     chosen = [row[0] for row in get_db().execute("SELECT sport FROM user_sports WHERE user_id = ?", (user["id"],))]
+    from .clubs import CLUB_SHOW
+    show = get_db().execute("SELECT club_show FROM users WHERE id = ?", (user["id"],)).fetchone()[0]
     return render_template("auth/signup_sports.html", form=MultiDict([("sports", s) for s in chosen]),
-                           theme=session.get("theme", "light"))
+                           theme=session.get("theme", "light"), CLUB_SHOW=CLUB_SHOW, club_show=show)
 
 
 @bp.route("/signup/texts", methods=("GET", "POST"))

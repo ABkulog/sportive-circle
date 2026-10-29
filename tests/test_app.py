@@ -8427,3 +8427,33 @@ def test_links_checked_by_hand_fill_in_what_uw_lists_without(accounts, client, a
         club = get_db().execute("SELECT id, instagram FROM clubs WHERE name = 'Husky Pickleball Club'").fetchone()
     assert club["instagram"] == "huskypickleball"
     assert "instagram.com/huskypickleball" in client.get(f"/clubs/{club['id']}").data.decode()
+def test_for_you_only_suggests_clubs_you_can_join(accounts, client, app):
+    """FR-CLUB-47: a man with no gender on his profile was shown women's clubs under For you. Now For you counts a
+    men's or women's club only from the gender on someone's profile or their "Clubs to suggest" pick (sign-up and
+    Socials and sports); with neither, only clubs open to everyone. Other clubs stay in the A-Z list."""
+    accounts.signup(email="captain@uw.edu", name="Cap Tain")
+    for name, who in [("UW Women's Soccer Club", "women"), ("UW Men's Soccer Club", "men"), ("UW Pickup Soccer", "everyone")]:
+        client.post("/clubs/new", data={**CLUB, "name": name, "sport": "soccer", "who_can_join": who})
+    with app.app_context():
+        get_db().execute("UPDATE clubs SET status = 'approved'")
+        get_db().commit()
+    accounts.logout()
+    accounts.signup(email="vince@uw.edu", name="Vince R")
+    client.post("/profile/edit/sports", data={"sports": "soccer"})
+
+    def for_you():
+        page = client.get("/clubs").data.decode()
+        head = page[page.index("For you"):page.index("All clubs, A")] if "All clubs, A" in page else page
+        return {name for name in ("Women&#39;s Soccer", "Men&#39;s Soccer", "Pickup Soccer") if name in head}
+    assert for_you() == {"Pickup Soccer"}                                        # nothing picked: no guessing
+    client.post("/profile/edit/sports", data={"sports": "soccer", "club_show": "men"})
+    assert for_you() == {"Men&#39;s Soccer", "Pickup Soccer"}
+    client.post("/profile/edit/sports", data={"sports": "soccer", "club_show": "all"})
+    assert for_you() == {"Women&#39;s Soccer", "Men&#39;s Soccer", "Pickup Soccer"}
+    assert "Clubs to suggest" in client.get("/profile/edit/sports").data.decode()
+
+
+def test_free_filter_skips_clubs_whose_dues_nobody_wrote(accounts, client, app):
+    """FR-CLUB-48: "Free" listed every club UW lists (blank dues), many of which charge. Blank now means unknown."""
+    club = _approved_club(accounts, client, app, dues="")
+    assert f'href="/clubs/{club}"' not in client.get("/clubs?easy=free").data.decode()
