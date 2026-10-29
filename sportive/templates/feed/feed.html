@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import home_tabs, icon, club_logo, avatar, open_to_field, place_check, spot_field %}
+{% from "_macros.html" import home_tabs, icon, club_logo, avatar, open_to_field, place_check, spot_field, event_card %}
 {% from "feed/_cards.html" import feed_item %}
 {% block title %}{{ '#' ~ SPORTS[sport] if sport else "Feed" }}{% endblock %}
 {% block content %}
@@ -29,7 +29,9 @@
 </nav>
 {% if show %}<p class="muted small feed-find-club"><a href="{{ url_for('clubs.directory') }}">Find a club to follow →</a>{% if show == 'myclubs' %}<a href="{{ url_for('clubs.updates') }}">Manage my clubs</a>{% endif %}</p>{% endif %}
 
-{# The ＋ button (bottom right) opens this sheet, like Instagram's create: the feed itself starts with posts. #}
+{# The ＋ button (bottom right) opens this sheet, like Instagram's create: the feed itself starts with posts.
+   While students' posts are paused it's only for a club's officers and for posting a game. #}
+{% if can_open_sheet %}
 <div class="post-sheet" id="post" role="dialog" aria-modal="true" aria-labelledby="post-sheet-title">
   <div class="post-sheet-panel">
     <header class="post-sheet-head">
@@ -60,7 +62,7 @@
     {% if post_as %}{# club officers can post as themselves or as their club #}
       <label class="post-as"><span>Post as</span>
         <select name="as_club">
-          <option value="">{{ g.user.full_name }}</option>
+          {% if people_posting() or post_event %}<option value="">{{ g.user.full_name }}</option>{% endif %}
           {% for c in post_as %}<option value="{{ c.id }}" {% if c.id == as_club %}selected{% endif %}>{{ c.name }} ✓ (club)</option>{% endfor %}
         </select></label>
       {# Shows once a club is picked above (style.css) #}
@@ -109,6 +111,15 @@
 </form>
   </div>
 </div>
+{% endif %}
+
+{% if week %}{# What students and clubs are playing in the next 7 days, before posts and news #}
+  <section class="this-week" aria-labelledby="this-week-title">
+    <h2 id="this-week-title" class="home-section-title">This week{{ ' in ' ~ SPORTS[sport] if sport }}</h2>
+    <div class="stack">{% for e in week %}{{ event_card(e) }}{% endfor %}</div>
+    <p class="muted small this-week-more"><a href="{{ url_for('events.feed', **({'sport': sport} if sport else {})) }}">Every game on Play →</a></p>
+  </section>
+{% endif %}
 
 {% if club_picks %}
   <section class="card clubs-for-you" aria-labelledby="clubs-for-you">
@@ -133,7 +144,8 @@
   {% else %}
     <div class="card empty">
       <p><strong>Nothing here yet.</strong></p>
-      <p class="muted">Be the first: post a plan, a PR or a question{{ ' about ' ~ SPORTS[sport] if sport }}.</p>
+      {% if people_posting() %}<p class="muted">Be the first: post a plan, a PR or a question{{ ' about ' ~ SPORTS[sport] if sport }}.</p>
+      {% else %}<p class="muted">Clubs' posts and Husky news show up here. <a href="{{ url_for('events.create') }}">Start a game →</a></p>{% endif %}
     </div>
   {% endfor %}
 </div>

@@ -10,7 +10,7 @@ import json
 import os
 import re
 
-from flask import (Blueprint, Response, abort, flash, g, jsonify, redirect, render_template, request, send_file,
+from flask import (Blueprint, Response, abort, current_app, flash, g, jsonify, redirect, render_template, request, send_file,
                    url_for)
 from markupsafe import Markup, escape
 from werkzeug.datastructures import MultiDict
@@ -150,9 +150,11 @@ def feed_items(sport=None, before=None, limit=PAGE):
                 ORDER BY cp.created_at DESC, cp.id DESC LIMIT :limit""", params).fetchall():
         items.append({"kind": "club_post", "at": row["created_at"], "club_post": row})
 
-    # 3. Husky news: scores and results from UW's teams in these sports (from GoHuskies.com)
+    # 3. Husky news: scores and results from UW's teams in these sports (from GoHuskies.com). In a sport's channel
+    # it's mixed in by time; in the main feed it comes after what students and clubs posted (added at the end).
     from .news import feed_news
-    items += feed_news(sports, params["before"], params["limit"], channel=bool(sport))
+    if sport:
+        items += feed_news(sports, params["before"], params["limit"], channel=True)
 
     items.sort(key=_order, reverse=True)
     if before:  # drop the ones from that minute the last page already showed
@@ -165,6 +167,10 @@ def feed_items(sport=None, before=None, limit=PAGE):
         on_page = sum(1 for i in items[:limit] if i["at"] == last)
         older = f"{last}|{on_page + (shown_in_minute if last == before else 0)}"
     items = items[:limit]
+    if not sport and older is None:  # the last page of posts: Husky news fills the rest, newest first
+        news = feed_news(sports, params["before"], limit, channel=False)
+        news.sort(key=_order, reverse=True)
+        items += news[:max(limit - len(items), 3)]
     # The games behind plan posts and club event posts, for their "I'm in" buttons
     events = _events_by_id([i["post"]["event_id"] for i in items if i["kind"] == "post" and i["post"]["event_id"]]
                            + [i["club_post"]["event_id"] for i in items
@@ -301,6 +307,7 @@ def feed():
     in_a_club = get_db().execute("SELECT 1 FROM club_members WHERE user_id = ?", (g.user["id"],)).fetchone()
     club_picks = [] if in_a_club or before else suggested_clubs(g.user["id"], user_sports(g.user["id"]), limit=6)
     post_event = _postable_event(request.args.get("event", type=int))  # "📣 Post this event" (the event's page)
+    week = this_week(sport) if not before and show != "myclubs" else []
     if not sport and not before and not show:
         from .notifications import mark_seen  # (notifications.py is loaded after this module)
         mark_seen("feed_posts")  # the new-posts number on Home is cleared once you've seen the top of your feed
@@ -311,7 +318,27 @@ def feed():
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"),
                            as_club=request.args.get("as", type=int) or (post_event["club_id"] if post_event
                                                                          and post_event["club_id"] else None),
-                           post_event=post_event, member_roles=MEMBER_ROLES, club_picks=club_picks)
+                           post_event=post_event, member_roles=MEMBER_ROLES, club_picks=club_picks, week=week,
+                           can_open_sheet=bool(current_app.config.get("PEOPLE_POSTING", False) or post_event
+                                               or poster_clubs(g.user["id"])))
+
+
+THIS_WEEK = 3  # games and club practices in "This week" at the top of Home
+
+
+def this_week(sport=None):
+    """The top of Home: pickup games and club practices in the next 7 days for your sports (or one sport), soonest
+    first, that you could join: open to you, not full, not private, not on hold."""
+    from .events import SHOWN_UNLESS_FULL, games_open_to_me
+    sports = [sport] if sport else user_sports(g.user["id"])
+    now = now_local()
+    where = ["e.cancelled = 0", "e.ends_at >= :now", "e.starts_at < :week", "e.is_private = 0", NOT_BLOCKED,
+             games_open_to_me(), MEMBERS_ONLY_FOR_MEMBERS, SHOWN_UNLESS_FULL]
+    params = {"now": to_db(now), "week": to_db(now + timedelta(days=7))}
+    if sports:
+        where.append(f"e.sport IN ({', '.join(f':tw{i}' for i in range(len(sports)))})")
+        params.update({f"tw{i}": key for i, key in enumerate(sports)})
+    return query_events(where, params, limit=THIS_WEEK)
 
 
 def posts_by(user_id, limit=10):
@@ -695,6 +722,9 @@ def create():
             back = url_for("clubs.updates")
         sport = sport if sport in SPORTS else club["sport"]
     attached = _postable_event(form.get("event_id", type=int))  # "📣 Post this event": its card goes under the post
+    if club is None and attached is None and not current_app.config.get("PEOPLE_POSTING", False):
+        flash("Posts are paused for now. Clubs still post here, and you can post a game from Play.", "error")
+        return redirect(url_for("posts.feed"))
     if attached is not None and sport not in SPORTS:
         sport = attached["sport"]
     if sport not in SPORTS:

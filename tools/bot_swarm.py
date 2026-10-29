@@ -265,7 +265,8 @@ def main():
     app = create_app({"TESTING": True, "DATABASE": os.path.join(tmp, "bots.db"), "SECRET_KEY": "bots" * 10,
                       "CSRF_ENABLED": False, "PASSWORD_HASH_METHOD": "pbkdf2:sha256:1000",
                       "ADMIN_EMAILS": "bot0@uw.edu",
-                      "CHECK_PLACE_HOURS": False})  # bots post games at any hour: this is about load, not hours
+                      "CHECK_PLACE_HOURS": False,  # bots post games at any hour: this is about load, not hours
+                      "PEOPLE_POSTING": True})
     app.logger.disabled = True
     import logging
     logging.disable(logging.CRITICAL)

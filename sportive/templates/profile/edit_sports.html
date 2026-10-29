@@ -22,6 +22,14 @@
       </div>
     </details>
     {{ sport_checkboxes(form, legend=False) }}
+    <fieldset class="field">
+      <legend>Clubs to suggest <em>(for men's and women's teams)</em></legend>
+      <div class="segmented" role="radiogroup" aria-label="Clubs to suggest">
+        {% for key, label in CLUB_SHOW.items() %}
+          <label><input type="radio" name="club_show" value="{{ key }}" {% if club_show == key %}checked{% endif %}><span>{{ label }}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
     <button class="btn btn-block">Save</button>
   </form>
 </div>

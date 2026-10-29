@@ -2060,3 +2060,8 @@ html, body { overflow-x: clip; }
 .link-pill:hover { border-color: var(--purple); color: var(--purple); }
 .link-pill.is-muted { color: var(--muted); font-weight: 400; }
 .club-facts { margin: 6px 0 0; font-size: .85rem; }
+
+/* Home: "This week" (games and club practices in the next 7 days) above the feed */
+.this-week { margin: 4px 0 18px; }
+.this-week .home-section-title { margin-bottom: 8px; }
+.this-week-more { margin: 8px 0 0; text-align: right; }

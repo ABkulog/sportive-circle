@@ -50,6 +50,8 @@ JOINING = {"open": "Open: just show up", "tryouts": "Tryouts", "application": "A
 EXPERIENCE = {"none": "No experience needed", "some": "Some experience helps", "experienced": "Experienced players"}
 WHO_CAN_JOIN = {"everyone": "Anyone", "women": "Women", "men": "Men", "nonbinary": "Nonbinary",  # in the form
                 "other": "Other"}
+# "Clubs to suggest" in a student's sports: which men's / women's clubs For you shows (no choice: neither).
+CLUB_SHOW = {"men": "Men's + co-ed", "women": "Women's + co-ed", "all": "All"}
 WHO_CAN_JOIN_LABELS = {**WHO_CAN_JOIN, "women_nb": "Women & nonbinary"}  # older clubs may still say this
 # Optional social accounts: (label, emoji, rule to check it, how to turn it into a link)
 SOCIALS = {
@@ -78,7 +80,39 @@ def social_links(club, members=True):
     return links
 
 
+UW_REC_LIST = "https://www.washington.edu/ima/rec-clubs/club-offerings/"  # one page listing all 42 Rec Clubs
+
+
+def club_link_row(club, socials):
+    """The one row of links under a club's description, most useful first: Instagram, the club's own website, its
+    other socials, its HuskyLink or UW page, email. A link that goes where another one already does shows once, and
+    UW Rec's page of every Rec Club (not about this club) only shows when a club has no other link."""
+    def bare(url):
+        return url.lower().split("://")[-1].removeprefix("www.").rstrip("/")
+
+    def same(a, b):
+        return bare(a) == bare(b)
+    from .linkcheck import dead  # websites that were gone two days in a row (linkcheck.py)
+    gone = dead([club["contact_url"], club["verification_url"]])
+    instagram = [link for link in socials if link[0] == "Instagram"]
+    rows = list(instagram)
+    if club["contact_url"] and club["contact_url"] not in gone:
+        rows.append(("Website", "🔗", club["contact_url"], club["contact_url"].split("://")[-1]))
+    rows += [link for link in socials if link[0] != "Instagram"]
+    page = club["verification_url"] if club["verification_url"] not in gone else ""
+    if page and not any(same(page, url) for _, _, url, _ in rows):
+        label = ("HuskyLink" if "huskylink.washington.edu" in page else "UW Rec" if "washington.edu/ima" in page
+                 else "UW page")
+        if not (same(page, UW_REC_LIST) and rows):
+            rows.append((label, "🏛️", page, page.split("://")[-1]))
+    if club["club_email"]:
+        rows.append(("Email", "✉️", f"mailto:{club['club_email']}", club["club_email"]))
+    return rows
+
+
 # SQL for "how many confirmed members" (members + officers; followers and people waiting don't count).
+# A member count only says something once a club has people here; "0 members" makes a real club look empty.
+SHOW_MEMBERS_FROM = 5
 MEMBER_COUNT = ("(SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id"
                 " AND m.role IN ('member', 'officer')"
                 " AND m.user_id NOT IN (SELECT id FROM users WHERE suspended = 1)) AS member_count")  # matches the roster
@@ -355,13 +389,18 @@ def directory():
     if "no_tryouts" in easy:
         where.append("c.joining = 'open'")
     # "For you" first (your clubs, and clubs for your sports that you can join), then every other club A-Z.
+    # Which men's or women's clubs count as "for you": from the gender on their profile, else the "Clubs to show
+    # me" choice in their sports. Nobody's guessed: with neither, only clubs open to everyone are suggested.
     gender = (g.user["gender"] if g.get("user") else "") or ""
+    show = (g.user["club_show"] if g.get("user") else "") or ""
     params.update({f"you{i}": key for i, key in enumerate(my_sports)})
     yours = " OR ".join([f"c.sport = :you{i}" for i in range(len(my_sports))]) or "0"
-    can_join = ("1" if not gender else
+    group = {"woman": "women", "man": "men"}.get(gender, gender) if gender in ("woman", "man", "nonbinary") else \
+        show if show in ("men", "women") else ""
+    can_join = ("1" if show == "all" and not group else
                 "c.who_can_join = 'everyone' OR c.who_can_join = :gender_group OR "
-                "(c.who_can_join = 'women_nb' AND :gender IN ('woman', 'nonbinary'))")
-    params.update({"gender": gender, "gender_group": {"woman": "women", "man": "men"}.get(gender, gender)})
+                "(c.who_can_join = 'women_nb' AND :gender_group IN ('women', 'nonbinary'))")
+    params.update({"gender_group": group})
     clubs = get_db().execute(
         f"""SELECT c.*, {MEMBER_COUNT},
                    ((SELECT m.role FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me) IS NOT NULL
@@ -377,7 +416,7 @@ def directory():
             ORDER BY for_you DESC, fold(c.name) LIMIT 300""",
         {**params, "now": to_db(now_local()), "hold_now": to_db(now_local())}).fetchall()
     return render_template("clubs/directory.html", clubs=clubs, q=q, sport=sport, mine=mine, easy=easy,
-                           fits=fits, my_sports=my_sports)
+                           fits=fits, my_sports=my_sports, show_members_from=SHOW_MEMBERS_FROM)
 
 
 @bp.route("/clubs/<int:club_id>")
@@ -428,7 +467,7 @@ def view(club_id):
         feed_posts, feed_photos = club_post_items(club_id)
         for item in feed_posts:
             item["on_club_page"] = True
-    return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
+    return render_template("clubs/view.html", club=club, show_members_from=SHOW_MEMBERS_FROM, posts=posts, members=members, events=events,
                            feed_posts=feed_posts, feed_photos=feed_photos, max_photos=10,
                            friends_line=friends_line(club_id, me) if me and role not in MEMBER_ROLES else None,
                            week=officer_week(club_id) if role == "officer" and club["status"] == "approved" else None,
@@ -437,7 +476,7 @@ def view(club_id):
                            my_claim_code=claim_code(club_id, g.user["id"]) if g.get("user") else "",
                            club_email_masked=masked_email(club["club_email"]) if club["club_email"] else "",
                            can_post=bool(me) and can_post_as(club_id, me), can_decide=can_decide, followers=followers, kinds=CLUB_KINDS, focus=FOCUS,
-                           socials=social_links(club, members=role in MEMBER_ROLES or is_admin()),
+                           links=club_link_row(club, social_links(club, members=role in MEMBER_ROLES or is_admin())),
                            discord_hidden=bool(club["discord"] and club["discord_members_only"]
                                                and not (role in MEMBER_ROLES or is_admin())),
                            joining=JOINING,
@@ -691,7 +730,8 @@ ACTIVE_OFFICERS = """SELECT COUNT(*) FROM club_members m JOIN users u ON u.id = 
 WAITING_ROLES = ("requested", "tryout")
 # Dues officers typed that mean free: "Free", "Free!", "free (shirt optional)", "$0", "None", "No dues", blank.
 # ("Free first quarter, then $40" has a price in it, so it isn't.)
-FREE_DUES = """(TRIM(c.dues) = '' OR LOWER(TRIM(c.dues)) IN ('0', '$0', '0$', '$0.00', 'none', 'no', 'no dues', 'n/a', 'na')
+# Only dues a club wrote down: blank means nobody said (a club listed from UW's pages, or officers who skipped it).
+FREE_DUES = """(LOWER(TRIM(c.dues)) IN ('0', '$0', '0$', '$0.00', 'none', 'no', 'no dues', 'n/a', 'na')
                OR ((LOWER(TRIM(c.dues)) LIKE 'free%' OR LOWER(TRIM(c.dues)) LIKE 'no dues%')
                    AND c.dues NOT GLOB '*[1-9]*'))"""
 
@@ -1347,6 +1387,8 @@ def review_claim(claim_id, decision):
 # ---------------------------------------------------- UW Rec Clubs, listed before any officer signs up
 
 UW_REC_CLUBS = os.path.join(os.path.dirname(__file__), "data", "uw_rec_clubs.json")  # tools/fetch_rec_clubs.py
+CLUB_LINKS_BY_HAND = os.path.join(os.path.dirname(__file__), "data", "club_links_by_hand.json")
+HAND_LINK_KEYS = ("instagram", "website", "facebook", "discord", "x_handle", "club_email")
 CLUB_SOURCES = {"uw_rec": "UW Rec", "huskylink": "HuskyLink"}
 
 
@@ -1357,6 +1399,12 @@ def uw_rec_clubs(listing=None):
     if listing is None:
         with open(UW_REC_CLUBS, encoding="utf-8") as file:
             listing = json.load(file)
+    with open(CLUB_LINKS_BY_HAND, encoding="utf-8") as file:
+        by_hand = json.load(file)["clubs"]
+    for club in listing["clubs"]:  # links a person checked win over what UW's pages say
+        for key, value in by_hand.get(club["name"], {}).items():
+            if key in HAND_LINK_KEYS and isinstance(value, str):
+                club[key] = value.strip().lstrip("@") if key == "instagram" else value.strip()
     ours = get_db().execute("SELECT id, name, instagram, huskylink_id, claimed FROM clubs WHERE status != 'denied'").fetchall()
     by_name = {fold(row["name"]): row for row in ours}
     by_instagram = {row["instagram"].lower(): row for row in ours if row["instagram"]}
@@ -1397,7 +1445,9 @@ def add_uw_rec_clubs(listing=None):
         values = listed_club_values(club)
         if club["match"]:
             if not club["match"]["claimed"]:
-                keep = {k: v for k, v in values.items() if v not in ("", None) or k in LISTED_BLANKS}
+                # Links come from UW's lists as they are today, gone ones included (an old "website" that was
+                # really its HuskyLink page is cleared); a description is only replaced by a new one.
+                keep = {k: v for k, v in values.items() if v not in ("", None) or k != "description"}
                 db.execute(f"UPDATE clubs SET {', '.join(f'{k} = ?' for k in keep)} WHERE id = ? AND claimed = 0",
                            (*keep.values(), club["match"]["id"]))
             continue
@@ -1441,6 +1491,12 @@ def _sync_clubs(app):
             log.info("UW clubs refreshed; %d new.", len(added))
     except Exception:
         log.exception("Couldn't refresh the UW clubs")
+    try:
+        with app.app_context():
+            from .linkcheck import check_club_websites
+            check_club_websites()
+    except Exception:
+        log.exception("Couldn't check the club websites")
 
 
 @bp.route("/admin/clubs/uw-rec", methods=("GET", "POST"))

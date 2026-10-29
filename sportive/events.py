@@ -235,12 +235,17 @@ def event_place(event):
     return None
 
 
-LIVE_SOON = timedelta(hours=1)       # Play's live map: games starting within an hour...
+LIVE_SOON = timedelta(hours=1)       # Play's live map: games starting later today (or within an hour, after 11 PM)...
 LIVE_AFTER = timedelta(minutes=10)   # ...going on now, or ended in the last 10 minutes
 
 
+def live_window_end(now):
+    """The map shows games starting before this: the rest of today (or the next hour, late at night)."""
+    return max(datetime.combine(now.date() + timedelta(days=1), time(), tzinfo=now.tzinfo), now + LIVE_SOON)
+
+
 def live_games(now):
-    """What's happening around now, for Play's live map (like Snap Map): starting within an hour, going on, or
+    """What's happening today, for Play's live map (like Snap Map): starting later today, going on, or
     ended in the last 10 minutes. Same rules as the list: no blocked hosts, only games open to you, members-only
     for members, private ones only for their players and invited friends."""
     return query_events(
@@ -248,7 +253,7 @@ def live_games(now):
          MEMBERS_ONLY_FOR_MEMBERS,
          "(e.is_private = 0 OR EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"
          " OR EXISTS (SELECT 1 FROM invites i WHERE i.event_id = e.id AND i.guest_id = :me AND i.status = 'pending'))"],
-        {"soon": to_db(now + LIVE_SOON), "ended": to_db(now - LIVE_AFTER)}, limit=60)
+        {"soon": to_db(live_window_end(now)), "ended": to_db(now - LIVE_AFTER)}, limit=60)
 
 
 def live_status(event, now):
@@ -258,7 +263,10 @@ def live_status(event, now):
         return "ended", "Ended"
     if starts <= now:
         return "live", "Live"
-    return "soon", f"in {max(1, round((starts - now).total_seconds() / 60))} min"
+    minutes = max(1, round((starts - now).total_seconds() / 60))
+    if minutes <= 60:
+        return "soon", f"in {minutes} min"
+    return "soon", starts.strftime("%I:%M %p").lstrip("0")  # later today: its start time
 
 
 def game_pins(games, now=None):
