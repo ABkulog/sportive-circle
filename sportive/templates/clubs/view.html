@@ -45,7 +45,7 @@
       <li><a class="link-pill" href="{{ url }}" target="_blank" rel="noopener nofollow" aria-label="{{ label }}: {{ shown }}"><span aria-hidden="true">{{ emoji }}</span> {{ label }}</a></li>
     {% endfor %}
     {% if discord_hidden %}<li><span class="link-pill is-muted">💬 Discord: for members</span></li>{% endif %}
-    {% if club.contact_url %}<li><a class="link-pill" href="{{ club.contact_url }}" target="_blank" rel="noopener nofollow"><span aria-hidden="true">🔗</span> Website</a></li>{% endif %}
+    {% if club.contact_url and club.contact_url != club.verification_url and 'huskylink.washington.edu' not in club.contact_url %}<li><a class="link-pill" href="{{ club.contact_url }}" target="_blank" rel="noopener nofollow"><span aria-hidden="true">🔗</span> Website</a></li>{% endif %}
     {% if club.verification_url %}<li><a class="link-pill" href="{{ club.verification_url }}" target="_blank" rel="noopener nofollow"><span aria-hidden="true">🏛️</span> {{ 'HuskyLink' if 'huskylink.washington.edu' in club.verification_url else 'UW Rec' if 'washington.edu/ima' in club.verification_url else 'UW page' }}</a></li>{% endif %}
     {% if club.club_email %}<li><a class="link-pill" href="mailto:{{ club.club_email }}"><span aria-hidden="true">✉️</span> Email</a></li>{% endif %}
   </ul>

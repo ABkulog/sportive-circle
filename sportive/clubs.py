@@ -1397,7 +1397,9 @@ def add_uw_rec_clubs(listing=None):
         values = listed_club_values(club)
         if club["match"]:
             if not club["match"]["claimed"]:
-                keep = {k: v for k, v in values.items() if v not in ("", None) or k in LISTED_BLANKS}
+                # Links come from UW's lists as they are today, gone ones included (an old "website" that was
+                # really its HuskyLink page is cleared); a description is only replaced by a new one.
+                keep = {k: v for k, v in values.items() if v not in ("", None) or k != "description"}
                 db.execute(f"UPDATE clubs SET {', '.join(f'{k} = ?' for k in keep)} WHERE id = ? AND claimed = 0",
                            (*keep.values(), club["match"]["id"]))
             continue
