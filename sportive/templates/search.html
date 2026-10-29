@@ -19,7 +19,7 @@
         {% for c in clubs %}
           <li><a class="result" href="{{ url_for('clubs.view', club_id=c.id) }}">{{ club_logo(c, 40) }}
             <span><strong>{{ c.name }}{% if c.claimed %} {{ verified_badge() }}{% endif %}</strong>
-              <small class="muted">{{ SPORTS[c.sport] }} · {{ c.member_count }} member{{ 's' if c.member_count != 1 }}{% if c.my_role %} · {{ {'officer': 'Officer', 'member': 'Member', 'follower': 'Following'}.get(c.my_role, 'Asked to join') }}{% endif %}</small></span></a></li>
+              <small class="muted">{{ SPORTS[c.sport] }}{% if c.member_count >= show_members_from %} · {{ c.member_count }} members{% endif %}{% if c.my_role %} · {{ {'officer': 'Officer', 'member': 'Member', 'follower': 'Following'}.get(c.my_role, 'Asked to join') }}{% endif %}</small></span></a></li>
         {% endfor %}
       </ul>
     {% else %}
@@ -41,6 +41,29 @@
     {% endif %}
   </section>
 {% else %}
-  <p class="muted">Find a club to follow, or a friend. <a href="{{ url_for('clubs.directory') }}">See every club →</a></p>
+  {% if popular %}
+    <section aria-labelledby="popular-clubs">
+      <h2 class="section-title" id="popular-clubs">Popular clubs</h2>
+      <ul class="result-list">
+        {% for c in popular %}
+          <li><a class="result" href="{{ url_for('clubs.view', club_id=c.id) }}">{{ club_logo(c, 40) }}
+            <span><strong>{{ c.name }}{% if c.claimed %} {{ verified_badge() }}{% endif %}</strong>
+              <small class="muted">{{ SPORT_EMOJI[c.sport] }} {{ SPORTS[c.sport] }}</small></span></a></li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+  {% if suggested %}
+    <section aria-labelledby="people-you-may-know">
+      <h2 class="section-title" id="people-you-may-know">People you may know</h2>
+      <ul class="result-list">
+        {% for p in suggested %}
+          <li><a class="result" href="{{ url_for('profile.view', user_id=p.id) }}">{{ avatar(p.id, p.full_name, p.avatar_updated, 40) }}
+            <span><strong>{{ p.full_name }}</strong>{% if p.why %}<small class="muted">{{ p.why }}</small>{% endif %}</span></a></li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+  <p class="muted"><a href="{{ url_for('clubs.directory') }}">See every club →</a></p>
 {% endif %}
 {% endblock %}

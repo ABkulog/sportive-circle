@@ -1138,6 +1138,14 @@ def test_cancelled_games_dont_count_for_badges(accounts, client, app):
         assert eligible(1) == {"founding_dawg"}
 
 
+def test_search_before_typing_shows_popular_clubs_and_people(accounts, client, app):
+    """Vince: "Search: fill it with popular clubs and suggested people"."""
+    _approved_club(accounts, client, app, name="UW Spikeball Club")
+    accounts.signup(email="fan@uw.edu", name="Fan Person")
+    page = client.get("/search").data.decode()
+    assert "Popular clubs" in page and "UW Spikeball Club" in page and "0 members" not in page
+
+
 def test_top_dawgs(accounts, client, app, monkeypatch):
     from datetime import datetime
     from sportive import events, spirit
@@ -1152,6 +1160,8 @@ def test_top_dawgs(accounts, client, app, monkeypatch):
     with app.app_context():
         board = spirit.top_dawgs(now=fake_now())
         assert [row["full_name"] for row in board] == ["Hana Host", "Pat Player"]
+    assert b"Top Dawgs this month" not in client.get("/").data          # Vince: hide it until there's real activity
+    monkeypatch.setattr(events, "TOP_DAWGS_SHOW_FROM", 2)
     feed = client.get("/").data
     assert b"Top Dawgs this month" in feed and b"Hana Host" in feed
 
@@ -1982,9 +1992,11 @@ def test_officer_claims_a_listed_club_and_it_gets_verified(accounts, client, app
         club = db.execute("INSERT INTO clubs (name, sport, description, status, claimed, created_at)"
                           " VALUES ('UW Ultimate', 'ultimate', 'Frisbee club', 'approved', 0, '2026-10-01 10:00')").lastrowid
         db.commit()
+    visitor = client.get(f"/clubs/{club}").data.decode()                 # Vince: "make Claim it easy to find"
+    assert "Is this your club? Claim it" in visitor and "/signup?club=1&amp;next=" in visitor
     accounts.signup(email="fan@uw.edu", name="Fan Person")
     page = client.get(f"/clubs/{club}").data.decode()
-    assert "Nobody from UW Ultimate runs this page yet" in page and "Claim this club" in page
+    assert "Nobody from UW Ultimate runs this page yet" in page and "Is this your club? Claim it" in page
     assert "Verified" not in page and "Request to join" not in page
     client.post(f"/clubs/{club}/join")                                   # nobody could confirm them
     with app.app_context():
@@ -2013,7 +2025,14 @@ def test_officer_claims_a_listed_club_and_it_gets_verified(accounts, client, app
     accounts.logout()
     accounts.login(email="prez@uw.edu")
     page = client.get(f"/clubs/{club}").data.decode()
-    assert "Verified" in page and "Claim this club" not in page and "Edit club" in page
+    assert "Verified" in page and "Claim it" not in page and "Edit club" in page
+    with app.app_context():                                               # an automatic post: "just claimed"
+        assert get_db().execute("SELECT body FROM club_posts WHERE club_id = ?", (club,)).fetchone()[0] == \
+            "✅ UW Ultimate just claimed their page."
+        get_db().execute("INSERT OR IGNORE INTO user_sports (user_id, sport) VALUES (?, 'ultimate')",
+                         (_user_id(app, "prez@uw.edu"),))
+        get_db().commit()
+    assert "just claimed their page" in client.get("/feed").data.decode()
     assert "You run UW Ultimate" in client.get("/notifications").data.decode()
     with app.app_context():
         from sportive.clubs import poster_clubs
@@ -3077,6 +3096,12 @@ def test_clubs_for_you_first_then_a_to_z_and_adding_one_is_a_small_link(accounts
     accounts.signup(email="fan@uw.edu", sports=("tennis",))
     page = client.get("/clubs").data.decode()
     assert "＋ Register a club" not in page and "Can't find your club?" in page
+    with app.app_context():                                                 # Vince: "Show me: men's and co-ed..."
+        get_db().execute("UPDATE clubs SET who_can_join = 'women' WHERE name = 'Beta Tennis Club'")
+        get_db().commit()
+    assert "Beta Tennis Club" not in client.get("/clubs?show=men").data.decode()
+    assert "Beta Tennis Club" not in client.get("/clubs").data.decode()     # remembered
+    assert "Beta Tennis Club" in client.get("/clubs?show=all").data.decode()
     order = [page.index(name) for name in ("For you", "Beta Tennis Club", "Zed Tennis Club", "All clubs, A–Z",
                                            "Alpha Rowing Club")]
     assert order == sorted(order)
