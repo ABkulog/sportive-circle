@@ -1593,7 +1593,8 @@ def test_clubs_are_open_to_everyone(accounts, client, app):
     _approve(app, club)
     accounts.logout()
     directory = client.get("/clubs").data.decode()          # no account needed
-    assert "UW Spikeball Club" in directory and "1 member" in directory
+    assert "UW Spikeball Club" in directory and "1 member" not in directory  # a count only once there are a few
+    assert "Spikeball · No tryouts · Beginners welcome" in directory
     page = client.get(f"/clubs/{club}").data.decode()
     assert "Casual roundnet" in page and "Verified club</span>" in page and "Sign up to join" in page
     assert "Come to any Tuesday practice!" in page and "@uwspikeball" in page
@@ -2091,7 +2092,7 @@ def test_follow_is_not_membership(accounts, client, app):
     client.post(f"/clubs/{club}/follow")
     page = client.get(f"/clubs/{club}").data.decode()
     stats = re.findall(r"<strong>(\d+)</strong><span>(\w+)</span>", page)
-    assert ">Unfollow<" in page and ("1", "member") in stats and ("2", "followers") in stats   # captain + curious
+    assert ">Unfollow<" in page and all(label != "member" for _, label in stats) and ("2", "followers") in stats   # 1 member: no count yet (FR-CLUB-45)
 
 
 def test_tryouts_flow_with_messages(accounts, client, app):
@@ -8336,3 +8337,93 @@ def test_the_host_sees_what_happened_to_each_invite(accounts, client, app):
     assert "Invites that didn't work out" in page
     for line in ("joined, then left", "said they can&#39;t make it", "the host took them off", "invite was taken back"):
         assert line in page
+
+
+def test_club_cards_hide_member_counts_until_a_club_has_a_few(accounts, client, app):
+    """FR-CLUB-45: "0 members" on a club UW lists made the app look empty. Cards and the club page show a member
+    count only from 5 members; until then the card says what helps someone pick (the sport, a men's or women's
+    club, tryouts or not)."""
+    club = _approved_club(accounts, client, app, name="UW Women's Volleyball Club", sport="volleyball",
+                          who_can_join="women", joining="tryouts", experience="some")
+    directory = client.get("/clubs").data.decode()
+    assert "Volleyball · Women&#39;s club · Tryouts" in directory and "1 member" not in directory
+    assert ">members</span>" not in client.get(f"/clubs/{club}").data.decode()
+    with app.app_context():
+        db = get_db()
+        for n in range(4):
+            db.execute("INSERT INTO users (email, full_name, password_hash) VALUES (?, ?, 'x')", (f"m{n}@uw.edu", f"M {n}"))
+            db.execute("INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, last_insert_rowid(), 'member', '2026-10-01 12:00:00')", (club,))
+        db.commit()
+    assert "5 members" in client.get("/clubs").data.decode()
+    assert "<strong>5</strong><span>members</span>" in client.get(f"/clubs/{club}").data.decode()
+def test_club_links_one_row_most_useful_first(accounts, client, app):
+    """FR-CLUB-46: a club's links read Instagram first, then its own website, then its other socials, its HuskyLink
+    or UW page, email. A link that goes where another does shows once, and UW Rec's page of all 42 Rec Clubs only
+    shows when a club has no other link."""
+    from sportive.clubs import UW_REC_LIST
+    with app.app_context():
+        db = get_db()
+        def listed(name, **links):
+            row = {"name": name, "sport": "running", "status": "approved", "claimed": 0, "club_kind": "rec_club",
+                   "description": "A club.", "created_at": "2026-10-01 12:00:00", **links}
+            return db.execute(f"INSERT INTO clubs ({', '.join(row)}) VALUES ({', '.join('?' * len(row))})",
+                              tuple(row.values())).lastrowid
+        rec = listed("UW Running Club", instagram="huskyrunningclub", facebook="https://facebook.com/hrc",
+                     contact_url="https://students.washington.edu/uwrunner/", verification_url=UW_REC_LIST)
+        lone = listed("UW Shotokan Karate Club", verification_url=UW_REC_LIST)
+        twice = listed("Husky Pickleball Club", contact_url="https://huskylink.washington.edu/huskypickle/",
+                       verification_url="https://huskylink.washington.edu/huskypickle")
+        db.commit()
+    page = client.get(f"/clubs/{rec}").data.decode()
+    row = page[page.index('id="contact"'):page.index("</ul>", page.index('id="contact"'))]
+    assert row.index("Instagram") < row.index("Website") < row.index("Facebook")
+    assert UW_REC_LIST not in row                                     # not about this club, and it has others
+    lone_page = client.get(f"/clubs/{lone}").data.decode()
+    assert f'href="{UW_REC_LIST}"' in lone_page and "UW Rec" in lone_page   # its only link
+    twice_page = client.get(f"/clubs/{twice}").data.decode()
+    row = twice_page[twice_page.index('id="contact"'):twice_page.index("</ul>", twice_page.index('id="contact"'))]
+    assert row.count("href=\"https://huskylink.washington.edu/huskypickle") == 1
+
+
+def test_dead_club_websites_are_hidden_after_two_days(accounts, client, app):
+    """FR-CLUB-49: once a day the site opens every club website; one that's gone (404, 5xx, no answer) two days in a
+    row is left off the club page until it works again. Sites that refuse robots (403, 429) count as working."""
+    from sportive.linkcheck import check_club_websites
+    old = "https://students.washington.edu/huskylax/"
+    with app.app_context():
+        db = get_db()
+        club = db.execute("""INSERT INTO clubs (name, sport, status, claimed, club_kind, description, created_at,
+                                                instagram, contact_url) VALUES ('UW Men''s Lacrosse Club', 'lacrosse',
+                             'approved', 0, 'rec_club', 'A club.', '2026-10-01 12:00:00', 'uwmlax', ?)""",
+                          (old,)).lastrowid
+        db.commit()
+    def website_shown():
+        return f'href="{old}"' in client.get(f"/clubs/{club}").data.decode()
+    with app.app_context():
+        assert check_club_websites(lambda url: "404") == []                  # one bad day: still shown
+    assert website_shown()
+    with app.app_context():
+        assert check_club_websites(lambda url: "no answer") == [old]         # two in a row: hidden
+    assert not website_shown() and "Instagram" in client.get(f"/clubs/{club}").data.decode()
+    with app.app_context():
+        check_club_websites(lambda url: "403")                               # refuses robots: a person can open it
+    assert website_shown()
+
+
+def test_links_checked_by_hand_fill_in_what_uw_lists_without(accounts, client, app, tmp_path, monkeypatch):
+    """FR-CLUB-50: most HuskyLink-only clubs have no Instagram on UW's pages. data/club_links_by_hand.json holds links
+    a person checked; they win over UW's pages when the club list is refreshed."""
+    import json
+    import sportive.clubs as clubs_module
+    hand = tmp_path / "hand.json"
+    hand.write_text(json.dumps({"clubs": {"Husky Pickleball Club": {"instagram": "@huskypickleball"}}}))
+    monkeypatch.setattr(clubs_module, "CLUB_LINKS_BY_HAND", str(hand))
+    listing = {"source": "x", "clubs": [{"uw_name": "Husky Pickleball Club", "name": "Husky Pickleball Club",
+               "sport": "pickleball", "description": "Pickleball.", "website": "", "instagram": "", "facebook": "",
+               "x_handle": "", "discord": "", "club_email": "", "source": "huskylink", "huskylink_id": 36322,
+               "uw_page": "https://huskylink.washington.edu/huskypickle/", "who_can_join": "everyone"}]}
+    with app.app_context():
+        clubs_module.add_uw_rec_clubs(listing)
+        club = get_db().execute("SELECT id, instagram FROM clubs WHERE name = 'Husky Pickleball Club'").fetchone()
+    assert club["instagram"] == "huskypickleball"
+    assert "instagram.com/huskypickleball" in client.get(f"/clubs/{club['id']}").data.decode()

@@ -532,3 +532,12 @@ CREATE TABLE IF NOT EXISTS poll_votes (
     created_at TEXT NOT NULL,
     PRIMARY KEY (option_id, user_id)
 );
+
+-- Club websites that didn't answer when the site checked them (once a day, with the club sync). Two failed days
+-- in a row and the link is hidden from the club's page until it works again (linkcheck.py).
+CREATE TABLE IF NOT EXISTS dead_links (
+    url          TEXT PRIMARY KEY,
+    failures     INTEGER NOT NULL DEFAULT 0,  -- failed checks in a row
+    last_status  TEXT NOT NULL DEFAULT '',    -- "404", "no answer"...
+    last_checked TEXT NOT NULL
+);
