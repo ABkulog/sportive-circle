@@ -294,6 +294,36 @@ def game_pins(games, now=None):
     return list(pins.values())
 
 
+def spot_pins(now=None):
+    """Play's map, under the game bubbles: every place games are played (the IMA, courts, fields, the track), so the
+    map is never empty. Tap one: its hours today, what UW Rec has booked there for the rest of today (club practices,
+    IM games, rentals) and "Post a game here". Rooms inside one building share its pin (the IMA's pool, mats...)."""
+    from .placecheck import time_range  # placecheck imports this module
+    from .placehours import _clock, hours_on
+    now = now or now_local()
+    groups = {}
+    for place, coords in LOCATION_COORDS.items():
+        if coords:
+            groups.setdefault(coords, []).append(place)
+    end_of_day = datetime.combine(now.date() + timedelta(days=1), time(0, 0), tzinfo=now.tzinfo)
+    spots = []
+    for (lat, lng), places in groups.items():
+        main = places[0]
+        hours = hours_on(main, now.date())
+        text = ("Closed today" if hours is None else None if hours == "any"
+                else f"Open until {_clock(hours[1])} today" if hours[0] == "00:00"
+                else f"Open {_clock(hours[0])} – {_clock(hours[1])} today")
+        marks = ",".join("?" * len(places))
+        rows = get_db().execute(
+            f"""SELECT * FROM rec_reservations WHERE location IN ({marks}) AND ends_at > ? AND starts_at < ?
+                ORDER BY starts_at LIMIT 6""", (*places, to_db(now), to_db(end_of_day))).fetchall()
+        bookings = [{"label": (r["label"] if r["location"] == main else f"{r['location'].split(' (')[0]}: {r['label']}"),
+                     "when": time_range(r["starts_at"], r["ends_at"])} for r in rows]
+        spots.append({"name": main, "lat": lat, "lng": lng, "hours": text, "bookings": bookings,
+                      "new_url": url_for("events.create", location=main)})
+    return spots
+
+
 MAX_GAMES_PER_HOUR = 60  # games one person can post in an hour (five 12-week practices fit): stops bell spam
 
 
@@ -526,7 +556,7 @@ def feed():
                            month_name=now.strftime("%B"), more_page=more_page, capped=capped,
                            top_dawgs=top_dawgs(now=now, viewer=g.user["id"]), top_dawgs_from=TOP_DAWGS_SHOW_FROM,
                            texts_card=show_texts_card(),
-                           map_pins=game_pins(live_games(now), now))
+                           map_pins=game_pins(live_games(now), now), spot_pins=spot_pins(now))
 
 
 def show_texts_card():
@@ -777,7 +807,9 @@ def create():
         starts, ends = default_times()
         form = MultiDict({"starts_at": starts, "ends_at": ends, "skill_level": "All levels",
                           "password": suggested_password(),
-                          "sport": request.args.get("sport", "") or (club["sport"] if club else "")})
+                          "sport": request.args.get("sport", "") or (club["sport"] if club else ""),
+                          # "Post a game here" on a spot on Play's map
+                          "location": request.args.get("location", "") if request.args.get("location") in LOCATION_COORDS else ""})
     return render_template("events/form.html", form=form, event=None, club=club, friends=friends_of(g.user["id"]),
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"))
 

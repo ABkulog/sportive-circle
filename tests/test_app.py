@@ -8550,3 +8550,30 @@ def test_students_posts_are_paused_but_clubs_and_games_still_post(accounts, clie
     client.post("/posts/new", data={"body": "Practice moved to 6", "sport": "spikeball", "as_club": str(club)})
     with app.app_context():
         assert get_db().execute("SELECT COUNT(*) FROM posts WHERE club_id = ?", (club,)).fetchone()[0] == 1
+
+
+def test_play_map_shows_every_spot_with_hours_and_uw_rec_bookings(accounts, client, app):
+    """FR-PLAY-31 (Vince's checklist): Play's map always has the places games are played (IMA, courts, fields,
+    track), even with no games. Tap one: hours today, what UW Rec booked there for the rest of today (club practices
+    too; rooms inside the IMA join its pin) and Post a game here, which opens the form at that place."""
+    import json
+    from sportive.timeutil import to_db
+    accounts.signup(email="player@uw.edu")
+    with app.app_context():
+        db = get_db()
+        now = now_local()
+        for location, label, starts, ends in (
+                ("IMA Pool", "Swim Club - Practice", now - timedelta(minutes=10), now + timedelta(minutes=10)),
+                ("Denny Field", "Old booking", now - timedelta(hours=3), now - timedelta(hours=2)),
+                ("Denny Field", "Next week", now + timedelta(days=2), now + timedelta(days=2, hours=1))):
+            db.execute("INSERT INTO rec_reservations (location, starts_at, ends_at, label, source, created_at)"
+                       " VALUES (?, ?, ?, ?, 'feed', ?)", (location, to_db(starts), to_db(ends), label, to_db(now)))
+        db.commit()
+    page = client.get("/?scope=all").data.decode()
+    spots = {s["name"]: s for s in json.loads(page.split('id="play-spots">')[1].split("</script>")[0])}
+    assert {"Husky Track", "Denny Field", "IMA South Tennis Courts"} <= set(spots) and "IMA Pool" not in spots
+    assert [b["label"] for b in spots["IMA (Intramural Activities Building)"]["bookings"]] == ["IMA Pool: Swim Club - Practice"]
+    assert spots["Denny Field"]["bookings"] == []                      # ended, or not today: not shown
+    form = client.get(spots["Denny Field"]["new_url"]).data.decode()
+    assert "<option selected>Denny Field</option>" in form
+    assert "<option selected>" not in client.get("/events/new?location=Mars").data.decode().split('name="location"')[1].split("</select>")[0]

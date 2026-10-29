@@ -30,7 +30,8 @@ def test_the_live_window(accounts, client, app):
     assert '"state": "live"' in play and '"label": "Live"' in play and '"Denny Field"' in play
     assert '"Husky Track"' in play and ('"label": "in 55 min"' in play or '"label": "in 54 min"' in play)
     assert '"The Quad"' in play and '"label": "Ended"' in play
-    assert '"Red Square"' not in play and '"Recreation Field 1 (by the IMA)"' not in play
+    pins = play.split('id="play-pins">')[1].split("</script>")[0]  # the game bubbles (every place has a 📍 too)
+    assert '"Red Square"' not in pins and '"Recreation Field 1 (by the IMA)"' not in pins
 
 
 def test_the_map_shows_the_rest_of_today_and_leads_only_when_busy(accounts, client, app):

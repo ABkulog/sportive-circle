@@ -1544,6 +1544,10 @@ body.has-app-nav .home-tabs { position: sticky; top: 60px; z-index: 20; backgrou
 .live-map-note { margin: 6px 2px 0; font-size: .85rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: live-pulse 1.6s ease-in-out infinite; }
 .live-icon { background: none; border: 0; }
+.spot-dot { font-size: 1.15rem; line-height: 26px; text-align: center; filter: drop-shadow(0 1px 2px rgb(0 0 0 / .35)); }
+.map-spot-hours { margin: 4px 0 0; font-size: .85rem; }
+.map-spot-title { margin: 6px 0 0; font-size: .75rem; font-weight: 700; color: var(--muted); }
+.map-booking { display: block; font-size: .8rem; }
 .live-bubble { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 64px; }
 .live-emoji { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem;
   background: #fff; box-shadow: 0 3px 10px rgb(0 0 0 / .25); border: 3px solid var(--purple); }

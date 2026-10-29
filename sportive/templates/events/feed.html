@@ -17,11 +17,12 @@
 <section class="live-map-wrap" id="live-map" aria-labelledby="live-title" data-live-map>
   <h2 class="visually-hidden" id="live-title">Happening now</h2>
   <div class="play-map" id="play-map" role="img" aria-label="Live map: {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games today"></div>
-  <p class="live-map-note">{% if map_pins %}<span class="live-dot" aria-hidden="true"></span> {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games today{% else %}Nothing on right now · games today show up here{% endif %}</p>
+  <p class="live-map-note">{% if map_pins %}<span class="live-dot" aria-hidden="true"></span> {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games today{% else %}Nothing on right now · games today show up here{% endif %} · tap a 📍 for hours and bookings</p>
   <button type="button" class="map-open" data-map-open aria-label="Open the map full screen"><span>⤢ Tap to open the map</span></button>
   <button type="button" class="map-back" data-map-close hidden>← Back</button>
   <button type="button" class="map-recenter" data-map-recenter hidden aria-label="Back to campus">◎</button>
   <script type="application/json" id="play-pins">{{ map_pins|tojson }}</script>
+  <script type="application/json" id="play-spots">{{ spot_pins|tojson }}</script>
 </section>
 {% endmacro %}
 {% block content %}

@@ -20,7 +20,53 @@
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
 
+  // Every place games are played (the IMA, courts, fields, the track): its hours today, what UW Rec has booked
+  // there (club practices, IM games) and "Post a game here". Where a game is on, it joins that bubble's popup.
+  const spotsData = document.getElementById("play-spots");
+  const spots = spotsData ? JSON.parse(spotsData.textContent) : [];
+  const spotAt = {};
+  spots.forEach((spot) => { spotAt[`${spot.lat},${spot.lng}`] = spot; });
+  function spotInfo(spot, box) {
+    if (spot.hours) {
+      const hours = document.createElement("p");
+      hours.className = "map-spot-hours";
+      hours.textContent = spot.hours;
+      box.appendChild(hours);
+    }
+    if (spot.bookings.length) {
+      const title = document.createElement("p");
+      title.className = "map-spot-title";
+      title.textContent = "Booked by UW Rec today";
+      box.appendChild(title);
+      spot.bookings.forEach((booking) => {
+        const row = document.createElement("span");
+        row.className = "map-booking";
+        row.textContent = `${booking.label} · ${booking.when}`;
+        box.appendChild(row);
+      });
+    }
+    const add = document.createElement("a");
+    add.href = spot.new_url;
+    add.className = "map-game";
+    add.textContent = "＋ Post a game here";
+    box.appendChild(add);
+  }
+
   const bounds = [];
+  const withGames = new Set(pins.map((pin) => `${pin.lat},${pin.lng}`));
+  spots.forEach((spot) => {
+    if (withGames.has(`${spot.lat},${spot.lng}`)) return;  // the game bubble there shows it
+    const dot = document.createElement("div");
+    dot.className = "spot-dot";
+    dot.textContent = "📍";
+    const icon = L.divIcon({ html: dot, className: "live-icon", iconSize: [26, 26], iconAnchor: [13, 24] });
+    const box = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = spot.name;
+    box.appendChild(name);
+    spotInfo(spot, box);
+    L.marker([spot.lat, spot.lng], { icon, title: spot.name }).addTo(map).bindPopup(box);
+  });
   pins.forEach((pin) => {
     const bubble = document.createElement("div");
     bubble.className = `live-bubble is-${pin.state}`;
@@ -44,7 +90,9 @@
       link.textContent = `${game.title} · ${game.when}`;
       list.appendChild(link);
     });
-    L.marker([pin.lat, pin.lng], { icon, title: `${pin.name}: ${pin.label}` }).addTo(map).bindPopup(list);
+    const spot = spotAt[`${pin.lat},${pin.lng}`];
+    if (spot) spotInfo(spot, list);
+    L.marker([pin.lat, pin.lng], { icon, title: `${pin.name}: ${pin.label}`, zIndexOffset: 1000 }).addTo(map).bindPopup(list);
     bounds.push([pin.lat, pin.lng]);
   });
   // Center it once the page has its final size: set up while the page was still laying out, it landed ~2 km
