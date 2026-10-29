@@ -2086,6 +2086,50 @@ def test_admins_add_every_uw_rec_club_with_its_links(accounts, client, app):
     assert "UW Climbing Club" in client.get("/clubs").data.decode()
 
 
+def test_uw_clubs_refresh_themselves_every_day(accounts, client, app, monkeypatch):
+    """The owner: "don't leave me anything", "access all the information daily", and "just have all their links...
+    don't fill in the about page". Once a day the site reads UW's club lists again (here they're down, so it uses the
+    saved copy), adds new clubs, and gives unclaimed ones UW's latest links; nothing is guessed."""
+    import sportive.clubs as clubs_module
+    import sportive.clubsources as sources
+    with app.app_context():                                                # listed before it was found not a sport
+        get_db().execute("INSERT INTO clubs (name, sport, description, status, claimed, created_at) VALUES "
+                         "('Sumo Union Membership Organization', 'wrestling', 'TV', 'approved', 0, '2026-10-01 10:00')")
+        get_db().commit()
+    monkeypatch.setattr(sources, "build_listing", lambda log=None: (_ for _ in ()).throw(OSError("UW is down")))
+    monkeypatch.setattr(clubs_module.threading, "Thread", lambda target, args, **kw: type(
+        "Now", (), {"start": lambda self: target(*args)})())
+    clubs_module.clubs_round(app)
+    with app.app_context():
+        db = get_db()
+        count = db.execute("SELECT COUNT(*) FROM clubs WHERE claimed = 0").fetchone()[0]
+        running = db.execute("SELECT * FROM clubs WHERE name = 'UW Running Club'").fetchone()
+        assert count >= 80 and running["meets"] == "" and running["joining"] == "" and running["focus"] == ""
+        assert running["instagram"] == "huskyrunningclub" and running["verification_url"].startswith("https://www.washington.edu/ima")
+        assert not db.execute("SELECT 1 FROM clubs WHERE name LIKE 'Sumo%'").fetchone()
+        db.execute("UPDATE clubs SET instagram = 'oldhandle' WHERE id = ?", (running["id"],))
+        pickle = db.execute("SELECT id FROM clubs WHERE name = 'Husky Pickleball Club'").fetchone()[0]
+        db.execute("UPDATE clubs SET contact_url = 'https://huskylink.washington.edu/huskypickle/' WHERE id = ?",
+                   (pickle,))                                              # how the first import saved it
+        db.execute("DELETE FROM app_state WHERE key LIKE 'club_sync:%'")      # the next day
+        db.commit()
+    clubs_module.clubs_round(app)
+    clubs_module.clubs_round(app)                                          # same day: nothing more
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT COUNT(*) FROM clubs").fetchone()[0] == count
+        assert db.execute("SELECT instagram FROM clubs WHERE id = ?", (running["id"],)).fetchone()[0] == "huskyrunningclub"
+        assert db.execute("SELECT contact_url FROM clubs WHERE id = ?", (pickle,)).fetchone()[0] == ""
+    accounts.signup()
+    rugby = client.get(f"/clubs/{_club_id(app, 'UW Men' + chr(39) + 's Rugby Club')}").data.decode()
+    running_page = client.get(f"/clubs/{running['id']}").data.decode()
+    assert "instagram.com/huskyrunningclub" in running_page
+    for guess in ("Ask the club", "No experience needed", "Open: just show up"):  # nothing guessed
+        assert guess not in rugby and guess not in running_page
+    pickle_page = client.get(f"/clubs/{pickle}").data.decode()  # the owner: "why do HuskyLink and Website open the same page?"
+    assert pickle_page.count("huskylink.washington.edu/huskypickle") == 1 and "Website</a>" not in pickle_page
+
+
 def test_follow_is_not_membership(accounts, client, app):
     club = _approved_club(accounts, client, app)
     accounts.signup(email="curious@uw.edu")
