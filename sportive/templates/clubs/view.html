@@ -41,13 +41,10 @@
   <p class="club-about clamp" id="club-about" title="Tap to read more" data-expand>{{ club.description }}</p>
   {# Everything the club made public, right here: no About tab to dig through #}
   <ul class="club-links" aria-label="{{ club.name }}'s links" id="contact">
-    {% for label, emoji, url, shown in socials %}
-      <li><a class="link-pill" href="{{ url }}" target="_blank" rel="noopener nofollow" aria-label="{{ label }}: {{ shown }}"><span aria-hidden="true">{{ emoji }}</span> {{ label }}</a></li>
+    {% for label, emoji, url, shown in links %}
+      <li><a class="link-pill" href="{{ url }}"{% if not url.startswith('mailto:') %} target="_blank" rel="noopener nofollow"{% endif %} aria-label="{{ label }}: {{ shown }}"><span aria-hidden="true">{{ emoji }}</span> {{ label }}</a></li>
     {% endfor %}
     {% if discord_hidden %}<li><span class="link-pill is-muted">💬 Discord: for members</span></li>{% endif %}
-    {% if club.contact_url %}<li><a class="link-pill" href="{{ club.contact_url }}" target="_blank" rel="noopener nofollow"><span aria-hidden="true">🔗</span> Website</a></li>{% endif %}
-    {% if club.verification_url %}<li><a class="link-pill" href="{{ club.verification_url }}" target="_blank" rel="noopener nofollow"><span aria-hidden="true">🏛️</span> {{ 'HuskyLink' if 'huskylink.washington.edu' in club.verification_url else 'UW Rec' if 'washington.edu/ima' in club.verification_url else 'UW page' }}</a></li>{% endif %}
-    {% if club.club_email %}<li><a class="link-pill" href="mailto:{{ club.club_email }}"><span aria-hidden="true">✉️</span> Email</a></li>{% endif %}
   </ul>
   {% if club.claimed %}{# what the officers wrote themselves: one short line, only the parts they filled in #}
     {% set facts = [] %}

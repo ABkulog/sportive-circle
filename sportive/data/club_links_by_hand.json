@@ -1,0 +1,21 @@
+{
+ "_how": "Links a person checked by hand, for clubs UW's pages list without them (most HuskyLink-only clubs have no Instagram there). Key: the club's name exactly as on the app. Values: instagram (just the handle, no @), website, facebook, discord, x_handle, club_email. These win over what UW's pages say. Only add a link you saw on the club's own account or site.",
+ "clubs": {
+  "Barbell Club at the University of Washington": {
+   "instagram": "barbellclubuw"
+  },
+  "Husky Pickleball Club": {
+   "instagram": "huskypickleballclub"
+  },
+  "Men's Basketball Club @ UW": {
+   "instagram": "clubhoopsuw"
+  },
+  "The Hiking Club at UW": {
+   "instagram": "hikingclubuw"
+  },
+  "Women's Club Baseball at The University of Washington": {
+   "instagram": "uwwomensclubbaseball"
+  }
+ },
+ "_checked": "2026-10-28: these Instagram accounts' names match the club exactly (e.g. 'Barbell Club at UW'); found through web search, not yet confirmed with the clubs."
+}
