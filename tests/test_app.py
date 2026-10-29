@@ -8577,3 +8577,10 @@ def test_play_map_shows_every_spot_with_hours_and_uw_rec_bookings(accounts, clie
     form = client.get(spots["Denny Field"]["new_url"]).data.decode()
     assert "<option selected>Denny Field</option>" in form
     assert "<option selected>" not in client.get("/events/new?location=Mars").data.decode().split('name="location"')[1].split("</select>")[0]
+
+
+def test_shared_link_preview_says_the_launch_message(client):
+    """FR-SHARE-1: the link in a group chat reads "Find a UW sports club that fits you", with a description and the card."""
+    page = client.get("/").data.decode()
+    assert '<meta property="og:title" content="Find a UW sports club that fits you · Sportive Circle">' in page
+    assert 'og:description" content="Every UW sports club in one place' in page and "share-card.png" in page
