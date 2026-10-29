@@ -168,7 +168,14 @@
 
 {% macro club_post_card(item) %}
   {% set p = item.club_post %}
-  {% if p.body.startswith('🆕') %}
+  {% if p.body.startswith('✅') %}
+    {# A club an officer just claimed: one short line, like a new club #}
+    <article class="card feed-card feed-mini" id="club-post-{{ p.id }}" data-swap>
+      <a class="feed-mini-link" href="{{ url_for('clubs.view', club_id=p.club_id) }}">{{ club_logo(p, 28, logo=p.club_logo or '', club_id=p.club_id) }}
+        <span>✅ <strong>{{ p.club_name }}</strong> {{ verified_badge() }} just claimed their page <small class="muted">· {{ p.created_at|ago }}</small></span></a>
+      {{ follow_button(p.club_id, {'my_role': p.my_role}) }}
+    </article>
+  {% elif p.body.startswith('🆕') %}
     {# A new club: one short line, not a full card #}
     <article class="card feed-card feed-mini" id="club-post-{{ p.id }}" data-swap>
       <a class="feed-mini-link" href="{{ url_for('clubs.view', club_id=p.club_id) }}">{{ club_logo(p, 28, logo=p.club_logo or '', club_id=p.club_id) }}

@@ -10,6 +10,7 @@ def greeting(first_name):
 
 
 TOP_DAWGS = 10  # spots on the Home leaderboard
+TOP_DAWGS_SHOW_FROM = 5  # a board of two or three looks empty: it shows once this many people played this month
 
 
 def top_dawgs(limit=TOP_DAWGS, now=None, viewer=None):

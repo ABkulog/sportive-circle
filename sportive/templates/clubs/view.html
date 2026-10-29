@@ -71,7 +71,10 @@
   <div class="club-actions" id="join">
     {% set cta = {'tryouts': 'Sign up for tryouts', 'application': 'Apply to join'}.get(club.joining, 'Request to join') %}
     {% if not g.user %}
-      <a class="btn btn-block" href="{{ url_for('auth.signup', next=request.path) }}">Sign up to join</a>
+      <a class="btn btn-block" href="{{ url_for('auth.signup', next=request.path) }}">Sign up to {{ 'follow' if not club.claimed else 'join' }}</a>
+      {% if club.status == 'approved' and not club.claimed %}
+        <a class="btn btn-ghost btn-block claim-cta" href="{{ url_for('auth.signup', club=1, next=request.path ~ '?claim=1#join') }}">Is this your club? Claim it</a>
+      {% endif %}
     {% elif club.status != 'approved' %}
       {% if role == 'officer' and club.status != 'denied' %}<a class="btn btn-ghost btn-block" href="{{ url_for('clubs.edit', club_id=club.id) }}">Edit application</a>
         {% if owner %}<a class="btn btn-ghost btn-block manage-officers" href="{{ url_for('clubs.officers', club_id=club.id) }}">Manage officers</a>{% endif %}
@@ -109,7 +112,7 @@
             know. Keep it up until then.</span></div>
       {% else %}
         <details class="join-panel claim-panel" {% if request.args.get('claim') %}open{% endif %}>
-          <summary class="link-button">Are you an officer? Claim this club</summary>
+          <summary class="btn btn-ghost btn-block claim-cta">Is this your club? Claim it</summary>
           {% if not g.user %}
             <p><a class="btn" href="{{ url_for('auth.signup', club=1) }}">Sign up to claim it</a></p>
           {% else %}

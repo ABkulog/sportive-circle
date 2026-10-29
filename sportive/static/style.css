@@ -2065,3 +2065,6 @@ html, body { overflow-x: clip; }
 .this-week { margin: 4px 0 18px; }
 .this-week .home-section-title { margin-bottom: 8px; }
 .this-week-more { margin: 8px 0 0; text-align: right; }
+.show-me { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--muted); margin: 6px 0; }
+.show-me select { font-size: .85rem; padding: 4px 8px; border-radius: 999px; }
+.claim-cta { margin-top: 8px; }

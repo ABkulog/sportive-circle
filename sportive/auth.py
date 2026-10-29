@@ -319,8 +319,9 @@ def signup():
     if request.args.get("next"):
         session["after_login"] = safe_next(request.args["next"])
     if request.args.get("club"):  # "Club officer?": an account, the email code, then their club to claim
-        session["club_signup"] = True
-        session["after_login"] = url_for("clubs.directory")
+        session["club_signup"] = True  # a club page's "Claim it" brings them back to that club
+        session["after_login"] = safe_next(request.args.get("next", "")) if request.args.get("next") \
+            else url_for("clubs.directory")
     elif request.method == "GET" and not request.args.get("fix"):
         session.pop("club_signup", None)
     # Officers skip the sports and texts steps: they're here to claim their club (the profile can wait).
@@ -528,8 +529,8 @@ def verify():
             destination = log_in(user, just_signed_up=True)
             if club_signup:
                 flash(f"You're in, {user['full_name'].split()[0]}! Every UW club is already here: find yours and tap "
-                      "“Claim this club”. Your profile can wait.", "celebrate")
-                return redirect(url_for("clubs.directory"))
+                      "“Claim it”. Your profile can wait.", "celebrate")
+                return redirect(destination if destination.startswith("/clubs") else url_for("clubs.directory"))
             flash(f"Welcome, {user['full_name'].split()[0]}!", "celebrate")
             if user["phone"] and not user["phone_verified"]:
                 # The email is real now, so the number from step 3 gets its code.

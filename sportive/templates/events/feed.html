@@ -137,7 +137,7 @@
 
 {% if not map_pins %}{{ live_map() }}{% endif %}
 
-{% if top_dawgs|length >= 2 %}{# a board of one looks empty #}
+{% if top_dawgs|length >= top_dawgs_from %}{# hidden until there's real activity (spirit.TOP_DAWGS_SHOW_FROM) #}
   <section class="top-dawgs band">
     <h2 class="home-section-title">Top Dawgs this month</h2>
     <ol>

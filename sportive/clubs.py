@@ -15,7 +15,7 @@ import secrets
 import threading
 from datetime import timedelta
 
-from flask import Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.datastructures import MultiDict
 
 from .auth import login_required, safe_next
@@ -116,6 +116,8 @@ SHOW_MEMBERS_FROM = 5
 MEMBER_COUNT = ("(SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id"
                 " AND m.role IN ('member', 'officer')"
                 " AND m.user_id NOT IN (SELECT id FROM users WHERE suspended = 1)) AS member_count")  # matches the roster
+
+SHOW_ME = {"all": "All clubs", "men": "Men's & co-ed", "women": "Women's & co-ed"}  # the Clubs tab's "Show me"
 
 CHOICES = {"club_kind": CLUB_KINDS, "focus": FOCUS, "joining": JOINING, "experience": EXPERIENCE,
            "who_can_join": WHO_CAN_JOIN_LABELS}
@@ -363,7 +365,15 @@ def directory():
     my_sports = user_sports(g.user["id"]) if g.get("user") else []
     fits = request.args.get("fits") == "1" and bool(my_sports)  # clubs for the sports on your profile
     easy = request.args.getlist("easy")  # quick filters: beginner / free / no_tryouts
+    # "Show me": men's and co-ed / women's and co-ed / all, set once and remembered (this browser)
+    if request.args.get("show") in SHOW_ME:
+        session["club_show"] = request.args["show"]
+    show = session.get("club_show", "all")
     where, params = [], {"me": g.user["id"] if g.get("user") else 0}
+    if show == "men":
+        where.append("c.who_can_join IN ('everyone', 'men')")
+    elif show == "women":
+        where.append("c.who_can_join IN ('everyone', 'women', 'women_nb')")
     if mine:  # my clubs, including ones still being reviewed (those only for their officers: others can't open them)
         where.append("EXISTS (SELECT 1 FROM club_members m WHERE m.club_id = c.id AND m.user_id = :me"
                      " AND (c.status = 'approved' OR m.role = 'officer')) AND c.status != 'denied'")  # denied: clutter
@@ -416,7 +426,8 @@ def directory():
             ORDER BY for_you DESC, fold(c.name) LIMIT 300""",
         {**params, "now": to_db(now_local()), "hold_now": to_db(now_local())}).fetchall()
     return render_template("clubs/directory.html", clubs=clubs, q=q, sport=sport, mine=mine, easy=easy,
-                           fits=fits, my_sports=my_sports, show_members_from=SHOW_MEMBERS_FROM)
+                           fits=fits, my_sports=my_sports, show_members_from=SHOW_MEMBERS_FROM,
+                           show=show, show_me=SHOW_ME)
 
 
 @bp.route("/clubs/<int:club_id>")
@@ -1351,6 +1362,10 @@ def approve_claim(claim_row, club):
     notify(claim_row["user_id"], "club_review",
            f"✅ You run {club['name']} on Sportive Circle now! It has the verified badge, and you can post as the club.",
            link)
+    # An automatic post for the feed (students' own posts are paused; this kind isn't): "X just claimed their page"
+    if not db.execute("SELECT 1 FROM club_posts WHERE club_id = ? AND body LIKE '✅ %'", (club["id"],)).fetchone():
+        db.execute("INSERT INTO club_posts (club_id, author_id, body, created_at) VALUES (?, NULL, ?, ?)",
+                   (club["id"], f"✅ {club['name']} just claimed their page.", to_db(now_local())))
     db.commit()
 
 
