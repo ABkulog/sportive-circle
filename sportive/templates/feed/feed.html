@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import home_tabs, icon, club_logo, avatar, open_to_field, place_check, spot_field %}
+{% from "_macros.html" import home_tabs, icon, club_logo, avatar, open_to_field, place_check, spot_field, event_card %}
 {% from "feed/_cards.html" import feed_item %}
 {% block title %}{{ '#' ~ SPORTS[sport] if sport else "Feed" }}{% endblock %}
 {% block content %}
@@ -113,6 +113,14 @@
 </div>
 {% endif %}
 
+{% if week %}{# What students and clubs are playing in the next 7 days, before posts and news #}
+  <section class="this-week" aria-labelledby="this-week-title">
+    <h2 id="this-week-title" class="home-section-title">This week{{ ' in ' ~ SPORTS[sport] if sport }}</h2>
+    <div class="stack">{% for e in week %}{{ event_card(e) }}{% endfor %}</div>
+    <p class="muted small this-week-more"><a href="{{ url_for('events.feed', **({'sport': sport} if sport else {})) }}">Every game on Play →</a></p>
+  </section>
+{% endif %}
+
 {% if club_picks %}
   <section class="card clubs-for-you" aria-labelledby="clubs-for-you">
     <h2 id="clubs-for-you" class="home-section-title">Clubs for you</h2>
@@ -136,7 +144,8 @@
   {% else %}
     <div class="card empty">
       <p><strong>Nothing here yet.</strong></p>
-      <p class="muted">Be the first: post a plan, a PR or a question{{ ' about ' ~ SPORTS[sport] if sport }}.</p>
+      {% if people_posting() %}<p class="muted">Be the first: post a plan, a PR or a question{{ ' about ' ~ SPORTS[sport] if sport }}.</p>
+      {% else %}<p class="muted">Clubs' posts and Husky news show up here. <a href="{{ url_for('events.create') }}">Start a game →</a></p>{% endif %}
     </div>
   {% endfor %}
 </div>

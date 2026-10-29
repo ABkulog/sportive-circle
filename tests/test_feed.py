@@ -185,7 +185,9 @@ def test_club_posts_and_new_games_fill_the_feed(accounts, client, app):
     accounts.signup(email="fresh@uw.edu", sports=("running", "basketball"))
     feed = client.get("/feed").data.decode()
     assert "Tuesday run moved to Green Lake" in feed and "UW Run Club" in feed and "Club ·" in feed
-    assert "posted a game" not in feed and "Pickup 5v5" not in feed                    # games are on Play
+    # Games aren't posts in the feed; they're in "This week" at the top (FR-FEED-36), with a link to Play
+    week = feed[feed.index('id="this-week-title"'):feed.index("Every game on Play")]
+    assert "Pickup 5v5" in week and feed.count(">Pickup 5v5</a>") == 1
     followed = client.post(f"/clubs/{club}/follow", data={"next": "/feed"})
     assert followed.headers["Location"] == "/feed"                                       # + Follow stays on the feed
     assert 'class="head-follow"' not in client.get("/feed").data.decode()
@@ -249,3 +251,34 @@ def test_paging_never_skips_posts_from_the_same_minute(accounts, client, app):
             break
         page = client.get(more.group(1).replace("&amp;", "&")).data.decode()
     assert sorted(map(int, seen)) == list(range(40))          # every one, once
+
+
+def test_home_starts_with_this_week_and_husky_news_comes_last(accounts, client, app, monkeypatch):
+    """FR-FEED-36: Home opened on varsity GoHuskies stories. It now starts with "This week": up to 3 games and club
+    practices in the next 7 days for your sports (open to you, not full, not private). In the main feed Husky news
+    comes after students' and clubs' posts; a sport's channel still mixes it in by time."""
+    from datetime import timedelta
+    import sportive.news as news
+    from sportive.timeutil import now_local, to_db
+    from sportive.db import get_db
+    accounts.signup(email="maya@uw.edu", sports=("soccer",))
+    me = user_id(app, "maya@uw.edu")
+    now = now_local()
+    with app.app_context():
+        db = get_db()
+        for title, days in (("Soccer at Denny", 2), ("Next month soccer", 20)):
+            game = db.execute("""INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level,
+                                 max_players) VALUES (?, ?, 'soccer', 'Denny Field', ?, ?, 'All levels', 10)""",
+                              (me, title, to_db(now + timedelta(days=days)),
+                               to_db(now + timedelta(days=days, hours=1)))).lastrowid
+            db.execute("INSERT INTO rsvps (event_id, user_id, created_at) VALUES (?, ?, ?)", (game, me, to_db(now)))
+        db.commit()
+    story = {"kind": "news", "at": to_db(now), "story": {"link": "https://gohuskies.com/x", "title": "Huskies win",
+             "sport": "soccer", "team": "Husky Men's Soccer", "summary": ""}}
+    monkeypatch.setattr(news, "feed_news", lambda *a, **k: [dict(story)])
+    client.post("/posts/new", data={"body": "Anyone up for a kickabout", "sport": "soccer"})
+    page = client.get("/feed").data.decode()
+    assert "This week" in page and "Soccer at Denny" in page and "Next month soccer" not in page
+    assert page.index("This week") < page.index("Anyone up for a kickabout")
+    if "Huskies win" in page:                                     # news is last in the main feed
+        assert page.index("Anyone up for a kickabout") < page.index("Huskies win")

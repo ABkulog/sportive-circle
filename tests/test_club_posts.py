@@ -142,7 +142,9 @@ def test_the_feed_is_only_posts_games_are_on_play(accounts, client, app):
     accounts.logout()
     accounts.signup(email="fan@uw.edu", sports=("soccer",))
     feed = client.get("/feed").data.decode()
-    assert "Pickup 0" not in feed and "feed-games" not in feed
+    assert "feed-games" not in feed                                                  # games aren't feed posts...
+    week = feed[feed.index('id="this-week-title"'):feed.index("Every game on Play")]  # ...but This week shows 3
+    assert "Pickup 0" in week and "Pickup 2" in week                                  # (FR-FEED-36)
     assert "Pickup 0" in client.get("/").data.decode()
 
 
@@ -318,17 +320,17 @@ def test_admin_cleans_up_keyboard_mashing(accounts, client, app):
 
 
 def test_play_has_a_live_map_of_whats_on_now(accounts, client):
-    """Like Snap Map: games starting within an hour, going on, or ended in the last 10, as sport bubbles."""
+    """Like Snap Map: games starting later today, going on, or ended in the last 10, as sport bubbles."""
     accounts.signup(email="host@uw.edu", sports=("soccer",))
     for title, place, start in (("Soon", "Denny Field", timedelta(minutes=20)),
-                                ("Later", "Husky Track", timedelta(hours=3))):
+                                ("Tomorrow", "Husky Track", timedelta(hours=25))):
         client.post("/events/new", data={"title": title, "sport": "soccer", "location": place, "players": "10",
                                          "starts_at": form_time(start), "ends_at": form_time(start + timedelta(hours=1)),
                                          "note": ""})
     play = client.get("/").data.decode()
     assert 'id="play-map"' in play and '"name": "Denny Field"' in play and "playmap.js" in play
-    assert '"state": "soon"' in play and '"Husky Track"' not in play               # 3 hours away: not on the map
-    assert "1 place with games now" in play and "Clubs for you" not in play
+    assert '"state": "soon"' in play and '"Husky Track"' not in play               # tomorrow: not on the map
+    assert "1 place with games today" in play and "Clubs for you" not in play
 
 
 def test_cleanup_rows_keep_their_text_readable(client):
