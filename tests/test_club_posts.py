@@ -329,7 +329,8 @@ def test_play_has_a_live_map_of_whats_on_now(accounts, client):
                                          "note": ""})
     play = client.get("/").data.decode()
     assert 'id="play-map"' in play and '"name": "Denny Field"' in play and "playmap.js" in play
-    assert '"state": "soon"' in play and '"Husky Track"' not in play               # tomorrow: not on the map
+    pins = play.split('id="play-pins">')[1].split("</script>")[0]  # the game bubbles (every place has a 📍 too)
+    assert '"state": "soon"' in pins and '"Husky Track"' not in pins               # tomorrow: not on the map
     assert "1 place with games today" in play and "Clubs for you" not in play
 
 
