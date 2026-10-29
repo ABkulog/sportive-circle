@@ -19,6 +19,8 @@ def app(tmp_path):
         # Games in tests start "tomorrow at this time", whatever time the tests run: opening hours have their own
         # tests (they turn this back on), so the rest don't fail at night.
         "CHECK_PLACE_HOURS": False,
+        # Students' own posts are paused on the live site (PEOPLE_POSTING); the post tests need them on.
+        "PEOPLE_POSTING": True,
     })
 
 

@@ -8457,3 +8457,27 @@ def test_free_filter_skips_clubs_whose_dues_nobody_wrote(accounts, client, app):
     """FR-CLUB-48: "Free" listed every club UW lists (blank dues), many of which charge. Blank now means unknown."""
     club = _approved_club(accounts, client, app, dues="")
     assert f'href="/clubs/{club}"' not in client.get("/clubs?easy=free").data.decode()
+def test_students_posts_are_paused_but_clubs_and_games_still_post(accounts, client, app):
+    """FR-FEED-35: students' own posts (the Twitter-style part) are off until the app has enough people
+    (PEOPLE_POSTING). Clubs still post, a host can still post their game, and ＋ starts a game instead."""
+    app.config["PEOPLE_POSTING"] = False
+    club = _approved_club(accounts, client, app)
+    with app.app_context():
+        get_db().execute("UPDATE clubs SET claimed = 1 WHERE id = ?", (club,))
+        get_db().commit()
+    accounts.signup(email="maya@uw.edu", name="Maya Lee")
+    feed = client.get("/feed").data.decode()
+    assert 'id="post"' not in feed and 'aria-label="New game"' in feed               # no sheet; ＋ = new game
+    page = client.post("/posts/new", data={"body": "who's down", "sport": "basketball"},
+                       follow_redirects=True).data.decode()
+    assert "Posts are paused" in page
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM posts").fetchone()[0] == 0
+    profile = client.get(f"/u/{_user_id(app, 'maya@uw.edu')}").data.decode()
+    assert "Post something" not in profile and "Start a game" in profile
+    accounts.logout()
+    accounts.login(email="captain@uw.edu")                                   # the club's officer still posts as it
+    assert 'id="post"' in client.get("/feed").data.decode()
+    client.post("/posts/new", data={"body": "Practice moved to 6", "sport": "spikeball", "as_club": str(club)})
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM posts WHERE club_id = ?", (club,)).fetchone()[0] == 1

@@ -79,6 +79,9 @@ def create_app(test_config=None):
         TWILIO_AUTH_TOKEN=_setting("TWILIO_AUTH_TOKEN"),
         TWILIO_FROM=_setting("TWILIO_FROM"),
         # Send game reminders from inside the app (on by default on Render; REMINDER_LOOP=0 turns it off).
+        # Students' own posts on the feed (text, photos, polls). Off until the app has enough people for a feed to
+        # feel alive; clubs still post, and a host can still post their game. PEOPLE_POSTING=1 turns it back on.
+        PEOPLE_POSTING=(_setting("PEOPLE_POSTING") or "0") == "1",
         REMINDER_LOOP=(_setting("REMINDER_LOOP") or ("1" if os.environ.get("RENDER_EXTERNAL_URL") else "0")) == "1",
     )
     if test_config:
@@ -141,6 +144,7 @@ def _check_secret_key(app):
 
 def _add_template_helpers(app):
     from .posts import poll_of
+    app.jinja_env.globals["people_posting"] = lambda: app.config.get("PEOPLE_POSTING", False)
     app.jinja_env.globals["poll_of"] = poll_of  # a post's poll, as the viewer sees it (feed/_cards.html)
     app.jinja_env.globals.update(
         # forms and lists
