@@ -79,6 +79,8 @@ def social_links(club, members=True):
 
 
 # SQL for "how many confirmed members" (members + officers; followers and people waiting don't count).
+# A member count only says something once a club has people here; "0 members" makes a real club look empty.
+SHOW_MEMBERS_FROM = 5
 MEMBER_COUNT = ("(SELECT COUNT(*) FROM club_members m WHERE m.club_id = c.id"
                 " AND m.role IN ('member', 'officer')"
                 " AND m.user_id NOT IN (SELECT id FROM users WHERE suspended = 1)) AS member_count")  # matches the roster
@@ -377,7 +379,7 @@ def directory():
             ORDER BY for_you DESC, fold(c.name) LIMIT 300""",
         {**params, "now": to_db(now_local()), "hold_now": to_db(now_local())}).fetchall()
     return render_template("clubs/directory.html", clubs=clubs, q=q, sport=sport, mine=mine, easy=easy,
-                           fits=fits, my_sports=my_sports)
+                           fits=fits, my_sports=my_sports, show_members_from=SHOW_MEMBERS_FROM)
 
 
 @bp.route("/clubs/<int:club_id>")
@@ -428,7 +430,7 @@ def view(club_id):
         feed_posts, feed_photos = club_post_items(club_id)
         for item in feed_posts:
             item["on_club_page"] = True
-    return render_template("clubs/view.html", club=club, posts=posts, members=members, events=events,
+    return render_template("clubs/view.html", club=club, show_members_from=SHOW_MEMBERS_FROM, posts=posts, members=members, events=events,
                            feed_posts=feed_posts, feed_photos=feed_photos, max_photos=10,
                            friends_line=friends_line(club_id, me) if me and role not in MEMBER_ROLES else None,
                            week=officer_week(club_id) if role == "officer" and club["status"] == "approved" else None,

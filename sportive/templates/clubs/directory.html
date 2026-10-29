@@ -42,10 +42,14 @@
       <strong class="club-name">{{ c.name }}{% if c.status == 'approved' and c.claimed %} {{ verified_badge() }}{% endif %}</strong>
       <span class="club-desc muted">{{ c.description|truncate(110) }}</span>
       {# One grey line, like Instagram's search results #}
-      {% set bits = [c.member_count ~ ' member' ~ ('s' if c.member_count != 1 else '')] %}
+      {# What helps someone pick: the sport, who it's for, how to get in. A member count only once there are a few. #}
+      {% set bits = [SPORTS[c.sport]] if c.sport != 'other' else [] %}
+      {% if c.who_can_join in ('men', 'women') %}{% set _ = bits.append(c.who_can_join|capitalize ~ "'s club") %}{% endif %}
+      {% if c.member_count >= show_members_from %}{% set _ = bits.append(c.member_count ~ ' members') %}{% endif %}
       {% if c.upcoming %}{% set _ = bits.append(c.upcoming ~ ' upcoming') %}{% endif %}
       {% if c.my_status == 'officer' %}{% set _ = bits.append('Officer') %}{% elif c.my_status == 'member' %}{% set _ = bits.append('Member') %}
       {% elif c.my_status == 'follower' %}{% set _ = bits.append('Following') %}{% elif c.my_status in ('requested', 'tryout') %}{% set _ = bits.append('Waiting') %}{% endif %}
+      {% if c.joining == 'open' %}{% set _ = bits.append('No tryouts') %}{% elif c.joining == 'tryouts' %}{% set _ = bits.append('Tryouts') %}{% endif %}
       {% if c.experience == 'none' %}{% set _ = bits.append('Beginners welcome') %}{% endif %}
       <span class="club-line muted">{{ bits|join(' · ') }}
         {% if c.status == 'pending' %}<span class="badge badge-gold">⏳ In review</span>

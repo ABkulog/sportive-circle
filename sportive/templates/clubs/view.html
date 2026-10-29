@@ -25,7 +25,7 @@
     </div>
     {# Instagram's numbers next to the picture #}
     <ul class="stat-row" aria-label="Club stats">
-      <li><strong>{{ club.member_count }}</strong><span>member{{ 's' if club.member_count != 1 }}</span></li>
+      {% if club.member_count >= show_members_from %}<li><strong>{{ club.member_count }}</strong><span>members</span></li>{% endif %}
       <li><strong>{{ followers }}</strong><span>follower{{ 's' if followers != 1 }}</span></li>
       <li><strong>{{ events|length }}</strong><span>event{{ 's' if events|length != 1 }}</span></li>
     </ul>

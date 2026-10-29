@@ -1593,7 +1593,8 @@ def test_clubs_are_open_to_everyone(accounts, client, app):
     _approve(app, club)
     accounts.logout()
     directory = client.get("/clubs").data.decode()          # no account needed
-    assert "UW Spikeball Club" in directory and "1 member" in directory
+    assert "UW Spikeball Club" in directory and "1 member" not in directory  # a count only once there are a few
+    assert "Spikeball · No tryouts · Beginners welcome" in directory
     page = client.get(f"/clubs/{club}").data.decode()
     assert "Casual roundnet" in page and "Verified club</span>" in page and "Sign up to join" in page
     assert "Come to any Tuesday practice!" in page and "@uwspikeball" in page
@@ -2091,7 +2092,7 @@ def test_follow_is_not_membership(accounts, client, app):
     client.post(f"/clubs/{club}/follow")
     page = client.get(f"/clubs/{club}").data.decode()
     stats = re.findall(r"<strong>(\d+)</strong><span>(\w+)</span>", page)
-    assert ">Unfollow<" in page and ("1", "member") in stats and ("2", "followers") in stats   # captain + curious
+    assert ">Unfollow<" in page and all(label != "member" for _, label in stats) and ("2", "followers") in stats   # 1 member: no count yet (FR-CLUB-45)
 
 
 def test_tryouts_flow_with_messages(accounts, client, app):
@@ -8336,3 +8337,22 @@ def test_the_host_sees_what_happened_to_each_invite(accounts, client, app):
     assert "Invites that didn't work out" in page
     for line in ("joined, then left", "said they can&#39;t make it", "the host took them off", "invite was taken back"):
         assert line in page
+
+
+def test_club_cards_hide_member_counts_until_a_club_has_a_few(accounts, client, app):
+    """FR-CLUB-45: "0 members" on a club UW lists made the app look empty. Cards and the club page show a member
+    count only from 5 members; until then the card says what helps someone pick (the sport, a men's or women's
+    club, tryouts or not)."""
+    club = _approved_club(accounts, client, app, name="UW Women's Volleyball Club", sport="volleyball",
+                          who_can_join="women", joining="tryouts", experience="some")
+    directory = client.get("/clubs").data.decode()
+    assert "Volleyball · Women&#39;s club · Tryouts" in directory and "1 member" not in directory
+    assert ">members</span>" not in client.get(f"/clubs/{club}").data.decode()
+    with app.app_context():
+        db = get_db()
+        for n in range(4):
+            db.execute("INSERT INTO users (email, full_name, password_hash) VALUES (?, ?, 'x')", (f"m{n}@uw.edu", f"M {n}"))
+            db.execute("INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (?, last_insert_rowid(), 'member', '2026-10-01 12:00:00')", (club,))
+        db.commit()
+    assert "5 members" in client.get("/clubs").data.decode()
+    assert "<strong>5</strong><span>members</span>" in client.get(f"/clubs/{club}").data.decode()
