@@ -33,6 +33,7 @@ def close_db(exception=None):
 # To add a column later: put it in schema.sql AND append it here.
 # (Columns and tables of removed features, like ranks, stay in older databases unused; nothing reads them.)
 ADDED_COLUMNS = [
+    ("users", "club_show", "TEXT NOT NULL DEFAULT ''"),  # which clubs For you suggests: '' / men / women / all
     ("posts", "club_id", "INTEGER REFERENCES clubs(id) ON DELETE CASCADE"),  # posted by an officer as the club
     ("posts", "pinned_until", "TEXT"),  # a club pinned it to the top of its page, until then (24 hours)
     ("posts", "members_only", "INTEGER NOT NULL DEFAULT 0"),  # a club's post only its members see
