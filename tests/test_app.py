@@ -2127,7 +2127,7 @@ def test_uw_clubs_refresh_themselves_every_day(accounts, client, app, monkeypatc
     for guess in ("Ask the club", "No experience needed", "Open: just show up"):  # nothing guessed
         assert guess not in rugby and guess not in running_page
     pickle_page = client.get(f"/clubs/{pickle}").data.decode()  # the owner: "why do HuskyLink and Website open the same page?"
-    assert pickle_page.count("huskylink.washington.edu/huskypickle") == 1 and "Website</a>" not in pickle_page
+    assert pickle_page.count('href="https://huskylink.washington.edu/huskypickle') == 1 and "Website</a>" not in pickle_page
 
 
 def test_follow_is_not_membership(accounts, client, app):
