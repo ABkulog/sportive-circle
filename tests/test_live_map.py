@@ -1,4 +1,4 @@
-"""Play's live map (like Snap Map): starting within an hour, going on, or ended in the last 10 minutes."""
+"""Play's live map (like Snap Map): starting later today, going on, or ended in the last 10 minutes."""
 from datetime import timedelta
 
 from sportive.db import get_db
@@ -25,9 +25,29 @@ def test_the_live_window(accounts, client, app):
     add_game(app, host, "Starting", "Husky Track", timedelta(minutes=55), timedelta(minutes=100))
     add_game(app, host, "Just ended", "The Quad", timedelta(minutes=-70), timedelta(minutes=-5))
     add_game(app, host, "Long over", "Red Square", timedelta(minutes=-120), timedelta(minutes=-20))
-    add_game(app, host, "Too far off", "Recreation Field 1 (by the IMA)", timedelta(minutes=70), timedelta(minutes=120))
+    add_game(app, host, "Too far off", "Recreation Field 1 (by the IMA)", timedelta(hours=25), timedelta(hours=26))
     play = client.get("/").data.decode()
     assert '"state": "live"' in play and '"label": "Live"' in play and '"Denny Field"' in play
     assert '"Husky Track"' in play and ('"label": "in 55 min"' in play or '"label": "in 54 min"' in play)
     assert '"The Quad"' in play and '"label": "Ended"' in play
     assert '"Red Square"' not in play and '"Recreation Field 1 (by the IMA)"' not in play
+
+
+def test_the_map_shows_the_rest_of_today_and_leads_only_when_busy(accounts, client, app):
+    """FR-PLAY-30: the map showed only games starting within the hour, so it said "Nothing on right now" almost
+    all day. It now shows the rest of today (a game later on says its time), and while nothing's on today the
+    Upcoming games list comes first and the map sits below it."""
+    from sportive.events import live_status, live_window_end
+    now = now_local()
+    assert live_window_end(now) >= now + timedelta(hours=1)
+    later = now.replace(hour=23, minute=0, second=0, microsecond=0)
+    if later - now > timedelta(hours=1):
+        game = {"starts_at": to_db(later), "ends_at": to_db(later + timedelta(minutes=30))}
+        assert live_status(game, now) == ("soon", "11:00 PM")
+    accounts.signup(email="host@uw.edu", sports=("soccer",))
+    play = client.get("/").data.decode()
+    assert play.index('id="games-title"') < play.index('id="live-map"')       # nothing today: list first
+    assert "games today show up here" in play
+    add_game(app, user_id(app, "host@uw.edu"), "On now", "Denny Field", timedelta(minutes=-10), timedelta(minutes=50))
+    play = client.get("/").data.decode()
+    assert play.index('id="live-map"') < play.index('id="games-title"')       # something on: the map leads

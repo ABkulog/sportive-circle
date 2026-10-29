@@ -148,8 +148,14 @@
     {% if post_items %}
       <div class="stack feed">{% for item in post_items %}{{ feed_item(item, post_photos) }}{% endfor %}</div>
     {% else %}
-      <p class="muted">{{ "You haven't posted yet. Share a PR, a plan or a question on the feed." if me else "No posts yet." }}
-        {% if me %}<a href="{{ url_for('posts.feed') }}">Post something →</a>{% endif %}</p>
+      {% if me and people_posting() %}
+      <p class="muted">You haven't posted yet. Share a PR, a plan or a question on the feed.
+        <a href="{{ url_for('posts.feed') }}">Post something →</a></p>
+      {% elif me %}
+      <p class="muted">Your games show here once you post one. <a href="{{ url_for('events.create') }}">Start a game →</a></p>
+      {% else %}
+      <p class="muted">No posts yet.</p>
+      {% endif %}
     {% endif %}
   </section>
 
