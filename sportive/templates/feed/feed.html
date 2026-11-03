@@ -113,10 +113,20 @@
 </div>
 {% endif %}
 
-{% if week %}{# What students and clubs are playing in the next 7 days, before posts and news #}
+{% if week or practices %}{# What students and clubs are playing in the next 7 days, before posts and news #}
   <section class="this-week" aria-labelledby="this-week-title">
-    <h2 id="this-week-title" class="home-section-title">This week{{ ' in ' ~ SPORTS[sport] if sport }}</h2>
-    <div class="stack">{% for e in week %}{{ event_card(e) }}{% endfor %}</div>
+    <h2 id="this-week-title" class="home-section-title">This week in {{ SPORTS[sport] if sport else 'UW sports' }}</h2>
+    {% if week %}<div class="stack">{% for e in week %}{{ event_card(e) }}{% endfor %}</div>{% endif %}
+    {% if practices %}
+      {# Club practices from UW Rec's public schedule (copied every day): real times, nothing guessed #}
+      <h3 class="this-week-sub">Club practices <small class="muted">· from UW Rec's schedule</small></h3>
+      <ul class="practice-list">
+        {% for p in practices %}
+          <li><span class="practice-emoji" aria-hidden="true">{{ p.emoji }}</span>
+            <span><strong>{{ p.name }}</strong><br><small class="muted">{{ p.when }} · {{ p.place }}</small></span></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
     <p class="muted small this-week-more"><a href="{{ url_for('events.feed', **({'sport': sport} if sport else {})) }}">Every game on Play →</a></p>
   </section>
 {% endif %}
