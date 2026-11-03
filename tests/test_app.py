@@ -882,10 +882,12 @@ def test_gym_buddy_places():
 
 def test_ultimate_frisbee_places(accounts, client):
     from sportive.constants import SPORT_LOCATIONS
-    assert SPORT_LOCATIONS["ultimate"] == ["Denny Field", "Husky Track", "The Quad",
+    assert SPORT_LOCATIONS["ultimate"] == ["Denny Field", "Gas Works Park", "Husky Track", "Laurelhurst Playfield",
+                                           "Magnuson Park (Sand Point)", "Montlake Playfield", "The Quad",
                                            "Recreation Field 1 (by the IMA)", "Recreation Field 2 (by Husky Track)",
                                            "Recreation Field 3 (by the golf range)",
-                                           "Recreation Field 4 (by the golf range)", "Off campus (see note)"]
+                                           "Recreation Field 4 (by the golf range)",
+                                           "University Playground (U District)", "Off campus (see note)"]
     accounts.signup()
     response = client.post("/events/new", data=event_form(title="Frisbee on the fields", sport="ultimate",
                                                           location="Recreation Field 1 (by the IMA)"))
@@ -1012,10 +1014,10 @@ def test_every_campus_place_has_a_map_entry():
             assert place in LOCATION_COORDS, place
     from math import cos, hypot, radians
     for place, coords in LOCATION_COORDS.items():
-        if coords:  # every pin is near UW (catches typos like a swapped digit): within 5 km of Red Square
-            lat, lng = coords
+        if coords:  # every pin is near UW (catches typos like a swapped digit): within 6 km of Red Square
+            lat, lng = coords  # (Magnuson Park, the farthest, is about 5.4 km)
             km = hypot(lat - 47.6560, (lng + 122.3095) * cos(radians(47.656))) * 111.2
-            assert km < 5, (place, round(km, 1))
+            assert km < 6, (place, round(km, 1))
 
 
 def test_event_page_shows_map_and_directions(accounts, client):
@@ -8669,3 +8671,24 @@ def test_a_new_pickup_game_posts_itself_on_home(accounts, client, app):
         db.execute("UPDATE events SET created_at = datetime('now', '-4 days')")
         db.commit()
     assert 'id="new-game-' not in client.get("/feed").data.decode()               # older than 3 days: gone
+
+
+def test_map_has_the_parks_near_campus_and_a_red_dot_for_many_sports(accounts, client):
+    """FR-PLAY-34 (the owner: "we don't have nearly enough spots on the map", and a place for many sports shouldn't
+    show one sport): Seattle parks near campus are places to play (Green Lake, Gas Works, Montlake, Magnuson,
+    University Playground, Laurelhurst, Ravenna), each with a pin; a place for 3+ sports is marked "multi" (the
+    red dot), a one-sport place keeps its sport's emoji."""
+    import json
+    accounts.signup(sports=("tennis",))
+    page = client.get("/?scope=all").data.decode()
+    spots = {s["name"]: s for s in json.loads(page.split('id="play-spots">')[1].split("</script>")[0])}
+    for park in ("Gas Works Park", "Montlake Playfield", "Magnuson Park (Sand Point)", "Laurelhurst Playfield",
+                 "University Playground (U District)", "Ravenna Park"):
+        assert park in spots, park
+    assert spots["IMA (Intramural Activities Building)"]["multi"] and spots["Denny Field"]["multi"]
+    assert not spots["UW Golf Driving Range"]["multi"] and spots["UW Golf Driving Range"]["emoji"] == "⛳"
+    assert spots["Montlake Playfield"]["new_url"] == "/events/new?location=Montlake+Playfield&sport=tennis"
+    assert "many sports" in page
+    form = client.post("/events/new", data=event_form(title="Montlake hit", sport="tennis",
+                                                      location="Montlake Playfield"))
+    assert form.status_code == 302

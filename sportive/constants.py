@@ -135,6 +135,8 @@ LOCATIONS = [
     "Denny Field",
     "Emerald City Boxing Gym (Roosevelt)",
     "Fitness Center West (under Elm Hall)",
+    "Gas Works Park",
+    "Green Lake Park (loop trail and courts)",
     "Green Lake Park pickleball courts",
     "The HUB (Husky Union Building)",
     "HUB Games (HUB basement, room B150)",
@@ -147,7 +149,11 @@ LOCATIONS = [
     "IMA Pool",
     "IMA South Tennis Courts",
     "IMA Squash & Racquetball Courts",
+    "Laurelhurst Playfield",
+    "Magnuson Park (Sand Point)",
+    "Montlake Playfield",
     "The Quad",
+    "Ravenna Park",
     "Recreation Field 1 (by the IMA)",
     "Recreation Field 2 (by Husky Track)",
     "Recreation Field 3 (by the golf range)",
@@ -155,6 +161,7 @@ LOCATIONS = [
     "Red Square",
     "Sand Volleyball Courts (by the IMA)",
     "UW Golf Driving Range",
+    "University Playground (U District)",
     "Waterfront Activities Center (WAC)",
     "Off campus (see note)",
     "Online",
@@ -186,6 +193,15 @@ QUAD = "The Quad"
 TRAIL = "Burke-Gilman Trail"
 # Seattle Parks' free public pickleball hub, where the Husky Pickleball Club also plays (about 2 miles north of campus).
 GREEN_LAKE_PICKLEBALL = "Green Lake Park pickleball courts"
+# Seattle parks near campus (Seattle Parks and Recreation, checked Nov 2026): free and open to anyone.
+GREEN_LAKE = "Green Lake Park (loop trail and courts)"  # the 2.8-mile paved loop; basketball courts by the community center
+GAS_WORKS = "Gas Works Park"                            # the big lawns and hill on Lake Union
+MONTLAKE = "Montlake Playfield"                         # a ball field and tennis courts, south of the Montlake Cut
+MAGNUSON = "Magnuson Park (Sand Point)"                 # many fields and courts on Lake Washington
+U_PLAYGROUND = "University Playground (U District)"     # 9th Ave NE & NE 50th: a ball field (soccer too) and 2 tennis courts
+LAURELHURST = "Laurelhurst Playfield"                   # fields, and a tennis court with pickleball lines
+RAVENNA = "Ravenna Park"                                # wooded trails along the ravine
+PARK_FIELDS = [MONTLAKE, MAGNUSON, U_PLAYGROUND, LAURELHURST]  # grass fields for ball sports
 OFF_CAMPUS = "Off campus (see note)"
 ONLINE = "Online"
 HUB = "The HUB (Husky Union Building)"  # the student union
@@ -229,6 +245,7 @@ PLACE_HOURS = {
           (("10-13", "12-31"), {day: None for day in range(7)}),      # closed for the season
           (("01-01", "03-31"), {day: None for day in range(7)})],
     GREEN_LAKE_PICKLEBALL: [(ALL_YEAR, {day: ("04:00", "23:30") for day in range(7)})],
+    GREEN_LAKE: [(ALL_YEAR, {day: ("04:00", "23:30") for day in range(7)})],
     # Area 01: school year 1-11 PM, summer (about mid-June to mid-September) 4-11 PM.
     AREA_01: [(("01-01", "06-14"), {day: ("13:00", "23:00") for day in range(7)}),
               (("06-15", "09-20"), {day: ("16:00", "23:00") for day in range(7)}),
@@ -268,6 +285,14 @@ LOCATION_COORDS = {
     GOLF_RANGE: (47.661100, -122.296500),     # NE Clark Rd, past Rec Fields 3 and 4
     RED_SQUARE: (47.655900, -122.309600),
     BOXING_GYM: (47.676600, -122.317500),     # 6516 Roosevelt Way NE
+    # Seattle parks (Wikipedia / latlong.net / TopoZone, checked Nov 2026)
+    GREEN_LAKE: (47.681547, -122.328384),     # by the community center (same pin as the pickleball courts)
+    GAS_WORKS: (47.645630, -122.334351),
+    MONTLAKE: (47.641953, -122.309174),       # 1618 E Calhoun St
+    MAGNUSON: (47.680800, -122.248100),       # 7400 Sand Point Way NE
+    U_PLAYGROUND: (47.664400, -122.319300),   # 4745 9th Ave NE
+    LAURELHURST: (47.659589, -122.278993),    # 4544 NE 41st St
+    RAVENNA: (47.671765, -122.307349),
 }
 
 # Open grass/turf areas, good for field sports like soccer and frisbee.
@@ -276,36 +301,36 @@ OPEN_FIELDS = [DENNY, QUAD, TRACK, REC_FIELD_1, REC_FIELD_2, REC_FIELD_3, REC_FI
 # Where each sport can actually be played. The event forms only offer these places,
 # and the server rejects any other combination.
 SPORT_LOCATIONS = {
-    "basketball": [IMA, OFF_CAMPUS],
-    "soccer": OPEN_FIELDS + [OFF_CAMPUS],
-    "football": OPEN_FIELDS + [OFF_CAMPUS],
+    "basketball": [IMA, GREEN_LAKE, OFF_CAMPUS],
+    "soccer": OPEN_FIELDS + PARK_FIELDS + [GAS_WORKS, OFF_CAMPUS],
+    "football": OPEN_FIELDS + PARK_FIELDS + [GAS_WORKS, OFF_CAMPUS],
     "volleyball": OPEN_FIELDS + [IMA, SAND_COURTS, OFF_CAMPUS],  # indoor courts in Gym C, sand courts outside
-    "spikeball": OPEN_FIELDS + [IMA, OFF_CAMPUS],
-    "ultimate": OPEN_FIELDS + [OFF_CAMPUS],
-    "tennis": [IMA_SOUTH_COURTS, IMA_NORTH_COURTS, OFF_CAMPUS],
-    "pickleball": [IMA_NORTH_COURTS, IMA, GREEN_LAKE_PICKLEBALL, OFF_CAMPUS],  # IMA = indoor, in Gym B
-    "running": OPEN_FIELDS + [TRAIL, RED_SQUARE, OFF_CAMPUS],   # the running club meets on the Quad
+    "spikeball": OPEN_FIELDS + PARK_FIELDS + [GAS_WORKS, IMA, OFF_CAMPUS],
+    "ultimate": OPEN_FIELDS + PARK_FIELDS + [GAS_WORKS, OFF_CAMPUS],
+    "tennis": [IMA_SOUTH_COURTS, IMA_NORTH_COURTS, MONTLAKE, MAGNUSON, U_PLAYGROUND, LAURELHURST, OFF_CAMPUS],
+    "pickleball": [IMA_NORTH_COURTS, IMA, GREEN_LAKE_PICKLEBALL, LAURELHURST, OFF_CAMPUS],  # IMA = indoor, in Gym B
+    "running": OPEN_FIELDS + [TRAIL, RED_SQUARE, GREEN_LAKE, GAS_WORKS, RAVENNA, MAGNUSON, OFF_CAMPUS],   # the running club meets on the Quad
     "climbing": [IMA, OFF_CAMPUS],                             # the Crags climbing center is in the IMA
     "gym": [IMA, FITNESS_WEST, OFF_CAMPUS],
     "rowing": [WAC, OFF_CAMPUS],
     "snow": [OFF_CAMPUS],
-    "hiking": [OFF_CAMPUS],
+    "hiking": [RAVENNA, OFF_CAMPUS],
     "biking": [TRAIL, OFF_CAMPUS],
     "esports": [HUB_GAMES, HUB, ONLINE, OFF_CAMPUS],     # HUB Games has a PC gaming lounge
     # UW club sports
     "archery": [IMA_ARCHERY, OFF_CAMPUS],
     "badminton": [IMA, OFF_CAMPUS],                            # Gym B is the badminton gym
-    "baseball": OPEN_FIELDS + [OFF_CAMPUS],
+    "baseball": OPEN_FIELDS + PARK_FIELDS + [OFF_CAMPUS],
     "billiards": [AREA_01, HUB_GAMES, OFF_CAMPUS],
     "bowling": [HUB_GAMES, OFF_CAMPUS],
     "boxing": [IMA, IMA_MATS, BOXING_GYM, OFF_CAMPUS],         # IMA: heavy bags in the conditioning room
     "bjj": [IMA, IMA_MATS, OFF_CAMPUS],
-    "cricket": OPEN_FIELDS + [OFF_CAMPUS],
-    "disc_golf": OPEN_FIELDS + [OFF_CAMPUS],
+    "cricket": OPEN_FIELDS + PARK_FIELDS + [OFF_CAMPUS],
+    "disc_golf": OPEN_FIELDS + [GAS_WORKS, OFF_CAMPUS],
     "dodgeball": OPEN_FIELDS + [IMA, OFF_CAMPUS],
     "equestrian": [OFF_CAMPUS],                                # lessons at a nearby barn
     "fencing": OPEN_FIELDS + [IMA, IMA_MATS, RED_SQUARE, OFF_CAMPUS],
-    "field_hockey": OPEN_FIELDS + [OFF_CAMPUS],
+    "field_hockey": OPEN_FIELDS + PARK_FIELDS + [OFF_CAMPUS],
     "figure_skating": [OFF_CAMPUS],
     "golf": [GOLF_RANGE, OFF_CAMPUS],
     "gymnastics": [IMA, IMA_MATS, OFF_CAMPUS],
@@ -314,13 +339,13 @@ SPORT_LOCATIONS = {
     "judo": [IMA, IMA_MATS, OFF_CAMPUS],
     "karate": [IMA, IMA_MATS, OFF_CAMPUS],
     "kendo": [IMA, IMA_MATS, OFF_CAMPUS],
-    "lacrosse": OPEN_FIELDS + [OFF_CAMPUS],
+    "lacrosse": OPEN_FIELDS + PARK_FIELDS + [OFF_CAMPUS],
     "muay_thai": [IMA, IMA_MATS, OFF_CAMPUS],
     "racquetball": [IMA_COURTS, OFF_CAMPUS],
-    "rugby": OPEN_FIELDS + [OFF_CAMPUS],
+    "rugby": OPEN_FIELDS + PARK_FIELDS + [OFF_CAMPUS],
     "sailing": [WAC, OFF_CAMPUS],
     "skateboarding": [OFF_CAMPUS],
-    "softball": OPEN_FIELDS + [OFF_CAMPUS],
+    "softball": OPEN_FIELDS + PARK_FIELDS + [OFF_CAMPUS],
     "squash": [IMA_COURTS, OFF_CAMPUS],
     "swimming": [IMA_POOL, WAC, OFF_CAMPUS],                   # WAC: open-water swims on Union Bay
     "table_tennis": [IMA, AREA_01, HUB_GAMES, HUB, OFF_CAMPUS],
