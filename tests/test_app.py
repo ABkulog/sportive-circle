@@ -8623,3 +8623,49 @@ def test_map_place_panel_lists_its_games_and_fills_in_place_and_sport(accounts, 
     form = client.get(ima["new_url"]).data.decode()
     assert "<option selected>IMA Pool</option>" in form and '<option value="swimming" selected>' in form
     assert "data-spot-sheet" in page and "Create an event" in page
+
+
+def test_home_this_week_shows_uw_rec_club_practices(accounts, client, app):
+    """FR-FEED-38: Home's This week lists club practices from UW Rec's schedule: practices only, each weekly one once
+    (its next time), your sports first. Rentals and IM games aren't practices."""
+    from sportive.timeutil import to_db
+    accounts.signup(email="player@uw.edu", sports=("soccer",))
+    with app.app_context():
+        db = get_db()
+        now = now_local()
+        for location, label, days in (("Denny Field", "Womxn's Rugby - Practice", 1),
+                                      ("Denny Field", "Womxn's Rugby - Practice", 3),
+                                      ("Recreation Field 1 (by the IMA)", "Men's Soccer - Practice", 2),
+                                      ("IMA (Intramural Activities Building)", "Gym A: Private Rental", 1),
+                                      ("Denny Field", "Old - Practice", -2)):
+            starts = now + timedelta(days=days)
+            db.execute("INSERT INTO rec_reservations (location, starts_at, ends_at, label, source, created_at)"
+                       " VALUES (?, ?, ?, ?, 'feed', ?)", (location, to_db(starts), to_db(starts + timedelta(hours=2)),
+                                                          label, to_db(now)))
+        db.commit()
+    page = client.get("/feed").data.decode()
+    assert "This week in UW sports" in page and "Club practices" in page
+    week = page.split("Club practices")[1].split("</ul>")[0]
+    assert week.index("Men&#39;s Soccer") < week.index("Womxn&#39;s Rugby")          # your sports first
+    assert week.count("Womxn&#39;s Rugby") == 1 and "Rental" not in week and "Old" not in week
+
+
+def test_a_new_pickup_game_posts_itself_on_home(accounts, client, app):
+    """FR-FEED-39: a new open pickup game shows on Home as one line ("New basketball game at the IMA ...");
+    private games and club events don't."""
+    accounts.signup(email="host@uw.edu")
+    client.post("/events/new", data=event_form(title="Hoops", location="IMA (Intramural Activities Building)",
+                                               starts_at=form_time(timedelta(days=2)),
+                                               ends_at=form_time(timedelta(days=2, hours=1))))
+    client.post("/events/new", data=event_form(title="Secret run", is_private="1", password="hoops-123",
+                                               starts_at=form_time(timedelta(days=2)),
+                                               ends_at=form_time(timedelta(days=2, hours=1))))
+    accounts.logout()
+    accounts.signup(email="player@uw.edu")
+    page = client.get("/feed").data.decode()
+    assert page.count('id="new-game-') == 1 and "New basketball game at the IMA" in page
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE events SET created_at = datetime('now', '-4 days')")
+        db.commit()
+    assert 'id="new-game-' not in client.get("/feed").data.decode()               # older than 3 days: gone

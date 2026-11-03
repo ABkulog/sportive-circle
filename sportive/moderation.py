@@ -5,7 +5,7 @@ chat they're part of. The reported person is never told who reported them. Admin
 emails in the ADMIN_EMAILS setting) review reports on /admin/reports.
 """
 import functools
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 from markupsafe import Markup
@@ -13,7 +13,7 @@ from markupsafe import Markup
 from .auth import login_required
 from .db import get_db
 from .social import block_user
-from .timeutil import now_local, to_db
+from .timeutil import SEATTLE, now_local, to_db
 
 bp = Blueprint("moderation", __name__)
 
@@ -186,12 +186,19 @@ ACTIVITY = (("posts", "author_id"), ("post_replies", "author_id"), ("post_likes"
 
 def _active_between(start, end):
     """How many different students did something between start and end (Seattle time)."""
-    parts = [f"SELECT {who} AS id FROM {table} WHERE created_at >= :start AND created_at < :end"
+    # (minute strings: "<= :end" so something done in the current minute counts)
+    parts = [f"SELECT {who} AS id FROM {table} WHERE created_at >= :start AND created_at <= :end"
              for table, who in ACTIVITY]
-    parts.append("SELECT host_id FROM events WHERE datetime(created_at, '-8 hours') >= :start"
-                 " AND datetime(created_at, '-8 hours') < :end")  # events.created_at is UTC: about Seattle time
+    # events.created_at is UTC with seconds: compare it with start and end in UTC (daylight saving included)
+    parts.append("SELECT host_id FROM events WHERE created_at >= :utc_start AND created_at <= :utc_end")
     return get_db().execute(f"SELECT COUNT(DISTINCT id) FROM ({' UNION '.join(parts)})",
-                            {"start": to_db(start), "end": to_db(end)}).fetchone()[0]
+                            {"start": to_db(start), "end": to_db(end),
+                             "utc_start": _as_utc(start), "utc_end": _as_utc(end + timedelta(seconds=59))}).fetchone()[0]
+
+
+def _as_utc(dt):
+    """A Seattle wall-clock time as SQLite's datetime('now') writes it (UTC, "YYYY-MM-DD HH:MM:SS")."""
+    return dt.replace(tzinfo=SEATTLE).astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
 @bp.route("/admin/numbers")

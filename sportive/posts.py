@@ -17,7 +17,7 @@ from werkzeug.datastructures import MultiDict
 
 from .auth import login_required, safe_next
 from .clubs import MEMBER_ROLES, can_post_as, clubs_of, poster_clubs
-from .constants import LOCATIONS, SPORT_EMOJI, SPORTS
+from .constants import LOCATIONS, OFF_CAMPUS, ONLINE, SPORT_EMOJI, SPORTS
 from .db import get_db, user_sports
 from .events import (MEMBERS_ONLY_FOR_MEMBERS, NOT_BLOCKED, insert_event, posting_too_fast, query_events,
                      read_event_form)
@@ -150,7 +150,11 @@ def feed_items(sport=None, before=None, limit=PAGE):
                 ORDER BY cp.created_at DESC, cp.id DESC LIMIT :limit""", params).fetchall():
         items.append({"kind": "club_post", "at": row["created_at"], "club_post": row})
 
-    # 3. Husky news: scores and results from UW's teams in these sports (from GoHuskies.com). In a sport's channel
+    # 3. Automatic one-liners for new pickup games ("🏀 New pickup game at the IMA tonight"): students' own posts are
+    # paused, so this is how a new game reaches Home. Open games only (not private, not a club's), not over yet.
+    items += new_game_items(sports, params["before"], params["limit"])
+
+    # 4. Husky news: scores and results from UW's teams in these sports (from GoHuskies.com). In a sport's channel
     # it's mixed in by time; in the main feed it comes after what students and clubs posted (added at the end).
     from .news import feed_news
     if sport:
@@ -308,6 +312,7 @@ def feed():
     club_picks = [] if in_a_club or before else suggested_clubs(g.user["id"], user_sports(g.user["id"]), limit=6)
     post_event = _postable_event(request.args.get("event", type=int))  # "📣 Post this event" (the event's page)
     week = this_week(sport) if not before and show != "myclubs" else []
+    practices = week_practices(sport) if not before and show != "myclubs" else []
     if not sport and not before and not show:
         from .notifications import mark_seen  # (notifications.py is loaded after this module)
         mark_seen("feed_posts")  # the new-posts number on Home is cleared once you've seen the top of your feed
@@ -318,12 +323,89 @@ def feed():
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"),
                            as_club=request.args.get("as", type=int) or (post_event["club_id"] if post_event
                                                                          and post_event["club_id"] else None),
-                           post_event=post_event, member_roles=MEMBER_ROLES, club_picks=club_picks, week=week,
+                           post_event=post_event, member_roles=MEMBER_ROLES, club_picks=club_picks, week=week, practices=practices,
                            can_open_sheet=bool(current_app.config.get("PEOPLE_POSTING", False) or post_event
                                                or poster_clubs(g.user["id"])))
 
 
+NEW_GAME_DAYS = 3  # a new pickup game is announced on Home for this long after it's posted (or until it ends)
+
+
+def day_word(starts, now):
+    """'tonight', 'today', 'tomorrow' or 'on Saturday', for a one-line announcement."""
+    days = (starts.date() - now.date()).days
+    if days <= 0:
+        return "tonight" if starts.hour >= 17 else "today"
+    return "tomorrow" if days == 1 else f"on {starts.strftime('%A')}"
+
+
+def place_phrase(location):
+    """'the IMA', 'Denny Field', 'off campus': a place in the middle of a sentence."""
+    from .placehours import _name
+    if location == OFF_CAMPUS:
+        return "off campus"
+    if location == ONLINE:
+        return "online"
+    name = _name(location)[0]
+    return "the " + name[4:] if name.startswith("The ") else name
+
+
+def new_game_items(sports, before, limit):
+    """Pickup games posted in the last few days that anyone could join, as feed items (kind 'new_game')."""
+    from .events import SHOWN_UNLESS_FULL, games_open_to_me
+    from .timeutil import from_db, from_sqlite_utc
+    now = now_local()
+    params = {"now": to_db(now)}
+    in_sports = _sports_clause("e.sport", sports, params)
+    rows = query_events(
+        ["e.cancelled = 0", "e.club_id IS NULL", "e.is_private = 0", "e.ends_at >= :now", in_sports,
+         f"e.created_at >= datetime('now', '-{NEW_GAME_DAYS} days')", NOT_BLOCKED, games_open_to_me(),
+         SHOWN_UNLESS_FULL], {**params, "hold_now": to_db(now)}, limit=limit)
+    items = []
+    for e in rows:
+        at = to_db(from_sqlite_utc(e["created_at"]))
+        if at <= before:
+            starts = from_db(e["starts_at"])
+            items.append({"kind": "new_game", "at": at, "event": e,
+                          "line": f"{SPORT_EMOJI.get(e['sport'], '🏅')} New {SPORTS.get(e['sport'], '').lower()} game at "
+                                  f"{place_phrase(e['location'])} {day_word(starts, now)}"})
+    return items
+
+
 THIS_WEEK = 3  # games and club practices in "This week" at the top of Home
+WEEK_PRACTICES = 4  # club practices from UW Rec's schedule in "This week"
+
+
+def week_practices(sport=None):
+    """Club practices in the next 7 days from UW Rec's public schedule (copied every day, see uwrec.py), for "This
+    week in UW sports" on Home: so Home shows what's on even before anyone posts a game. Only bookings UW Rec itself
+    calls a practice; the same weekly practice shows once (its next time); your sports first."""
+    from .placecheck import time_range
+    now = now_local()
+    rows = get_db().execute(
+        """SELECT location, label, starts_at, ends_at FROM rec_reservations
+           WHERE ends_at >= ? AND starts_at < ? AND label LIKE '%practice%' ORDER BY starts_at""",
+        (to_db(now), to_db(now + timedelta(days=7)))).fetchall()
+    sports = [sport] if sport else user_sports(g.user["id"])
+
+    def sport_of(label):
+        text = label.lower()
+        return next((key for key, name in SPORTS.items() if name.lower().split(" (")[0] in text), None)
+
+    seen, practices = set(), []
+    for r in rows:
+        name = r["label"].split(": ", 1)[-1]  # "Gym B: Kendo - Practice" -> "Kendo - Practice"
+        name = re.sub(r"\s*-\s*practice\b.*$", "", name, flags=re.I).strip() or name
+        if name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        key = sport_of(r["label"])
+        if sport and key != sport:
+            continue
+        practices.append({"name": name, "emoji": SPORT_EMOJI.get(key, "📅"), "mine": key in sports,
+                          "place": r["location"], "when": time_range(r["starts_at"], r["ends_at"])})
+    practices.sort(key=lambda p: not p["mine"])  # stable: soonest first within each group
+    return practices[:WEEK_PRACTICES]
 
 
 def this_week(sport=None):
