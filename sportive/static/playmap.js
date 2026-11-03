@@ -8,11 +8,12 @@
   if (!box || !data) return;
   if (typeof L === "undefined") { box.closest(".live-map-wrap").hidden = true; return; }
   const pins = JSON.parse(data.textContent);
+  const CAMPUS_ZOOM = 14;  // campus and the parks around it (Green Lake, Gas Works, Montlake) in one view
   const wrap = box.closest("[data-live-map]");
   // On the page it's a still preview (tap opens it full screen), so it never fights the page's scrolling.
   const map = L.map(box, { scrollWheelZoom: false, zoomControl: false, attributionControl: true, dragging: false,
                            touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false })
-    .setView([47.6553, -122.3035], 15);  // UW
+    .setView([47.6553, -122.3035], CAMPUS_ZOOM);  // UW
   // OpenStreetMap's own colorful tiles, like Snap Map (no grey filter). Not CARTO: its tiles need a paid key now
   // and showed "API KEY REQUIRED" across the map.
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -41,7 +42,7 @@
   function openSheet(spot) {
     if (!sheet) return;
     sheetBody.replaceChildren();
-    add(sheetBody, "p", "muted", `${spot.emoji} ${spot.name}…`);
+    add(sheetBody, "p", "muted", `${spot.name}…`);
     sheet.hidden = false;
     fetch(`${panelUrl}?place=${encodeURIComponent(spot.name)}`, { headers: { Accept: "application/json" }, credentials: "same-origin" })
       .then((response) => (response.ok ? response.json() : Promise.reject(response.status)))
@@ -50,7 +51,8 @@
   }
   function fillSheet(spot) {
     sheetBody.replaceChildren();
-    add(sheetBody, "h3", "spot-sheet-title", `${spot.emoji} ${spot.name}`);
+    add(sheetBody, "h3", "spot-sheet-title", spot.multi ? spot.name : `${spot.emoji} ${spot.name}`);
+    if (spot.multi) add(sheetBody, "p", "muted small", `🔴 ${spot.sports} sports are played here`);
     if (spot.hours) add(sheetBody, "p", spot.closed ? "spot-hours is-closed" : "spot-hours",
                         spot.closed ? "⚠️ Closed today" : spot.hours);
     add(sheetBody, "p", "spot-sheet-sub", spot.games.length ? "Games this week" : "No games here this week yet");
@@ -76,8 +78,8 @@
   spots.forEach((spot) => {
     if (withGames.has(`${spot.lat},${spot.lng}`)) return;  // the game bubble there opens the same panel
     const pinBox = document.createElement("div");
-    pinBox.className = `spot-pin${spot.game_count ? " has-games" : ""}${spot.closed ? " is-closed" : ""}`;
-    add(pinBox, "span", "spot-emoji", spot.emoji);
+    pinBox.className = `spot-pin${spot.multi ? " is-multi" : ""}${spot.game_count ? " has-games" : ""}${spot.closed ? " is-closed" : ""}`;
+    add(pinBox, "span", "spot-emoji", spot.multi ? "" : spot.emoji);  // many sports: a plain red dot
     add(pinBox, "span", "spot-name", spot.game_count ? `${spot.short} · ${spot.game_count}` : spot.short);
     const icon = L.divIcon({ html: pinBox, className: "live-icon", iconSize: [96, 58], iconAnchor: [48, 20] });
     L.marker([spot.lat, spot.lng], { icon, title: `${spot.name}: tap for games and to create an event` })
@@ -118,7 +120,7 @@
     map.invalidateSize();
     if (bounds.length === 1) map.setView(bounds[0], 16);
     else if (bounds.length > 1) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
-    else map.setView([47.6553, -122.3035], 15);
+    else map.setView([47.6553, -122.3035], CAMPUS_ZOOM);
   }
   frame();
   requestAnimationFrame(frame);
@@ -150,7 +152,7 @@
       setFull(true);
     });
     backButton.addEventListener("click", () => { if (pushed) history.back(); else setFull(false); });
-    recenter.addEventListener("click", () => map.setView([47.6553, -122.3035], 15));
+    recenter.addEventListener("click", () => map.setView([47.6553, -122.3035], CAMPUS_ZOOM));
     window.addEventListener("popstate", () => { pushed = false; setFull(location.hash === "#map"); });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && wrap.classList.contains("is-full")) backButton.click();
