@@ -5,7 +5,7 @@ import secrets
 from datetime import datetime, time, timedelta, timezone
 from urllib.parse import quote, urlparse
 
-from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, Response, abort, flash, g, jsonify, redirect, render_template, request, url_for
 from werkzeug.datastructures import MultiDict
 
 from .auth import login_required, safe_next
@@ -294,10 +294,36 @@ def game_pins(games, now=None):
     return list(pins.values())
 
 
-def spot_pins(now=None):
+SPOT_WEEK_GAMES = 8  # upcoming games listed on a spot's panel
+
+
+def short_place(location):
+    """A map label: 'IMA', 'WAC', 'Rec Field 1', 'Denny Field'."""
+    name, _, extra = location.partition(" (")
+    extra = extra.rstrip(")")
+    if extra.isupper() and len(extra) <= 5:
+        return extra
+    return name.replace("Recreation Field", "Rec Field").replace("The ", "", 1)
+
+
+def spot_sport(places, games, my_sports):
+    """(sport, place) for "Create an event here": one of your sports that's played at this spot, else the sport of
+    a game there, else the first sport the place is for. Rooms count (the IMA pin covers its pool, mats...)."""
+    fits = lambda sport: next((p for p in places if p in SPORT_LOCATIONS.get(sport, ())), None)  # noqa: E731
+    for sport in [*my_sports, *(game["sport"] for game in games)]:
+        if sport != "other" and fits(sport):
+            return sport, fits(sport)
+    for sport, spots in SPORT_LOCATIONS.items():
+        if sport != "other" and places[0] in spots:
+            return sport, places[0]
+    return "", places[0]
+
+
+def spot_pins(now=None, only=None):
     """Play's map, under the game bubbles: every place games are played (the IMA, courts, fields, the track), so the
-    map is never empty. Tap one: its hours today, what UW Rec has booked there for the rest of today (club practices,
-    IM games, rentals) and "Post a game here". Rooms inside one building share its pin (the IMA's pool, mats...)."""
+    map is never empty. Tap one and a panel opens: its hours today (closed is said plainly), the games there this
+    week, what UW Rec has booked there for the rest of today (club practices, IM games, rentals) and "Create an event
+    here" with the place and a sport filled in. Rooms inside one building share its pin (the IMA's pool, mats...)."""
     from .placecheck import time_range  # placecheck imports this module
     from .placehours import _clock, hours_on
     now = now or now_local()
@@ -306,9 +332,19 @@ def spot_pins(now=None):
         if coords:
             groups.setdefault(coords, []).append(place)
     end_of_day = datetime.combine(now.date() + timedelta(days=1), time(0, 0), tzinfo=now.tzinfo)
+    # This week's games anyone may see, at any of these places (one query, grouped below)
+    week = query_events(
+        ["e.cancelled = 0", "e.ends_at >= :now", "e.starts_at < :week", NOT_BLOCKED, games_open_to_me(),
+         MEMBERS_ONLY_FOR_MEMBERS, SHOWN_UNLESS_FULL,
+         "(e.is_private = 0 OR EXISTS (SELECT 1 FROM rsvps r WHERE r.event_id = e.id AND r.user_id = :me)"
+         " OR EXISTS (SELECT 1 FROM invites i WHERE i.event_id = e.id AND i.guest_id = :me AND i.status = 'pending'))"],
+        {"now": to_db(now), "week": to_db(now + timedelta(days=7))}, limit=300)
+    my_sports = user_sports(g.user["id"]) if g.get("user") is not None else []
     spots = []
     for (lat, lng), places in groups.items():
         main = places[0]
+        if only is not None and main != only:
+            continue
         hours = hours_on(main, now.date())
         text = ("Closed today" if hours is None else None if hours == "any"
                 else f"Open until {_clock(hours[1])} today" if hours[0] == "00:00"
@@ -319,9 +355,30 @@ def spot_pins(now=None):
                 ORDER BY starts_at LIMIT 6""", (*places, to_db(now), to_db(end_of_day))).fetchall()
         bookings = [{"label": (r["label"] if r["location"] == main else f"{r['location'].split(' (')[0]}: {r['label']}"),
                      "when": time_range(r["starts_at"], r["ends_at"])} for r in rows]
-        spots.append({"name": main, "lat": lat, "lng": lng, "hours": text, "bookings": bookings,
-                      "new_url": url_for("events.create", location=main)})
+        here = [e for e in week if e["location"] in places and e["location"] != OFF_CAMPUS]
+        games = [{"title": f"{SPORT_EMOJI[e['sport']]} {event_title(e)}", "sport": e["sport"],
+                  "when": fmt_when(e["starts_at"]), "url": url_for("events.detail", event_id=e["id"]),
+                  "going": e["going_count"] + e["extra_players"], "max": e["max_players"]}
+                 for e in here[:SPOT_WEEK_GAMES]]
+        sport, place = spot_sport(places, games, my_sports)
+        # The page carries only how many games (the panel loads their titles when the pin is tapped, from
+        # place_panel), so Play's filtered list is the only list of games on the page.
+        spots.append({"name": main, "short": short_place(main), "lat": lat, "lng": lng, "hours": text,
+                      "closed": hours is None, "bookings": bookings, "game_count": len(here),
+                      **({"games": games} if only is not None else {}),
+                      "emoji": SPORT_EMOJI.get(sport, "📍"),
+                      "new_url": url_for("events.create", location=place, sport=sport or None)})
     return spots
+
+
+@bp.route("/events/place-panel")
+@login_required
+def place_panel():
+    """A map place's panel, when its pin is tapped: the place (hours, UW Rec bookings) and its games this week."""
+    spots = spot_pins(only=request.args.get("place", ""))
+    if not spots:
+        abort(404)
+    return jsonify(spots[0])
 
 
 MAX_GAMES_PER_HOUR = 60  # games one person can post in an hour (five 12-week practices fit): stops bell spam
@@ -400,7 +457,8 @@ PASSWORD_WORDS = ("husky", "dawgs", "purple", "gold", "rally", "court", "field",
 
 
 # Which form field an error message is about, so the step-by-step form opens on it and marks it (wizard.js).
-ERROR_FIELDS = [("name is too long", "title"), ("can be at most", "ends_at"), ("can't be played at", "location"), ("Off campus", "note"),
+ERROR_FIELDS = [("closed", "location"), ("closes at", "location"), ("inside those hours", "location"),
+                ("name is too long", "title"), ("can be at most", "ends_at"), ("can't be played at", "location"), ("Off campus", "note"),
                 ("location", "location"), ("sport", "sport"), ("skill level", "skill_level"),
                 ("start time", "starts_at"), ("end time", "ends_at"), ("end after it starts", "ends_at"),
                 ("Event date", "starts_at"), ("when you're playing", "starts_in"), ("Note", "note"),
@@ -626,7 +684,8 @@ def read_event_form(form, event=None):
     if event is None or (to_db(starts), to_db(ends), location) != (event["starts_at"], event["ends_at"],
                                                                      event["location"]):
         closed = closed_message(location, starts, ends)
-        if closed:
+        if closed and not form.get("closed_ok"):  # a warning, not a wall: "Post anyway" lets them go ahead
+            g.closed_warning = closed
             return None, closed
 
     if len(note) > 500:
@@ -758,7 +817,8 @@ def create():
                 for week in range(1, repeat):
                     closed = closed_message(data["location"], from_db(data["starts_at"]) + timedelta(weeks=week),
                                             from_db(data["ends_at"]) + timedelta(weeks=week))
-                    if closed:
+                    if closed and not form.get("closed_ok"):
+                        g.closed_warning = closed
                         error = f"Week {week + 1}: {closed}"
                         break
         elif error is None:

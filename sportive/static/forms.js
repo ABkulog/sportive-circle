@@ -291,7 +291,8 @@
 })();
 
 // "Open 9:00 AM – 8:30 PM on Saturdays" under the place, for the date picked (Need players: today), so the host
-// picks a time while the place is open. The server checks the same hours (placehours.py).
+// picks a time while the place is open. Closed then: a warning (they can still post). The server checks the same
+// hours (placehours.py) and asks for "Post anyway" once.
 (function () {
   const hoursElement = document.getElementById("place-hours");
   const form = document.querySelector("form[data-sport-form]");
@@ -311,12 +312,16 @@
     const day = picked ? new Date(`${picked}T12:00:00`) : new Date();
     const stamp = `${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
     const season = seasons && seasons.find(([first, last]) => first <= stamp && stamp <= last);
+    line.classList.remove("is-closed");
     if (!season) { line.textContent = ""; return; }
     const weekday = (day.getDay() + 6) % 7;  // Monday first, like the server
     const today = season[2][String(weekday)];
     const allClosed = Object.values(season[2]).every((value) => value === null);
     if (today === undefined) line.textContent = "";
-    else if (today === null) line.textContent = allClosed ? "Closed for the season then." : `Closed on ${days[weekday]}.`;
+    else if (today === null) {  // a warning, not a wall: they can still post it (the server asks once more)
+      line.textContent = `⚠️ ${allClosed ? "Closed for the season then" : `Closed on ${days[weekday]}`}. You can still post it.`;
+      line.classList.add("is-closed");
+    }
     else if (today[0] === "00:00") line.textContent = `Lights off at ${clock(today[1])} on ${days[weekday]}.`;
     else line.textContent = `Open ${clock(today[0])} – ${clock(today[1])} on ${days[weekday]}.`;
   }
