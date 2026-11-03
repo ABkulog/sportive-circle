@@ -211,5 +211,12 @@
   {% if item.kind == 'post' %}{{ post_card(item, photos) }}
   {% elif item.kind == 'club_post' %}{{ club_post_card(item) }}
   {% elif item.kind == 'news' %}{{ news_card(item) }}
+  {% elif item.kind == 'new_game' %}
+    {# A new pickup game, posted automatically: one short line, like a new club #}
+    {% set e = item.event %}
+    <article class="card feed-card feed-mini" id="new-game-{{ e.id }}">
+      <a class="feed-mini-link" href="{{ url_for('events.detail', event_id=e.id) }}">
+        <span><strong>{{ item.line }}</strong> · {{ e.starts_at|clock }} <small class="muted">· {{ e.host_name.split(' ')[0] }} · {{ item.at|ago }}</small></span></a>
+    </article>
   {% endif %}
 {% endmacro %}
