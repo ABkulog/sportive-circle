@@ -54,6 +54,13 @@
         <small class="muted place-tip" data-place-tip></small>
     <small class="muted place-hours" data-place-hours aria-live="polite"></small>
     </label>
+    {% if g.get('closed_warning') %}
+      {# The place is closed then: say so, and let them go ahead anyway (the owner: warn, don't block) #}
+      <div class="closed-warning" role="alert">
+        <p>⚠️ {{ g.closed_warning }}</p>
+        <label class="toggle"><input type="checkbox" name="closed_ok" value="1"><span>Post anyway: we know it's closed then</span></label>
+      </div>
+    {% endif %}
     {{ spot_field(form) }}
     {% if not event %}{# one form for every game: a pickup game starting soon is a tap here #}
       <div class="start-quick" role="group" aria-label="Starting soon" data-start-quick>

@@ -8586,6 +8586,45 @@ def test_shared_link_preview_says_the_launch_message(client):
     assert 'og:description" content="Every UW sports club in one place' in page and "share-card.png" in page
 
 
+def test_a_closed_place_warns_but_post_anyway_still_posts(accounts, client, app):
+    """FR-PLAY-33 (the owner: "if that place is closed that day just warn the user, but still allow them"): the form
+    says the place is closed then and offers Post anyway; ticking it posts the game."""
+    app.config["CHECK_PLACE_HOURS"] = True
+    at = lambda moment: moment.strftime("%Y-%m-%dT%H:%M")  # noqa: E731
+    accounts.signup()
+    saturday = _next(5, 20)
+    late = event_form(title="Late run", starts_at=at(saturday), ends_at=at(saturday.replace(hour=22)))
+    page = client.post("/events/new", data=late, follow_redirects=True).data.decode()
+    assert "The IMA is open 9:00 AM – 8:30 PM on Saturdays" in page and 'name="closed_ok"' in page
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0          # asked first
+    assert event_id_from(client.post("/events/new", data={**late, "closed_ok": "1"}))      # then posted anyway
+    assert 'name="closed_ok"' not in client.get("/events/new").data.decode()               # no warning by default
+
+
+def test_map_place_panel_lists_its_games_and_fills_in_place_and_sport(accounts, client, app):
+    """FR-PLAY-32: each place's pin has a short name and its sport; its panel lists the games there this week, and
+    Create an event here opens the form with the place and a sport filled in (one of yours that's played there,
+    in the right room: a swimmer's IMA pin goes to the IMA Pool)."""
+    import json
+    accounts.signup(email="host@uw.edu")
+    client.post("/events/new", data=event_form(title="Denny kickabout", sport="soccer", location="Denny Field"))
+    accounts.logout()
+    accounts.signup(email="swim@uw.edu", sports=("swimming",))
+    page = client.get("/?scope=all").data.decode()
+    spots = {s["name"]: s for s in json.loads(page.split('id="play-spots">')[1].split("</script>")[0])}
+    denny, ima = spots["Denny Field"], spots["IMA (Intramural Activities Building)"]
+    assert denny["game_count"] == 1 and denny["emoji"] == "⚽" and "games" not in denny  # titles: on tap
+    panel = client.get("/events/place-panel?place=Denny Field").get_json()
+    assert [g["title"] for g in panel["games"]] == ["⚽ Denny kickabout"] and panel["game_count"] == 1
+    assert client.get("/events/place-panel?place=Mars").status_code == 404
+    assert ima["short"] == "IMA" and spots["Waterfront Activities Center (WAC)"]["short"] == "WAC"
+    assert ima["new_url"] == "/events/new?location=IMA+Pool&sport=swimming"
+    form = client.get(ima["new_url"]).data.decode()
+    assert "<option selected>IMA Pool</option>" in form and '<option value="swimming" selected>' in form
+    assert "data-spot-sheet" in page and "Create an event" in page
+
+
 def test_home_this_week_shows_uw_rec_club_practices(accounts, client, app):
     """FR-FEED-38: Home's This week lists club practices from UW Rec's schedule: practices only, each weekly one once
     (its next time), your sports first. Rentals and IM games aren't practices."""

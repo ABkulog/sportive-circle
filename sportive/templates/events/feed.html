@@ -17,11 +17,16 @@
 <section class="live-map-wrap" id="live-map" aria-labelledby="live-title" data-live-map>
   <h2 class="visually-hidden" id="live-title">Happening now</h2>
   <div class="play-map" id="play-map" role="img" aria-label="Live map: {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games today"></div>
-  <p class="live-map-note">{% if map_pins %}<span class="live-dot" aria-hidden="true"></span> {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games today{% else %}Nothing on right now · games today show up here{% endif %} · tap a 📍 for hours and bookings</p>
+  <p class="live-map-note">{% if map_pins %}<span class="live-dot" aria-hidden="true"></span> {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games today{% else %}Nothing on right now · games today show up here{% endif %} · tap a place for its games, hours and ＋ Create an event</p>
   <button type="button" class="map-open" data-map-open aria-label="Open the map full screen"><span>⤢ Tap to open the map</span></button>
   <button type="button" class="map-back" data-map-close hidden>← Back</button>
   <button type="button" class="map-recenter" data-map-recenter hidden aria-label="Back to campus">◎</button>
   <script type="application/json" id="play-pins">{{ map_pins|tojson }}</script>
+  {# A place's panel (filled in by playmap.js when its pin is tapped): scrolls on its own, Create an event at the end #}
+  <div class="spot-sheet" data-spot-sheet data-panel-url="{{ url_for('events.place_panel') }}" hidden role="dialog" aria-label="Place">
+    <button type="button" class="spot-sheet-close" data-spot-close aria-label="Close">✕</button>
+    <div class="spot-sheet-body" data-spot-body></div>
+  </div>
   <script type="application/json" id="play-spots">{{ spot_pins|tojson }}</script>
 </section>
 {% endmacro %}
