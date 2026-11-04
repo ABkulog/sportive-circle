@@ -882,7 +882,7 @@ def test_gym_buddy_places():
 
 def test_ultimate_frisbee_places(accounts, client):
     from sportive.constants import SPORT_LOCATIONS
-    assert SPORT_LOCATIONS["ultimate"] == ["Denny Field", "Gas Works Park", "Husky Track", "Laurelhurst Playfield",
+    assert SPORT_LOCATIONS["ultimate"] == ["Archery Range lawn (by the Penthouse Theatre)", "Denny Field", "Gas Works Park", "Husky Track", "Laurelhurst Playfield",
                                            "Magnuson Park (Sand Point)", "Montlake Playfield", "The Quad",
                                            "Recreation Field 1 (by the IMA)", "Recreation Field 2 (by Husky Track)",
                                            "Recreation Field 3 (by the golf range)",

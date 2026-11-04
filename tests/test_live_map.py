@@ -52,3 +52,17 @@ def test_the_map_shows_the_rest_of_today_and_leads_only_when_busy(accounts, clie
     add_game(app, user_id(app, "host@uw.edu"), "On now", "Denny Field", timedelta(minutes=-10), timedelta(minutes=50))
     play = client.get("/").data.decode()
     assert play.index('id="live-map"') < play.index('id="games-title"')       # something on: the map leads
+
+
+def test_golf_range_pin_is_on_the_range_and_the_archery_lawn_is_a_spot(accounts, client):
+    """FR-PLAY-31: the golf range's pin sat on NE 45th St; it's now on the range itself (west of Ravenna Creek,
+    south of 45th, north of NE Clark Rd). The lawn maps call "Archery Range" (by the Penthouse Theatre, north of
+    Denny Field) is a spot for lawn games; archery itself stays in the IMA's archery room."""
+    from sportive.constants import ARCHERY_LAWN, DENNY, GOLF_RANGE, LOCATION_COORDS, REC_FIELD_3, SPORT_LOCATIONS
+    lat, lng = LOCATION_COORDS[GOLF_RANGE]
+    assert 47.6585 < lat < 47.6605 and lng < LOCATION_COORDS[REC_FIELD_3][1]       # south of 45th, west of the fields
+    lawn = LOCATION_COORDS[ARCHERY_LAWN]
+    assert lawn[0] > LOCATION_COORDS[DENNY][0] and lawn[1] < LOCATION_COORDS[DENNY][1]  # north-west of Denny Field
+    assert ARCHERY_LAWN in SPORT_LOCATIONS["ultimate"] and ARCHERY_LAWN not in SPORT_LOCATIONS["archery"]
+    accounts.signup(email="maya@uw.edu", sports=("ultimate",))
+    assert "Archery Range lawn" in client.get("/").data.decode()

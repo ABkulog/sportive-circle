@@ -130,6 +130,7 @@ SPORT_EMOJI = {
 
 # Alphabetical ("The Quad" under Q), with Off campus and Online last.
 LOCATIONS = [
+    "Archery Range lawn (by the Penthouse Theatre)",
     "Area 01 (Maple Hall)",
     "Burke-Gilman Trail",
     "Denny Field",
@@ -175,6 +176,9 @@ IMA_ARCHERY = "IMA Archery Room"                   # room 106: where the archery
 IMA_COURTS = "IMA Squash & Racquetball Courts"     # squash (4 international courts), racquetball, handball
 SAND_COURTS = "Sand Volleyball Courts (by the IMA)"
 GOLF_RANGE = "UW Golf Driving Range"
+# The lawn north of Denny Field that maps call "Archery Range" (UW's old archery range). A lawn for frisbee,
+# spikeball and catch now; the archery club shoots indoors (IMA_ARCHERY), so it isn't offered for archery.
+ARCHERY_LAWN = "Archery Range lawn (by the Penthouse Theatre)"
 RED_SQUARE = "Red Square"
 BOXING_GYM = "Emerald City Boxing Gym (Roosevelt)"  # 6516 Roosevelt Way NE: where the UW Boxing Club trains
 # UW Recreation's outdoor courts: South #1-7 (lit at night), North #8-13 (#11 and #12 have pickleball lines).
@@ -282,7 +286,8 @@ LOCATION_COORDS = {
     IMA_ARCHERY: (47.653743, -122.301231),
     IMA_COURTS: (47.653743, -122.301231),
     SAND_COURTS: (47.654300, -122.300100),    # next to the IMA
-    GOLF_RANGE: (47.661100, -122.296500),     # NE Clark Rd, past Rec Fields 3 and 4
+    GOLF_RANGE: (47.659710, -122.297870),     # the middle of the range, between Montlake Blvd and Ravenna Creek
+    ARCHERY_LAWN: (47.660435, -122.307852),   # the lawn OpenStreetMap calls "Archery Range", by the Penthouse Theatre
     RED_SQUARE: (47.655900, -122.309600),
     BOXING_GYM: (47.676600, -122.317500),     # 6516 Roosevelt Way NE
     # Seattle parks (Wikipedia / latlong.net / TopoZone, checked Nov 2026)
@@ -302,11 +307,11 @@ OPEN_FIELDS = [DENNY, QUAD, TRACK, REC_FIELD_1, REC_FIELD_2, REC_FIELD_3, REC_FI
 # and the server rejects any other combination.
 SPORT_LOCATIONS = {
     "basketball": [IMA, GREEN_LAKE, OFF_CAMPUS],
-    "soccer": OPEN_FIELDS + PARK_FIELDS + [GAS_WORKS, OFF_CAMPUS],
-    "football": OPEN_FIELDS + PARK_FIELDS + [GAS_WORKS, OFF_CAMPUS],
+    "soccer": OPEN_FIELDS + [ARCHERY_LAWN] + PARK_FIELDS + [GAS_WORKS, OFF_CAMPUS],
+    "football": OPEN_FIELDS + [ARCHERY_LAWN] + PARK_FIELDS + [GAS_WORKS, OFF_CAMPUS],
     "volleyball": OPEN_FIELDS + [IMA, SAND_COURTS, OFF_CAMPUS],  # indoor courts in Gym C, sand courts outside
-    "spikeball": OPEN_FIELDS + PARK_FIELDS + [GAS_WORKS, IMA, OFF_CAMPUS],
-    "ultimate": OPEN_FIELDS + PARK_FIELDS + [GAS_WORKS, OFF_CAMPUS],
+    "spikeball": OPEN_FIELDS + [ARCHERY_LAWN] + PARK_FIELDS + [GAS_WORKS, IMA, OFF_CAMPUS],
+    "ultimate": OPEN_FIELDS + [ARCHERY_LAWN] + PARK_FIELDS + [GAS_WORKS, OFF_CAMPUS],
     "tennis": [IMA_SOUTH_COURTS, IMA_NORTH_COURTS, MONTLAKE, MAGNUSON, U_PLAYGROUND, LAURELHURST, OFF_CAMPUS],
     "pickleball": [IMA_NORTH_COURTS, IMA, GREEN_LAKE_PICKLEBALL, LAURELHURST, OFF_CAMPUS],  # IMA = indoor, in Gym B
     "running": OPEN_FIELDS + [TRAIL, RED_SQUARE, GREEN_LAKE, GAS_WORKS, RAVENNA, MAGNUSON, OFF_CAMPUS],   # the running club meets on the Quad
@@ -460,7 +465,7 @@ PLACE_TIPS = {
     ("badminton", IMA): "Gym B is the IMA's badminton gym. Needs an IMA membership.",
     ("volleyball", IMA): "Gym C is the IMA's volleyball gym. Needs an IMA membership.",
     ("climbing", IMA): "The Crags climbing center: a 42-foot wall and a bouldering area. Needs an IMA membership.",
-    ("golf", GOLF_RANGE): "UW's driving range on NE Clark Rd, past Rec Fields 3 and 4.",
+    ("golf", GOLF_RANGE): "UW's driving range, entrance on NE Clark Rd, between Montlake Blvd and Rec Field 3.",
     ("bjj", IMA_MATS): "Mat Rooms A and B in the IMA, used by martial arts clubs. Needs an IMA membership.",
     ("judo", IMA_MATS): "Mat Rooms A and B in the IMA, used by martial arts clubs. Needs an IMA membership.",
     ("karate", IMA_MATS): "Mat Rooms A and B in the IMA, used by martial arts clubs. Needs an IMA membership.",
