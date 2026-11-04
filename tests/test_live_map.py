@@ -66,3 +66,13 @@ def test_golf_range_pin_is_on_the_range_and_the_archery_lawn_is_a_spot(accounts,
     assert ARCHERY_LAWN in SPORT_LOCATIONS["ultimate"] and ARCHERY_LAWN not in SPORT_LOCATIONS["archery"]
     accounts.signup(email="maya@uw.edu", sports=("ultimate",))
     assert "Archery Range lawn" in client.get("/").data.decode()
+
+
+def test_sand_volleyball_and_track_pins_sit_on_the_places(accounts, client):
+    """FR-PLAY-32: the sand volleyball pin was east of Rec Field 1; the courts are right behind (west of) the IMA
+    North Tennis Courts. The track's pin was on its east end; it's now in the middle of the oval."""
+    from sportive.constants import IMA_NORTH_COURTS, LOCATION_COORDS, REC_FIELD_2, SAND_COURTS, TRACK
+    sand, north = LOCATION_COORDS[SAND_COURTS], LOCATION_COORDS[IMA_NORTH_COURTS]
+    assert sand[1] < north[1] and abs(sand[0] - north[0]) < 0.0006      # just west of the north courts
+    track, field2 = LOCATION_COORDS[TRACK], LOCATION_COORDS[REC_FIELD_2]
+    assert -122.2988 < track[1] < -122.2976 and track[0] < field2[0] + 0.0012
