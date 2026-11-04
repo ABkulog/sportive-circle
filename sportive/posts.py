@@ -312,7 +312,6 @@ def feed():
     club_picks = [] if in_a_club or before else suggested_clubs(g.user["id"], user_sports(g.user["id"]), limit=6)
     post_event = _postable_event(request.args.get("event", type=int))  # "📣 Post this event" (the event's page)
     week = this_week(sport) if not before and show != "myclubs" else []
-    practices = week_practices(sport) if not before and show != "myclubs" else []
     if not sport and not before and not show:
         from .notifications import mark_seen  # (notifications.py is loaded after this module)
         mark_seen("feed_posts")  # the new-posts number on Home is cleared once you've seen the top of your feed
@@ -323,7 +322,7 @@ def feed():
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"),
                            as_club=request.args.get("as", type=int) or (post_event["club_id"] if post_event
                                                                          and post_event["club_id"] else None),
-                           post_event=post_event, member_roles=MEMBER_ROLES, club_picks=club_picks, week=week, practices=practices,
+                           post_event=post_event, member_roles=MEMBER_ROLES, club_picks=club_picks, week=week,
                            can_open_sheet=bool(current_app.config.get("PEOPLE_POSTING", False) or post_event
                                                or poster_clubs(g.user["id"])))
 
@@ -372,44 +371,11 @@ def new_game_items(sports, before, limit):
     return items
 
 
-THIS_WEEK = 3  # games and club practices in "This week" at the top of Home
-WEEK_PRACTICES = 4  # club practices from UW Rec's schedule in "This week"
-
-
-def week_practices(sport=None):
-    """Club practices in the next 7 days from UW Rec's public schedule (copied every day, see uwrec.py), for "This
-    week in UW sports" on Home: so Home shows what's on even before anyone posts a game. Only bookings UW Rec itself
-    calls a practice; the same weekly practice shows once (its next time); your sports first."""
-    from .placecheck import time_range
-    now = now_local()
-    rows = get_db().execute(
-        """SELECT location, label, starts_at, ends_at FROM rec_reservations
-           WHERE ends_at >= ? AND starts_at < ? AND label LIKE '%practice%' ORDER BY starts_at""",
-        (to_db(now), to_db(now + timedelta(days=7)))).fetchall()
-    sports = [sport] if sport else user_sports(g.user["id"])
-
-    def sport_of(label):
-        text = label.lower()
-        return next((key for key, name in SPORTS.items() if name.lower().split(" (")[0] in text), None)
-
-    seen, practices = set(), []
-    for r in rows:
-        name = r["label"].split(": ", 1)[-1]  # "Gym B: Kendo - Practice" -> "Kendo - Practice"
-        name = re.sub(r"\s*-\s*practice\b.*$", "", name, flags=re.I).strip() or name
-        if name.lower() in seen:
-            continue
-        seen.add(name.lower())
-        key = sport_of(r["label"])
-        if sport and key != sport:
-            continue
-        practices.append({"name": name, "emoji": SPORT_EMOJI.get(key, "📅"), "mine": key in sports,
-                          "place": r["location"], "when": time_range(r["starts_at"], r["ends_at"])})
-    practices.sort(key=lambda p: not p["mine"])  # stable: soonest first within each group
-    return practices[:WEEK_PRACTICES]
+THIS_WEEK = 3  # games and club events in "This week" at the top of Home
 
 
 def this_week(sport=None):
-    """The top of Home: pickup games and club practices in the next 7 days for your sports (or one sport), soonest
+    """The top of Home: pickup games and club events in the next 7 days for your sports (or one sport), soonest
     first, that you could join: open to you, not full, not private, not on hold."""
     from .events import SHOWN_UNLESS_FULL, games_open_to_me
     sports = [sport] if sport else user_sports(g.user["id"])

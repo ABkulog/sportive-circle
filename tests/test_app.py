@@ -6432,7 +6432,7 @@ def test_game_page_shows_what_else_is_on_there(accounts, client, app):
                                                ends_at=six_pm[:-5] + "19:00", is_private="1", password="dawgs26"))
     _as(accounts, "Maya")
     page = client.get(f"/events/{mine}").data.decode()
-    assert "UW Rec: reserved" in page and "Club rugby" in page and "Check the place is still free" in page
+    assert "UW Rec: reserved" in page and "Booked (UW Rec)" in page and "Club rugby" not in page and "Check the place is still free" in page
     assert "A private game" in page and "Secret kick" not in page             # private details stay private
 
 
@@ -8574,7 +8574,7 @@ def test_play_map_shows_every_spot_with_hours_and_uw_rec_bookings(accounts, clie
     page = client.get("/?scope=all").data.decode()
     spots = {s["name"]: s for s in json.loads(page.split('id="play-spots">')[1].split("</script>")[0])}
     assert {"Husky Track", "Denny Field", "IMA South Tennis Courts"} <= set(spots) and "IMA Pool" not in spots
-    assert [b["label"] for b in spots["IMA (Intramural Activities Building)"]["bookings"]] == ["IMA Pool: Swim Club - Practice"]
+    assert [b["label"] for b in spots["IMA (Intramural Activities Building)"]["bookings"]] == ["IMA Pool: Booked (UW Rec)"]
     assert spots["Denny Field"]["bookings"] == []                      # ended, or not today: not shown
     form = client.get(spots["Denny Field"]["new_url"]).data.decode()
     assert "<option selected>Denny Field</option>" in form
@@ -8627,29 +8627,27 @@ def test_map_place_panel_lists_its_games_and_fills_in_place_and_sport(accounts, 
     assert "data-spot-sheet" in page and "Create an event" in page
 
 
-def test_home_this_week_shows_uw_rec_club_practices(accounts, client, app):
-    """FR-FEED-38: Home's This week lists club practices from UW Rec's schedule: practices only, each weekly one once
-    (its next time), your sports first. Rentals and IM games aren't practices."""
+def test_club_practices_stay_lowkey(accounts, client, app):
+    """FR-FEED-38 (the owner: "some clubs like to keep it lowkey"): UW Rec's club practices never show on Home, and
+    on the map and the game form a practice only shows as "Booked (UW Rec)" (the place is taken then, no club
+    name). IM games and drop-in times keep their names."""
     from sportive.timeutil import to_db
     accounts.signup(email="player@uw.edu", sports=("soccer",))
     with app.app_context():
         db = get_db()
         now = now_local()
-        for location, label, days in (("Denny Field", "Womxn's Rugby - Practice", 1),
-                                      ("Denny Field", "Womxn's Rugby - Practice", 3),
-                                      ("Recreation Field 1 (by the IMA)", "Men's Soccer - Practice", 2),
-                                      ("IMA (Intramural Activities Building)", "Gym A: Private Rental", 1),
-                                      ("Denny Field", "Old - Practice", -2)):
-            starts = now + timedelta(days=days)
+        for location, label in (("Denny Field", "Womxn's Rugby - Practice"),
+                                ("Denny Field", "IM Soccer - League Night")):
             db.execute("INSERT INTO rec_reservations (location, starts_at, ends_at, label, source, created_at)"
-                       " VALUES (?, ?, ?, ?, 'feed', ?)", (location, to_db(starts), to_db(starts + timedelta(hours=2)),
-                                                          label, to_db(now)))
+                       " VALUES (?, ?, ?, ?, 'feed', ?)", (location, to_db(now - timedelta(minutes=5)),
+                                                          to_db(now + timedelta(minutes=50)), label, to_db(now)))
         db.commit()
-    page = client.get("/feed").data.decode()
-    assert "This week in UW sports" in page and "Club practices" in page
-    week = page.split("Club practices")[1].split("</ul>")[0]
-    assert week.index("Men&#39;s Soccer") < week.index("Womxn&#39;s Rugby")          # your sports first
-    assert week.count("Womxn&#39;s Rugby") == 1 and "Rental" not in week and "Old" not in week
+    assert "Womxn" not in client.get("/feed").data.decode()
+    play = client.get("/?scope=all").data.decode()
+    assert "Womxn" not in play and "Booked (UW Rec)" in play and "IM Soccer - League Night" in play
+    from sportive.placecheck import public_label
+    assert public_label("Gym B: Kendo - Practice") == "Booked (UW Rec)"
+    assert public_label("Gym A: Open Rec Basketball") == "Gym A: Open Rec Basketball"
 
 
 def test_a_new_pickup_game_posts_itself_on_home(accounts, client, app):
