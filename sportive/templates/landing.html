@@ -22,6 +22,7 @@
     <li><span aria-hidden="true">2</span><strong>Pick a game</strong><small>or post your own</small></li>
     <li><span aria-hidden="true">3</span><strong>Show up & play</strong><small>maps and reminders included</small></li>
   </ol>
+  {% if games_this_week %}<p class="games-proof"><span class="live-dot" aria-hidden="true"></span> {{ games_this_week }} games played on Sportive Circle this week</p>{% endif %}
   <p class="hero-links"><a href="{{ url_for('how_it_works') }}">More about how it works →</a>
     <a href="{{ url_for('clubs.directory') }}">Browse clubs →</a></p>
 </section>
@@ -33,7 +34,7 @@
   </div>
   <div class="feature">
     <h3>Real UW clubs</h3>
-    <p>Every club is checked by our team before it's listed.</p>
+    <p>Every UW sports club is listed with its links. Clubs with a ✓ are run here by their officers, checked by our team.</p>
   </div>
   <div class="feature">
     <h3>Only UW students</h3>
@@ -42,7 +43,7 @@
 </section>
 
 <section class="landing-clubs">
-  <h2>Verified UW clubs</h2>
+  <h2>UW clubs</h2>
   {% if clubs %}
     <div class="club-grid">
       {% for c in clubs %}

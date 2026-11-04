@@ -2095,3 +2095,10 @@ html, body { overflow-x: clip; }
 .show-me { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--muted); margin: 6px 0; }
 .show-me select { font-size: .85rem; padding: 4px 8px; border-radius: 999px; }
 .claim-cta { margin-top: 8px; }
+
+/* Landing: proof people play (FR-TRUST-2) */
+.games-proof { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 10px 0 0; font-weight: 600; }
+.how-trust { margin: 18px 0; }
+.how-trust ul { padding-left: 18px; }
+.how-trust li { margin: 6px 0; }
+.steps .step p { margin: 4px 0 0; font-size: .9rem; }
