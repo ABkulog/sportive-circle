@@ -814,11 +814,14 @@ def create():
                         try_it=1 if form.get("try_it") else 0)
             if data["try_it"] and (data["members_only"] or data["is_private"]):
                 error = "A try-it-out session is for new people, so it has to be open to everyone."
-            elif not 1 <= repeat <= MAX_REPEAT_WEEKS:
-                error = f"A club event can repeat for up to {MAX_REPEAT_WEEKS} weeks."
+        # Any game can repeat every week (a club's practice, or "Tuesday 9 PM basketball at the IMA"): people come
+        # back for their game. Each week is its own game, and every week has to fit the place's hours.
+        if error is None:
+            if not 1 <= repeat <= MAX_REPEAT_WEEKS:
+                error = f"A game can repeat for up to {MAX_REPEAT_WEEKS} weeks."
             elif from_db(data["starts_at"]) + timedelta(weeks=repeat - 1) > now_local() + timedelta(days=MAX_DAYS_AHEAD):
                 error = "The last week would be more than a year away. Repeat for fewer weeks."
-            else:  # every week has to fit the place's hours (they change with the season: the golf range, the WAC)
+            else:  # the hours change with the season (the golf range, the WAC)
                 for week in range(1, repeat):
                     closed = closed_message(data["location"], from_db(data["starts_at"]) + timedelta(weeks=week),
                                             from_db(data["ends_at"]) + timedelta(weeks=week))
@@ -826,8 +829,6 @@ def create():
                         g.closed_warning = closed
                         error = f"Week {week + 1}: {closed}"
                         break
-        elif error is None:
-            repeat = 1
         if error is None:
             get_db().commit()
             get_db().execute("BEGIN IMMEDIATE")  # one post at a time, so a double tap can't make two copies
@@ -864,10 +865,16 @@ def create():
                 if skipped:
                     flash("One week was skipped: clocks jump ahead that night, so that time doesn't exist.", "info")
             else:
-                flash(created_message(data["is_private"], reserve, "Your game is up!"), "celebrate")
+                flash(created_message(data["is_private"], reserve, "Your game is up!" if posted == 1 else
+                                      f"Your game is up, every {from_db(data['starts_at']).strftime('%A')} for "
+                                      f"{posted} weeks!"), "celebrate")
+                if skipped:
+                    flash("One week was skipped: clocks jump ahead that night, so that time doesn't exist.", "info")
             return redirect(url_for("events.detail", event_id=event_id))
         get_db().rollback()  # let go of the write lock taken for the duplicate check
         form_error(error)
+    elif request.args.get("again", type=int):
+        form = play_again_form(request.args.get("again", type=int))
     else:
         starts, ends = default_times()
         form = MultiDict({"starts_at": starts, "ends_at": ends, "skill_level": "All levels",
@@ -879,7 +886,33 @@ def create():
                            min_start=now_local().strftime("%Y-%m-%dT%H:%M"))
 
 
-MAX_REPEAT_WEEKS = 12  # about a quarter of weekly practices
+MAX_REPEAT_WEEKS = 12  # about a quarter of weekly games or practices
+
+
+def play_again_form(event_id):
+    """"Play again with this group": the game form filled in like a game you hosted or played in (sport, place,
+    level, players), a week later than it was (or the next week after now), with the friends from it ticked to get
+    a spot held. Only for its players: anyone else gets an empty form."""
+    starts, ends = default_times()
+    blank = MultiDict({"starts_at": starts, "ends_at": ends, "skill_level": "All levels", "password": suggested_password()})
+    rows = query_events(["e.id = :id"], {"id": event_id}, limit=1)
+    event = rows[0] if rows else None
+    if event is None or event["club_id"] or not (event["host_id"] == g.user["id"] or event["i_am_going"]):
+        return blank
+    first, last = from_db(event["starts_at"]), from_db(event["ends_at"])
+    week = timedelta(weeks=1)
+    while first <= now_local():  # the same weekday and time, the next week that's still ahead
+        first, last = first + week, last + week
+    if first == from_db(event["starts_at"]):  # a game still ahead: the week after it
+        first, last = first + week, last + week
+    played = {row[0] for row in get_db().execute("SELECT user_id FROM rsvps WHERE event_id = ?", (event_id,))}
+    played.add(event["host_id"])
+    friends = [str(f["id"]) for f in friends_of(g.user["id"]) if f["id"] in played and f["id"] != g.user["id"]]
+    return MultiDict([("title", event["title"]), ("sport", event["sport"]), ("location", event["location"]),
+                      ("skill_level", event["skill_level"]), ("open_to", event["open_to"]),
+                      ("players", str(event["max_players"] or "")), ("note", event["note"] or ""),
+                      ("starts_at", first.strftime("%Y-%m-%dT%H:%M")), ("ends_at", last.strftime("%Y-%m-%dT%H:%M")),
+                      ("password", suggested_password()), *(("reserve", friend) for friend in friends)])
 
 
 def post_club_event(club, event_id, data, repeat):

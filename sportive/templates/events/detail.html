@@ -84,6 +84,10 @@
     {% endif %}
   {% endif %}
 
+  {% if (is_host or event.i_am_going) and not event.club_id and not event.cancelled and ended %}
+    {# After a game: one tap to set up the next one with the same people (the friends among them get a spot held) #}
+    <p class="play-again"><a class="btn btn-block" href="{{ url_for('events.create', again=event.id) }}">🔁 Play again with this group</a></p>
+  {% endif %}
   {% if not event.cancelled and not ended %}
     {# 1. The one main action #}
     <div class="primary-action">
