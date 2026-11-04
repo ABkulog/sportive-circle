@@ -3,12 +3,26 @@
 {% block content %}
 <h1 class="page-title">How it works</h1>
 
+<p class="lead">Sportive Circle is where UW students find people to play with: pickup games, every UW sports club,
+  and the places to play, in one app. Only students with a verified UW email can sign up.</p>
+
 <ol class="steps simple">
-  {% for url, text in [(url_for('events.feed'), 'Find a game'), (url_for('events.create'), 'Start your own'),
-                       (url_for('clubs.directory'), 'Join a club')] %}
-    <li><a class="step" href="{{ url }}"><span class="step-number">{{ loop.index }}</span><h2>{{ text }}</h2></a></li>
+  {% for url, text, more in [
+       (url_for('events.feed'), 'Find a game', 'Play shows the games coming up for your sports and a map of every place to play: tap a place to see what\'s on there. Tap "I\'m in" to join.'),
+       (url_for('events.create'), 'Start your own', 'Short a few players? Post "need 2 for 5v5" in seconds. Everyone who plays your sport sees it, and you get a reminder before it starts.'),
+       (url_for('clubs.directory'), 'Join a club', 'Every UW sports club, with its Instagram and links. Filter by No tryouts, Free or No experience needed, and follow the ones you like.')] %}
+    <li><a class="step" href="{{ url }}"><span class="step-number">{{ loop.index }}</span><h2>{{ text }}</h2><p class="muted">{{ more }}</p></a></li>
   {% endfor %}
 </ol>
+
+<section class="how-trust">
+  <h2>Who's on it</h2>
+  <ul>
+    <li><strong>Only UW students.</strong> Every account is checked with a UW email code.</li>
+    <li><strong>Clubs with a ✓</strong> are run here by their officers, checked by our team. The rest are listed from UW's own club pages until an officer claims them.</li>
+    <li><strong>You choose what's private.</strong> Games can be private (invite or password), and clubs choose who sees when and where they practice.</li>
+  </ul>
+</section>
 
 <section class="how-cta">
   {% if g.user %}

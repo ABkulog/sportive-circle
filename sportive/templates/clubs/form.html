@@ -56,6 +56,11 @@
         <input name="location" maxlength="120" value="{{ form.get('location', '') }}" list="places" placeholder="Denny Field" required></label>
       <datalist id="places">{% for place in locations %}<option value="{{ place }}">{% endfor %}</datalist>
     </div>
+    <label class="field"><span>Who can see when and where you practice</span>
+      <select name="schedule_visibility">
+        {% for value, text in schedule_seen_by.items() %}<option value="{{ value }}" {% if form.get('schedule_visibility', 'uw') == value %}selected{% endif %}>{{ text }}</option>{% endfor %}
+      </select>
+      <small class="muted">Keeping it lowkey? Pick "Only members and followers".</small></label>
     <div class="row row-pair">
       <label class="field"><span>Dues <em>(optional, blank = free)</em></span>
         <input name="dues" maxlength="60" value="{{ form.get('dues', '') }}" placeholder="$40/quarter"></label>

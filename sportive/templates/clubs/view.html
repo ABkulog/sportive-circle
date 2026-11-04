@@ -26,8 +26,9 @@
     {# Instagram's numbers next to the picture #}
     <ul class="stat-row" aria-label="Club stats">
       {% if club.member_count >= show_members_from %}<li><strong>{{ club.member_count }}</strong><span>members</span></li>{% endif %}
-      <li><strong>{{ followers }}</strong><span>follower{{ 's' if followers != 1 }}</span></li>
-      <li><strong>{{ events|length }}</strong><span>event{{ 's' if events|length != 1 }}</span></li>
+      {# Small numbers make a club look empty ("4 followers · 0 events"): they show once they mean something #}
+      {% if followers >= show_followers_from %}<li><strong>{{ followers }}</strong><span>follower{{ 's' if followers != 1 }}</span></li>{% endif %}
+      {% if events %}<li><strong>{{ events|length }}</strong><span>event{{ 's' if events|length != 1 }}</span></li>{% endif %}
     </ul>
   </div>
   <div class="club-profile-main">
@@ -48,8 +49,12 @@
   </ul>
   {% if club.claimed %}{# what the officers wrote themselves: one short line, only the parts they filled in #}
     {% set facts = [] %}
-    {% if club.meets %}{% set _ = facts.append('🗓️ ' ~ club.meets) %}{% endif %}
-    {% if club.location %}{% set _ = facts.append('📍 ' ~ club.location) %}{% endif %}
+    {% if schedule_visible %}{# the club picks who sees when and where it practices (UW students by default) #}
+      {% if club.meets %}{% set _ = facts.append('🗓️ ' ~ club.meets) %}{% endif %}
+      {% if club.location %}{% set _ = facts.append('📍 ' ~ club.location) %}{% endif %}
+    {% elif club.meets or club.location %}
+      {% set _ = facts.append('🔒 Practice times: ' ~ ('for members and followers' if club.schedule_visibility == 'members' else 'log in to see')) %}
+    {% endif %}
     {% if club.dues %}{% set _ = facts.append('💵 ' ~ club.dues) %}{% endif %}
     {% if facts %}<p class="club-facts muted">{{ facts|join(' · ') }}</p>{% endif %}
     {% if club.how_to_join %}<p class="how-to-join" id="how-to-join" tabindex="-1"><strong>How to join:</strong> {{ club.how_to_join }}</p>{% endif %}

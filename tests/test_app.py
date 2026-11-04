@@ -1953,7 +1953,7 @@ def test_clubs_featured_on_landing_and_home(accounts, client, app):
     client.post("/clubs/new", data=CLUB)
     _approve(app, _club_id(app))
     accounts.logout()
-    assert "Verified UW clubs" in client.get("/").data.decode() and "UW Spikeball Club" in client.get("/").data.decode()
+    assert "UW clubs" in client.get("/").data.decode() and "UW Spikeball Club" in client.get("/").data.decode()
     accounts.signup(email="fan@uw.edu", sports=("spikeball",))
     home = client.get("/feed").data.decode()                        # Clubs for you: on the feed (Play is games)
     assert "Clubs for you" in home and "UW Spikeball Club" in home
@@ -2151,7 +2151,8 @@ def test_uw_clubs_refresh_themselves_every_day(accounts, client, app, monkeypatc
     assert pickle_page.count('href="https://huskylink.washington.edu/huskypickle') == 1 and "Website</a>" not in pickle_page
 
 
-def test_follow_is_not_membership(accounts, client, app):
+def test_follow_is_not_membership(accounts, client, app, monkeypatch):
+    monkeypatch.setattr("sportive.clubs.SHOW_FOLLOWERS_FROM", 1)  # count every follower (shown from 10)
     club = _approved_club(accounts, client, app)
     accounts.signup(email="curious@uw.edu")
     client.post(f"/clubs/{club}/follow")
@@ -3231,7 +3232,8 @@ def test_first_photo_still_required_to_pick_one(accounts, client):
                                                   follow_redirects=True).data
 
 
-def test_club_page_counts_followers(accounts, client, app):
+def test_club_page_counts_followers(accounts, client, app, monkeypatch):
+    monkeypatch.setattr("sportive.clubs.SHOW_FOLLOWERS_FROM", 1)  # count every follower (shown from 10)
     club = _approved_club(accounts, client, app)
     page = client.get(f"/clubs/{club}").data.decode()                  # members follow too: the captain counts
     assert "<strong>1</strong><span>follower</span>" in page and "<span>following</span>" not in page
@@ -8690,3 +8692,54 @@ def test_map_has_the_parks_near_campus_and_a_red_dot_for_many_sports(accounts, c
     form = client.post("/events/new", data=event_form(title="Montlake hit", sport="tennis",
                                                       location="Montlake Playfield"))
     assert form.status_code == 302
+
+
+def test_clubs_choose_who_sees_their_practice_times(accounts, client, app):
+    """FR-CLUB-53: a claimed club's practice times show to logged-in UW students by default, to anyone if it picks
+    Anyone, and only to members and followers if it keeps it lowkey. FR-CLUB-54: no "0 followers · 0 events"."""
+    with app.app_context():
+        db = get_db()
+        club_id = db.execute(
+            "INSERT INTO clubs (name, sport, description, meets, location, status, claimed, created_at)"
+            " VALUES ('Lowkey Lifters', 'gym', 'A friendly lifting club for everyone at UW.', 'Tue 7 PM', 'The IMA',"
+            " 'approved', 1, ?)", (to_db(now_local()),)).lastrowid
+        db.commit()
+    page = lambda: client.get(f"/clubs/{club_id}").data.decode()  # noqa: E731
+    visitor = page()
+    assert "Tue 7 PM" not in visitor and "log in to see" in visitor              # default: UW students only
+    assert "<span>followers" not in visitor and "<span>event" not in visitor      # no small numbers
+    accounts.signup(email="student@uw.edu")
+    assert "Tue 7 PM" in page()
+    with app.app_context():
+        get_db().execute("UPDATE clubs SET schedule_visibility = 'members' WHERE id = ?", (club_id,))
+        get_db().commit()
+    assert "Tue 7 PM" not in page() and "for members and followers" in page()
+    client.post(f"/clubs/{club_id}/follow")
+    assert "Tue 7 PM" in page()                                                    # a follower sees it
+    accounts.logout()
+    with app.app_context():
+        get_db().execute("UPDATE clubs SET schedule_visibility = 'public' WHERE id = ?", (club_id,))
+        get_db().commit()
+    assert "Tue 7 PM" in page()                                                    # Anyone
+
+
+def test_landing_is_honest_and_shows_games_played(accounts, client, app):
+    """FR-INFO-6: no "every club is checked" claim; "N games played this week" once there are 3; How it works says
+    what each step does."""
+    from sportive.timeutil import to_db
+    landing = client.get("/").data.decode()
+    assert "checked by our team before it" not in landing and "games played on Sportive Circle" not in landing
+    accounts.signup(email="host@uw.edu")
+    with app.app_context():
+        db = get_db()
+        host = db.execute("SELECT id FROM users").fetchone()[0]
+        for hours in (2, 30, 100):
+            when = now_local() - timedelta(hours=hours)
+            db.execute("INSERT INTO events (host_id, title, sport, location, skill_level, starts_at, ends_at)"
+                       " VALUES (?, 'Run', 'basketball', 'IMA (Intramural Activities Building)', 'Casual', ?, ?)",
+                       (host, to_db(when), to_db(when + timedelta(hours=1))))
+        db.commit()
+    accounts.logout()
+    assert "3 games played on Sportive Circle this week" in client.get("/").data.decode()
+    how = client.get("/how-it-works").data.decode()
+    assert "Only UW students" in how and "need 2 for 5v5" in how
