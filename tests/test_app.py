@@ -8676,8 +8676,8 @@ def test_a_new_pickup_game_posts_itself_on_home(accounts, client, app):
 def test_map_has_the_parks_near_campus_and_a_red_dot_for_many_sports(accounts, client):
     """FR-PLAY-34 (the owner: "we don't have nearly enough spots on the map", and a place for many sports shouldn't
     show one sport): Seattle parks near campus are places to play (Green Lake, Gas Works, Montlake, Magnuson,
-    University Playground, Laurelhurst, Ravenna), each with a pin; a place for 3+ sports is marked "multi" (the
-    red dot), a one-sport place keeps its sport's emoji."""
+    University Playground, Laurelhurst, Ravenna), each with a pin; a place for 2+ sports is marked "multi" (the
+    red dot, FR-PLAY-37), a one-sport place keeps its sport's emoji."""
     import json
     accounts.signup(sports=("tennis",))
     page = client.get("/?scope=all").data.decode()
@@ -8688,7 +8688,7 @@ def test_map_has_the_parks_near_campus_and_a_red_dot_for_many_sports(accounts, c
     assert spots["IMA (Intramural Activities Building)"]["multi"] and spots["Denny Field"]["multi"]
     assert not spots["UW Golf Driving Range"]["multi"] and spots["UW Golf Driving Range"]["emoji"] == "⛳"
     assert spots["Montlake Playfield"]["new_url"] == "/events/new?location=Montlake+Playfield&sport=tennis"
-    assert "many sports" in page
+    assert "more than one sport" in page
     form = client.post("/events/new", data=event_form(title="Montlake hit", sport="tennis",
                                                       location="Montlake Playfield"))
     assert form.status_code == 302

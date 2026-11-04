@@ -76,3 +76,21 @@ def test_sand_volleyball_and_track_pins_sit_on_the_places(accounts, client):
     assert sand[1] < north[1] and abs(sand[0] - north[0]) < 0.0006      # just west of the north courts
     track, field2 = LOCATION_COORDS[TRACK], LOCATION_COORDS[REC_FIELD_2]
     assert -122.2988 < track[1] < -122.2976 and track[0] < field2[0] + 0.0012
+
+
+def test_one_sport_icons_only_for_places_with_one_sport_and_the_legend_sits_below_the_map(accounts, client):
+    """FR-PLAY-37 (the owner: "other things happen at Red Square other than running", and the North courts are
+    tennis and pickleball): any place for 2+ sports is a red dot. The golf range, the South courts, sand volleyball
+    and Fitness Center West (gym and weightlifting are both 🏋️) keep their sport's icon. The legend sits under the
+    map, not under "Tap to open the map"."""
+    import json
+    accounts.signup(sports=("tennis",))
+    page = client.get("/?scope=all").data.decode()
+    spots = {s["name"]: s for s in json.loads(page.split('id="play-spots">')[1].split("</script>")[0])}
+    for place in ("Red Square", "IMA North Tennis Courts", "Ravenna Park"):
+        assert spots[place]["multi"], place
+    for place in ("UW Golf Driving Range", "IMA South Tennis Courts", "Sand Volleyball Courts (by the IMA)",
+                  "Fitness Center West (under Elm Hall)"):
+        assert not spots[place]["multi"], place
+    assert page.index('id="play-spots"') < page.index('class="map-legend"') and \
+        page.index("</section>", page.index('id="live-map"')) < page.index('class="map-legend"')
