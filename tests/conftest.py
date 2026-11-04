@@ -21,6 +21,8 @@ def app(tmp_path):
         "CHECK_PLACE_HOURS": False,
         # Students' own posts are paused on the live site (PEOPLE_POSTING); the post tests need them on.
         "PEOPLE_POSTING": True,
+        # The daily club website check opens real sites; tests give it fake answers instead (test_dead_club_websites).
+        "CHECK_CLUB_LINKS": False,
     })
 
 
