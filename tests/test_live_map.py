@@ -55,7 +55,7 @@ def test_the_map_shows_the_rest_of_today_and_leads_only_when_busy(accounts, clie
 
 
 def test_golf_range_pin_is_on_the_range_and_the_archery_lawn_is_a_spot(accounts, client):
-    """FR-PLAY-31: the golf range's pin sat on NE 45th St; it's now on the range itself (west of Ravenna Creek,
+    """FR-PLAY-35: the golf range's pin sat on NE 45th St; it's now on the range itself (west of Ravenna Creek,
     south of 45th, north of NE Clark Rd). The lawn maps call "Archery Range" (by the Penthouse Theatre, north of
     Denny Field) is a spot for lawn games; archery itself stays in the IMA's archery room."""
     from sportive.constants import ARCHERY_LAWN, DENNY, GOLF_RANGE, LOCATION_COORDS, REC_FIELD_3, SPORT_LOCATIONS
@@ -69,7 +69,7 @@ def test_golf_range_pin_is_on_the_range_and_the_archery_lawn_is_a_spot(accounts,
 
 
 def test_sand_volleyball_and_track_pins_sit_on_the_places(accounts, client):
-    """FR-PLAY-32: the sand volleyball pin was east of Rec Field 1; the courts are right behind (west of) the IMA
+    """FR-PLAY-36: the sand volleyball pin was east of Rec Field 1; the courts are right behind (west of) the IMA
     North Tennis Courts. The track's pin was on its east end; it's now in the middle of the oval."""
     from sportive.constants import IMA_NORTH_COURTS, LOCATION_COORDS, REC_FIELD_2, SAND_COURTS, TRACK
     sand, north = LOCATION_COORDS[SAND_COURTS], LOCATION_COORDS[IMA_NORTH_COURTS]
