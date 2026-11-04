@@ -8,6 +8,7 @@ from sportive.db import get_db
 from test_feed import approved_club, as_user, form_time, post, user_id
 
 
+
 def test_a_club_post_reaches_everyone_not_only_followers(accounts, client, app):
     accounts.signup(email="officer@uw.edu", sports=("running",))
     club = approved_club(app, "officer@uw.edu")
@@ -403,9 +404,10 @@ def test_the_clubs_tab_finds_and_registers_clubs(accounts, client, app):
     assert '<span class="tab-label">Clubs<' in page and 'class="tab is-active" href="/clubs"' in page
 
 
-def test_clubs_pin_a_post_owner_picks_posters_and_members_keep_following(accounts, client, app):
+def test_clubs_pin_a_post_owner_picks_posters_and_members_keep_following(accounts, client, app, monkeypatch):
     """The owner: clubs pin a post on their page for a day; the owner gives officers permission to post (not every
     officer runs the socials); members follow the club and leaving the club keeps them following."""
+    monkeypatch.setattr("sportive.clubs.SHOW_FOLLOWERS_FROM", 1)  # count every follower (shown from 10)
     accounts.signup(email="owner@uw.edu", sports=("running",))
     accounts.logout()
     accounts.signup(email="vp@uw.edu", sports=("running",))

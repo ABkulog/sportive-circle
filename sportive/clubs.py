@@ -277,6 +277,7 @@ def read_club_form(form, club_id=None, phone_on_file=""):
         value = get(key)
         data[key] = value if key in LINK_SOCIALS else social_handle(key, value)
     data["competes"] = 1 if form.get("competes") else 0
+    data["schedule_visibility"] = form.get("schedule_visibility") if form.get("schedule_visibility") in SCHEDULE_SEEN_BY else "uw"
     data["discord_members_only"] = 1 if form.get("discord_members_only") else 0
     typed_phone = form.get("contact_phone", "").strip()
     data["contact_phone"] = (phone_from_form(form.get("contact_phone_country"), typed_phone) or ""
@@ -347,7 +348,7 @@ def read_club_form(form, club_id=None, phone_on_file=""):
     return data, None, None
 
 
-FIELDS = ("name", "sport", "description", "meets", "location", "contact_url", "club_kind", "verification_url",
+FIELDS = ("name", "sport", "description", "meets", "location", "schedule_visibility", "contact_url", "club_kind", "verification_url",
           "officer_role", "member_estimate", "focus", "joining", "experience", "who_can_join", "dues", "gear",
           "competes", "how_to_join", "club_email", "instagram", "join_question", "tiktok", "snapchat", "x_handle",
           "facebook", "youtube", "discord", "discord_members_only", "contact_phone")
@@ -479,6 +480,7 @@ def view(club_id):
         for item in feed_posts:
             item["on_club_page"] = True
     return render_template("clubs/view.html", club=club, show_members_from=SHOW_MEMBERS_FROM, posts=posts, members=members, events=events,
+                           schedule_visible=can_see_schedule(club, role), show_followers_from=SHOW_FOLLOWERS_FROM,
                            feed_posts=feed_posts, feed_photos=feed_photos, max_photos=10,
                            friends_line=friends_line(club_id, me) if me and role not in MEMBER_ROLES else None,
                            week=officer_week(club_id) if role == "officer" and club["status"] == "approved" else None,
@@ -675,7 +677,7 @@ def create():
 
 
 def _club_form_page(form, club, error_field, unchanged=False):
-    return render_template("clubs/form.html", form=form, club=club, locations=LOCATIONS, kinds=CLUB_KINDS,
+    return render_template("clubs/form.html", form=form, club=club, locations=LOCATIONS, kinds=CLUB_KINDS, schedule_seen_by=SCHEDULE_SEEN_BY,
                            focus=FOCUS, joining=JOINING, experience=EXPERIENCE, who=WHO_CAN_JOIN,
                            min_members=MIN_ACTIVE_MEMBERS, error_field=error_field, unchanged=unchanged,
                            owner=bool(club) and is_owner(club),
@@ -734,6 +736,19 @@ def edit(club_id):
 # ------------------------------------------------------------ membership
 
 MEMBER_ROLES = ("member", "officer")
+# Who can see a club's practice times and place (its choice; UW students by default)
+SCHEDULE_SEEN_BY = {"uw": "UW students (logged in)", "members": "Only members and followers", "public": "Anyone"}
+SHOW_FOLLOWERS_FROM = 10  # a club's follower count shows from 10: "4 followers" makes a club look empty
+
+
+def can_see_schedule(club, role):
+    """Whether the person looking may see when and where this club practices (FR-CLUB-53)."""
+    seen_by = club["schedule_visibility"] if "schedule_visibility" in club.keys() else "uw"
+    if seen_by == "public" or role == "officer" or is_admin():
+        return True
+    if seen_by == "members":
+        return role in ("member", "officer", "follower")
+    return g.get("user") is not None
 
 # SQL: officers who can still act (a suspended officer can't run the club, so they don't count toward "at least one").
 ACTIVE_OFFICERS = """SELECT COUNT(*) FROM club_members m JOIN users u ON u.id = m.user_id

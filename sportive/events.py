@@ -294,6 +294,17 @@ def game_pins(games, now=None):
     return list(pins.values())
 
 
+SHOW_GAMES_PLAYED_FROM = 3  # "14 games played this week" on the landing page, once it isn't a sad number
+
+
+def games_played_this_week():
+    """Proof people play, for visitors: open games that started in the last 7 days (private ones aren't counted)."""
+    now = now_local()
+    count = get_db().execute("SELECT COUNT(*) FROM events WHERE cancelled = 0 AND is_private = 0 AND starts_at >= ?"
+                             " AND starts_at <= ?", (to_db(now - timedelta(days=7)), to_db(now))).fetchone()[0]
+    return count if count >= SHOW_GAMES_PLAYED_FROM else 0
+
+
 SPOT_WEEK_GAMES = 8  # upcoming games listed on a spot's panel
 MULTI_SPORT = 3      # a place for this many sports or more gets the "all sports" red dot, not one sport's emoji
 
@@ -528,7 +539,7 @@ def celebrate_progress(user_id):
 @bp.route("/")
 def feed():
     if g.user is None:
-        return render_template("landing.html", clubs=featured_clubs())
+        return render_template("landing.html", clubs=featured_clubs(), games_this_week=games_played_this_week())
 
     my_sports = user_sports(g.user["id"])
     filters = {key: request.args.get(key, "") for key in ("scope", "sport", "location", "skill", "when", "open")}

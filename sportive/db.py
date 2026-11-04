@@ -41,6 +41,9 @@ ADDED_COLUMNS = [
     ("clubs", "discord", "TEXT NOT NULL DEFAULT ''"),  # an invite link (discord.gg/... or discord.com/invite/...)
     ("clubs", "huskylink_id", "INTEGER"),  # its group on HuskyLink (UW's student org site)
     ("clubs", "discord_members_only", "INTEGER NOT NULL DEFAULT 0"),  # 1 = only members see the Discord invite
+    # Who sees when and where a club practices: 'public' (anyone), 'uw' (logged-in UW students, the default) or
+    # 'members' (its members and followers). Some clubs keep practices lowkey.
+    ("clubs", "schedule_visibility", "TEXT NOT NULL DEFAULT 'uw'"),
     ("club_posts", "link", "TEXT NOT NULL DEFAULT ''"),  # unused now (automatic HuskyLink event posts were taken out)
     ("club_posts", "huskylink_event", "INTEGER"),  # unused now: kept so older databases stay readable
     ("club_posts", "ends_at", "TEXT"),  # unused now
