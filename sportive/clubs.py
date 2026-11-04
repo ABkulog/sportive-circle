@@ -1506,6 +1506,8 @@ def _sync_clubs(app):
             log.info("UW clubs refreshed; %d new.", len(added))
     except Exception:
         log.exception("Couldn't refresh the UW clubs")
+    if not app.config.get("CHECK_CLUB_LINKS", True):  # tests: no real websites to open
+        return
     try:
         with app.app_context():
             from .linkcheck import check_club_websites
