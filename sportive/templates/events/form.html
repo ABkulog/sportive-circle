@@ -80,13 +80,13 @@
     <section class="wizard-step">
     <h2 class="form-step"><span>3</span> Who can join</h2>
     {{ who_can_join(form, club=club or (event and event.club_id)) }}
-    {% if club %}
+    {% if not event %}
       <label class="field"><span>Repeat</span>
         <select name="repeat">
           <option value="1">Just once</option>
           {% for n in range(2, 13) %}<option value="{{ n }}" {% if form.get('repeat')|string == n|string %}selected{% endif %}>Every week, {{ n }} weeks</option>{% endfor %}
         </select>
-        <small class="muted">For weekly practices: one tap instead of making each one.</small></label>
+        <small class="muted">{{ 'For weekly practices: one tap instead of making each one.' if club else 'Your weekly game ("Tuesdays 9 PM at the IMA"): people come back for it.' }}</small></label>
     {% endif %}
     {% if event %}
       {% if event.team_size %}<p class="muted">Format: {{ event.team_size }}v{{ event.team_size }} team vs team.</p>{% endif %}

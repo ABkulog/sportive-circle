@@ -8694,6 +8694,33 @@ def test_map_has_the_parks_near_campus_and_a_red_dot_for_many_sports(accounts, c
     assert form.status_code == 302
 
 
+def test_any_game_repeats_weekly_and_play_again_fills_in_the_group(accounts, client, app):
+    """FR-EVT-26 (outside-eye review: people come back for *their* game): any game can repeat every week, not only
+    a club's practices; after a game, its players get "Play again with this group": the form filled in like it
+    (sport, place, level, a week later) with their friends from it ticked to get a spot held."""
+    ids = _people(accounts, app, "Maya", "Sam", "Riley")
+    _friends(app, ids["Maya"], ids["Sam"])
+    _as(accounts, "Maya")
+    created = client.post("/events/new", data=event_form(title="Tuesday hoops", repeat="4"), follow_redirects=True)
+    assert "every" in created.data.decode() and "for 4 weeks" in created.data.decode()
+    with app.app_context():
+        games = get_db().execute("SELECT id, starts_at FROM events WHERE title = 'Tuesday hoops' ORDER BY starts_at").fetchall()
+    assert len(games) == 4
+    assert client.post("/events/new", data=event_form(title="Too long", repeat="13")).status_code == 200  # 12 max
+    first = games[0]["id"]
+    _as(accounts, "Sam")
+    client.post(f"/events/{first}/join")
+    _as(accounts, "Maya")
+    _move_to_past(app, first)
+    page = client.get(f"/events/{first}").data.decode()
+    assert "Play again with this group" in page
+    again = client.get(f"/events/new?again={first}").data.decode()
+    assert 'value="Tuesday hoops"' in again and "<option selected>IMA (Intramural Activities Building)</option>" in again
+    assert f'name="reserve" value="{ids["Sam"]}" checked' in again                    # the friend from that game
+    _as(accounts, "Riley")                                                              # not in that game
+    assert "Tuesday hoops" not in client.get(f"/events/new?again={first}").data.decode()
+
+
 def test_clubs_choose_who_sees_their_practice_times(accounts, client, app):
     """FR-CLUB-53: a claimed club's practice times show to logged-in UW students by default, to anyone if it picks
     Anyone, and only to members and followers if it keeps it lowkey. FR-CLUB-54: no "0 followers · 0 events"."""
