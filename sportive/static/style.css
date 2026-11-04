@@ -2092,10 +2092,6 @@ html, body { overflow-x: clip; }
 .this-week { margin: 4px 0 18px; }
 .this-week .home-section-title { margin-bottom: 8px; }
 .this-week-more { margin: 8px 0 0; text-align: right; }
-.this-week-sub { margin: 12px 0 6px; font-size: .9rem; }
-.practice-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.practice-list li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line, #eee); border-radius: 12px; }
-.practice-emoji { font-size: 1.3rem; line-height: 1.4; }
 .show-me { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--muted); margin: 6px 0; }
 .show-me select { font-size: .85rem; padding: 4px 8px; border-radius: 999px; }
 .claim-cta { margin-top: 8px; }

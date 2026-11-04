@@ -86,12 +86,20 @@ def is_drop_in(label, sport):
     return bool(name) and "open rec" in text and name.lower() in text
 
 
+def public_label(label):
+    """What students see of a UW Rec booking. A club's practice stays lowkey (some clubs don't want theirs found):
+    only that the place is booked then. IM games, rentals and drop-in times ("Open Rec Basketball") keep their name.
+    Admins see every label in Admin -> UW Rec."""
+    text = (label or "").lower()
+    return "Booked (UW Rec)" if "practice" in text or "club" in text else label
+
+
 def whats_on(location, starts, ends, exclude=None, sport=None):
     """Everything the host (or a player) should know about this place at this time."""
     return {
         "uw_rec": is_uw_rec(location),
         "schedule": UW_REC_SCHEDULE if is_uw_rec(location) else None,
-        "reserved": [{"label": r["label"], "when": time_range(r["starts_at"], r["ends_at"]),
+        "reserved": [{"label": public_label(r["label"]), "when": time_range(r["starts_at"], r["ends_at"]),
                       "drop_in": is_drop_in(r["label"], sport)}
                      for r in rec_reservations(location, starts, ends)],
         "games": games_at(location, starts, ends, exclude),

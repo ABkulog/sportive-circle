@@ -323,9 +323,9 @@ def spot_sport(places, games, my_sports):
 def spot_pins(now=None, only=None):
     """Play's map, under the game bubbles: every place games are played (the IMA, courts, fields, the track), so the
     map is never empty. Tap one and a panel opens: its hours today (closed is said plainly), the games there this
-    week, what UW Rec has booked there for the rest of today (club practices, IM games, rentals) and "Create an event
+    week, what UW Rec has booked there for the rest of today (IM games, rentals; a club practice only shows as booked) and "Create an event
     here" with the place and a sport filled in. Rooms inside one building share its pin (the IMA's pool, mats...)."""
-    from .placecheck import time_range  # placecheck imports this module
+    from .placecheck import public_label, time_range  # placecheck imports this module
     from .placehours import _clock, hours_on
     now = now or now_local()
     groups = {}
@@ -354,7 +354,8 @@ def spot_pins(now=None, only=None):
         rows = get_db().execute(
             f"""SELECT * FROM rec_reservations WHERE location IN ({marks}) AND ends_at > ? AND starts_at < ?
                 ORDER BY starts_at LIMIT 6""", (*places, to_db(now), to_db(end_of_day))).fetchall()
-        bookings = [{"label": (r["label"] if r["location"] == main else f"{r['location'].split(' (')[0]}: {r['label']}"),
+        bookings = [{"label": (public_label(r["label"]) if r["location"] == main
+                               else f"{r['location'].split(' (')[0]}: {public_label(r['label'])}"),
                      "when": time_range(r["starts_at"], r["ends_at"])} for r in rows]
         here = [e for e in week if e["location"] in places and e["location"] != OFF_CAMPUS]
         games = [{"title": f"{SPORT_EMOJI[e['sport']]} {event_title(e)}", "sport": e["sport"],
