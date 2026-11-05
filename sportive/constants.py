@@ -271,7 +271,7 @@ LOCATION_COORDS = {
     REC_FIELD_2: (47.657727, -122.297914),    # north of Husky Track
     REC_FIELD_3: (47.660058, -122.295414),    # by the golf range, NE Clark Rd
     REC_FIELD_4: (47.660431, -122.293564),    # by the golf range, NE Clark Rd
-    TRACK: (47.656746, -122.297181),          # "Husky Outdoor Track"
+    TRACK: (47.656747, -122.298205),          # the middle of Husky Outdoor Track's oval
     WAC: (47.648534, -122.299694),            # the boat rental entrance
     DENNY: (47.659804, -122.305883),
     QUAD: (47.657285, -122.307213),
@@ -285,7 +285,7 @@ LOCATION_COORDS = {
     IMA_POOL: (47.653743, -122.301231),
     IMA_ARCHERY: (47.653743, -122.301231),
     IMA_COURTS: (47.653743, -122.301231),
-    SAND_COURTS: (47.654300, -122.300100),    # next to the IMA
+    SAND_COURTS: (47.654391, -122.301926),    # right behind (west of) the IMA North Tennis Courts
     GOLF_RANGE: (47.659710, -122.297870),     # the middle of the range, between Montlake Blvd and Ravenna Creek
     ARCHERY_LAWN: (47.660435, -122.307852),   # the lawn OpenStreetMap calls "Archery Range", by the Penthouse Theatre
     RED_SQUARE: (47.655900, -122.309600),

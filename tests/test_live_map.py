@@ -55,7 +55,7 @@ def test_the_map_shows_the_rest_of_today_and_leads_only_when_busy(accounts, clie
 
 
 def test_golf_range_pin_is_on_the_range_and_the_archery_lawn_is_a_spot(accounts, client):
-    """FR-PLAY-31: the golf range's pin sat on NE 45th St; it's now on the range itself (west of Ravenna Creek,
+    """FR-PLAY-35: the golf range's pin sat on NE 45th St; it's now on the range itself (west of Ravenna Creek,
     south of 45th, north of NE Clark Rd). The lawn maps call "Archery Range" (by the Penthouse Theatre, north of
     Denny Field) is a spot for lawn games; archery itself stays in the IMA's archery room."""
     from sportive.constants import ARCHERY_LAWN, DENNY, GOLF_RANGE, LOCATION_COORDS, REC_FIELD_3, SPORT_LOCATIONS
@@ -66,3 +66,31 @@ def test_golf_range_pin_is_on_the_range_and_the_archery_lawn_is_a_spot(accounts,
     assert ARCHERY_LAWN in SPORT_LOCATIONS["ultimate"] and ARCHERY_LAWN not in SPORT_LOCATIONS["archery"]
     accounts.signup(email="maya@uw.edu", sports=("ultimate",))
     assert "Archery Range lawn" in client.get("/").data.decode()
+
+
+def test_sand_volleyball_and_track_pins_sit_on_the_places(accounts, client):
+    """FR-PLAY-36: the sand volleyball pin was east of Rec Field 1; the courts are right behind (west of) the IMA
+    North Tennis Courts. The track's pin was on its east end; it's now in the middle of the oval."""
+    from sportive.constants import IMA_NORTH_COURTS, LOCATION_COORDS, REC_FIELD_2, SAND_COURTS, TRACK
+    sand, north = LOCATION_COORDS[SAND_COURTS], LOCATION_COORDS[IMA_NORTH_COURTS]
+    assert sand[1] < north[1] and abs(sand[0] - north[0]) < 0.0006      # just west of the north courts
+    track, field2 = LOCATION_COORDS[TRACK], LOCATION_COORDS[REC_FIELD_2]
+    assert -122.2988 < track[1] < -122.2976 and track[0] < field2[0] + 0.0012
+
+
+def test_one_sport_icons_only_for_places_with_one_sport_and_the_legend_sits_below_the_map(accounts, client):
+    """FR-PLAY-37 (the owner: "other things happen at Red Square other than running", and the North courts are
+    tennis and pickleball): any place for 2+ sports is a red dot. The golf range, the South courts, sand volleyball
+    and Fitness Center West (gym and weightlifting are both 🏋️) keep their sport's icon. The legend sits under the
+    map, not under "Tap to open the map"."""
+    import json
+    accounts.signup(sports=("tennis",))
+    page = client.get("/?scope=all").data.decode()
+    spots = {s["name"]: s for s in json.loads(page.split('id="play-spots">')[1].split("</script>")[0])}
+    for place in ("Red Square", "IMA North Tennis Courts", "Ravenna Park"):
+        assert spots[place]["multi"], place
+    for place in ("UW Golf Driving Range", "IMA South Tennis Courts", "Sand Volleyball Courts (by the IMA)",
+                  "Fitness Center West (under Elm Hall)"):
+        assert not spots[place]["multi"], place
+    assert page.index('id="play-spots"') < page.index('class="map-legend"') and \
+        page.index("</section>", page.index('id="live-map"')) < page.index('class="map-legend"')
