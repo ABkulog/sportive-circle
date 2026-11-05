@@ -8770,3 +8770,37 @@ def test_landing_is_honest_and_shows_games_played(accounts, client, app):
     assert "3 games played on Sportive Circle this week" in client.get("/").data.decode()
     how = client.get("/how-it-works").data.decode()
     assert "Only UW students" in how and "need 2 for 5v5" in how
+
+
+def test_students_old_posts_leave_the_feed_while_posting_is_paused(accounts, client, app):
+    """FR-FEED-40 (the owner: "the feed is still there, and posts that were previously made are also there"):
+    with students' posts paused (FR-FEED-35), their old posts leave the feed too; clubs' posts stay. Nothing is
+    deleted: the post is still on its author's profile. A post's game that already happened says Ended, not I'm in."""
+    from datetime import timedelta
+    from sportive.timeutil import now_local, to_db
+    club = _approved_club(accounts, client, app)
+    with app.app_context():
+        get_db().execute("UPDATE clubs SET claimed = 1 WHERE id = ?", (club,))
+        get_db().commit()
+    accounts.login(email="captain@uw.edu")
+    client.post("/posts/new", data={"body": "Practice moved to 6", "sport": "spikeball", "as_club": str(club)})
+    accounts.logout()
+    accounts.signup(email="ab@uw.edu", name="Ab Kulog")
+    client.post("/posts/new", data={"body": "YOOO JOIN UP", "sport": "basketball"})
+    me = _user_id(app, "ab@uw.edu")
+    with app.app_context():
+        db = get_db()
+        then = now_local() - timedelta(days=10)
+        game = db.execute("""INSERT INTO events (host_id, title, sport, location, starts_at, ends_at, skill_level,
+                             max_players) VALUES (?, 'Old 5v5', 'basketball', 'IMA (Intramural Activities Building)',
+                             ?, ?, 'All levels', 10)""", (me, to_db(then), to_db(then + timedelta(hours=1)))).lastrowid
+        db.execute("UPDATE posts SET event_id = ? WHERE body = 'YOOO JOIN UP'", (game,))
+        db.commit()
+    accounts.logout()
+    accounts.signup(email="maya@uw.edu", name="Maya Lee", sports=("basketball", "spikeball"))
+    feed = client.get("/feed").data.decode()
+    assert "YOOO JOIN UP" in feed and "Ended" in feed                        # posting on: shown, game over
+    app.config["PEOPLE_POSTING"] = False
+    feed = client.get("/feed").data.decode()
+    assert "YOOO JOIN UP" not in feed and "Practice moved to 6" in feed
+    assert "YOOO JOIN UP" in client.get(f"/u/{me}").data.decode()           # not deleted: on AB's profile

@@ -145,6 +145,8 @@ def _check_secret_key(app):
 def _add_template_helpers(app):
     from .posts import poll_of
     app.jinja_env.globals["people_posting"] = lambda: app.config.get("PEOPLE_POSTING", False)
+    from .events import game_over
+    app.jinja_env.globals["game_over"] = game_over
     app.jinja_env.globals["poll_of"] = poll_of  # a post's poll, as the viewer sees it (feed/_cards.html)
     app.jinja_env.globals.update(
         # forms and lists
