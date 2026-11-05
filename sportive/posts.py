@@ -130,10 +130,13 @@ def feed_items(sport=None, before=None, limit=PAGE):
     in_sports = _sports_clause("p.sport", sports, params)
     # Clubs post to everyone: a club's posts are in every feed, not only its followers'
     mine = "" if sport else " OR p.author_id = :me OR p.club_id IS NOT NULL"
+    # While students' own posts are paused (PEOPLE_POSTING), their old ones leave the feed too, so it isn't a
+    # stale Twitter: only clubs' posts show. Nothing's deleted: they're still on each person's profile.
+    paused = "" if current_app.config.get("PEOPLE_POSTING", False) else " AND p.club_id IS NOT NULL"
     for row in db.execute(
             f"""SELECT {POST_FIELDS}, {POST_COUNTS}
                 FROM {POST_FROM}
-                WHERE ({in_sports}{mine}) AND {POST_VISIBLE} AND p.created_at <= :before AND {NOT_CANCELED}
+                WHERE ({in_sports}{mine}){paused} AND {POST_VISIBLE} AND p.created_at <= :before AND {NOT_CANCELED}
                 ORDER BY p.created_at DESC, p.id DESC LIMIT :limit""", params).fetchall():
         items.append({"kind": "post", "at": row["created_at"], "post": row})
 

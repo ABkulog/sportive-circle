@@ -130,9 +130,15 @@ def spots_left(event):
     return max(event["max_players"] - event["going_count"] - event["extra_players"] - event["held_count"], 0)
 
 
+def game_over(event):
+    """The game has ended (a post's game card says Ended, not I'm in)."""
+    return from_db(event["ends_at"]) < now_local()
+
+
 def can_quick_join(event):
-    """For the Join button on feed cards: private and team games need their page (password, teams)."""
-    return (not event["cancelled"] and not event["i_am_going"] and not event["team_size"] and not not_for_me(event)
+    """For the Join button on feed cards: private and team games need their page (password, teams); a game that
+    already happened can't be joined."""
+    return (not event["cancelled"] and not game_over(event) and not event["i_am_going"] and not event["team_size"] and not not_for_me(event)
             and (not event["members_only"] or event["i_am_member"])
             and (event["i_am_invited"] or (not event["is_private"] and spots_left(event) != 0)))
 
