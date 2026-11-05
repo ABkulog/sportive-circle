@@ -306,7 +306,7 @@ def games_played_this_week():
 
 
 SPOT_WEEK_GAMES = 8  # upcoming games listed on a spot's panel
-MULTI_SPORT = 3      # a place for this many sports or more gets the "all sports" red dot, not one sport's emoji
+MULTI_SPORT = 2      # a place for 2+ sports (by their emoji: gym and weightlifting are one 🏋️) gets the red dot
 
 
 def short_place(location):
@@ -374,14 +374,15 @@ def spot_pins(now=None, only=None):
                   "going": e["going_count"] + e["extra_players"], "max": e["max_players"]}
                  for e in here[:SPOT_WEEK_GAMES]]
         sport, place = spot_sport(places, games, my_sports)
-        # A place for many sports (the IMA, the fields, the parks) isn't one sport's: its pin is a red dot
+        # A place for more than one sport (the IMA, the fields, Red Square, the North courts' tennis and pickleball)
+        # isn't one sport's: its pin is a red dot. One sport (the golf range, the South courts): that sport's emoji
         played = {key for key, spots in SPORT_LOCATIONS.items() if key != "other" and any(p in spots for p in places)}
         # The page carries only how many games (the panel loads their titles when the pin is tapped, from
         # place_panel), so Play's filtered list is the only list of games on the page.
         spots.append({"name": main, "short": short_place(main), "lat": lat, "lng": lng, "hours": text,
                       "closed": hours is None, "bookings": bookings, "game_count": len(here),
                       **({"games": games} if only is not None else {}),
-                      "multi": len(played) >= MULTI_SPORT, "sports": len(played),
+                      "multi": len({SPORT_EMOJI.get(key) for key in played}) >= MULTI_SPORT, "sports": len(played),
                       "emoji": SPORT_EMOJI.get(sport, "📍"),
                       "new_url": url_for("events.create", location=place, sport=sport or None)})
     return spots

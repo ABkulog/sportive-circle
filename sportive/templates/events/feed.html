@@ -18,7 +18,6 @@
   <h2 class="visually-hidden" id="live-title">Happening now</h2>
   <div class="play-map" id="play-map" role="img" aria-label="Live map: {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games today"></div>
   <p class="live-map-note">{% if map_pins %}<span class="live-dot" aria-hidden="true"></span> {{ map_pins|length }} place{{ 's' if map_pins|length != 1 }} with games today{% else %}Nothing on right now · games today show up here{% endif %} · tap a place for its games, hours and ＋ Create an event</p>
-  <p class="map-legend"><span><span class="legend-dot" aria-hidden="true"></span> many sports</span><span>⚽ 🎾 🏊 one sport</span><span>gold ring: games this week</span></p>
   <button type="button" class="map-open" data-map-open aria-label="Open the map full screen"><span>⤢ Tap to open the map</span></button>
   <button type="button" class="map-back" data-map-close hidden>← Back</button>
   <button type="button" class="map-recenter" data-map-recenter hidden aria-label="Back to campus">◎</button>
@@ -30,6 +29,8 @@
   </div>
   <script type="application/json" id="play-spots">{{ spot_pins|tojson }}</script>
 </section>
+{# Under the map, outside it: "Tap to open the map" covers the map, never what its pins mean #}
+<p class="map-legend"><span><span class="legend-dot" aria-hidden="true"></span> more than one sport</span><span>⛳ 🎾 🏐 one sport</span><span>gold ring: games this week</span></p>
 {% endmacro %}
 {% block content %}
 {{ home_tabs('feed') }}
