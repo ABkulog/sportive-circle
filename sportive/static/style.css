@@ -2102,3 +2102,10 @@ html, body { overflow-x: clip; }
 .how-trust ul { padding-left: 18px; }
 .how-trust li { margin: 6px 0; }
 .steps .step p { margin: 4px 0 0; font-size: .9rem; }
+
+/* Line icons where emojis used to be (the owner: emojis in sentences look generated). Sport emojis stay. */
+.bell-emoji .icon, .create-emoji .icon, .officer-signup-icon .icon { width: 22px; height: 22px; color: var(--purple); }
+.empty-emoji .icon, .chat-empty-icon .icon { width: 32px; height: 32px; color: var(--muted); }
+.photo-preview > .icon { width: 40px; height: 40px; color: var(--muted); }
+.pinned-line .icon, .map-links .icon { width: 14px; height: 14px; vertical-align: -2px; }
+.composer-photos .icon { width: 18px; height: 18px; }

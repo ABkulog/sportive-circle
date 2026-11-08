@@ -1,3 +1,4 @@
+{% from "_macros.html" import icon %}
 {# Shared chat box: messages + composer. Swipe left on the messages to see every message's time (like WhatsApp);
    hold a message to react (or copy/report it), double-tap it for ❤️ (chat.js);
    status: "Seen"/"Delivered" under my newest message (social.dm_status / group_status).
@@ -45,7 +46,7 @@
       {% endfor %}
     </ol>
     <div class="chat-empty" id="chat-empty" {% if messages %}hidden{% endif %}>
-      <span class="chat-empty-icon" aria-hidden="true">👋</span>
+      <span class="chat-empty-icon" aria-hidden="true">{{ icon('chat') }}</span>
       <p class="muted">{{ empty_text if can_send else "No messages." }}</p>
     </div>
     {% if can_send %}

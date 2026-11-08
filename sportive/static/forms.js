@@ -319,7 +319,7 @@
     const allClosed = Object.values(season[2]).every((value) => value === null);
     if (today === undefined) line.textContent = "";
     else if (today === null) {  // a warning, not a wall: they can still post it (the server asks once more)
-      line.textContent = `⚠️ ${allClosed ? "Closed for the season then" : `Closed on ${days[weekday]}`}. You can still post it.`;
+      line.textContent = `${allClosed ? "Closed for the season then" : `Closed on ${days[weekday]}`}. You can still post it.`;
       line.classList.add("is-closed");
     }
     else if (today[0] === "00:00") line.textContent = `Lights off at ${clock(today[1])} on ${days[weekday]}.`;

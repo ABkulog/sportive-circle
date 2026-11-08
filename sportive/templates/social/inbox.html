@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import avatar %}
+{% from "_macros.html" import avatar, icon %}
 {% block title %}Messages{% endblock %}
 {% block content %}
 <h1 class="page-title">Messages</h1>
@@ -40,7 +40,7 @@
       {{ avatar(c.id, c.full_name, c.avatar_updated, 44) }}
       <span class="convo-body">
         <strong>{{ c.full_name }}</strong>
-        <span class="muted convo-preview">{% if c.sender_id == g.user.id %}You: {% endif %}{{ c.body|truncate(70) if c.body else '📷 Photo' }}</span>
+        <span class="muted convo-preview">{% if c.sender_id == g.user.id %}You: {% endif %}{{ c.body|truncate(70) if c.body else 'Photo' }}</span>
       </span>
       <span class="convo-meta">
         <small class="muted">{{ c.created_at|when }}</small>
@@ -71,10 +71,10 @@
 
 {% if not q and not conversations and not new_friends %}
   <div class="card empty">
-    <p class="empty-emoji" aria-hidden="true">✉️</p>
+    <p class="empty-emoji" aria-hidden="true">{{ icon('send') }}</p>
     <p><strong>No messages yet.</strong></p>
     <p class="muted">Add <a href="{{ url_for('social.friends') }}">friends</a> and they'll show up here to message.
-      For questions about a game, use its 💬 group chat.</p>
+      For questions about a game, use its group chat.</p>
   </div>
 {% endif %}
 {% endblock %}

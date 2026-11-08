@@ -26,8 +26,8 @@
           data-story-link="{{ link.split('://')[-1] }}" data-story-file="{{ club.name|lower|replace(' ', '-') }}-story.png"
           {% if club.logo_updated %}data-story-logo="{{ url_for('clubs.logo', club_id=club.id, v=club.logo_updated) }}"{% else %}data-story-emoji="{{ SPORT_EMOJI[club.sport] }}"{% endif %}>
     Share to Instagram story</button>
-  <p class="story-tip" data-story-tip hidden>✅ <strong>Link copied.</strong> In your story, tap the sticker button
-    (the square smiley at the top) → <strong>Link</strong> → paste, and put it on the 👇. Anyone watching taps it to
+  <p class="story-tip" data-story-tip hidden><strong>Link copied.</strong> In your story, tap the sticker button
+    (the square smiley at the top) → <strong>Link</strong> → paste, and put it on the arrow. Anyone watching taps it to
     open your club.</p>
   <button type="button" class="btn btn-ghost btn-block" data-print>Print or save poster</button>
   <p class="muted fine-print">Tap the link above to copy it for your Instagram bio or group chat.</p>

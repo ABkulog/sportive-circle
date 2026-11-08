@@ -1,4 +1,4 @@
-"""Notifications: the 🔔 bell, and numbers on the icons.
+"""Notifications: the bell, and numbers on the icons.
 
 Everything new shows up in exactly ONE place, so nothing is counted twice:
 - on its own tab when it has a home there: messages (Messages), friend requests and club updates (Profile);
@@ -24,25 +24,26 @@ from .timeutil import now_local, to_db
 
 bp = Blueprint("notifications", __name__)
 
-# key, emoji, its name in Settings, where it shows up ("bell" or an icon/tab), who it's for.
-Kind = namedtuple("Kind", "key emoji label place audience")
+# key, its icon in the bell (a line icon from the page's icon set, not an emoji), its name in Settings, where it
+# shows up ("bell" or an icon/tab), who it's for.
+Kind = namedtuple("Kind", "key icon label place audience")
 
 KINDS = [
-    Kind("invites", "🙌", "Invites to games", "bell", "everyone"),
-    Kind("game_updates", "📅", "Changes to games you joined", "bell", "everyone"),
-    Kind("friend_games", "🆕", "New games from friends and your clubs", "bell", "everyone"),
-    Kind("game_chat", "💬", "Your games' group chats", "bell", "everyone"),
-    Kind("need_players", "⚡", "Need players posts for your sports", "bell", "everyone"),
-    Kind("feed_posts", "🔥", "New posts in your sports on the feed", "home", "everyone"),
-    Kind("badges", "🏅", "Badges you earn", "bell", "everyone"),
-    Kind("account", "👤", "Tips about your account", "bell", "everyone"),
-    Kind("post_activity", "💬", "Replies and 🔥 on your posts", "bell", "everyone"),
-    Kind("messages", "✉️", "Direct messages", "messages", "everyone"),
-    Kind("friend_requests", "👥", "Friend requests", "friends", "everyone"),
-    Kind("club_updates", "📣", "Updates from your clubs", "clubs", "everyone"),
-    Kind("club_requests", "🙋", "People asking to join your club", "clubs", "officers"),
-    Kind("club_review", "🏛️", "Your club's review (approved or sent back)", "bell", "officers"),
-    Kind("suggestion_trends", "💡", "Suggestion topics 3+ people bring up", "admin", "admins"),
+    Kind("invites", "people", "Invites to games", "bell", "everyone"),
+    Kind("game_updates", "calendar", "Changes to games you joined", "bell", "everyone"),
+    Kind("friend_games", "plus", "New games from friends and your clubs", "bell", "everyone"),
+    Kind("game_chat", "chat", "Your games' group chats", "bell", "everyone"),
+    Kind("need_players", "people", "Need players posts for your sports", "bell", "everyone"),
+    Kind("feed_posts", "home", "New posts in your sports on the feed", "home", "everyone"),
+    Kind("badges", "badge", "Badges you earn", "bell", "everyone"),
+    Kind("account", "user", "Tips about your account", "bell", "everyone"),
+    Kind("post_activity", "heart", "Replies and 🔥 on your posts", "bell", "everyone"),
+    Kind("messages", "send", "Direct messages", "messages", "everyone"),
+    Kind("friend_requests", "friends", "Friend requests", "friends", "everyone"),
+    Kind("club_updates", "clubs", "Updates from your clubs", "clubs", "everyone"),
+    Kind("club_requests", "people", "People asking to join your club", "clubs", "officers"),
+    Kind("club_review", "shield", "Your club's review (approved or sent back)", "bell", "officers"),
+    Kind("suggestion_trends", "help", "Suggestion topics 3+ people bring up", "admin", "admins"),
 ]
 PLACE_NAMES = {"bell": "In the bell", "home": "On the Home tab", "messages": "On the Messages tab", "friends": "On the Profile tab",
                "clubs": "On the Profile tab", "admin": "On the Profile tab"}
@@ -252,7 +253,7 @@ def bell_count():
 
 
 def bell_items():
-    """[(emoji, text, url)] for what's counted rather than saved as notices: game chats (one line per game),
+    """[(icon, text, url)] for what's counted rather than saved as notices: game chats (one line per game),
     Need players posts and badges. Written as sentences."""
     found = counts()
     items = []
@@ -263,15 +264,15 @@ def bell_items():
                                                     on_hold=True)}  # same games the unread count counts if unread else {}
         for event_id, n in sorted(unread.items(), key=lambda item: -item[1]):
             if event_id in games and n:
-                items.append(("💬", f"{n} new message{'s' if n != 1 else ''} in {event_title(games[event_id])}",
+                items.append(("chat", f"{n} new message{'s' if n != 1 else ''} in {event_title(games[event_id])}",
                               url_for("social.event_chat", event_id=event_id)))
     if found.get("need_players"):
         n = found["need_players"]
-        items.append(("⚡", f"{n} new Need players post{'s' if n != 1 else ''} for your sports",
+        items.append(("people", f"{n} new Need players post{'s' if n != 1 else ''} for your sports",
                       url_for("events.feed", _anchor="now")))
     if found.get("badges"):
         n = found["badges"]
-        items.append(("🏅", "You earned a new badge" if n == 1 else f"You earned {n} new badges",
+        items.append(("badge", "You earned a new badge" if n == 1 else f"You earned {n} new badges",
                       url_for("profile.badge_locker")))
     return items
 

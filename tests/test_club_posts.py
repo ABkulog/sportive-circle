@@ -102,7 +102,7 @@ def test_clubs_reply_as_the_club_and_their_posts_take_replies(accounts, client, 
     page = client.get(f"/posts/{maya_post}").data.decode()
     assert "Come run with us!" in page and "Verified club" in page and f'href="/clubs/{club}"' in page
     bell = client.get("/notifications").data.decode()
-    assert "💬 UW Run Club replied to your post" in bell
+    assert "UW Run Club replied to your post" in bell
 
 
 def test_my_clubs_shows_club_posts_and_officers_post_from_it(accounts, client, app):
@@ -445,15 +445,15 @@ def test_clubs_pin_a_post_owner_picks_posters_and_members_keep_following(account
     with app.app_context():
         first = get_db().execute("SELECT id FROM posts WHERE body = 'Track night 6pm'").fetchone()[0]
     page = client.get(f"/clubs/{club}").data.decode()
-    assert page.index("Newer post") < page.index("Track night 6pm") and "📌 Pin for 24 hours" in page
+    assert page.index("Newer post") < page.index("Track night 6pm") and "Pin for 24 hours" in page
     client.post(f"/posts/{first}/pin")
     page = client.get(f"/clubs/{club}").data.decode()
-    assert "📌 Pinned" in page and page.index("Track night 6pm") < page.index("Newer post") and ">Unpin<" in page
+    assert "Pinned</p>" in page and page.index("Track night 6pm") < page.index("Newer post") and ">Unpin<" in page
     with app.app_context():
         get_db().execute("UPDATE posts SET pinned_until = '2020-01-01 00:00' WHERE id = ?", (first,))  # a day later
         get_db().commit()
     page = client.get(f"/clubs/{club}").data.decode()
-    assert "📌 Pinned" not in page and page.index("Newer post") < page.index("Track night 6pm")
+    assert "Pinned</p>" not in page and page.index("Newer post") < page.index("Track night 6pm")
     as_user(accounts, "fan@uw.edu")
     assert client.post(f"/posts/{first}/pin").status_code == 403         # only the club's posters pin
 
@@ -600,9 +600,9 @@ def test_a_club_can_post_for_members_only(accounts, client, app):
     accounts.signup(email="officer@uw.edu", sports=("running",))
     club = approved_club(app, "officer@uw.edu")
     composer = client.get("/feed").data.decode()
-    assert 'name="members_only"' in composer and "🔒 Members only" in composer
+    assert 'name="members_only"' in composer and "Members only" in composer
     page = post(client, as_club=str(club), body="Team dinner Friday, members only", members_only="1").data.decode()
-    assert "Only its members see it." in page and "🔒 Members only" in page
+    assert "Only its members see it." in page and "Members only" in page
     post(client, as_club=str(club), body="Members track night", members_only="1", plan="1",
          starts_at=form_time(timedelta(days=2)), duration="60", location="Husky Track", spots="10")
     with app.app_context():
@@ -710,10 +710,10 @@ def test_posts_tag_people_and_clubs(accounts, client, app):
         assert get_db().execute("SELECT COUNT(*) FROM post_tags").fetchone()[0] == 2
     accounts.logout()
     accounts.login("maya@uw.edu")
-    assert "🏷️ Jordan tagged you in a post." in client.get("/notifications").data.decode()
+    assert "Jordan tagged you in a post." in client.get("/notifications").data.decode()
     accounts.logout()
     accounts.login("officer@uw.edu")
-    assert "🏷️ Jordan tagged UW Run Club in a post." in client.get("/notifications").data.decode()
+    assert "Jordan tagged UW Run Club in a post." in client.get("/notifications").data.decode()
     with app.app_context():
         db = get_db()
         db.execute("INSERT INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, '2026-01-01')",
@@ -828,7 +828,7 @@ def test_polls_like_whatsapp(accounts, client, app):
     it back; each option shows its votes, voters and a bar; "View votes" lists who picked what."""
     accounts.signup(email="maya@uw.edu", name="Maya Chen", sports=("running",))
     feed = client.get("/feed").data.decode()
-    assert "📊 Poll" in feed and 'name="poll_question"' in feed and feed.count('name="poll_option"') == 2
+    assert "<span>Poll</span>" in feed and 'name="poll_question"' in feed and feed.count('name="poll_option"') == 2
     assert 'name="poll_multiple" value="1" checked' in feed and "Make it a plan" not in feed
     assert "Ask a question" in post(client, sport="running", poll="1", poll_option=["A", "B"]).data.decode()
     assert "at least 2 options" in post(client, sport="running", poll="1", poll_question="Q?",
@@ -875,7 +875,7 @@ def test_post_your_event_with_words_and_photos(accounts, client, app):
     response = client.post("/events/new", data=event_form())
     event_id = int(response.headers["Location"].rsplit("/", 1)[1])
     page = client.get(f"/events/{event_id}").data.decode()
-    assert f'href="/feed?event={event_id}#post">📣 Post this event</a>' in page
+    assert f'href="/feed?event={event_id}#post">Post this event</a>' in page
     sheet = client.get(f"/feed?event={event_id}").data.decode()
     assert f'name="event_id" value="{event_id}"' in sheet and "Your game goes under your post" in sheet
     photos = [(BytesIO(make_image()), "court.png")]
@@ -888,7 +888,7 @@ def test_post_your_event_with_words_and_photos(accounts, client, app):
     post(client, event_id=str(event_id), sport="basketball", body="")        # just the event is fine too
     accounts.logout()
     accounts.signup(email="other@uw.edu", sports=("basketball",))
-    assert "📣 Post this event" not in client.get(f"/events/{event_id}").data.decode()  # only its host
+    assert ">Post this event</a>" not in client.get(f"/events/{event_id}").data.decode()  # only its host
     assert "Your game goes under your post" not in client.get(f"/feed?event={event_id}").data.decode()
     post(client, event_id=str(event_id), sport="basketball", body="Not mine")
     with app.app_context():

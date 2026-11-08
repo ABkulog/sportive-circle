@@ -333,7 +333,7 @@
     const bubble = item.querySelector(".chat-bubble");
     bubble.classList.remove("is-photo");
     bubble.querySelectorAll(".chat-photo, .chat-game, :scope > p, .chat-more").forEach((part) => part.remove());
-    bubble.insertBefore(el("p", "", text || "🚫 Message deleted"), bubble.querySelector(".chat-meta"));
+    bubble.insertBefore(el("p", "", text || "Message deleted"), bubble.querySelector(".chat-meta"));
     item.dataset.reactions = "[]";
     showReactions(item, []);
   }

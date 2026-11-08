@@ -6,7 +6,7 @@
   <div class="plan-box">
     <a class="plan-title" href="{{ url_for('events.detail', event_id=e.id) }}">{{ SPORT_EMOJI[e.sport] }} {{ event_title(e) }}</a>
     <div class="plan-meta">{{ e.starts_at|when }} · {{ e.location }}</div>
-    {% if e.try_it %}<p class="plan-welcome">👋 Try-it-out session: new people welcome</p>{% endif %}
+    {% if e.try_it %}<p class="plan-welcome">Try-it-out session: new people welcome</p>{% endif %}
     <div class="plan-row">
       <span class="plan-count"><strong>{{ e.going_count + e.extra_players }}</strong>{% if e.max_players %}/{{ e.max_players }}{% endif %} going</span>
       {% if e.cancelled %}<span class="badge badge-danger">Canceled</span>
@@ -77,11 +77,11 @@
   {% set who = p.club_name if p.club_id else p.full_name %}
   {# Your own posts are tinted purple, everyone else's are white (the owner's ask) #}
   <article class="card feed-card {% if p.club_id %}is-club{% elif g.user and p.author_id == g.user.id %}is-mine{% endif %}" id="post-{{ p.id }}" data-swap>
-    {% if item.pinned %}<p class="pinned-line">📌 Pinned</p>{% endif %}
+    {% if item.pinned %}<p class="pinned-line">{{ icon('pin') }} Pinned</p>{% endif %}
     {% if p.club_id %}
       {% set name %}{{ p.club_name }} {{ verified_badge() }}{% endset %}
       {{ card_head(url_for('clubs.view', club_id=p.club_id), club_logo(p, 32, logo=p.club_logo or '', club_id=p.club_id),
-                   name, 'Club · ' ~ ('🔒 Members only · ' if p.members_only else '') ~ (p.created_at|ago), p.sport, follow_button(p.club_id, item)) }}
+                   name, 'Club · ' ~ ('Members only · ' if p.members_only else '') ~ (p.created_at|ago), p.sport, follow_button(p.club_id, item)) }}
     {% else %}
       {{ card_head(url_for('profile.view', user_id=p.author_id), avatar(p.author_id, p.full_name, p.avatar_updated, 32),
                    p.full_name, p.created_at|ago, p.sport) }}
@@ -152,7 +152,7 @@
       <div class="more-menu-panel right">
         {% if pin_url %}
           <form method="post" action="{{ pin_url }}" data-inplace data-swap-target="#club-posts-list">
-            {{ csrf_field() }}<button class="link-button">{{ 'Unpin' if pinned else '📌 Pin for 24 hours' }}</button>
+            {{ csrf_field() }}<button class="link-button">{{ 'Unpin' if pinned else 'Pin for 24 hours' }}</button>
           </form>
         {% endif %}
         {% if report_url %}<a href="{{ report_url }}">Report</a>{% endif %}
@@ -173,7 +173,7 @@
     {# A club an officer just claimed: one short line, like a new club #}
     <article class="card feed-card feed-mini" id="club-post-{{ p.id }}" data-swap>
       <a class="feed-mini-link" href="{{ url_for('clubs.view', club_id=p.club_id) }}">{{ club_logo(p, 28, logo=p.club_logo or '', club_id=p.club_id) }}
-        <span>✅ <strong>{{ p.club_name }}</strong> {{ verified_badge() }} just claimed their page <small class="muted">· {{ p.created_at|ago }}</small></span></a>
+        <span><strong>{{ p.club_name }}</strong> {{ verified_badge() }} just claimed their page <small class="muted">· {{ p.created_at|ago }}</small></span></a>
       {{ follow_button(p.club_id, {'my_role': p.my_role}) }}
     </article>
   {% else %}
@@ -184,7 +184,7 @@
                  follow_button(p.club_id, {'my_role': p.my_role})) }}
     <p class="feed-body">{{ p.body }}</p>
     {% if item.event %}{{ plan_box(item.event) }}{% endif %}
-    {% if item.friends %}<p class="friends-line">👥 {{ item.friends }}</p>{% endif %}
+    {% if item.friends %}<p class="friends-line">{{ item.friends }}</p>{% endif %}
 
   </article>
   {% endif %}

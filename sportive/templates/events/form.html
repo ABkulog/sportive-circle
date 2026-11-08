@@ -37,7 +37,7 @@
       </fieldset>
       {% if club %}
         <label class="toggle"><input type="checkbox" name="try_it" value="1" {% if form.get('try_it') %}checked{% endif %}>
-          <span>👋 <strong>Try-it-out session</strong>: new people welcome. It's shown in the feed to everyone who plays
+          <span><strong>Try-it-out session</strong>: new people welcome. It's shown in the feed to everyone who plays
             {{ SPORTS[club.sport] }}, not only your followers.</span></label>
       {% endif %}
     {% endif %}
@@ -57,7 +57,7 @@
     {% if g.get('closed_warning') %}
       {# The place is closed then: say so, and let them go ahead anyway (the owner: warn, don't block) #}
       <div class="closed-warning" role="alert">
-        <p>⚠️ {{ g.closed_warning }}</p>
+        <p>{{ g.closed_warning }}</p>
         <label class="toggle"><input type="checkbox" name="closed_ok" value="1"><span>Post anyway: we know it's closed then</span></label>
       </div>
     {% endif %}

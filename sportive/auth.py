@@ -152,7 +152,7 @@ def log_in(user, remember=True, just_signed_up=False):
         born = date.fromisoformat(user["birth_date"])
         today = now_local().date()
         if is_birthday(born, today):
-            flash(f"Happy birthday, {user['full_name'].split()[0]}! 🎂", "birthday")
+            flash(f"Happy birthday, {user['full_name'].split()[0]}!", "birthday")
     if invite:
         from .parties import accept_invite_link  # imported here: parties.py imports this module
         destination = accept_invite_link(user, invite, just_signed_up=just_signed_up)
@@ -174,7 +174,7 @@ def send_verification_email(email, code, purpose="signup"):
         reason = "Didn't ask for this? You can ignore this email. Your password hasn't changed."
     else:
         subject = f"{code} is your Sportive Circle code"
-        heading = f"Welcome to the pack{', ' + first if first else ''}! 🐺"
+        heading = f"Welcome to the pack{', ' + first if first else ''}!"
         lines = ["You're one step away from finding people to play sports with. Here's your code:"]
         reason = "Didn't sign up? You can ignore this email. Nothing happens without the code."
     body, html = compose(subject, heading, lines, code=code, after=after, reason=reason,

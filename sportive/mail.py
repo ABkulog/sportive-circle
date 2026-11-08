@@ -72,7 +72,7 @@ def compose(subject, heading, lines, code=None, after=(), button=None, reason=No
     text += [line + "\n" for line in after]
     if button:
         text += [f"{button[0]}: {button[1]}", ""]
-    text += ["Go Dawgs! 💜💛", "The Sportive Circle team", "", "--"]
+    text += ["Go Dawgs!", "The Sportive Circle team", "", "--"]
     if reason:
         text.append(reason)
     if unsubscribe:
@@ -168,10 +168,10 @@ def check_email_command(to, admins):
         if not recipients:
             click.echo("ADMIN_EMAILS is empty, so there's nobody to send to.")
     for address, is_admin in recipients:
-        send_designed(address, "Sportive Circle test email", "Emails are working! 🎉",
+        send_designed(address, "Sportive Circle test email", "Emails are working!",
                       ["This is a test from Sportive Circle. If you can read this, the app's emails (sign-up "
                        "codes, reminders and club notices) reach your inbox."]
-                      + (["You're an admin, so you'll also see the 🛡️ icon for reports, club requests and "
+                      + (["You're an admin, so you'll also see the Admin page for reports, club requests and "
                           "suggestions."] if is_admin else []),
                       button=("Open Sportive Circle", cfg["PUBLIC_URL"].rstrip("/")),
                       reason="You're getting this because a Sportive Circle admin tested the email settings.")

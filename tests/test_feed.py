@@ -144,7 +144,7 @@ def test_report_and_delete_posts(accounts, client, app):
     accounts.logout()
     accounts.signup(email="admin@uw.edu", sports=("running",))
     queue = client.get("/admin/reports").data.decode()
-    assert "Feed post" in queue and "Something not OK" in queue and "📷 [1 photo]" in queue
+    assert "Feed post" in queue and "Something not OK" in queue and "[1 photo]" in queue
     assert f"/posts/{post_id}" in queue
     assert f"/posts/{post_id}/delete" in client.get(f"/posts/{post_id}").data.decode()    # admins can delete it
     client.post(f"/posts/{post_id}/delete")
@@ -197,7 +197,7 @@ def test_feed_is_home_and_has_rules(accounts, client):
     accounts.signup()
     home = client.get("/feed").data.decode()
     assert 'class="tab is-active" href="/feed"' in home and ">Play<" in home
-    assert "📊 Poll" in home and "Make it a plan" not in home and 'href="/rules"' in home and 'data-max-files="10"' in home
+    assert "<span>Poll</span>" in home and "Make it a plan" not in home and 'href="/rules"' in home and 'data-max-files="10"' in home
     rules = client.get("/rules").data.decode()
     assert "physique and progress photos are welcome" in rules and "Nudity or sexual content" in rules and "18 and older" in rules
 

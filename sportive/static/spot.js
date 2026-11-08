@@ -44,7 +44,7 @@
     };
     function setPin(lat, lng, note) {
       pin.value = `${lat.toFixed(6)},${lng.toFixed(6)}`;
-      status.textContent = note || "📍 Pin dropped. Drag it to adjust.";
+      status.textContent = note || "Pin dropped. Drag it to adjust.";
       clear.hidden = false;
       if (map) {
         if (marker) marker.setLatLng([lat, lng]);
@@ -86,7 +86,7 @@
       navigator.geolocation.getCurrentPosition(async (position) => {
         const { latitude, longitude } = position.coords;
         await openMap([latitude, longitude]);
-        setPin(latitude, longitude, "📍 Pin dropped where you are. Drag it to adjust.");
+        setPin(latitude, longitude, "Pin dropped where you are. Drag it to adjust.");
       }, () => { status.textContent = "Couldn't get your location. Drop the pin on the map instead."; },
       { enableHighAccuracy: true, timeout: 10000 });
     });

@@ -61,8 +61,8 @@ def test_try_it_out_sessions_welcome_new_people(accounts, client, app):
     accounts.logout()
     accounts.signup(email="newbie@uw.edu", sports=("tennis",))
     feed = client.get("/feed").data.decode()
-    assert "👋 Try it out, new people welcome!" in feed and "Try-it-out session: new people welcome" in feed
-    assert "👋 New people welcome" in client.get("/").data.decode()                    # on Play too
+    assert "Try it out, new people welcome!" in feed and "Try-it-out session: new people welcome" in feed
+    assert "New people welcome" in client.get("/").data.decode()                    # on Play too
 
 
 def test_friends_in_a_club_and_the_officers_week(accounts, client, app):

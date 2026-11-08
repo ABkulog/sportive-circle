@@ -56,10 +56,10 @@
       {% if c.joining == 'open' %}{% set _ = bits.append('No tryouts') %}{% elif c.joining == 'tryouts' %}{% set _ = bits.append('Tryouts') %}{% endif %}
       {% if c.experience == 'none' %}{% set _ = bits.append('Beginners welcome') %}{% endif %}
       <span class="club-line muted">{{ bits|join(' · ') }}
-        {% if c.status == 'pending' %}<span class="badge badge-gold">⏳ In review</span>
+        {% if c.status == 'pending' %}<span class="badge badge-gold">In review</span>
         {% elif c.status == 'denied' %}<span class="badge badge-danger">Denied</span>
         {% elif c.status not in ('approved',) %}<span class="badge badge-danger">Needs changes</span>{% endif %}
-        {% if c.my_status == 'officer' and c.waiting %}<span class="badge badge-gold">🙋 {{ c.waiting }} waiting to join</span>{% endif %}</span>
+        {% if c.my_status == 'officer' and c.waiting %}<span class="badge badge-gold">{{ c.waiting }} waiting to join</span>{% endif %}</span>
       </span>
     </a>
   {% else %}

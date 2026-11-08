@@ -970,7 +970,7 @@ def club_event_text(data, repeat):
     if data.get("is_private"):  # private: only invited people and password holders get the details
         return ("New private events." if repeat > 1 else "New private event.") + " Invited people: see your invites."
     when = fmt_when(data["starts_at"])
-    welcome = "👋 Try it out, new people welcome! " if data.get("try_it") else ""
+    welcome = "Try it out, new people welcome! " if data.get("try_it") else ""
     if repeat > 1:
         starts = from_db(data["starts_at"])
         text = (f"New: {data['title']}, every {starts.strftime('%A')} at {fmt_clock(data['starts_at'])} "
@@ -1178,7 +1178,7 @@ def tell_players_it_changed(event, data, by=None):
                     subject, f"{title} changed",
                     [f"Hey {player['full_name'].split()[0]}, {host} changed this game: {', '.join(changes)}.",
                      *([f"🏅 Now {SPORTS[data['sport']]}"] if data["sport"] != event["sport"] else []),
-                     f"🕐 {fmt_when(data['starts_at'])} – {fmt_clock(data['ends_at'])}", f"📍 {data['location']}"],
+                     f"When: {fmt_when(data['starts_at'])} – {fmt_clock(data['ends_at'])}", f"Where: {data['location']}"],
                     button=("See the game", public_url("events.detail", event_id=event["id"])),
                     reason="You're getting this because you joined this game.",
                     preheader=f"{host} changed {title}.")
@@ -1224,7 +1224,7 @@ def tell_players_it_was_cancelled(event, page_stays=True, by_host=True, by=None)
             body, html = compose(
                 subject, f"{title} was canceled",
                 [f"Hey {player['full_name'].split()[0]}, heads up: {who_full} canceled this game.",
-                 f"🕐 {when}", f"📍 {event['location']}", "No worries, there are more games waiting for you."],
+                 f"When: {when}", f"Where: {event['location']}", "No worries, there are more games waiting for you."],
                 button=("Find another game", public_url("events.feed")),
                 reason="You're getting this because you joined this game.",
                 preheader=f"{who_full} canceled {title}.")
