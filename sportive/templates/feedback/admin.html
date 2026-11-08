@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Suggestions{% endblock %}
 {% block content %}
-{% from "_macros.html" import admin_nav %}{{ admin_nav('suggestions') }}
+{% from "_macros.html" import admin_nav, icon %}{{ admin_nav('suggestions') }}
 <h1 class="page-title">Suggestions</h1>
 <p class="muted">What students would like to see. Only admins can see this page. You're only notified when
   {{ trend_people }}+ different people bring up the same topic.</p>
@@ -42,7 +42,7 @@
       </p>
     </article>
   {% else %}
-    <div class="card empty"><p class="empty-emoji" aria-hidden="true">💡</p><p><strong>No suggestions yet.</strong></p></div>
+    <div class="card empty"><p class="empty-emoji" aria-hidden="true">{{ icon('help') }}</p><p><strong>No suggestions yet.</strong></p></div>
   {% endfor %}
 </div>
 {% if page > 1 or more %}

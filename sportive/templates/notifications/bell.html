@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import icon %}
 {% block title %}Notifications{% endblock %}
 {% block content %}
 <div class="section-head">
@@ -8,13 +9,13 @@
 
 {% if items or notices %}
   <ul class="bell-list">
-    {% for emoji, text, url in items %}
-      <li><a class="bell-item is-new" href="{{ url }}"><span class="bell-emoji" aria-hidden="true">{{ emoji }}</span>
+    {% for kind_icon, text, url in items %}
+      <li><a class="bell-item is-new" href="{{ url }}"><span class="bell-emoji" aria-hidden="true">{{ icon(kind_icon) }}</span>
         <span class="bell-text">{{ text }}</span><span class="bell-dot" aria-label="new"></span></a></li>
     {% endfor %}
     {% for n in notices %}
       <li><a class="bell-item {% if not n.read_at %}is-new{% endif %}" href="{{ n.url }}">
-        <span class="bell-emoji" aria-hidden="true">{{ kinds[n.kind].emoji }}</span>
+        <span class="bell-emoji" aria-hidden="true">{{ icon(kinds[n.kind].icon) }}</span>
         <span class="bell-text">{{ n.text }}<time class="muted bell-time" datetime="{{ n.created_at }}"
               title="{{ n.created_at|full }}">{{ n.created_at|ago }}</time></span>
         {% if not n.read_at %}<span class="bell-dot" aria-label="new"></span>{% endif %}</a></li>

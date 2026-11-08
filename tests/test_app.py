@@ -1673,7 +1673,7 @@ def test_club_events_pick_their_levels(accounts, client, app):
     assert "Open night" in feed("Competitive")
     edit = client.get(f"/events/{mixed}/edit").data.decode()
     assert 'value="Casual"\n              checked' in edit or 'value="Casual" checked' in edit.replace("\n              ", " ")
-    assert "🏛️ UW Spikeball Club".encode() in client.get(f"/events/{mixed}").data
+    assert "UW Spikeball Club".encode() in client.get(f"/events/{mixed}").data
     assert b"Club night" in client.get(f"/clubs/{club}").data
     accounts.logout()
     accounts.signup(email="random@uw.edu")
@@ -3373,18 +3373,18 @@ def test_admins_get_the_team_badge_and_label(accounts, client, app):
     accounts.signup(email="boss@uw.edu", name="Boss Husky")
     boss = _user_id(app, "boss@uw.edu")
     page = client.get(f"/u/{boss}").data.decode()
-    assert "🐾 Team" in page and "Sportive Circle Team" in page         # label + badge in the showcase
+    assert ">Team</span>" in page and "Sportive Circle Team" in page         # label + badge in the showcase
     accounts.logout()
     accounts.signup(email="student@uw.edu")
     me = _user_id(app, "student@uw.edu")
-    assert "🐾 Team" in client.get(f"/u/{boss}").data.decode()          # everyone sees who runs the app
-    assert "🐾 Team" not in client.get(f"/u/{me}").data.decode()
+    assert ">Team</span>" in client.get(f"/u/{boss}").data.decode()          # everyone sees who runs the app
+    assert ">Team</span>" not in client.get(f"/u/{me}").data.decode()
     assert "Sportive Circle Team" not in client.get("/profile/badges").data.decode()   # can't be earned
     app.config["ADMIN_EMAILS"] = ""                                       # no longer an admin
     accounts.logout()
     accounts.login(email="boss@uw.edu")
     page = client.get(f"/u/{boss}").data.decode()
-    assert "🐾 Team" not in page and "Sportive Circle Team" not in page
+    assert ">Team</span>" not in page and "Sportive Circle Team" not in page
 
 
 def test_suggestion_text_is_escaped_and_length_checked(accounts, client, app):
@@ -3901,7 +3901,7 @@ def test_message_odd_contents(accounts, client, app):
         rows = get_db().execute("SELECT id, body, photo_id FROM direct_messages").fetchall()
     assert len(rows) == 1 and rows[0]["photo_id"]                               # only the photo went through
     _as(accounts, "Jordan")
-    assert "📷 Photo" in client.get("/messages").data.decode()
+    assert "Photo" in client.get("/messages").data.decode()
     client.post(f"/report/dm/{rows[0]['id']}", data={"reason": "spam", "details": ""})
     with app.app_context():
         assert "sent a photo" in get_db().execute("SELECT snapshot FROM reports").fetchone()[0]
@@ -4926,9 +4926,9 @@ def test_private_game_needs_the_password_unless_invited(accounts, client, app):
     assert "dawgs26" in client.get(f"/events/{game}").data.decode()          # the host sees it to share it
     _as(accounts, "Sam")
     page = client.get(f"/events/{game}").data.decode()
-    assert "🔒 Private" in page and "dawgs26" not in page and 'name="password"' in page
+    assert "Private" in page and "dawgs26" not in page and 'name="password"' in page
     feed = client.get("/?scope=all").data.decode()
-    assert "🔒 Private" in feed and f"/events/{game}/join" not in feed       # no one-tap Join on the card
+    assert ">Private</span>" in feed and f"/events/{game}/join" not in feed       # no one-tap Join on the card
     assert b"Enter the password" in client.post(f"/events/{game}/join", follow_redirects=True).data
     assert b"not the password" in client.post(f"/events/{game}/join", data={"password": "nope"},
                                                follow_redirects=True).data
@@ -5291,7 +5291,7 @@ def test_create_page_only_shows_what_makes_sense(accounts, client, app):
     _as(accounts, "Maya")
     for page in ("/events/new",):
         html = client.get(page).data.decode()
-        assert "Who can join?" in html and ">Anyone<" in html and "🔒 Private" in html
+        assert "Who can join?" in html and ">Anyone<" in html and "Private" in html
         assert re.search(r'name="password"[^>]*disabled|value="[a-z]+-[a-z]+-\d{3}"', html)   # ready-made, off until Private
         assert 'data-show="private"' in html and "get an invite, no password needed" in html
         assert 'name="players"' in html and "We have" not in html and "Max players" not in html
@@ -5309,7 +5309,7 @@ def test_create_page_only_shows_what_makes_sense(accounts, client, app):
     feed = client.get("/?scope=all").data.decode()
     happening_soon = feed.split('id="now"')[1].split("</nav>")[0] if 'id="now"' in feed else ""
     assert f"/events/{game}" not in happening_soon
-    assert f"/events/{game}" in feed and "🔒 Private" in feed                           # listed, with a lock
+    assert f"/events/{game}" in feed and ">Private</span>" in feed                           # listed, with a lock
     assert "Need players" not in client.get("/notifications").data.decode()
     assert "Send invite link" not in client.get(f"/events/{game}").data.decode()          # not a player
     # Jordan was invited: joins with one tap, no password.

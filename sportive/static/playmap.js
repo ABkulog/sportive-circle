@@ -52,9 +52,9 @@
   function fillSheet(spot) {
     sheetBody.replaceChildren();
     add(sheetBody, "h3", "spot-sheet-title", spot.multi ? spot.name : `${spot.emoji} ${spot.name}`);
-    if (spot.multi) add(sheetBody, "p", "muted small", `🔴 ${spot.sports} sports are played here`);
+    if (spot.multi) add(sheetBody, "p", "muted small", `${spot.sports} sports are played here`);
     if (spot.hours) add(sheetBody, "p", spot.closed ? "spot-hours is-closed" : "spot-hours",
-                        spot.closed ? "⚠️ Closed today" : spot.hours);
+                        spot.closed ? "Closed today" : spot.hours);
     add(sheetBody, "p", "spot-sheet-sub", spot.games.length ? "Games this week" : "No games here this week yet");
     spot.games.forEach((game) => {
       const link = add(sheetBody, "a", "spot-game");

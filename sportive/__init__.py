@@ -218,7 +218,7 @@ def _security_headers(response):
 ERRORS = {
     400: "Something was wrong with that request. Go back, refresh the page and try again.",
     403: "You don't have permission to do that.",
-    404: "This Dawg got lost. 🐾 The link might be broken, or the page was removed.",
+    404: "This Dawg got lost. The link might be broken, or the page was removed.",
     405: "That page can't be opened that way. Go back and use the buttons on the page.",
     413: f"That file is too big. Photos can be up to {MAX_UPLOAD_MB} MB, and a post's video up to 60 MB.",
     500: "Something broke on our side. It's not you. Try again in a minute.",

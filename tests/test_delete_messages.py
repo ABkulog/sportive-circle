@@ -27,7 +27,7 @@ def test_delete_a_direct_message_for_everyone(accounts, client, app):
         first, photo_msg = [r[0] for r in get_db().execute("SELECT id FROM direct_messages ORDER BY id")]
         photo_id = get_db().execute("SELECT photo_id FROM direct_messages WHERE id = ?", (photo_msg,)).fetchone()[0]
     answer = client.post("/chat/delete", data={"kind": "dm", "id": first}, headers={"Accept": "application/json"})
-    assert answer.json == {"id": first, "deleted": True, "body": "🚫 Message deleted"}
+    assert answer.json == {"id": first, "deleted": True, "body": "Message deleted"}
     client.post("/chat/delete", data={"kind": "dm", "id": photo_msg})
     with app.app_context():
         assert get_db().execute("SELECT COUNT(*) FROM chat_photos WHERE id = ?", (photo_id,)).fetchone()[0] == 0
@@ -35,10 +35,10 @@ def test_delete_a_direct_message_for_everyone(accounts, client, app):
     assert client.post("/chat/delete", data={"kind": "dm", "id": first}).status_code == 404   # not hers to delete
     poll = client.get(f"/messages/{sam}/poll?after=0&from={first}").json
     assert poll["deleted"] == [first, photo_msg]
-    assert all(m["body"] == "🚫 Message deleted" and not m["photo"] and m["deleted"] for m in poll["messages"])
+    assert all(m["body"] == "Message deleted" and not m["photo"] and m["deleted"] for m in poll["messages"])
     page = client.get(f"/messages/{sam}").data.decode()
     assert "oops wrong chat" not in page and "is-deleted" in page
-    assert "🚫 Message deleted" in client.get("/messages").data.decode()                       # inbox preview too
+    assert "Message deleted" in client.get("/messages").data.decode()                       # inbox preview too
 
 
 def test_delete_a_game_chat_message(accounts, client, app):
@@ -52,5 +52,5 @@ def test_delete_a_game_chat_message(accounts, client, app):
         message = get_db().execute("SELECT id FROM event_messages").fetchone()[0]
     client.post("/chat/delete", data={"kind": "game", "id": message})
     poll = client.get(f"/events/{event_id}/chat/poll?after=0&from={message}").json
-    assert poll["deleted"] == [message] and poll["messages"][0]["body"] == "🚫 Message deleted"
+    assert poll["deleted"] == [message] and poll["messages"][0]["body"] == "Message deleted"
     assert 'data-delete-url="/chat/delete"' in client.get(f"/events/{event_id}/chat").data.decode()

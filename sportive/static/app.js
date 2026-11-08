@@ -272,7 +272,7 @@
       ctx.fillStyle = "#4b2e83"; ctx.font = `800 52px ${font}`;  // the club's short link, big enough to read and type
       ctx.fillText(button.dataset.storyLink, 540, 940 + lines.length * 90 + 20);
       ctx.fillStyle = "#ffffff"; ctx.font = `800 60px ${font}`;  // where the link sticker goes
-      ctx.fillText("Tap the link to join 👇", 540, cardEnd + 190);
+      ctx.fillText("Tap the link to join ↓", 540, cardEnd + 190);
       return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/png"));
     };
     const tip = document.querySelector("[data-story-tip]");

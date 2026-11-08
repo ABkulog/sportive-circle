@@ -43,7 +43,7 @@
     function describe(meters) {
       const miles = meters / 1609.34;
       const walkMinutes = Math.max(1, Math.round(meters / 80)); // ~80 m per minute walking
-      if (meters < 60) return "You're here! 🎉";
+      if (meters < 60) return "You're here!";
       const distance = miles < 0.1 ? `${Math.round(meters)} m` : `${miles.toFixed(1)} mi`;
       if (miles > 3) return `You're about ${distance} away. That's a long walk, maybe take the bus or bike.`;
       return `You're about ${distance} away, around a ${walkMinutes} min walk.`;

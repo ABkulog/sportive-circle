@@ -7,7 +7,7 @@
   </form>
 {% endmacro %}
 {% block content %}
-{% from "_macros.html" import admin_nav %}{{ admin_nav('reports') }}
+{% from "_macros.html" import admin_nav, icon %}{{ admin_nav('reports') }}
 <h1 class="page-title">Reports</h1>
 <p class="muted">Read the saved copy, decide, then mark it reviewed. Suspend an account only for serious or repeated
   problems (threats, harassment, hate, spam). If someone may be in danger, contact UW Police (911 in an emergency).</p>
@@ -30,7 +30,7 @@
       {% endfor %}
     </ul>
   {% else %}
-    <div class="card empty"><p class="empty-emoji" aria-hidden="true">🛡️</p><p><strong>No suspended accounts.</strong></p></div>
+    <div class="card empty"><p class="empty-emoji" aria-hidden="true">{{ icon('shield') }}</p><p><strong>No suspended accounts.</strong></p></div>
   {% endif %}
 {% else %}
 
@@ -75,7 +75,7 @@
       </div>
     </article>
   {% else %}
-    <div class="card empty"><p class="empty-emoji" aria-hidden="true">🛡️</p><p><strong>No {{ status }} reports.</strong></p></div>
+    <div class="card empty"><p class="empty-emoji" aria-hidden="true">{{ icon('shield') }}</p><p><strong>No {{ status }} reports.</strong></p></div>
   {% endfor %}
 </div>
 {% set total = report_counts.get(status, 0) %}

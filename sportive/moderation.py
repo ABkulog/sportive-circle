@@ -61,7 +61,7 @@ def is_team(user_id):
 def _snapshot(message):
     """What admins see of a reported message: its words, and that it had a photo (a photo-only message
     would otherwise leave nothing to review)."""
-    photo = "📷 [sent a photo]" if message["photo_id"] else ""
+    photo = "[sent a photo]" if message["photo_id"] else ""
     return "\n".join(part for part in (message["body"], photo) if part)
 
 def resolve_target(target_type, target_id):
@@ -113,7 +113,7 @@ def resolve_target(target_type, target_id):
                WHERE p.id = ? AND p.author_id != ? AND u.suspended = 0""", (target_id, me)).fetchone()
         if post is None:
             abort(404)
-        photos = f"📷 [{post['photo_count']} photo{'s' if post['photo_count'] != 1 else ''}]" if post["photo_count"] else ""
+        photos = f"[{post['photo_count']} photo{'s' if post['photo_count'] != 1 else ''}]" if post["photo_count"] else ""
         return {"user_id": post["author_id"], "name": post["full_name"],
                 "snapshot": "\n".join(part for part in (post["body"], photos) if part),
                 "what": f"a post by {post['full_name']}", "back": url_for("posts.feed")}

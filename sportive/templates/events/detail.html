@@ -29,11 +29,11 @@
         <span class="badge">{{ SPORTS[event.sport] }}</span>
         {% if event.skill_level != 'All levels' %}<span class="badge">{{ event.skill_level }}</span>{% endif %}
         {% if event.is_quick %}<span class="badge badge-gold">Need players</span>{% endif %}
-        {% if event.is_private %}<span class="badge">🔒 Private</span>{% endif %}
+        {% if event.is_private %}<span class="badge">Private</span>{% endif %}
         {% if event.team_size %}<span class="badge badge-purple">Team vs team · {{ event.team_size }}v{{ event.team_size }}</span>{% endif %}
         {% if event.members_only %}<span class="badge badge-gold">Members only</span>{% endif %}
         {% if event.open_to != 'everyone' %}<span class="badge badge-gold">{{ OPEN_TO_BADGE[event.open_to] }}</span>{% endif %}
-        {% if event.club_id %}<a class="badge badge-club" href="{{ url_for('clubs.view', club_id=event.club_id) }}">🏛️ {{ event.club_name }}</a>{% endif %}
+        {% if event.club_id %}<a class="badge badge-club" href="{{ url_for('clubs.view', club_id=event.club_id) }}">{{ event.club_name }}</a>{% endif %}
         {% if event.cancelled %}<span class="badge badge-danger">Canceled</span>{% elif event.on_hold %}<span class="badge badge-muted">On hold</span>{% elif ended %}<span class="badge badge-muted">Ended</span>{% endif %}
       </div>
     </div>
@@ -86,7 +86,7 @@
 
   {% if (is_host or event.i_am_going) and not event.club_id and not event.cancelled and ended %}
     {# After a game: one tap to set up the next one with the same people (the friends among them get a spot held) #}
-    <p class="play-again"><a class="btn btn-block" href="{{ url_for('events.create', again=event.id) }}">🔁 Play again with this group</a></p>
+    <p class="play-again"><a class="btn btn-block" href="{{ url_for('events.create', again=event.id) }}">Play again with this group</a></p>
   {% endif %}
   {% if not event.cancelled and not ended %}
     {# 1. The one main action #}
@@ -94,7 +94,7 @@
       {% if is_host %}
         <span class="going-pill">You're hosting</span>
         {# Post it to the feed with your own words and photos (its card, with I'm in, goes under the post) #}
-        <a class="btn btn-block post-event-btn" href="{{ url_for('posts.feed', event=event.id) }}#post">📣 Post this event</a>
+        <a class="btn btn-block post-event-btn" href="{{ url_for('posts.feed', event=event.id) }}#post">Post this event</a>
       {% elif event.i_am_going %}
         <span class="going-pill">You're going</span>
       {% endif %}
@@ -104,7 +104,7 @@
         {% set first = g.user.full_name.split()[0] %}
         {% set invite_text = first ~ " wants you in their Sportive Circle game: " ~ event_title(event) ~ ", " ~ (event.starts_at|when) ~ ". Tap to sign up and you're in." %}
         <div class="share-box">
-          {% if event.is_private %}<p><strong>🔒 Private game</strong> · Password <strong class="password">{{ event.password }}</strong></p>{% endif %}
+          {% if event.is_private %}<p><strong>Private game</strong> · Password <strong class="password">{{ event.password }}</strong></p>{% endif %}
           <div class="action-pair">
             <button type="button" class="btn" data-share-title="{{ event_title(event) }}" data-share-url="{{ invite_link(event.id) }}"
                     data-share-text="{{ invite_text }}"><span data-share-label>Send invite link</span></button>
@@ -235,7 +235,7 @@
       </details>
     {% elif place %}
       {# Off campus with an address or a maps link, no pin: open it in either maps app #}
-      <p class="map-links"><span>📍 {{ place.name if not place.link_only else 'Off campus' }}</span>
+      <p class="map-links"><span>{{ icon('pin') }} {{ place.name if not place.link_only else 'Off campus' }}</span>
         {% if place.link_only %}<a class="btn btn-small btn-ghost" href="{{ place.google }}" target="_blank" rel="noopener nofollow">Open the map</a>
         {% else %}<a class="btn btn-small btn-ghost" href="{{ place.google }}" target="_blank" rel="noopener">Google Maps</a>
           <a class="btn btn-small btn-ghost" href="{{ place.apple }}" target="_blank" rel="noopener">Apple Maps</a>{% endif %}</p>
@@ -254,7 +254,7 @@
 
 {% macro person_line(person) %}
   <a class="person" href="{{ url_for('profile.view', user_id=person.id) }}">{{ avatar(person.id, person.full_name, person.avatar_updated, 36) }}{{ person.full_name }}</a>
-  {% if is_team(person.id) %}<span class="team-pill" title="Runs Sportive Circle">🐾 Team</span>{% endif %}
+  {% if is_team(person.id) %}<span class="team-pill" title="Runs Sportive Circle">Team</span>{% endif %}
   {% if person.grad_year %}<span class="muted">’{{ (person.grad_year|string)[-2:] }}</span>{% endif %}
   {% if person.id == event.host_id %}<span class="badge badge-purple">Host</span>
   {% elif manage and person.id != g.user.id and not ended and not event.cancelled %}

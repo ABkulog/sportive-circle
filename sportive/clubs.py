@@ -849,7 +849,7 @@ def join(club_id):
             subject = f"{g.user['full_name']} {what} {club['name']}"
             answer = [f"Their answer to “{club['join_question']}”:", message] if message and club["join_question"] \
                 else ([f"Their message: {message}"] if message else [])
-            body, html = compose(subject, f"{g.user['full_name']} {what} {club['name']} 🙋", answer,
+            body, html = compose(subject, f"{g.user['full_name']} {what} {club['name']}", answer,
                                  after=["Confirm or decline them from your club's Members tab."],
                                  button=("Review requests", f"{_club_link(club_id)}#requests"),
                                  reason=f"You're getting this because you're an officer of {club['name']}.")
@@ -883,7 +883,7 @@ def decide(club_id, user_id, decision):
             flash("Someone already decided this one.", "info")
             return redirect(url_for("clubs.view", club_id=club_id) + "#requests")
         made_it = "You made the team! " if row["role"] == "tryout" else ""
-        _dm(me, user_id, f"✅ {made_it}You're officially a member of {club['name']}. Welcome! "
+        _dm(me, user_id, f"{made_it}You're officially a member of {club['name']}. Welcome! "
                          f"{SPORT_EMOJI[club['sport']]} {_club_link(club_id)}")
         flash("Confirmed. They're a member now.", "success")
     elif decision == "decline" and row["role"] in WAITING_ROLES:
@@ -894,10 +894,10 @@ def decide(club_id, user_id, decision):
             return redirect(url_for("clubs.view", club_id=club_id) + "#requests")
         if row["role"] == "tryout":
             body = (f"Thanks so much for trying out for {club['name']}! We couldn't offer you a spot this time, "
-                    "but we'd love to see you again next season. You're still following the club. 💜")
+                    "but we'd love to see you again next season. You're still following the club.")
         else:
             body = (f"Thanks for your interest in {club['name']}! We can't add you as a member right now, "
-                    "but you're still following the club and we hope to see you around. 💜")
+                    "but you're still following the club and we hope to see you around.")
         _dm(me, user_id, body)
         flash("Declined. They still follow the club.", "info")
     elif decision == "remove" and row["role"] == "member":
@@ -991,7 +991,7 @@ def make_officer(club_id, user_id):
                          (club_id, user_id)).rowcount
     if changed:
         club = get_club(club_id)
-        _dm(g.user["id"], user_id, f"⭐ You're now an officer of {club['name']}. You can edit the club, make club "
+        _dm(g.user["id"], user_id, f"You're now an officer of {club['name']}. You can edit the club, make club "
                                    f"events and confirm new members. {_club_link(club_id)}")
         flash("They're an officer now.", "success")
     else:
@@ -1037,7 +1037,7 @@ def officers(club_id):
                           ON CONFLICT(club_id, user_id) DO UPDATE SET role = 'officer', can_post = 0""",
                        (club_id, user_id, to_db(now_local())))
             if user_id != g.user["id"]:
-                _dm(g.user["id"], user_id, f"⭐ You're now an officer of {club['name']}. You can edit the club, make "
+                _dm(g.user["id"], user_id, f"You're now an officer of {club['name']}. You can edit the club, make "
                                            f"club events and confirm new members. {_club_link(club_id)}")
             flash(f"{first} is an officer now.", "success")
         elif action in ("posting_on", "posting_off"):
@@ -1046,7 +1046,7 @@ def officers(club_id):
             if db.execute("UPDATE club_members SET can_post = ? WHERE club_id = ? AND user_id = ? AND role = 'officer'",
                           (1 if on else 0, club_id, user_id)).rowcount:
                 if on and user_id != g.user["id"]:
-                    _dm(g.user["id"], user_id, f"📣 You can post as {club['name']} now: in the feed (Post as) or on "
+                    _dm(g.user["id"], user_id, f"You can post as {club['name']} now: in the feed (Post as) or on "
                                                f"the club's page. {_club_link(club_id)}")
                 flash(f"{first} can post as the club now." if on else f"{first} can't post as the club anymore.",
                       "success")
@@ -1067,7 +1067,7 @@ def officers(club_id):
                     db.rollback()
                     flash("That didn't go through: the club changed hands or they're no longer an officer.", "error")
                     return redirect(url_for("clubs.view", club_id=club_id))
-                _dm(g.user["id"], user_id, f"👑 You're now the owner of {club['name']}. You can add or remove officers "
+                _dm(g.user["id"], user_id, f"You're now the owner of {club['name']}. You can add or remove officers "
                                            f"and hand the club to someone else later. {_club_link(club_id)}")
                 db.commit()
                 flash(f"{first} is the owner now. You're still an officer.", "success")
@@ -1328,7 +1328,7 @@ def claim_with_code(club_id):
         flash("Too many wrong codes. Send a new one, or use Instagram or Discord instead.", "error")
     elif secrets.compare_digest(typed, row["email_code"]):
         approve_claim(row, club)
-        flash(f"✅ You run {club['name']} on Sportive Circle now! It has the verified badge.", "celebrate")
+        flash(f"You run {club['name']} on Sportive Circle now! It has the verified badge.", "celebrate")
         return redirect(url_for("clubs.view", club_id=club_id))
     else:
         db.execute("UPDATE club_claims SET email_tries = email_tries + 1 WHERE id = ?", (row["id"],))
@@ -1362,7 +1362,7 @@ def approve_claim(claim_row, club):
                "Ask them to add you in Manage officers.", link)
     db.execute("UPDATE club_claims SET status = 'denied' WHERE club_id = ? AND status = 'pending'", (club["id"],))
     notify(claim_row["user_id"], "club_review",
-           f"✅ You run {club['name']} on Sportive Circle now! It has the verified badge, and you can post as the club.",
+           f"You run {club['name']} on Sportive Circle now! It has the verified badge, and you can post as the club.",
            link)
     # An automatic post for the feed (students' own posts are paused; this kind isn't): "X just claimed their page"
     if not db.execute("SELECT 1 FROM club_posts WHERE club_id = ? AND body LIKE '✅ %'", (club["id"],)).fetchone():
@@ -1639,7 +1639,7 @@ def review(club_id, decision):
     db.commit()
     link = _club_link(club_id)
     if decision == "approve":
-        _notify_officers(club, f"✅ {club['name']} is live on Sportive Circle!", f"{club['name']} is live! 🎉",
+        _notify_officers(club, f"{club['name']} is live on Sportive Circle!", f"{club['name']} is live!",
                          ["Your club is verified and now visible to every student.",
                           "Next: post an update and add your next practice as a club event."],
                          ("Open your club", link + "?approved=1"),

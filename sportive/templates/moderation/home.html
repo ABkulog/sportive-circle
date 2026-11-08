@@ -1,32 +1,33 @@
 {% extends "base.html" %}
+{% from "_macros.html" import icon %}
 {% block title %}Admin{% endblock %}
 {% block content %}
 <h1 class="page-title">Admin</h1>
 {% set reports, clubs, trending = open_report_count(), pending_club_count(), tab_badges().admin %}
 <div class="create-grid admin-home">
   <a class="card create-option" href="{{ url_for('moderation.admin_numbers') }}">
-    <span class="create-emoji" aria-hidden="true">📈</span><strong>Numbers</strong>
+    <span class="create-emoji" aria-hidden="true">{{ icon('sliders') }}</span><strong>Numbers</strong>
     <span class="muted">Who uses the app and how often</span></a>
   <a class="card create-option" href="{{ url_for('moderation.admin_reports') }}">
-    <span class="create-emoji" aria-hidden="true">🛡️</span><strong>Reports</strong>
+    <span class="create-emoji" aria-hidden="true">{{ icon('shield') }}</span><strong>Reports</strong>
     <span class="muted">{{ reports ~ ' open' if reports else 'Nothing to check' }}</span></a>
   <a class="card create-option" href="{{ url_for('clubs.review_queue') }}">
-    <span class="create-emoji" aria-hidden="true">🚩</span><strong>Club requests</strong>
+    <span class="create-emoji" aria-hidden="true">{{ icon('flag') }}</span><strong>Club requests</strong>
     <span class="muted">{{ clubs ~ ' waiting' if clubs else 'None waiting' }}</span></a>
   <a class="card create-option" href="{{ url_for('clubs.uw_rec_import') }}">
-    <span class="create-emoji" aria-hidden="true">🏛️</span><strong>UW clubs</strong>
+    <span class="create-emoji" aria-hidden="true">{{ icon('clubs') }}</span><strong>UW clubs</strong>
     <span class="muted">Put every UW sports club on the app, with its links</span></a>
   <a class="card create-option" href="{{ url_for('placecheck.admin_rec') }}">
-    <span class="create-emoji" aria-hidden="true">🏟️</span><strong>UW Rec reservations</strong>
+    <span class="create-emoji" aria-hidden="true">{{ icon('map') }}</span><strong>UW Rec reservations</strong>
     <span class="muted">{{ upcoming_rec ~ ' coming up' if upcoming_rec else 'None added yet' }}</span></a>
   <a class="card create-option" href="{{ url_for('feedback.admin_suggestions') }}">
-    <span class="create-emoji" aria-hidden="true">💡</span><strong>Suggestions</strong>
+    <span class="create-emoji" aria-hidden="true">{{ icon('help') }}</span><strong>Suggestions</strong>
     <span class="muted">{{ trending ~ ' trending' if trending else 'Ideas people sent' }}</span></a>
   <a class="card create-option" href="{{ url_for('cleanup.cleanup') }}">
-    <span class="create-emoji" aria-hidden="true">🧹</span><strong>Clean up test data</strong>
+    <span class="create-emoji" aria-hidden="true">{{ icon('x') }}</span><strong>Clean up test data</strong>
     <span class="muted">Wipe junk posts and clubs before people see them</span></a>
   <a class="card create-option" href="{{ url_for('flyer') }}">
-    <span class="create-emoji" aria-hidden="true">🖨️</span><strong>Flyer</strong>
+    <span class="create-emoji" aria-hidden="true">{{ icon('share') }}</span><strong>Flyer</strong>
     <span class="muted">Print a QR code flyer for the app</span></a>
 </div>
 {% endblock %}

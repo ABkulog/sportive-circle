@@ -117,7 +117,7 @@ def _send(app, recipients, d):
                 body, html = compose(
                     subject, f"{d['emoji']} {d['host']} posted a game",
                     [f"Hey {first}, {d['host']} just posted {d['title']}{d['via']}. Want in?",
-                     f"🕐 {d['when']}", f"📍 {d['location']}"],
+                     f"When: {d['when']}", f"Where: {d['location']}"],
                     button=("See the game and join", d["url"]),
                     reason="You're getting this because you're friends with the host or follow or belong to the club. "
                            "Turn these emails off in Settings.",

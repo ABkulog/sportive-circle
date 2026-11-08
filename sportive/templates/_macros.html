@@ -30,7 +30,7 @@
     <div class="segmented" role="radiogroup" aria-label="Who can join">
       <label><input type="radio" name="is_private" value="" {% if not choice %}checked{% endif %}><span>Anyone</span></label>
       {% if club %}<label><input type="radio" name="is_private" value="members" {% if choice == 'members' %}checked{% endif %}><span>Members</span></label>{% endif %}
-      <label><input type="radio" name="is_private" value="1" {% if private %}checked{% endif %}><span>🔒 Private</span></label>
+      <label><input type="radio" name="is_private" value="1" {% if private %}checked{% endif %}><span>Private</span></label>
     </div>
   </fieldset>
   <label class="field" data-show="private" {% if not private %}hidden{% endif %}><span>Password</span>
@@ -127,9 +127,9 @@
       </div>
       <div class="event-meta">{{ e.location }}</div>
       <div class="badges">
-        {% if e.club_name %}<span class="badge badge-club">🏛️ {{ e.club_name }}</span>{% endif %}
-        {% if e.try_it %}<span class="badge badge-gold">👋 New people welcome</span>{% endif %}
-        {% if e.is_private %}<span class="badge">🔒 Private</span>{% endif %}
+        {% if e.club_name %}<span class="badge badge-club">{{ e.club_name }}</span>{% endif %}
+        {% if e.try_it %}<span class="badge badge-gold">New people welcome</span>{% endif %}
+        {% if e.is_private %}<span class="badge">Private</span>{% endif %}
         {% if e.team_size %}<span class="badge">{{ e.team_size }}v{{ e.team_size }} teams</span>{% endif %}
         {% if e.members_only %}<span class="badge">Members only</span>{% endif %}
         {% if e.open_to != 'everyone' %}<span class="badge">{{ OPEN_TO_BADGE[e.open_to] }}</span>{% endif %}
@@ -217,11 +217,11 @@
   {# Admin pages link to each other, so admins on phones (no sidebar) can reach them all from the shield icon. #}
   <nav class="admin-nav" aria-label="Admin">
     <a href="{{ url_for('moderation.admin_home') }}">← Admin</a>
-    <a href="{{ url_for('moderation.admin_reports') }}" {% if active == 'reports' %}aria-current="page"{% endif %}>🛡️ Reports{% set n = open_report_count() %}{% if n %} ({{ n }}){% endif %}</a>
-    <a href="{{ url_for('clubs.review_queue') }}" {% if active == 'clubs' %}aria-current="page"{% endif %}>🚩 Club requests{% set n = pending_club_count() %}{% if n %} ({{ n }}){% endif %}</a>
-    <a href="{{ url_for('clubs.uw_rec_import') }}" {% if active == 'uwrecclubs' %}aria-current="page"{% endif %}>🏛️ UW clubs</a>
-    <a href="{{ url_for('placecheck.admin_rec') }}" {% if active == 'uwrec' %}aria-current="page"{% endif %}>🏟️ UW Rec reservations</a>
-    <a href="{{ url_for('feedback.admin_suggestions') }}" {% if active == 'suggestions' %}aria-current="page"{% endif %}>💡 Suggestions{% set n = tab_badges().admin %}{% if n %} ({{ n }} trending){% endif %}</a>
+    <a href="{{ url_for('moderation.admin_reports') }}" {% if active == 'reports' %}aria-current="page"{% endif %}>Reports{% set n = open_report_count() %}{% if n %} ({{ n }}){% endif %}</a>
+    <a href="{{ url_for('clubs.review_queue') }}" {% if active == 'clubs' %}aria-current="page"{% endif %}>Club requests{% set n = pending_club_count() %}{% if n %} ({{ n }}){% endif %}</a>
+    <a href="{{ url_for('clubs.uw_rec_import') }}" {% if active == 'uwrecclubs' %}aria-current="page"{% endif %}>UW clubs</a>
+    <a href="{{ url_for('placecheck.admin_rec') }}" {% if active == 'uwrec' %}aria-current="page"{% endif %}>UW Rec reservations</a>
+    <a href="{{ url_for('feedback.admin_suggestions') }}" {% if active == 'suggestions' %}aria-current="page"{% endif %}>Suggestions{% set n = tab_badges().admin %}{% if n %} ({{ n }} trending){% endif %}</a>
   </nav>
 {% endmacro %}
 
@@ -260,16 +260,16 @@
 {% macro spot_field(form) %}
   {# Off campus only (spot.js shows it when "Off campus" is picked): exactly where, so people can get there. #}
   <div class="spot-field" data-spot>
-    <label class="field"><span>📍 Where exactly? <em>(an address, or paste a Google / Apple Maps link)</em></span>
+    <label class="field"><span>Where exactly? <em>(an address, or paste a Google / Apple Maps link)</em></span>
       <input name="place_address" maxlength="300" value="{{ form.get('place_address', '') }}" autocomplete="street-address"
              placeholder="e.g. Green Lake Park, or a maps link"></label>
     <input type="hidden" name="pin" value="{{ form.get('pin', '') }}" data-pin>
     <div class="spot-buttons">
-      <button type="button" class="btn btn-small btn-ghost" data-drop-pin>📍 Drop a pin</button>
+      <button type="button" class="btn btn-small btn-ghost" data-drop-pin>Drop a pin</button>
       <button type="button" class="btn btn-small btn-ghost" data-my-spot>Use my location</button>
       <button type="button" class="link-button" data-clear-pin hidden>Remove pin</button>
     </div>
-    <p class="muted small" data-pin-status aria-live="polite">{% if form.get('pin') %}📍 Pin dropped.{% endif %}</p>
+    <p class="muted small" data-pin-status aria-live="polite">{% if form.get('pin') %}Pin dropped.{% endif %}</p>
     <div class="spot-map" data-spot-map hidden></div>
   </div>
 {% endmacro %}

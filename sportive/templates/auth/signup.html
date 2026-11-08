@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% from "_macros.html" import icon %}
 {% block title %}Sign up{% endblock %}
 {% block content %}
 {% if not club_signup %}
 {# Officers at a club meeting: one tap to the short path (account, code, club), no profile to fill in first #}
 <a class="card officer-signup" href="{{ url_for('auth.signup', club=1) }}">
-  <span class="officer-signup-icon" aria-hidden="true">🏆</span>
+  <span class="officer-signup-icon" aria-hidden="true">{{ icon('clubs') }}</span>
   <span><strong>Club officer? Claim your club</strong><br>
     <small class="muted">Every UW club is already here. A quick account, then claim yours. Your profile can wait.</small></span>
   <span class="officer-signup-go" aria-hidden="true">›</span>

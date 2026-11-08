@@ -66,7 +66,7 @@
           {% for c in post_as %}<option value="{{ c.id }}" {% if c.id == as_club %}selected{% endif %}>{{ c.name }} ✓ (club)</option>{% endfor %}
         </select></label>
       {# Shows once a club is picked above (style.css) #}
-      <label class="toggle members-only"><input type="checkbox" name="members_only" value="1"><span>🔒 Members only</span></label>
+      <label class="toggle members-only"><input type="checkbox" name="members_only" value="1"><span>Members only</span></label>
     {% endif %}
     <div class="composer-row">
       {% set pick = sport or (post_event.sport if post_event else '') %}
@@ -77,7 +77,7 @@
       </select>
       <label class="btn btn-ghost btn-small composer-photos" title="Add up to {{ max_photos }} photos">{{ icon('camera') }}<span>Photos</span>
         <input type="file" name="photos" id="post-photos" accept="image/*" multiple data-max-files="{{ max_photos }}" class="visually-hidden"></label>
-      <label class="btn btn-ghost btn-small composer-photos" title="Add a video, up to 1 minute">🎬<span>Video</span>
+      <label class="btn btn-ghost btn-small composer-photos" title="Add a video, up to 1 minute">{{ icon('camera') }}<span>Video</span>
         <input type="file" name="video" accept="video/mp4,video/quicktime,video/*" data-max-seconds="{{ max_seconds }}" data-max-mb="60" class="visually-hidden"></label>
     </div>
     <p class="composer-hint muted" id="sport-hint" data-sport-hint>Everyone who plays that sport sees it, and it's in that sport's channel.</p>
@@ -91,7 +91,7 @@
     </div>
     {# A poll, like WhatsApp's: a question, options (a new box shows as you fill the last one, up to {{ max_poll_options }}),
        and "Allow multiple answers". (Plans are made on Play now: "📣 Post this event" posts one.) #}
-    <label class="toggle poll-toggle"><input type="checkbox" name="poll" value="1"><span>📊 Poll</span></label>
+    <label class="toggle poll-toggle"><input type="checkbox" name="poll" value="1"><span>Poll</span></label>
     <fieldset class="poll-fields" data-poll-fields data-max="{{ max_poll_options|default(12) }}">
       <legend class="visually-hidden">Poll</legend>
       <label class="field"><span>Question</span><input name="poll_question" maxlength="200" placeholder="Ask question" autocomplete="off"></label>

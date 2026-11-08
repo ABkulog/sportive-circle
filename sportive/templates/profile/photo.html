@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import avatar %}
+{% from "_macros.html" import avatar, icon %}
 {% block title %}Profile picture{% endblock %}
 {% block content %}
 <div class="card form-card center">
@@ -15,7 +15,7 @@
     {{ csrf_field() }}
     <label class="photo-picker">
       <span class="photo-preview" id="photo-preview">
-        {% if g.user.avatar_updated %}{{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 150) }}{% else %}📷{% endif %}
+        {% if g.user.avatar_updated %}{{ avatar(g.user.id, g.user.full_name, g.user.avatar_updated, 150) }}{% else %}{{ icon('camera') }}{% endif %}
       </span>
       <span class="btn btn-ghost">Choose a photo</span>
       <input type="file" name="photo" id="photo-input" accept="image/*" class="file-input" {% if first_time %}required{% endif %}>

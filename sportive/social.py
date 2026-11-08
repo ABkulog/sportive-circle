@@ -263,7 +263,7 @@ def event_chat_unread():
     return g.chat_unread
 
 
-DELETED_TEXT = "🚫 Message deleted"
+DELETED_TEXT = "Message deleted"
 
 
 def message_json(row, me, kind):

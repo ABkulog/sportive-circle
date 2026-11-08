@@ -46,7 +46,7 @@ def _announce_texts(send):
     for person in people:
         first = person["full_name"].split()[0]
         try:
-            send_designed(person["email"], "New on Sportive Circle: game updates by text 📱",
+            send_designed(person["email"], "New on Sportive Circle: game updates by text",
                           f"Hey {first}, you can get texts now",
                           ["Add your number and we'll text you game reminders, time or place changes, "
                            "cancellations, and friends' invites to games (those are in your bell, not email).",

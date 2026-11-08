@@ -571,7 +571,7 @@ def reply(post_id):
                (post_id, g.user["id"], body, to_db(now_local()), club["id"] if club else None))
     preview = body if len(body) <= 60 else body[:57] + "…"
     who = club["name"] if club else g.user["full_name"].split()[0]
-    _tell_author(post, f"💬 {who} replied to your post: “{preview}”", f"replies:{post_id}")
+    _tell_author(post, f"{who} replied to your post: “{preview}”", f"replies:{post_id}")
     db.commit()
     return redirect(back)
 
@@ -740,14 +740,14 @@ def _save_tags(post_id, users, clubs, posted_as):
     link = url_for("posts.view", post_id=post_id)
     for user_id in users:
         db.execute("INSERT INTO post_tags (post_id, user_id) VALUES (?, ?)", (post_id, user_id))
-        notify(user_id, "post_activity", f"🏷️ {who} tagged you in a post.", link, key=f"tag:{post_id}")
+        notify(user_id, "post_activity", f"{who} tagged you in a post.", link, key=f"tag:{post_id}")
     for club_id in clubs:
         db.execute("INSERT INTO post_tags (post_id, club_id) VALUES (?, ?)", (post_id, club_id))
         club = db.execute("SELECT name FROM clubs WHERE id = ?", (club_id,)).fetchone()
         for officer in db.execute("SELECT user_id FROM club_members WHERE club_id = ? AND role = 'officer' AND user_id != ?",
                                   (club_id, g.user["id"])):
             if officer["user_id"] not in users:
-                notify(officer["user_id"], "post_activity", f"🏷️ {who} tagged {club['name']} in a post.", link,
+                notify(officer["user_id"], "post_activity", f"{who} tagged {club['name']} in a post.", link,
                        key=f"tag:{post_id}")
 
 
