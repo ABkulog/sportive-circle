@@ -6,7 +6,9 @@ from sportive.timeutil import now_local, to_db
 from test_feed import approved_club, as_user, form_time, user_id
 
 
-def test_a_newly_approved_club_is_announced_once_to_its_sport(accounts, client, app):
+def test_an_approved_club_posts_no_joined_line(accounts, client, app):
+    """FR-CLUB-23 (the owner): "X just joined Sportive Circle" lost its meaning once every UW club was listed, and
+    those lines sat at the top of Home. Approving a club posts nothing; old ones are deleted (database version 4)."""
     app.config["ADMIN_EMAILS"] = "admin@uw.edu"
     accounts.signup(email="officer@uw.edu", sports=("running",))
     with app.app_context():
@@ -25,7 +27,16 @@ def test_a_newly_approved_club_is_announced_once_to_its_sport(accounts, client, 
     accounts.logout()
     accounts.signup(email="runner@uw.edu", sports=("running",))
     feed = client.get("/feed").data.decode()
-    assert feed.count('class="card feed-card feed-mini"') == 1 and "joined Sportive Circle" in feed  # one short line
+    assert "joined Sportive Circle" not in feed
+    with app.app_context():
+        db = get_db()
+        db.execute("INSERT INTO club_posts (club_id, author_id, body, created_at) VALUES (?, NULL, ?, ?)",
+                   (club, "🆕 UW Run Club just joined Sportive Circle!", to_db(now_local())))
+        db.execute("PRAGMA user_version = 3")
+        db.commit()
+        from sportive.db import init_db
+        init_db()
+        assert get_db().execute("SELECT COUNT(*) FROM club_posts WHERE body LIKE '🆕 %'").fetchone()[0] == 0
 
 
 def test_clubs_for_you_until_you_follow_one(accounts, client, app):

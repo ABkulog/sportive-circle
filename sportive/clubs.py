@@ -179,19 +179,6 @@ def can_post_as(club_id, user_id):
     return any(club["id"] == club_id for club in poster_clubs(user_id))
 
 
-def announce_new_club(club):
-    """A club's first approval: a post everyone who plays its sport sees in their feed (a launch moment)."""
-    db = get_db()
-    if db.execute("SELECT 1 FROM club_posts WHERE club_id = ? AND body LIKE '🆕 %'", (club["id"],)).fetchone():
-        return  # approved again after a re-check: it was announced already
-    about = " ".join(club["description"].split())
-    about = about if len(about) <= 140 else about[:137].rstrip() + "…"
-    db.execute("INSERT INTO club_posts (club_id, author_id, body, created_at) VALUES (?, NULL, ?, ?)",
-               (club["id"], f"🆕 {club['name']} just joined Sportive Circle! {about} Follow to see their practices "
-                            "and events.", to_db(now_local())))
-    db.commit()
-
-
 def friends_in_club(club_id, me, limit=2):
     """(first names of a few friends who follow or are in the club, how many in all), for "Maya and 2 friends"."""
     rows = get_db().execute(
@@ -1652,7 +1639,6 @@ def review(club_id, decision):
     db.commit()
     link = _club_link(club_id)
     if decision == "approve":
-        announce_new_club(club)
         _notify_officers(club, f"✅ {club['name']} is live on Sportive Circle!", f"{club['name']} is live! 🎉",
                          ["Your club is verified and now visible to every student.",
                           "Next: post an update and add your next practice as a club event."],

@@ -176,13 +176,6 @@
         <span>✅ <strong>{{ p.club_name }}</strong> {{ verified_badge() }} just claimed their page <small class="muted">· {{ p.created_at|ago }}</small></span></a>
       {{ follow_button(p.club_id, {'my_role': p.my_role}) }}
     </article>
-  {% elif p.body.startswith('🆕') %}
-    {# A new club: one short line, not a full card #}
-    <article class="card feed-card feed-mini" id="club-post-{{ p.id }}" data-swap>
-      <a class="feed-mini-link" href="{{ url_for('clubs.view', club_id=p.club_id) }}">{{ club_logo(p, 28, logo=p.club_logo or '', club_id=p.club_id) }}
-        <span>🆕 <strong>{{ p.club_name }}</strong> {{ verified_badge() }} joined Sportive Circle <small class="muted">· {{ p.created_at|ago }}</small></span></a>
-      {{ follow_button(p.club_id, {'my_role': p.my_role}) }}
-    </article>
   {% else %}
   <article class="card feed-card is-club" id="club-post-{{ p.id }}" data-swap>
     {% set name %}{{ p.club_name }}{% if p.club_claimed %} {{ verified_badge() }}{% endif %}{% endset %}
