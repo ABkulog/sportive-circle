@@ -160,6 +160,9 @@ def init_db():
     if db.execute("PRAGMA user_version").fetchone()[0] < 3:  # version 3 = no automatic HuskyLink event posts:
         db.execute("DELETE FROM club_posts WHERE huskylink_event IS NOT NULL")  # the app has clubs' links, not news
         db.execute("PRAGMA user_version = 3")
+    if db.execute("PRAGMA user_version").fetchone()[0] < 4:  # version 4 = no "🆕 X just joined" posts: every UW
+        db.execute("DELETE FROM club_posts WHERE body LIKE '🆕 %'")  # club is listed now, so they mean nothing
+        db.execute("PRAGMA user_version = 4")
     db.commit()
 
 
